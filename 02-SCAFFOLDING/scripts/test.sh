@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+# scripts/test.sh — run the full Hermes3D-OS test suite (Linux / WSL).
+#
+# Usage:
+#   bash scripts/test.sh                    # Layer A + B (fast, default)
+#   bash scripts/test.sh --integration      # + Layer C
+#   bash scripts/test.sh --e2e              # + Layer D (requires display or headless browser)
+#   bash scripts/test.sh --acceptance       # acceptance runner only
+
+set -u
+
+INTEGRATION=0
+E2E=0
+ACCEPTANCE_ONLY=0
+EXTRA_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --integration) INTEGRATION=1; shift ;;
+        --e2e) E2E=1; INTEGRATION=1; shift ;;
+        --acceptance) ACCEPTANCE_ONLY=1; shift ;;
+        --) shift; while [[ $# -gt 0 ]]; do EXTRA_ARGS+=("$1"); shift; done ;;
+        *) EXTRA_ARGS+=("$1"); shift ;;
+    esac
+done
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+
+PYTHONPATH_BACKUP="${PYTHONPATH:-}"
+export PYTHONPATH="$REPO_ROOT/src:$PYTHONPATH_BACKUP"
+export HERMES3D_PROOF_KEY="${HERMES3D_PROOF_KEY:-hermes3d-default-proof-key-not-secret}"
+
+if ! command -v python3 >/dev/null 2>&1; then
+    echo "[FAIL] python3 not on PATH. Run scripts/doctor.sh first." >&2
+    exit 1
+fi
+
+if [[ "$ACCEPTANCE_ONLY" -eq 1 ]]; then
+    echo "[1/1] Acceptance runner ..."
+    python3 ../04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py
+    exit $?
+fi
+
+# Layer A static gates: ruff format + check + mypy (best-effort if installed)
+echo "[1/4] Layer A: static gates ..."
+if command -v ruff >/dev/null 2>&1; then
+    ruff format --check src tests || { echo "[FAIL] ruff format"; exit 1; }
+    ruff check src tests || { echo "[FAIL] ruff check"; exit 1; }
+    echo "  [PASS] ruff format + check"
+else
+    echo "  [WARN] ruff not installed; skipping format + lint (pip install ruff)"
+fi
+
+# Forbidden-pattern scan: TODO/FIXME/STUB outside tests/fixtures
+echo "  [SCAN] forbidden patterns ..."
+hits=$(grep -rE '\b(TODO|FIXME|STUB|PLACEHOLDER|NOT_IMPLEMENTED)\b' \
+       src/hermes3d 2>/dev/null \
+       --include='*.py' --exclude-dir=__pycache__ \
+       || true)
+if [[ -n "$hits" ]]; then
+    echo "[FAIL] Forbidden patterns found in runtime code:"
+    echo "$hits"
+    exit 1
+fi
+echo "  [PASS] no forbidden patterns in src/hermes3d"
+
+# Layer B: unit + smoke tests
+echo "[2/4] Layer B: unit + smoke tests ..."
+if [[ "$INTEGRATION" -eq 1 ]]; then
+    pytest_args=("tests/")
+else
+    pytest_args=("tests/unit" "tests/conformance")
+fi
+python3 -m pytest "${pytest_args[@]}" "${EXTRA_ARGS[@]}" || exit $?
+
+# Layer B continued: acceptance runner
+echo "[3/4] Layer B: acceptance runner ..."
+python3 ../04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py || exit $?
+
+if [[ "$E2E" -eq 1 ]]; then
+    echo "[4/4] Layer D: E2E launcher smoke ..."
+    if command -v gradio >/dev/null 2>&1 || python3 -c 'import gradio' 2>/dev/null; then
+        # Smoke-import the launcher; full E2E requires a browser
+        python3 -c 'import hermes3d.app.launcher as m; print("launcher importable:", hasattr(m, "build_app") or hasattr(m, "main"))'
+    else
+        echo "  [WARN] gradio not installed; skipping launcher smoke"
+    fi
+else
+    echo "[4/4] Layer D: skipped (use --e2e to enable)"
+fi
+
+echo
+echo "[OK] All applicable layers green."

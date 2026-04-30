@@ -1,0 +1,102 @@
+{
+  "manifest": {
+    "author": "",
+    "created_unix": 1777530013.7191868,
+    "description": "Known quirks of the Tronxy D01 Pro CoreXY: Z-wobble above 180 mm and bed-mesh refresh cadence.",
+    "license": "CC0-1.0",
+    "pack_name": "tronxy_d01_quirks",
+    "pack_schema_version": "1.0.0",
+    "pack_version": "1.0.0",
+    "sha256": "fa98671b85840cf29dfc4090f2449da4e2ecbdabe65769163dd04a3013f569b3",
+    "skill_count": 4,
+    "skill_schema_version": "1.0.0"
+  },
+  "skills": [
+    {
+      "body": {
+        "warning": "Visible Z-wobble bands above ~180 mm Z. Use slower outer perimeter (\u226440 mm/s) above this threshold."
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.7192285,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "D01 Pro Z-wobble above 180 mm",
+      "notes": "Caused by a slight Z lead-screw misalignment; replacement screw on order.",
+      "scope": {
+        "hour_of_day": null,
+        "material": null,
+        "printer_id": "tronxy_d01_pro",
+        "quality_level": null
+      },
+      "skill_id": "80a1dd54-849a-44bf-b25e-190d437a3bd4",
+      "skill_kind": "printer_quirk",
+      "source": "visual inspection 2026-03",
+      "updated_unix": 1777530013.7192287
+    },
+    {
+      "body": {
+        "refresh_interval_hours": 168,
+        "trigger_macro": "BED_MESH_CALIBRATE"
+      },
+      "confidence": 0.8,
+      "created_unix": 1777530013.7192528,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "D01 Pro bed-mesh refresh weekly",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": null,
+        "printer_id": "tronxy_d01_pro",
+        "quality_level": null
+      },
+      "skill_id": "a0d9ea19-101e-48a0-b39b-f81858d73d22",
+      "skill_kind": "scheduling_pref",
+      "source": "ops experience",
+      "updated_unix": 1777530013.7192528
+    },
+    {
+      "body": {
+        "max_outer_perimeter_speed_mm_s": 40
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.7193491,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "D01 Pro outer perimeter speed cap",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": null,
+        "printer_id": "tronxy_d01_pro",
+        "quality_level": null
+      },
+      "skill_id": "2c915c0c-7c05-4caa-a188-43be5f3c26b0",
+      "skill_kind": "parameter_override",
+      "source": "quality observation",
+      "updated_unix": 1777530013.7193496
+    },
+    {
+      "body": {
+        "mitigation": "lower acceleration to 1500",
+        "trigger_height_mm": 200
+      },
+      "confidence": 0.7,
+      "created_unix": 1777530013.719397,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "D01 Pro tall PETG layer-shift",
+      "notes": "Three layer-shift failures observed on PETG prints above 200 mm; mitigation is reducing accel.",
+      "scope": {
+        "hour_of_day": null,
+        "material": "PETG",
+        "printer_id": "tronxy_d01_pro",
+        "quality_level": null
+      },
+      "skill_id": "323e05f8-08b3-4952-babe-05e6d57fe492",
+      "skill_kind": "failure_pattern",
+      "source": "failure log 2026-03",
+      "updated_unix": 1777530013.7193973
+    }
+  ]
+}

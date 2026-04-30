@@ -1,0 +1,69 @@
+## Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+build/
+dist/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.hypothesis/
+.venv/
+venv/
+
+## Hermes3D runtime state (per-machine, never committed)
+var/
+logs/
+*.log
+*.tmp
+
+## Sliced output / artifacts
+sliced/
+output/
+acceptance-results/
+backups/
+
+## Editor / IDE
+.idea/
+.vscode/*
+!.vscode/settings.json.example
+!.vscode/launch.json.example
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+## Environment / secrets
+.env
+.env.local
+.env.*.local
+!env/.env.example
+
+## Slicer caches
+*.gcode
+*.3mf
+!04-TEST-CASE-DESK-ORGANIZER/golden/*.gcode
+*.bgcode
+
+## Vendor (only fork-mode)
+vendor/OrcaSlicer/
+vendor/PrusaSlicer/
+
+## Skill packs the user might import (project-specific)
+config/skill_packs/local_*.json
+
+## Node / Playwright (added in kit-hardening)
+node_modules/
+04_testing/playwright/test-results/
+04_testing/playwright/playwright-report/
+04_testing/playwright/.cache/
+
+## Proof bundle outputs (per-build artifacts, retained externally)
+05_truth_proof/bundles/*.zip
+05_truth_proof/bundles/*.sig
+

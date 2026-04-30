@@ -1,0 +1,73 @@
+{
+  "installer_version": "1.0.0",
+  "kit_version": "5.0.0",
+  "name": "Hermes3D-OS Lite",
+  "minimum_python": "3.11",
+  "supported_platforms": ["windows-11", "ubuntu-22.04", "wsl2"],
+  "components": {
+    "core": {
+      "required": true,
+      "description": "Hermes3D-OS Lite Python package + dependencies",
+      "install": "pip install -e ."
+    },
+    "gradio_ui": {
+      "required": false,
+      "description": "Gradio-based control panel (port 7860)",
+      "install": "pip install gradio>=4.0",
+      "default": true
+    },
+    "rest_api": {
+      "required": false,
+      "description": "FastAPI REST server (port 8765)",
+      "install": "pip install fastapi uvicorn",
+      "default": true
+    },
+    "ollama_provider": {
+      "required": false,
+      "description": "Ollama LLM provider (run ollama serve separately)",
+      "install": "pip install httpx",
+      "default": false,
+      "external_setup": "https://ollama.com/download"
+    },
+    "remote_control": {
+      "required": false,
+      "description": "Telegram + Discord remote-control bridge",
+      "install": "pip install python-telegram-bot discord.py",
+      "default": false,
+      "credentials_required": ["HERMES3D_TELEGRAM_BOT_TOKEN", "HERMES3D_DISCORD_CONTROL_WEBHOOK"]
+    },
+    "vector_memory_faiss": {
+      "required": false,
+      "description": "FAISS-backed vector memory (TF-IDF works without this)",
+      "install": "pip install faiss-cpu sentence-transformers",
+      "default": false
+    },
+    "blender_mcp": {
+      "required": false,
+      "description": "Blender MCP server (spec-only in v5; requires bpy 4.2+)",
+      "install": "pip install bpy>=4.2 pymeshlab",
+      "default": false,
+      "tier": "spec"
+    }
+  },
+  "post_install_steps": [
+    "Run scripts/doctor.ps1 (or doctor.sh) to verify the environment",
+    "Run scripts/test.ps1 (or test.sh) to confirm the smoke + acceptance suites pass",
+    "Set HERMES3D_PROOF_KEY in .env (production); the dev default is hermes3d-default-proof-key-not-secret",
+    "Edit config/printers.toml with your fleet's Moonraker URLs"
+  ],
+  "ports_used": {
+    "8765": "REST API (configurable via --port)",
+    "7860": "Gradio UI (configurable via GRADIO_SERVER_PORT)",
+    "11434": "Ollama (external; default localhost-only)"
+  },
+  "directories_created": [
+    "./var",
+    "./var/proofs",
+    "./var/proofs/dispatch",
+    "./var/proofs/slicer",
+    "./var/proofs/gates",
+    "./var/acceptance-results",
+    "./logs"
+  ]
+}

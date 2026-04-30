@@ -1,0 +1,128 @@
+{
+  "manifest": {
+    "author": "",
+    "created_unix": 1777530013.7202635,
+    "description": "Material-level pack: ASA settings that work on any enclosure-capable printer in the fleet.",
+    "license": "CC0-1.0",
+    "pack_name": "asa_general_tips",
+    "pack_schema_version": "1.0.0",
+    "pack_version": "1.0.0",
+    "sha256": "8876587b964f8a1a7a3549c9b89e64ec58cc40a4adde6de4c46fb6bb8c1d6561",
+    "skill_count": 5,
+    "skill_schema_version": "1.0.0"
+  },
+  "skills": [
+    {
+      "body": {
+        "chamber_temp_c": 50,
+        "tolerance": [
+          45,
+          55
+        ]
+      },
+      "confidence": 0.9,
+      "created_unix": 1777530013.720288,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "ASA chamber temp 45-55C",
+      "notes": "ASA wants a warm chamber for layer adhesion and to avoid warping.",
+      "scope": {
+        "hour_of_day": null,
+        "material": "ASA",
+        "printer_id": null,
+        "quality_level": null
+      },
+      "skill_id": "6019648d-0b0f-4694-87a2-55c6da578f26",
+      "skill_kind": "material_quirk",
+      "source": "material datasheet + ops experience",
+      "updated_unix": 1777530013.720288
+    },
+    {
+      "body": {
+        "bed_temperature": 105,
+        "first_layer_bed_temperature": 110
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.7202988,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "ASA bed temperature",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": "ASA",
+        "printer_id": null,
+        "quality_level": null
+      },
+      "skill_id": "5abea80e-cac5-4da7-8804-fbf42f27f8f3",
+      "skill_kind": "parameter_override",
+      "source": "material datasheet",
+      "updated_unix": 1777530013.720299
+    },
+    {
+      "body": {
+        "max_outer_perimeter_speed_mm_s": 35,
+        "max_print_speed_mm_s": 70
+      },
+      "confidence": 0.8,
+      "created_unix": 1777530013.7203178,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "ASA print speed cap",
+      "notes": "ASA needs cooling time even in an enclosure.",
+      "scope": {
+        "hour_of_day": null,
+        "material": "ASA",
+        "printer_id": null,
+        "quality_level": null
+      },
+      "skill_id": "99e8bd1e-7cfb-487f-8192-d67b4b6cedd6",
+      "skill_kind": "parameter_override",
+      "source": "ops experience",
+      "updated_unix": 1777530013.7203183
+    },
+    {
+      "body": {
+        "max_fan_pct": 30,
+        "min_print_speed_for_fan_mm_s": 0
+      },
+      "confidence": 0.8,
+      "created_unix": 1777530013.7203274,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "ASA fan policy",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": "ASA",
+        "printer_id": null,
+        "quality_level": null
+      },
+      "skill_id": "5fd9b169-0e7f-4c8c-bfe6-6f4e91e0a195",
+      "skill_kind": "parameter_override",
+      "source": "material datasheet",
+      "updated_unix": 1777530013.7203274
+    },
+    {
+      "body": {
+        "warning": "ASA emits styrene-related VOCs. Print in a ventilated area or a vented enclosure."
+      },
+      "confidence": 0.95,
+      "created_unix": 1777530013.7203374,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "ASA outgassing \u2014 vent the room",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": "ASA",
+        "printer_id": null,
+        "quality_level": null
+      },
+      "skill_id": "33de3ba8-32fa-46bd-9ac3-d9f12a5f1b78",
+      "skill_kind": "material_quirk",
+      "source": "MSDS",
+      "updated_unix": 1777530013.7203374
+    }
+  ]
+}

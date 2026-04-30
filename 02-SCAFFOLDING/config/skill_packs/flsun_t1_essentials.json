@@ -1,0 +1,192 @@
+{
+  "manifest": {
+    "author": "",
+    "created_unix": 1777530013.7177024,
+    "description": "PA, IS, and flow ratios for FLSUN T1 (units A and B), PLA + PETG. Calibrated 2026-04 by ShadowByte.",
+    "license": "CC0-1.0",
+    "pack_name": "flsun_t1_essentials",
+    "pack_schema_version": "1.0.0",
+    "pack_version": "1.0.0",
+    "sha256": "1e2c967d97ce92bc13dcda1c125c4b0e56b0abd409bbb33a05a6dc242e7de640",
+    "skill_count": 8,
+    "skill_schema_version": "1.0.0"
+  },
+  "skills": [
+    {
+      "body": {
+        "pressure_advance": 0.045,
+        "pressure_advance_smooth_time": 0.04
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.7177649,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "PA value for PLA on T1A",
+      "notes": "Visually clean corners up to 200 mm/s.",
+      "scope": {
+        "hour_of_day": null,
+        "material": "PLA",
+        "printer_id": "flsun_t1_a",
+        "quality_level": null
+      },
+      "skill_id": "b6782aef-33ac-42ab-9d03-ec3d7eb92a37",
+      "skill_kind": "parameter_override",
+      "source": "tower test 2026-04-15",
+      "updated_unix": 1777530013.717765
+    },
+    {
+      "body": {
+        "pressure_advance": 0.062,
+        "pressure_advance_smooth_time": 0.04
+      },
+      "confidence": 0.8,
+      "created_unix": 1777530013.7178013,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "PA value for PETG on T1A",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": "PETG",
+        "printer_id": "flsun_t1_a",
+        "quality_level": null
+      },
+      "skill_id": "227fe7d5-62f8-442a-bec5-ba2883f4cf1b",
+      "skill_kind": "parameter_override",
+      "source": "tower test 2026-04-15",
+      "updated_unix": 1777530013.7178016
+    },
+    {
+      "body": {
+        "damping_ratio_x": 0.1,
+        "shaper_freq_x": 53.4,
+        "shaper_type_x": "mzv"
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.717815,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "Input shaper X \u2014 T1A",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": null,
+        "printer_id": "flsun_t1_a",
+        "quality_level": null
+      },
+      "skill_id": "999a53c9-d5d7-4132-b5ca-95349e3c6f2b",
+      "skill_kind": "parameter_override",
+      "source": "resonance test 2026-04-12",
+      "updated_unix": 1777530013.7178154
+    },
+    {
+      "body": {
+        "damping_ratio_y": 0.1,
+        "shaper_freq_y": 56.1,
+        "shaper_type_y": "mzv"
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.7178266,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "Input shaper Y \u2014 T1A",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": null,
+        "printer_id": "flsun_t1_a",
+        "quality_level": null
+      },
+      "skill_id": "caab06d3-94d6-4b99-87e1-1fe36ee767a9",
+      "skill_kind": "parameter_override",
+      "source": "resonance test 2026-04-12",
+      "updated_unix": 1777530013.7178268
+    },
+    {
+      "body": {
+        "extrusion_multiplier": 0.965
+      },
+      "confidence": 0.8,
+      "created_unix": 1777530013.7178392,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "Flow ratio for PLA on T1A",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": "PLA",
+        "printer_id": "flsun_t1_a",
+        "quality_level": null
+      },
+      "skill_id": "7538f12c-313a-4213-8f4d-30ae6ac90cb9",
+      "skill_kind": "parameter_override",
+      "source": "single-wall cube test 2026-04-15",
+      "updated_unix": 1777530013.7178392
+    },
+    {
+      "body": {
+        "pressure_advance": 0.043,
+        "pressure_advance_smooth_time": 0.04
+      },
+      "confidence": 0.85,
+      "created_unix": 1777530013.71785,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "PA value for PLA on T1B",
+      "notes": "T1B PA is slightly lower \u2014 different hotend block batch.",
+      "scope": {
+        "hour_of_day": null,
+        "material": "PLA",
+        "printer_id": "flsun_t1_b",
+        "quality_level": null
+      },
+      "skill_id": "a0c33dfe-71b7-4539-8f41-a41fda683e71",
+      "skill_kind": "parameter_override",
+      "source": "tower test 2026-04-15",
+      "updated_unix": 1777530013.71785
+    },
+    {
+      "body": {
+        "pressure_advance": 0.06
+      },
+      "confidence": 0.8,
+      "created_unix": 1777530013.71786,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "PA value for PETG on T1B",
+      "notes": "",
+      "scope": {
+        "hour_of_day": null,
+        "material": "PETG",
+        "printer_id": "flsun_t1_b",
+        "quality_level": null
+      },
+      "skill_id": "960b263f-cecd-4641-b14b-255b1934be73",
+      "skill_kind": "parameter_override",
+      "source": "tower test 2026-04-15",
+      "updated_unix": 1777530013.71786
+    },
+    {
+      "body": {
+        "action": "BED_MESH_CALIBRATE",
+        "trigger": "bed_plate_swap"
+      },
+      "confidence": 0.9,
+      "created_unix": 1777530013.7178705,
+      "evidence_count": 1,
+      "last_applied_unix": null,
+      "name": "T1 \u2014 re-mesh after bed swap",
+      "notes": "After hot-swap of the bed plate on either T1 unit, re-run bed mesh before the first print.",
+      "scope": {
+        "hour_of_day": null,
+        "material": null,
+        "printer_id": null,
+        "quality_level": null
+      },
+      "skill_id": "cd39c62a-ef15-41fa-9dad-67615f677797",
+      "skill_kind": "printer_quirk",
+      "source": "ops experience",
+      "updated_unix": 1777530013.7178705
+    }
+  ]
+}
