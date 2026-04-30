@@ -166,6 +166,37 @@ jobs:
           name: hermes3d-os-lite-release
           path: dist/release/**/*
 
+  layer_w_wizard_e2e:
+    # Layer W — recorded wizard run on a clean Linux runner, proving the
+    # non-coder flow from zero. Quick mode (skips acceptance + UI launch
+    # so the job stays under 5 min) is the gate; the full version is for
+    # local + release validation. Verifier asserts the transcript actually
+    # contains the preflight banner and the env fingerprint is honest.
+    name: Layer W — Wizard E2E (Linux × py3.11)
+    needs: layer_a_static_gates
+    runs-on: ubuntu-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run wizard recording (quick mode)
+        run: bash scripts/wizard-record.sh --auto-yes --quick
+      - name: Verify recording
+        run: |
+          LATEST=$(ls -dt var/wizard-runs/*/ | head -1)
+          python scripts/verify-wizard-recording.py "$LATEST"
+      - name: Upload wizard transcript
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizard-recording
+          path: var/wizard-runs/
+          if-no-files-found: warn
+
   honesty_gates:
     name: Layer F — honesty gates
     needs: layer_a_static_gates
