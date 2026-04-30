@@ -11,28 +11,22 @@ inputs:
     required: true
     description: Branch under test.
 action_sequence:
-  - run: mkdir -p var/qa/screenshots
-  - run: pytest --junitxml=var/qa/pytest.xml --html=var/qa/pytest.html --self-contained-html 04_testing/pytest/
-  - run: bash scripts/run-e2e.sh
-  - run: python -c "import xml.etree.ElementTree as ET, sys; t=ET.parse('var/qa/pytest.xml').getroot(); f=int(t.attrib.get('failures',0))+int(t.attrib.get('errors',0)); sys.exit(0 if f==0 else 1)"
+  - run: mkdir -p var/qa
+  - run: bash scripts/truth-gate.sh
 outputs:
-  - path: var/qa/pytest.xml
-    description: JUnit XML report for the unit and integration suite.
-  - path: var/qa/pytest.html
-    description: Self-contained HTML report.
-  - path: var/qa/playwright.xml
-    description: JUnit XML for the Playwright e2e run.
-  - path: var/qa/screenshots/
-    description: Playwright screenshots captured during e2e runs.
+  - path: var/truth-gate/
+    description: Per-run dir with logs + signed proof bundle (one zip per run).
+  - artifact: signed_proof_bundle
+    description: HMAC-signed zip aggregating pytest report, acceptance results, Playwright report (advisory), forbidden-pattern log, evidence ledger, and manifest with file-level sha256s.
 gates:
-  - name: pytest_all_pass
-    threshold: 100% pass
+  - name: truth_gate_green
+    threshold: exit 0
     blocking: true
-    command: pytest 04_testing/pytest/
-  - name: playwright_all_pass
-    threshold: 100% pass
+    command: bash scripts/truth-gate.sh
+  - name: bundle_signature_verifies
+    threshold: exit 0
     blocking: true
-    command: bash scripts/run-e2e.sh
+    command: python 05_truth_proof/conformance_runner.py --bundle var/truth-gate/*/*.zip
 retry_policy:
   max_retries: 3
   backoff_strategy: exponential
