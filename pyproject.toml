@@ -27,6 +27,8 @@ classifiers = [
 ]
 dependencies = [
   "trimesh>=4.0",
+  "rtree>=1.2",          # spatial index for trimesh.proximity (truth_gate wall-thickness)
+  "manifold3d>=2.5",     # used by trimesh manifold checks (truth_gate manifold gate)
   "numpy>=1.26",
   "fastapi>=0.110",
   "uvicorn>=0.29",

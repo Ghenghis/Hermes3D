@@ -464,7 +464,7 @@ def _node_slice(state: WorkflowState) -> NodeResult:
         ended_unix=_now(),
         state_patch={
             "sliced_gcode_path": str(result.gcode_path),
-            "slicer_metadata": result.metadata,
+            "slicer_metadata": result.extra,
         },
     )
 
@@ -480,7 +480,7 @@ def _node_analyze_gcode(state: WorkflowState) -> NodeResult:
         started_unix=started,
         ended_unix=_now(),
         state_patch={
-            "gcode_analysis": a,
+            "gcode_analysis": a.to_dict(),
             "estimated_print_time_min": a.estimated_print_time_min,
             "filament_used_g": a.filament_used_g,
             "gcode_risk_flags": list(a.risk_flags),
@@ -514,7 +514,7 @@ def _node_cost_estimate(state: WorkflowState) -> NodeResult:
         outcome=NodeOutcome.PASS,
         started_unix=started,
         ended_unix=_now(),
-        state_patch={"cost_estimate": e},
+        state_patch={"cost_estimate": e.to_dict()},
         notes=[
             f"${e.total_cost_usd:.2f} (filament ${e.filament_cost_usd} + "
             f"energy ${e.energy_cost_usd})"
