@@ -1,0 +1,39 @@
+role: branchguard
+description: Pre-push hook role. Refuses to push if HEAD is on main or master, or if the test suite is not green at HEAD.
+model: haiku
+inputs:
+  - name: remote
+    type: string
+    required: true
+    description: Remote being pushed to (typically origin).
+  - name: refs
+    type: list
+    required: true
+    description: List of refs being pushed in this operation.
+action_sequence:
+  - run: bash -c '[[ "$(git symbolic-ref --short HEAD)" != "main" && "$(git symbolic-ref --short HEAD)" != "master" ]]'
+  - run: bash scripts/scaffolding/lint.sh
+  - run: pytest -x 04_testing/pytest/
+outputs:
+  - artifact: push_decision
+    description: 'allow | block, with a reason string.'
+  - path: var/branchguard/last_check.json
+    description: Timestamp, branch, and gate results from the most recent run.
+gates:
+  - name: not_on_protected_branch
+    threshold: branch != main/master
+    blocking: true
+    command: bash -c '[[ "$(git symbolic-ref --short HEAD)" != "main" && "$(git symbolic-ref --short HEAD)" != "master" ]]'
+  - name: tests_green
+    threshold: exit==0
+    blocking: true
+    command: pytest -x 04_testing/pytest/
+  - name: lint_clean
+    threshold: exit==0
+    blocking: true
+    command: bash scripts/scaffolding/lint.sh
+retry_policy:
+  max_retries: 0
+  backoff_strategy: linear
+  initial_delay_seconds: 0
+escalate_to: human

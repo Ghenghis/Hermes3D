@@ -1,0 +1,130 @@
+name: ci
+
+# Top-level CI for Hermes3D — runs from repo root after the A.1 restructure.
+# Layout reference: see root README.md "Repository layout".
+#
+# Matrix: Windows + Ubuntu × Python 3.11 + 3.12.
+
+on:
+  push:
+    branches: [main, develop, "release/**", "hotfix/**"]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  layer_a_static_gates:
+    name: Layer A — static gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ruff + mypy
+        # Pin ruff to a specific version — formatter rules drift across minor
+        # releases (0.14 -> 0.15 reformatted dashboard.py). Bump deliberately
+        # via a dedicated PR that includes the format diff.
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'ruff==0.14.14' mypy
+      - name: ruff format --check
+        run: ruff format --check 03_implementation/src 04_testing/pytest
+      - name: ruff check
+        run: ruff check 03_implementation/src 04_testing/pytest
+      - name: forbidden-pattern scan
+        run: python scripts/scaffolding/forbidden_pattern_scan.py
+      - name: mypy --strict (advisory)
+        run: |
+          pip install -r requirements.txt
+          mypy --strict --no-incremental 03_implementation/src/hermes3d || echo "mypy advisory in v5; v5.1 promotes to hard gate"
+
+  layer_b_smoke_and_acceptance:
+    name: "Layer B — smoke + acceptance (${{ matrix.os }} × py${{ matrix.python-version }})"
+    needs: layer_a_static_gates
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    env:
+      HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
+      # Force UTF-8 stdout so unicode box-drawing chars in the acceptance
+      # runner ('━' etc.) don't crash on Windows cp1252.
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: Install editable package
+        run: pip install -e .
+      - name: pytest (unit + conformance)
+        run: pytest 04_testing/pytest/unit 04_testing/pytest/conformance -v --maxfail=5
+      - name: Acceptance runner
+        run: python 04_testing/acceptance/run_acceptance.py
+
+  layer_c_integration:
+    name: Layer C — integration (Linux only)
+    needs: layer_b_smoke_and_acceptance
+    runs-on: ubuntu-latest
+    env:
+      HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Integration tests
+        run: pytest 04_testing/pytest/integration -v
+
+  layer_e_release_dryrun:
+    name: Layer E — release dry-run
+    needs: layer_b_smoke_and_acceptance
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Run release.sh in dry-run mode
+        run: bash scripts/scaffolding/release.sh --dry-run
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes3d-os-lite-release
+          path: dist/release/**/*
+
+  honesty_gates:
+    name: Layer F — honesty gates
+    needs: layer_a_static_gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Regenerate manifest
+        run: python 00_overview/contract/_generate_manifest.py
+      - name: Honesty diff
+        run: python scripts/scaffolding/honesty_diff.py
+      - name: README claim audit (advisory)
+        run: python scripts/scaffolding/readme_claim_audit.py

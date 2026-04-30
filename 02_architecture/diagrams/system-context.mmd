@@ -1,0 +1,45 @@
+%% Hermes3D-OS Lite -- System Context (C4-style Level 1)
+%% Render: npx -p @mermaid-js/mermaid-cli mmdc -i system-context.mmd -o system-context.svg
+graph LR
+    User([Dave / Operator])
+
+    subgraph Hermes3D["Hermes3D-OS Lite"]
+        Core[["Core Runtime<br/>(orchestrator, dispatcher,<br/>queue, supervisor)"]]
+        API[/"REST + MCP API<br/>(FastAPI, MCP server)"/]
+        UI[/"CLI + Gradio UI"/]
+    end
+
+    subgraph Fleet["Klipper / Moonraker Fleet"]
+        FlsunT1A[("flsun_t1_a")]
+        FlsunT1B[("flsun_t1_b")]
+        FlsunS1[("flsun_s1")]
+        Others[("...8 more printers")]
+    end
+
+    subgraph Slicers["Slicers"]
+        Prusa[["PrusaSlicer CLI"]]
+        Orca[["OrcaSlicer CLI"]]
+    end
+
+    subgraph LLM["LLM Providers"]
+        Ollama[["Ollama (local)"]]
+        Cloud[["Optional cloud LLM<br/>(via env-only secrets)"]]
+    end
+
+    subgraph Notify["Notifiers"]
+        Telegram[["Telegram Bot API"]]
+        Discord[["Discord Webhooks"]]
+        Slack[["Slack Webhooks"]]
+    end
+
+    SkillStore[("Skill Store<br/>(local JSONL +<br/>signed skill packs)")]
+
+    User -->|chat / commands| Hermes3D
+    User -->|prints / orders| API
+    UI --> Core
+    API --> Core
+    Core -->|HTTP| Fleet
+    Core -->|CLI exec| Slicers
+    Core -->|HTTP| LLM
+    Core -->|HTTP| Notify
+    Core <-->|read/write| SkillStore

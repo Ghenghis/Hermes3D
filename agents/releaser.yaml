@@ -1,0 +1,46 @@
+role: releaser
+description: Tags the release commit, builds the wheel, and signs the proof bundle. Runs only after qa, auditor, and reviewer have all approved.
+model: sonnet
+inputs:
+  - name: version
+    type: string
+    required: true
+    description: Semver string (e.g. 5.3.0) to tag and embed in the wheel.
+  - name: release_notes
+    type: path
+    required: true
+    description: Path to a markdown file with release notes.
+  - name: signing_key
+    type: ref
+    required: true
+    description: Reference to the gpg/cosign key id used to sign the bundle (the agent never sees the key material itself).
+action_sequence:
+  - run: bash scripts/scaffolding/build.sh
+  - run: bash scripts/scaffolding/release.sh "$VERSION"
+  - run: bash scripts/build-bundle.sh "$VERSION"
+  - run: git tag -a "v$VERSION" -m "release v$VERSION" && git push origin "v$VERSION"
+outputs:
+  - path: dist/
+    description: Built wheel and sdist.
+  - path: var/release/proof-bundle-*.zip
+    description: Signed proof bundle for this version.
+  - artifact: git_tag
+    description: Annotated git tag v{version} pushed to origin.
+gates:
+  - name: wheel_built
+    threshold: exit==0
+    blocking: true
+    command: bash -c 'ls dist/*.whl >/dev/null'
+  - name: tag_exists
+    threshold: exit==0
+    blocking: true
+    command: bash -c 'git rev-parse "v$VERSION" >/dev/null'
+  - name: bundle_signed
+    threshold: signature verifies
+    blocking: true
+    command: bash scripts/verify-bundle.sh "var/release/proof-bundle-$VERSION.zip"
+retry_policy:
+  max_retries: 1
+  backoff_strategy: linear
+  initial_delay_seconds: 30
+escalate_to: human

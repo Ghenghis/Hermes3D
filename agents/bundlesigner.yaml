@@ -1,0 +1,40 @@
+role: bundlesigner
+description: Builds and signs the proof bundle zip used for downstream attestation. The signature must verify against the pinned public key or the role blocks.
+model: haiku
+inputs:
+  - name: version
+    type: string
+    required: true
+    description: Semver version string used in the bundle filename.
+  - name: bundle_inputs
+    type: list
+    required: true
+    description: Files and directories to include (proofs, ADRs, audit reports).
+  - name: signing_key_id
+    type: string
+    required: true
+    description: gpg or cosign key id; the actual key material stays in the host keystore.
+action_sequence:
+  - run: mkdir -p var/release
+  - run: bash scripts/build-bundle.sh "$VERSION"
+  - run: bash scripts/sign-bundle.sh "var/release/proof-bundle-$VERSION.zip" "$SIGNING_KEY_ID"
+  - run: bash scripts/verify-bundle.sh "var/release/proof-bundle-$VERSION.zip"
+outputs:
+  - path: var/release/proof-bundle-*.zip
+    description: The signed proof bundle archive.
+  - path: var/release/proof-bundle-*.zip.sig
+    description: Detached signature alongside the bundle.
+gates:
+  - name: bundle_exists
+    threshold: file exists
+    blocking: true
+    command: bash -c 'test -f "var/release/proof-bundle-$VERSION.zip"'
+  - name: signature_verifies
+    threshold: signature valid
+    blocking: true
+    command: bash scripts/verify-bundle.sh "var/release/proof-bundle-$VERSION.zip"
+retry_policy:
+  max_retries: 2
+  backoff_strategy: exponential
+  initial_delay_seconds: 5
+escalate_to: human

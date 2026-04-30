@@ -47,7 +47,7 @@ Thumbs.db
 ## Slicer caches
 *.gcode
 *.3mf
-!04-TEST-CASE-DESK-ORGANIZER/golden/*.gcode
+!04_testing/acceptance/golden/*.gcode
 *.bgcode
 
 ## Vendor (only fork-mode)
@@ -55,7 +55,7 @@ vendor/OrcaSlicer/
 vendor/PrusaSlicer/
 
 ## Skill packs the user might import (project-specific)
-config/skill_packs/local_*.json
+03_implementation/config/skill_packs/local_*.json
 
 ## Node / Playwright (added in kit-hardening)
 node_modules/

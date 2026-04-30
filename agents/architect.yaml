@@ -1,0 +1,40 @@
+role: architect
+description: Designs implementation plans for incoming feature requests and emits Architecture Decision Records (ADRs) under 02_architecture/.
+model: opus
+inputs:
+  - name: feature_request
+    type: string
+    required: true
+    description: Free-form description of the feature, bug, or refactor to design.
+  - name: contract_ref
+    type: ref
+    required: true
+    description: Git ref of 00_overview/contract/MASTER_CONTRACT.md the plan must respect.
+  - name: existing_adrs
+    type: path
+    required: false
+    description: Glob of existing ADR markdown files used as context.
+action_sequence:
+  - prompt: Read 00_overview/contract/MASTER_CONTRACT.md and the listed existing ADRs. Identify constraints relevant to {feature_request}.
+  - prompt: Produce a numbered implementation plan with file-level granularity, listing affected modules, new types, and migration steps.
+  - run: mkdir -p 02_architecture/adr
+  - prompt: Write the ADR markdown file to 02_architecture/adr/ADR-<n>-<slug>.md following the existing ADR template (Status, Context, Decision, Consequences).
+outputs:
+  - path: 02_architecture/adr/ADR-*.md
+    description: Newly authored ADR for this feature.
+  - artifact: implementation_plan
+    description: Numbered plan handed downstream to the implementer role.
+gates:
+  - name: adr_lints
+    threshold: exit==0
+    blocking: true
+    command: python scripts/scaffolding/readme_claim_audit.py 02_architecture/adr
+  - name: contract_unchanged
+    threshold: no diff to 00_overview/contract/
+    blocking: true
+    command: git diff --quiet -- 00_overview/contract/
+retry_policy:
+  max_retries: 2
+  backoff_strategy: linear
+  initial_delay_seconds: 5
+escalate_to: human

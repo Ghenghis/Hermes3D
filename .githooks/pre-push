@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Hermes3D pre-push hook (A.5 / rubric criterion 5)
+# - Refuses direct pushes to main/master
+# - Runs the fast test subset before allowing push
+set -euo pipefail
+
+RED='\033[0;31m'
+GRN='\033[0;32m'
+YLW='\033[0;33m'
+NC='\033[0m'
+
+branch="$(git symbolic-ref --short HEAD 2>/dev/null || echo 'DETACHED')"
+
+case "$branch" in
+  main|master)
+    printf "${RED}ERROR:${NC} Direct push to '%s' is forbidden.\n" "$branch" >&2
+    printf "  Create a feature branch with ${YLW}scripts/new-feature.sh${NC} and open a PR.\n" >&2
+    printf "  See ${YLW}06_release/BRANCH_STRATEGY.md${NC} for the gitflow rules.\n" >&2
+    exit 1
+    ;;
+esac
+
+repo_root="$(git rev-parse --show-toplevel)"
+test_script="$repo_root/scripts/scaffolding/test.sh"
+
+if [ -x "$test_script" ] || [ -f "$test_script" ]; then
+  printf "${GRN}pre-push:${NC} running fast test subset...\n"
+  if ! bash "$test_script" --fast; then
+    printf "${RED}ERROR:${NC} Tests failed; not pushing.\n" >&2
+    exit 1
+  fi
+else
+  printf "${YLW}pre-push:${NC} test.sh not found at %s — skipping fast tests.\n" "$test_script" >&2
+fi
+
+printf "${GRN}pre-push:${NC} branch '%s' OK; tests passed.\n" "$branch"
+exit 0

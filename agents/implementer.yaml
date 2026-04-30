@@ -1,0 +1,46 @@
+role: implementer
+description: Test-driven code writer. Consumes a task spec from the architect and emits a PR diff plus the tests that prove it.
+model: sonnet
+inputs:
+  - name: task_spec
+    type: yaml
+    required: true
+    description: Structured task spec referencing the ADR and target files.
+  - name: branch_name
+    type: string
+    required: true
+    description: Feature branch to commit the work onto. Must not be main or master.
+  - name: target_files
+    type: list
+    required: true
+    description: Files the implementer is permitted to edit.
+action_sequence:
+  - run: git checkout -b "$BRANCH_NAME" || git checkout "$BRANCH_NAME"
+  - prompt: Write failing tests under 04_testing/pytest/ that encode the task spec acceptance criteria. Commit them on the feature branch.
+  - run: pytest -x 04_testing/pytest/ || true
+  - prompt: Implement the minimum production code under 03_implementation/src/ that makes the new tests pass. Do not edit files outside target_files.
+  - run: pytest 04_testing/pytest/
+  - run: git add -A && git diff --cached > var/implementer.patch
+outputs:
+  - path: var/implementer.patch
+    description: Unified diff of the work produced this run.
+  - artifact: pr_diff
+    description: The same diff exposed to downstream reviewer/qa roles.
+gates:
+  - name: tests_pass
+    threshold: exit==0
+    blocking: true
+    command: pytest 04_testing/pytest/
+  - name: lint
+    threshold: exit==0
+    blocking: true
+    command: bash scripts/scaffolding/lint.sh
+  - name: not_on_main
+    threshold: branch != main/master
+    blocking: true
+    command: bash -c '[[ "$(git symbolic-ref --short HEAD)" != "main" && "$(git symbolic-ref --short HEAD)" != "master" ]]'
+retry_policy:
+  max_retries: 3
+  backoff_strategy: exponential
+  initial_delay_seconds: 4
+escalate_to: repair
