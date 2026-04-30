@@ -1,0 +1,125 @@
+# Hermes3D v4.1 External Repository / Tool Registry
+tools:
+  blender:
+    name: Blender
+    type: external_app
+    repo: https://github.com/blender/blender
+    homepage: https://www.blender.org/download/
+    required: true
+    os_support: [windows, linux]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary_or_existing_install, windows_hint: "Detect blender.exe", linux_hint: "Detect blender in PATH"}
+    verify: {commands: ["blender --version"], expected: "version output contains Blender"}
+    adapter: {mode: external_process, capabilities: [detect, launch_external, dock_if_supported, screenshot_source]}
+  blender_mcp_ahujasid:
+    name: Blender MCP ahujasid
+    type: mcp_provider
+    repo: https://github.com/ahujasid/blender-mcp
+    required: true
+    os_support: [windows, linux]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: uvx, command: "uvx blender-mcp"}
+    verify: {commands: ["uvx blender-mcp --help", "claude mcp list"], expected: "MCP provider can be listed and connected"}
+    adapter: {mode: mcp, capabilities: [get_scene_info, get_viewport_screenshot, execute_blender_code, export_3mf]}
+  blender_mcp_vxai:
+    name: Blender MCP VxAI
+    type: mcp_provider
+    repo: https://github.com/VxASI/blender-mcp-vxai
+    required: false
+    os_support: [windows, linux]
+    version_policy: {channel: experimental, manual_select: true}
+    install: {method: repo_or_package, command: "manual provider install after validation"}
+    verify: {commands: ["claude mcp list"], expected: "Provider appears and required capabilities pass"}
+    adapter: {mode: mcp, capabilities: [get_scene_info, get_viewport_screenshot, execute_blender_code]}
+  prusa_slicer:
+    name: PrusaSlicer
+    type: slicer
+    repo: https://github.com/prusa3d/PrusaSlicer
+    required: true
+    os_support: [windows, linux]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary_or_existing_install, windows_hint: "Detect prusa-slicer.exe"}
+    verify: {commands: ["prusa-slicer --version"], expected: "version output"}
+    adapter: {mode: cli_external_process, capabilities: [detect, version, slice_to_staging, launch_external]}
+  orca_slicer:
+    name: OrcaSlicer
+    type: slicer
+    repo: https://github.com/SoftFever/OrcaSlicer
+    required: false
+    os_support: [windows, linux]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary_or_existing_install}
+    verify: {commands: ["orca-slicer --version || OrcaSlicer --version"], expected: "version output or graceful unsupported"}
+    adapter: {mode: cli_external_process, capabilities: [detect, version, slice_to_staging, launch_external]}
+  flsun_slicer:
+    name: FLSUN Slicer
+    type: slicer
+    repo: https://github.com/Flsun3d/FlsunSlicer
+    source: user_provided_zip_supported
+    required: true
+    os_support: [windows]
+    version_policy: {channel: user_provided_or_stable, manual_select: true}
+    install: {method: portable_or_installer, windows_hint: "Use user-provided FlsunSlicer-2.0.6.zip or detected install"}
+    verify: {commands: ["detect executable path and record file version"], expected: "FLSUN Slicer executable detected"}
+    adapter: {mode: external_process, capabilities: [detect, version, launch_external, slice_to_staging_if_cli_available]}
+  cura:
+    name: Ultimaker Cura
+    type: slicer
+    repo: https://github.com/Ultimaker/Cura
+    required: false
+    os_support: [windows, linux]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary_or_existing_install}
+    verify: {commands: ["cura --version || Ultimaker-Cura --version"], expected: "version output or graceful unsupported"}
+    adapter: {mode: external_process, capabilities: [detect, version, launch_external]}
+  printrun:
+    name: Printrun / Pronterface / Pronsole
+    type: printer_control_usb
+    repo: https://github.com/kliment/Printrun
+    source: user_provided_zip_supported
+    required: true
+    os_support: [windows, linux]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: bundled_or_python, windows_hint: "Use user-provided printrun-2.2.0_windows_x64_py3.10.zip or source zip"}
+    verify: {commands: ["pronsole --help", "python -m printrun.pronsole --help"], expected: "help output or detected bundled app"}
+    adapter: {mode: cli_or_gui_external_process, capabilities: [detect, list_serial_ports, read_only_connect, send_gcode_with_approval, launch_external]}
+  moonraker:
+    name: Moonraker
+    type: printer_api
+    repo: https://github.com/Arksine/moonraker
+    required: true
+    os_support: [linux, network_service]
+    version_policy: {channel: existing_printer_service, manual_select: true}
+    install: {method: existing_service_or_remote_endpoint}
+    verify: {commands: ["curl http://<printer-ip>:7125/server/info"], expected: "JSON server info"}
+    adapter: {mode: http_api, capabilities: [status, temps, job_status, file_list, controlled_write_after_gate]}
+  fluidd:
+    name: Fluidd
+    type: external_web_ui
+    repo: https://github.com/fluidd-core/fluidd
+    required: false
+    os_support: [network_service]
+    version_policy: {channel: existing_printer_ui, manual_select: true}
+    install: {method: existing_service_or_remote_endpoint}
+    verify: {commands: ["curl -I http://<fluidd-host>/"], expected: "HTTP 200/30x or graceful unavailable"}
+    adapter: {mode: web_embed_or_external, capabilities: [dock_if_allowed, undock, fullscreen_external, status_link]}
+  mainsail:
+    name: Mainsail
+    type: external_web_ui
+    repo: https://github.com/mainsail-crew/mainsail
+    required: false
+    os_support: [network_service]
+    version_policy: {channel: existing_printer_ui, manual_select: true}
+    install: {method: existing_service_or_remote_endpoint}
+    verify: {commands: ["curl -I http://<mainsail-host>/"], expected: "HTTP 200/30x or graceful unavailable"}
+    adapter: {mode: web_embed_or_external, capabilities: [dock_if_allowed, undock, fullscreen_external, status_link]}
+  octoprint:
+    name: OctoPrint
+    type: printer_api_and_web_ui
+    repo: https://github.com/OctoPrint/OctoPrint
+    required: false
+    os_support: [linux, windows, network_service]
+    version_policy: {channel: existing_service_or_stable, manual_select: true}
+    install: {method: existing_service_or_python}
+    verify: {commands: ["curl http://<octoprint-host>/api/version"], expected: "JSON version output when API reachable"}
+    adapter: {mode: http_api_and_web_embed, capabilities: [status, temps, job_status, file_list, dock_if_allowed, controlled_write_after_gate]}

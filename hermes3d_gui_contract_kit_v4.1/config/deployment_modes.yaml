@@ -1,0 +1,18 @@
+deployment_modes:
+  desktop_windows:
+    name: Hermes3D Desktop GPU Worker Edition
+    os: windows
+    owns_heavy_compute: true
+    required_checks: [gpu_detection, local_ui_launch, adapter_detect_only, proof_bundle_local]
+  vps_ubuntu:
+    name: Hermes3D VPS Control Server Edition
+    os: ubuntu
+    owns_heavy_compute: false
+    required_checks: [auth_enabled, worker_registration, remote_job_dry_run, proof_bundle_mirror]
+secure_tunnels:
+  preferred: [tailscale, cloudflare_tunnel, wireguard]
+known_local_gpu_targets:
+  - name: EVGA FTW3 Ultra RTX 3090 Ti
+    vram_gb: 24
+    vendor: NVIDIA
+    priority: primary
