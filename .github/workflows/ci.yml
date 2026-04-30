@@ -22,9 +22,12 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install ruff + mypy
+        # Pin ruff to a specific version — formatter rules drift across minor
+        # releases (0.14 -> 0.15 reformatted dashboard.py). Bump deliberately
+        # via a dedicated PR that includes the format diff.
         run: |
           python -m pip install --upgrade pip
-          pip install ruff mypy
+          pip install 'ruff==0.14.14' mypy
       - name: ruff format --check
         run: ruff format --check 03_implementation/src 04_testing/pytest
       - name: ruff check
