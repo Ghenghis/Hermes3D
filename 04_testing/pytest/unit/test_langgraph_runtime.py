@@ -66,9 +66,9 @@ def test_orchestrator_fallback_without_langgraph(tmp_path: Path, monkeypatch):
         warnings.simplefilter("always")
         final = orch.run(state, checkpoint_dir=tmp_path / "cp")
     assert final.terminal is True
-    assert any(
-        issubclass(w.category, LangGraphUnavailableWarning) for w in caught
-    ), "expected LangGraphUnavailableWarning"
+    assert any(issubclass(w.category, LangGraphUnavailableWarning) for w in caught), (
+        "expected LangGraphUnavailableWarning"
+    )
     assert not final.aborted
     # The fallback ran the real WorkflowGraph nodes
     pass_nodes = {h.node_name for h in final.history if h.outcome.value == "pass"}
@@ -102,7 +102,6 @@ def test_orchestrator_checkpoint_resume(tmp_path: Path):
 def test_orchestrator_repair_conditional_edge(tmp_path: Path):
     """A non-watertight mesh triggers the repair node — conditional path."""
     import numpy as np
-
     from hermes3d.core.agents.orchestrator import LangGraphOrchestrator
     from hermes3d.core.orchestration import new_state
 

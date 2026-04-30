@@ -281,11 +281,7 @@ class LangGraphOrchestrator:
 
             def runner(d: dict) -> dict:
                 ws_cls = type(state)
-                ws = (
-                    ws_cls.from_dict(d)
-                    if isinstance(d, dict) and "workflow_id" in d
-                    else state
-                )
+                ws = ws_cls.from_dict(d) if isinstance(d, dict) and "workflow_id" in d else state
                 ok, why = node.can_run(ws)
                 if not ok:
                     if not node.optional:
@@ -341,9 +337,7 @@ class LangGraphOrchestrator:
         final_dict = compiled.invoke(state.to_dict(), config=config)
 
         ws_cls = type(state)
-        final_state = (
-            ws_cls.from_dict(final_dict) if isinstance(final_dict, dict) else state
-        )
+        final_state = ws_cls.from_dict(final_dict) if isinstance(final_dict, dict) else state
         if checkpoint_dir is not None:
             cp_path = Path(checkpoint_dir) / f"{final_state.workflow_id}.json"
             cp_path.parent.mkdir(parents=True, exist_ok=True)

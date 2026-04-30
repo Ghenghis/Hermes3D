@@ -444,9 +444,7 @@ class MultiAgentLoop:
                 ),
             )
 
-        provider_name = getattr(
-            getattr(provider, "config", None), "provider", None
-        )
+        provider_name = getattr(getattr(provider, "config", None), "provider", None)
         provider_value = (
             provider_name.value if hasattr(provider_name, "value") else str(provider_name)
         )
@@ -455,9 +453,7 @@ class MultiAgentLoop:
         rounds: list[LLMRoundRecord] = []
         ctx_block = ""
         if context:
-            ctx_block = "\n\nContext:\n" + "\n".join(
-                f"- {k}: {v}" for k, v in context.items()
-            )
+            ctx_block = "\n\nContext:\n" + "\n".join(f"- {k}: {v}" for k, v in context.items())
         task_block = "\n".join(f"- {k}: {v}" for k, v in task.items())
 
         # ---- Round 1: Executor draft -----------------------------------
@@ -541,8 +537,7 @@ class MultiAgentLoop:
         # Token count is provider-specific; pull from raw payload when present.
         raw = getattr(res, "raw", {}) or {}
         token_count = (
-            raw.get("eval_count")
-            or raw.get("usage", {}).get("total_tokens")
+            raw.get("eval_count") or raw.get("usage", {}).get("total_tokens")
             if isinstance(raw, dict)
             else None
         )

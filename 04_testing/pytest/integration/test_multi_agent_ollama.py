@@ -25,7 +25,9 @@ def test_multi_agent_loop_against_local_ollama():
 
     # Discover an available model so we don't pin to a specific tag.
     with httpx.Client(timeout=5.0) as c:
-        models = [m["name"] for m in c.get("http://127.0.0.1:11434/api/tags").json().get("models", [])]
+        models = [
+            m["name"] for m in c.get("http://127.0.0.1:11434/api/tags").json().get("models", [])
+        ]
     assert models, "Ollama is up but has no models pulled"
 
     import os
