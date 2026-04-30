@@ -81,6 +81,12 @@ class WorkflowState:
     history: list[NodeResult] = field(default_factory=list)
     aborted: bool = False
     abort_reason: str | None = None
+    terminal: bool = False
+
+    @property
+    def node_results(self) -> list[NodeResult]:
+        """Alias for ``history`` — surfaced for the orchestrator API contract."""
+        return self.history
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -96,6 +102,7 @@ class WorkflowState:
             ],
             "aborted": self.aborted,
             "abort_reason": self.abort_reason,
+            "terminal": self.terminal,
         }
 
     @classmethod
@@ -106,6 +113,7 @@ class WorkflowState:
             data=dict(d.get("data", {})),
             aborted=bool(d.get("aborted", False)),
             abort_reason=d.get("abort_reason"),
+            terminal=bool(d.get("terminal", False)),
         )
         for h in d.get("history", []):
             s.history.append(
@@ -288,6 +296,11 @@ class WorkflowGraph:
 
             idx += 1
 
+        # Mark terminal when we ran to completion (or aborted) without an
+        # explicit stop point. The orchestrator API treats this as the signal
+        # that no further nodes will execute on this state.
+        if stop_after is None:
+            state.terminal = True
         return state
 
 
