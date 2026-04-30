@@ -212,3 +212,36 @@ jobs:
         run: python scripts/scaffolding/honesty_diff.py
       - name: README claim audit (advisory)
         run: python scripts/scaffolding/readme_claim_audit.py
+
+  layer_t_truth_gate:
+    # Unified truth pipeline: every gate above into ONE signed bundle.
+    # Reviewers can download the artifact and inspect the full evidence
+    # trail in a single zip.
+    name: Layer T — Unified Truth Gate (Linux × py3.11)
+    needs: [layer_a_static_gates, layer_b_smoke_and_acceptance, layer_c_integration, honesty_gates]
+    runs-on: ubuntu-latest
+    env:
+      HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Run unified truth gate
+        run: bash scripts/truth-gate.sh
+      - name: Upload truth-gate artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: truth-gate-bundle
+          path: |
+            var/truth-gate/
+          if-no-files-found: warn
