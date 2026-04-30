@@ -219,9 +219,7 @@ class OpenRouterProvider(_OpenAICompatProvider):
 
     def __init__(self, config: ProviderConfig) -> None:
         if not config.api_key:
-            raise ProviderUnavailable(
-                "OpenRouter selected but HERMES3D_LLM_API_KEY is not set."
-            )
+            raise ProviderUnavailable("OpenRouter selected but HERMES3D_LLM_API_KEY is not set.")
         super().__init__(config)
 
 

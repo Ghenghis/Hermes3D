@@ -1,4 +1,5 @@
 """Tests for hermes3d.core.printers — fleet metadata + Moonraker client."""
+
 from __future__ import annotations
 
 import math
@@ -25,6 +26,7 @@ from hermes3d.core.printers.moonraker_client import (
 # ----------------------------------------------------------------------------
 # Fleet structure
 # ----------------------------------------------------------------------------
+
 
 def test_fleet_has_exactly_twelve_printers():
     """Dave's actual fleet — must match exactly. If the fleet changes, this
@@ -86,6 +88,7 @@ def test_list_ids_matches_fleet():
 # Bed-shape validation
 # ----------------------------------------------------------------------------
 
+
 def test_bed_shape_rejects_zero_dims():
     with pytest.raises(ValueError):
         BedShape(kind="rectangular", x_mm=0, y_mm=200)
@@ -101,6 +104,7 @@ def test_bed_shape_rejects_unknown_kind():
 # ----------------------------------------------------------------------------
 # Bed-fit logic
 # ----------------------------------------------------------------------------
+
 
 def test_fits_rectangular_pass():
     p = get_profile("prusa_mk3s")  # 250x210x210
@@ -159,6 +163,7 @@ def test_fits_circular_fallback_to_bbox_when_no_radius():
 # Moonraker client
 # ----------------------------------------------------------------------------
 
+
 def test_moonraker_client_construct_strips_trailing_slash():
     c = MoonrakerClient("http://example.local/")
     assert c.base_url == "http://example.local"
@@ -200,8 +205,14 @@ def test_probe_fleet_returns_one_entry_per_printer():
     entries = probe_fleet(timeout_s=0.2)
     assert len(entries) == len(FLEET)
     expected_keys = {
-        "profile_id", "manufacturer", "model", "moonraker_url",
-        "reachable", "klippy_state", "moonraker_version", "error",
+        "profile_id",
+        "manufacturer",
+        "model",
+        "moonraker_url",
+        "reachable",
+        "klippy_state",
+        "moonraker_version",
+        "error",
     }
     for e in entries:
         assert set(e.keys()) >= expected_keys

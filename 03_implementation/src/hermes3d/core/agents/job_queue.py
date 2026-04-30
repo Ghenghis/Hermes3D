@@ -20,6 +20,7 @@ State machine:
 The queue file is human-readable JSON. The JobQueue class is process-safe
 via an OS file lock on save (with a fallback for non-POSIX).
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -52,15 +53,15 @@ class JobState(str, enum.Enum):
 # Allowed forward transitions (one of these must hold OR a backward move
 # to QUEUED for retry, OR -> CANCELLED from any non-terminal state).
 _ALLOWED: dict[JobState, set[JobState]] = {
-    JobState.QUEUED:     {JobState.DISPATCHED, JobState.CANCELLED, JobState.FAILED},
+    JobState.QUEUED: {JobState.DISPATCHED, JobState.CANCELLED, JobState.FAILED},
     JobState.DISPATCHED: {JobState.VALIDATED, JobState.QUEUED, JobState.CANCELLED, JobState.FAILED},
-    JobState.VALIDATED:  {JobState.SLICED, JobState.QUEUED, JobState.CANCELLED, JobState.FAILED},
-    JobState.SLICED:     {JobState.UPLOADED, JobState.QUEUED, JobState.CANCELLED, JobState.FAILED},
-    JobState.UPLOADED:   {JobState.PRINTING, JobState.CANCELLED, JobState.FAILED},
-    JobState.PRINTING:   {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED},
-    JobState.SUCCEEDED:  set(),  # terminal
-    JobState.FAILED:     {JobState.QUEUED},  # retry path
-    JobState.CANCELLED:  set(),  # terminal
+    JobState.VALIDATED: {JobState.SLICED, JobState.QUEUED, JobState.CANCELLED, JobState.FAILED},
+    JobState.SLICED: {JobState.UPLOADED, JobState.QUEUED, JobState.CANCELLED, JobState.FAILED},
+    JobState.UPLOADED: {JobState.PRINTING, JobState.CANCELLED, JobState.FAILED},
+    JobState.PRINTING: {JobState.SUCCEEDED, JobState.FAILED, JobState.CANCELLED},
+    JobState.SUCCEEDED: set(),  # terminal
+    JobState.FAILED: {JobState.QUEUED},  # retry path
+    JobState.CANCELLED: set(),  # terminal
 }
 
 
@@ -103,8 +104,9 @@ class Job:
         d["state"] = JobState(d["state"])
         return cls(**d)
 
-    def transition(self, next_state: JobState, *, reason: str = "",
-                   updated_unix: float | None = None) -> None:
+    def transition(
+        self, next_state: JobState, *, reason: str = "", updated_unix: float | None = None
+    ) -> None:
         """Advance to ``next_state`` if the transition is allowed.
 
         Records the transition in ``history`` and updates ``updated_unix``.
@@ -119,12 +121,14 @@ class Job:
         prev = self.state
         self.state = next_state
         self.updated_unix = updated_unix or time.time()
-        self.history.append({
-            "from": prev.value,
-            "to": next_state.value,
-            "at_unix": self.updated_unix,
-            "reason": reason,
-        })
+        self.history.append(
+            {
+                "from": prev.value,
+                "to": next_state.value,
+                "at_unix": self.updated_unix,
+                "reason": reason,
+            }
+        )
 
 
 # =============================================================================
@@ -181,9 +185,17 @@ class JobQueue:
 
     # -------- CRUD --------
 
-    def enqueue(self, *, mesh_path: str, mesh_sha256: str, material: str,
-                quality_level: str = "normal", layer_height_mm: float = 0.2,
-                requested_strategy: str = "auto", notes: str = "") -> Job:
+    def enqueue(
+        self,
+        *,
+        mesh_path: str,
+        mesh_sha256: str,
+        material: str,
+        quality_level: str = "normal",
+        layer_height_mm: float = 0.2,
+        requested_strategy: str = "auto",
+        notes: str = "",
+    ) -> Job:
         with self._lock:
             now = time.time()
             job = Job(
@@ -198,12 +210,14 @@ class JobQueue:
                 layer_height_mm=layer_height_mm,
                 requested_strategy=requested_strategy,
                 notes=notes,
-                history=[{
-                    "from": "<new>",
-                    "to": JobState.QUEUED.value,
-                    "at_unix": now,
-                    "reason": "enqueue",
-                }],
+                history=[
+                    {
+                        "from": "<new>",
+                        "to": JobState.QUEUED.value,
+                        "at_unix": now,
+                        "reason": "enqueue",
+                    }
+                ],
             )
             self._jobs[job.job_id] = job
             self.save()
@@ -236,8 +250,9 @@ class JobQueue:
 
     # -------- Convenience helpers --------
 
-    def transition_job(self, job_id: str, next_state: JobState, *,
-                       reason: str = "", **field_updates: Any) -> Job:
+    def transition_job(
+        self, job_id: str, next_state: JobState, *, reason: str = "", **field_updates: Any
+    ) -> Job:
         """Advance job state and persist atomically.
 
         Extra kwargs set fields on the job (e.g. target_printer_id).

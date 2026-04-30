@@ -15,4 +15,5 @@ Each subpackage corresponds to one section of the agent pipeline:
 KIT_MANIFEST.json at the kit root tags every file as runnable / spec /
 scaffold so consumers never have to guess.
 """
+
 __version__ = "5.0.0"

@@ -138,8 +138,9 @@ def _probe_html_title(client: httpx.Client, base: str) -> str | None:
         return None
 
 
-def discover_host(host: str, *, ports: Iterable[int] = _DEFAULT_PORTS,
-                   timeout: float = 1.0) -> DiscoveredHost | None:
+def discover_host(
+    host: str, *, ports: Iterable[int] = _DEFAULT_PORTS, timeout: float = 1.0
+) -> DiscoveredHost | None:
     """Probe a single host across known ports. Returns None if nothing matched."""
     found = DiscoveredHost(host=host, port=0)
     for port in ports:

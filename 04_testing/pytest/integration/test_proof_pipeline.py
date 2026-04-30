@@ -13,6 +13,7 @@ Walks every step the production system performs:
 If this passes, the proof system is end-to-end functional. This is the
 strongest single check in the suite — it touches every runnable subsystem.
 """
+
 from __future__ import annotations
 
 import os
@@ -85,10 +86,17 @@ def test_full_proof_pipeline(tmp_path: Path) -> None:
 def test_proof_rejects_tampered_envelope(tmp_path: Path) -> None:
     """Editing the JSON itself (not the mesh) must also be detected by the
     HMAC signature — the signature covers the canonical payload."""
-    mesh = build_organizer(OrganizerSpec(width_mm=120, depth_mm=80,
-                                         height_mm=45, tray_count=2,
-                                         pen_count=2, phone_slot=False,
-                                         cable_passthrough=False))
+    mesh = build_organizer(
+        OrganizerSpec(
+            width_mm=120,
+            depth_mm=80,
+            height_mm=45,
+            tray_count=2,
+            pen_count=2,
+            phone_slot=False,
+            cable_passthrough=False,
+        )
+    )
     stl = tmp_path / "compact.stl"
     mesh.export(stl)
     cfg = TruthGateConfig(printer_profile_id="flsun_qqs_pro")
@@ -128,7 +136,8 @@ def test_proof_envelope_is_deterministic(tmp_path: Path) -> None:
         mesh_path=stl,
         truth_gate_report=tg.to_dict(),
         visual_evidence_paths=[],
-        generator_name="g", generator_version="1.0.0",
+        generator_name="g",
+        generator_version="1.0.0",
         generator_signature="x",
         timestamp_unix=1700000000.0,
     )
@@ -137,11 +146,13 @@ def test_proof_envelope_is_deterministic(tmp_path: Path) -> None:
         mesh_path=stl,
         truth_gate_report=tg.to_dict(),
         visual_evidence_paths=[],
-        generator_name="g", generator_version="1.0.0",
+        generator_name="g",
+        generator_version="1.0.0",
         generator_signature="x",
         timestamp_unix=1700000000.0,
     )
     import json
+
     e1 = json.loads(p1.read_text())
     e2 = json.loads(p2.read_text())
     assert e1["signature"]["value"] == e2["signature"]["value"]

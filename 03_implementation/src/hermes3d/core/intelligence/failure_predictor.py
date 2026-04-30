@@ -18,6 +18,7 @@ Design: a deliberately simple Bayesian-flavored blend. Not ML —
 real-farm datasets are too small for ML; this is a rule-based estimator
 that's auditable and tunable.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -25,7 +26,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hermes3d.core.farm.print_history import (
-    PrintHistory, PrinterAggregate, aggregate_metrics,
+    PrintHistory,
+    PrinterAggregate,
+    aggregate_metrics,
 )
 from hermes3d.core.memory import SkillKind, SkillStore
 
@@ -46,7 +49,7 @@ class FailureForecast:
     printer_id: str
     material: str
     failure_probability: float
-    confidence: str             # "low" | "medium" | "high"
+    confidence: str  # "low" | "medium" | "high"
     citations: list[str] = field(default_factory=list)
     components: dict[str, float] = field(default_factory=dict)
 
@@ -54,8 +57,9 @@ class FailureForecast:
         return dataclasses.asdict(self)
 
 
-def _printer_component(history: PrintHistory | None,
-                         printer_id: str) -> tuple[float, int, str | None]:
+def _printer_component(
+    history: PrintHistory | None, printer_id: str
+) -> tuple[float, int, str | None]:
     if history is None:
         return DEFAULT_BASELINE_FAILURE_RATE, 0, None
     metrics = aggregate_metrics(history)
@@ -63,13 +67,15 @@ def _printer_component(history: PrintHistory | None,
     if pa is None or pa.total_prints == 0:
         return DEFAULT_BASELINE_FAILURE_RATE, 0, None
     rate = 1.0 - pa.success_rate
-    citation = (f"PrintHistory[{printer_id}]: {pa.failed} fails / "
-                f"{pa.successful + pa.failed} attempts")
+    citation = (
+        f"PrintHistory[{printer_id}]: {pa.failed} fails / {pa.successful + pa.failed} attempts"
+    )
     return rate, pa.total_prints, citation
 
 
-def _material_component(history: PrintHistory | None,
-                          material: str) -> tuple[float, int, str | None]:
+def _material_component(
+    history: PrintHistory | None, material: str
+) -> tuple[float, int, str | None]:
     if history is None:
         return DEFAULT_BASELINE_FAILURE_RATE, 0, None
     metrics = aggregate_metrics(history)
@@ -77,19 +83,19 @@ def _material_component(history: PrintHistory | None,
     if ma is None or ma.total_prints == 0:
         return DEFAULT_BASELINE_FAILURE_RATE, 0, None
     rate = 1.0 - (ma.successful / ma.total_prints)
-    citation = (f"PrintHistory[material={material}]: "
-                f"{ma.successful}/{ma.total_prints} successful")
+    citation = f"PrintHistory[material={material}]: {ma.successful}/{ma.total_prints} successful"
     return rate, ma.total_prints, citation
 
 
-def _skill_component(skills: SkillStore | None,
-                      printer_id: str, material: str
-                      ) -> tuple[float | None, list[str]]:
+def _skill_component(
+    skills: SkillStore | None, printer_id: str, material: str
+) -> tuple[float | None, list[str]]:
     if skills is None:
         return None, []
     matches = skills.lookup(
         kind=SkillKind.FAILURE_PATTERN,
-        printer_id=printer_id, material=material,
+        printer_id=printer_id,
+        material=material,
         min_confidence=0.4,
     )
     if not matches:
@@ -97,16 +103,21 @@ def _skill_component(skills: SkillStore | None,
     # The most-specific, highest-confidence skill wins
     top = matches[0]
     rate = float(top.body.get("observed_failure_rate", 0.5))
-    citation = (f"Skill[{top.skill_id[:8]}] '{top.name}' "
-                f"(confidence={top.confidence:.2f}): "
-                f"observed_failure_rate={rate:.2f}")
+    citation = (
+        f"Skill[{top.skill_id[:8]}] '{top.name}' "
+        f"(confidence={top.confidence:.2f}): "
+        f"observed_failure_rate={rate:.2f}"
+    )
     return rate, [citation]
 
 
-def predict_failure(*, printer_id: str, material: str,
-                     history: PrintHistory | None = None,
-                     skills: SkillStore | None = None,
-                     ) -> FailureForecast:
+def predict_failure(
+    *,
+    printer_id: str,
+    material: str,
+    history: PrintHistory | None = None,
+    skills: SkillStore | None = None,
+) -> FailureForecast:
     """Blend printer-history, material-history, and skill signals.
 
     Weighting:
@@ -159,7 +170,8 @@ def predict_failure(*, printer_id: str, material: str,
         confidence = "low"
 
     return FailureForecast(
-        printer_id=printer_id, material=material,
+        printer_id=printer_id,
+        material=material,
         failure_probability=round(prob, 3),
         confidence=confidence,
         citations=citations,

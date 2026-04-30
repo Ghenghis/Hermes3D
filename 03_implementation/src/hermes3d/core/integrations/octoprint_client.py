@@ -11,6 +11,7 @@ transparently.
 OctoPrint API docs: https://docs.octoprint.org/en/master/api/
 Auth: a long-lived API key in the X-Api-Key header.
 """
+
 from __future__ import annotations
 
 import json
@@ -37,14 +38,18 @@ class OctoPrintClient:
         h = {"Content-Type": "application/json"}
         if self.api_key:
             h["X-Api-Key"] = self.api_key
-        elif (env := os.environ.get("OCTOPRINT_API_KEY")):
+        elif env := os.environ.get("OCTOPRINT_API_KEY"):
             h["X-Api-Key"] = env
         return h
 
-    def _request(self, method: str, path: str,
-                  *, body: dict[str, Any] | bytes | None = None,
-                  headers: dict[str, str] | None = None,
-                  ) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: dict[str, Any] | bytes | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
         url = self.base_url.rstrip("/") + path
         h = dict(self._headers())
         if headers:
@@ -103,8 +108,7 @@ class OctoPrintClient:
         except Exception as exc:  # noqa: BLE001
             return {"reachable": False, "error": str(exc)}
 
-    def upload_gcode(self, gcode_path: str | Path,
-                       *, location: str = "local") -> str:
+    def upload_gcode(self, gcode_path: str | Path, *, location: str = "local") -> str:
         """Upload a g-code file via multipart form to /api/files/{location}.
 
         Returns the file's path on the OctoPrint server.
@@ -116,34 +120,37 @@ class OctoPrintClient:
         crlf = b"\r\n"
         body = b""
         body += f"--{boundary}{crlf.decode()}".encode()
-        body += (f'Content-Disposition: form-data; name="file"; '
-                  f'filename="{gcode_path.name}"\r\n').encode()
+        body += (
+            f'Content-Disposition: form-data; name="file"; filename="{gcode_path.name}"\r\n'
+        ).encode()
         body += b"Content-Type: application/octet-stream\r\n\r\n"
         body += gcode_path.read_bytes()
         body += crlf
         body += f"--{boundary}--{crlf.decode()}".encode()
         h = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
-        resp = self._request("POST", f"/api/files/{location}",
-                              body=body, headers=h)
-        return resp.get("files", {}).get(location, {}).get("path",
-                                                              gcode_path.name)
+        resp = self._request("POST", f"/api/files/{location}", body=body, headers=h)
+        return resp.get("files", {}).get(location, {}).get("path", gcode_path.name)
 
-    def start_print(self, gcode_relpath: str, *, location: str = "local",
-                     ) -> dict[str, Any]:
-        return self._request("POST", f"/api/files/{location}/{gcode_relpath}",
-                               body={"command": "select", "print": True})
+    def start_print(
+        self,
+        gcode_relpath: str,
+        *,
+        location: str = "local",
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"/api/files/{location}/{gcode_relpath}",
+            body={"command": "select", "print": True},
+        )
 
     def cancel_print(self) -> dict[str, Any]:
-        return self._request("POST", "/api/job",
-                               body={"command": "cancel"})
+        return self._request("POST", "/api/job", body={"command": "cancel"})
 
     def pause_print(self) -> dict[str, Any]:
-        return self._request("POST", "/api/job",
-                               body={"command": "pause", "action": "pause"})
+        return self._request("POST", "/api/job", body={"command": "pause", "action": "pause"})
 
     def resume_print(self) -> dict[str, Any]:
-        return self._request("POST", "/api/job",
-                               body={"command": "pause", "action": "resume"})
+        return self._request("POST", "/api/job", body={"command": "pause", "action": "resume"})
 
 
 __all__ = ["OctoPrintClient"]

@@ -20,6 +20,7 @@ Usage::
     bundle_path = create_backup(state_dir="./var", out_dir="./backups")
     restore_backup(bundle_path, target_dir="./var-restored")
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -55,8 +56,7 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _iter_state_files(state_dir: Path,
-                       extra_globs: Iterable[str] = ()) -> list[Path]:
+def _iter_state_files(state_dir: Path, extra_globs: Iterable[str] = ()) -> list[Path]:
     """Files that are part of a backup."""
     candidates: list[Path] = []
     for name in ("queue.json", "spools.json", "history.jsonl"):
@@ -75,9 +75,9 @@ def _iter_state_files(state_dir: Path,
     return candidates
 
 
-def create_backup(*, state_dir: str | Path, out_dir: str | Path,
-                   extra_globs: Iterable[str] = (),
-                   notes: str = "") -> Path:
+def create_backup(
+    *, state_dir: str | Path, out_dir: str | Path, extra_globs: Iterable[str] = (), notes: str = ""
+) -> Path:
     """Create a .tar.gz snapshot of state_dir's persistent files.
 
     Returns the path to the created bundle.
@@ -93,9 +93,7 @@ def create_backup(*, state_dir: str | Path, out_dir: str | Path,
 
     manifest = BackupManifest(state_dir=str(state), notes=notes)
     manifest.files = [
-        {"path": str(f.relative_to(state)),
-         "size_bytes": f.stat().st_size,
-         "sha256": _sha256(f)}
+        {"path": str(f.relative_to(state)), "size_bytes": f.stat().st_size, "sha256": _sha256(f)}
         for f in files
     ]
 
@@ -103,20 +101,20 @@ def create_backup(*, state_dir: str | Path, out_dir: str | Path,
         for f in files:
             tar.add(f, arcname=str(f.relative_to(state)))
         # Add manifest last
-        manifest_bytes = json.dumps(manifest.to_dict(), indent=2,
-                                       sort_keys=True).encode("utf-8")
+        manifest_bytes = json.dumps(manifest.to_dict(), indent=2, sort_keys=True).encode("utf-8")
         info = tarfile.TarInfo("manifest.json")
         info.size = len(manifest_bytes)
         info.mtime = int(time.time())
         import io
+
         tar.addfile(info, io.BytesIO(manifest_bytes))
 
     return bundle_path
 
 
-def restore_backup(bundle_path: str | Path, *,
-                    target_dir: str | Path,
-                    overwrite: bool = False) -> BackupManifest:
+def restore_backup(
+    bundle_path: str | Path, *, target_dir: str | Path, overwrite: bool = False
+) -> BackupManifest:
     """Extract a backup bundle into target_dir.
 
     Returns the loaded BackupManifest. Raises FileExistsError if target
@@ -126,9 +124,7 @@ def restore_backup(bundle_path: str | Path, *,
     target = Path(target_dir).resolve()
     target.mkdir(parents=True, exist_ok=True)
     if not overwrite and any(target.iterdir()):
-        raise FileExistsError(
-            f"target_dir {target} is not empty (use overwrite=True)"
-        )
+        raise FileExistsError(f"target_dir {target} is not empty (use overwrite=True)")
     with tarfile.open(bundle, "r:gz") as tar:
         # Validate manifest first
         manifest_member = None
@@ -138,13 +134,10 @@ def restore_backup(bundle_path: str | Path, *,
                 break
         if manifest_member is None:
             raise ValueError("Backup is missing manifest.json")
-        manifest_data = json.loads(
-            tar.extractfile(manifest_member).read().decode("utf-8")
-        )
+        manifest_data = json.loads(tar.extractfile(manifest_member).read().decode("utf-8"))
         if manifest_data.get("schema_version") != SCHEMA_VERSION:
             raise ValueError(
-                f"Backup schema {manifest_data.get('schema_version')!r} "
-                f"!= {SCHEMA_VERSION!r}"
+                f"Backup schema {manifest_data.get('schema_version')!r} != {SCHEMA_VERSION!r}"
             )
         # Extract everything except the manifest
         for member in tar.getmembers():
@@ -155,8 +148,9 @@ def restore_backup(bundle_path: str | Path, *,
                 raise ValueError(f"Refusing unsafe member: {member.name}")
             tar.extract(member, path=target, filter="data")
 
-    return BackupManifest(**{k: v for k, v in manifest_data.items()
-                              if k in BackupManifest.__dataclass_fields__})
+    return BackupManifest(
+        **{k: v for k, v in manifest_data.items() if k in BackupManifest.__dataclass_fields__}
+    )
 
 
 __all__ = [

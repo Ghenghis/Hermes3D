@@ -17,6 +17,7 @@ effort* — i.e. either ships with that firmware, or the community has produced
 a documented, stable port. Flags do NOT promise a turnkey experience for ports
 that require flashing — see `firmware.notes` for caveats.
 """
+
 from __future__ import annotations
 
 import math
@@ -130,13 +131,13 @@ FLEET: Tuple[PrinterProfile, ...] = (
         enclosed=False,
         firmware=FirmwareSupport(
             klipper=True,  # community port via Speeder Pad / RPi
-            marlin=True,   # ships Marlin 1.1.x derivative
+            marlin=True,  # ships Marlin 1.1.x derivative
             moonraker=True,
             fluidd=True,
             mainsail=True,
             notes="Stock = Marlin (FLSUN custom). Klipper requires RPi + flash. "
-                  "Strong community support (FLSUN North America FAQ, "
-                  "Klipper-Flsun-Speeder-Pad).",
+            "Strong community support (FLSUN North America FAQ, "
+            "Klipper-Flsun-Speeder-Pad).",
         ),
         moonraker_url_default="http://flsun-qqs-pro.local",
         notes="E3D V6 hotend block, 280mm parallel arms, TMC2208 upgradeable.",
@@ -162,7 +163,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,  # FLSUN bundles Mainsail UI
             notes="Ships with Klipper + Mainsail out of the box. HEPA + "
-                  "activated-carbon filter. Dual-gear direct drive.",
+            "activated-carbon filter. Dual-gear direct drive.",
         ),
         moonraker_url_default="http://flsun-t1-a.local",
         notes="Unit A of two T1 printers in fleet.",
@@ -208,12 +209,12 @@ FLEET: Tuple[PrinterProfile, ...] = (
         enclosed=False,
         firmware=FirmwareSupport(
             klipper=True,  # well-documented community port
-            marlin=True,   # stock = Marlin 2.0.8
+            marlin=True,  # stock = Marlin 2.0.8
             moonraker=True,
             fluidd=True,
             mainsail=True,
             notes="Stock = Marlin 2.0.8 (SKR V1.3 or MKS Robin Nano V3 board). "
-                  "Klipper conversion documented on 3D Print Beginner.",
+            "Klipper conversion documented on 3D Print Beginner.",
         ),
         moonraker_url_default="http://flsun-sr.local",
         notes="2GT 10mm belts (1250mm length). 4x TMC2209 drivers.",
@@ -239,11 +240,11 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Ships with vanilla Klipper + Mainsail (Tom's Hardware "
-                  "review confirmed). LIDAR sensor, CPAP cooling, AI camera.",
+            "review confirmed). LIDAR sensor, CPAP cooling, AI camera.",
         ),
         moonraker_url_default="http://flsun-s1.local",
         notes="Reachable Z varies across XY — 432mm at center, ~383mm at "
-              "diameter edge. See 02_architecture/printer_envelopes.md.",
+        "diameter edge. See 02_architecture/printer_envelopes.md.",
     ),
     PrinterProfile(
         profile_id="flsun_v400",
@@ -266,7 +267,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Ships with Klipper preinstalled on FLSUN Speeder Pad. "
-                  "MKS Robin Nano V2.1 controller. Dual-axis linear rails.",
+            "MKS Robin Nano V2.1 controller. Dual-axis linear rails.",
         ),
         moonraker_url_default="http://flsun-v400.local",
         notes="GT2 10mm belts, 1458mm length per belt. Volcano-style hotend.",
@@ -293,7 +294,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Stock = Marlin. Klipper widely documented (Klipper "
-                  "config repo `klipper-config-cr10s`). Add RPi or BTT Pi.",
+            "config repo `klipper-config-cr10s`). Add RPi or BTT Pi.",
         ),
         moonraker_url_default="http://creality-cr10s.local",
         notes="Bed-slinger; Y-axis cantilevered mass limits acceleration.",
@@ -319,7 +320,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Stock = Marlin (Creality custom for CR-6 Touch sensor). "
-                  "Klipper port keeps strain-gauge probe via klicky-style.",
+            "Klipper port keeps strain-gauge probe via klicky-style.",
         ),
         moonraker_url_default="http://creality-cr6max.local",
         notes="Largest cartesian in fleet at 400x400. Strain-gauge bed probe.",
@@ -346,7 +347,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Stock = Tronxy Marlin fork (CXY-V6 board). Klipper port "
-                  "available; flash via SD card.",
+            "available; flash via SD card.",
         ),
         moonraker_url_default="http://tronxy-d01.local",
         notes="CoreXY with linear rails. Enclosed for ABS/ASA.",
@@ -372,7 +373,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Stock = Tronxy Marlin fork. Linear rails, Titan extruder. "
-                  "Klipper config available; community-maintained.",
+            "Klipper config available; community-maintained.",
         ),
         moonraker_url_default="http://tronxy-x5sa.local",
         notes="CoreXY frame; large 330x330 build. Titan extruder remote.",
@@ -394,13 +395,13 @@ FLEET: Tuple[PrinterProfile, ...] = (
         enclosed=False,
         firmware=FirmwareSupport(
             klipper=True,  # well-supported community port
-            marlin=True,   # Prusa-Firmware (Marlin fork)
+            marlin=True,  # Prusa-Firmware (Marlin fork)
             moonraker=True,
             fluidd=True,
             mainsail=True,
             notes="Stock = Prusa-Firmware (Marlin 2.x fork w/ Prusa "
-                  "extensions). Klipper port = github.com/dz0ny/klipper-mk3 "
-                  "or similar. SuperPINDA inductive probe.",
+            "extensions). Klipper port = github.com/dz0ny/klipper-mk3 "
+            "or similar. SuperPINDA inductive probe.",
         ),
         moonraker_url_default="http://prusa-mk3s.local",
         notes="Bondtech extruder, SuperPINDA probe, magnetic flex plate.",
@@ -427,7 +428,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
             fluidd=True,
             mainsail=True,
             notes="Stock = Marlin (Creality-derivative board). Klipper "
-                  "config widely shared on Sovol community Discord/Reddit.",
+            "config widely shared on Sovol community Discord/Reddit.",
         ),
         moonraker_url_default="http://sovol-sv01.local",
         notes="Direct-drive bed-slinger. CR-10-class build volume.",
@@ -452,12 +453,14 @@ def get_profile(profile_id: str) -> PrinterProfile:
     for p in FLEET:
         if p.profile_id == profile_id:
             return p
-    raise KeyError(f"Unknown printer profile_id: {profile_id!r}. "
-                   f"Available: {list_ids()}")
+    raise KeyError(f"Unknown printer profile_id: {profile_id!r}. Available: {list_ids()}")
 
 
-def fits_bed(profile: PrinterProfile, mesh_extents_mm: tuple[float, float, float],
-             mesh_xy_radius_mm: float | None = None) -> Tuple[bool, str]:
+def fits_bed(
+    profile: PrinterProfile,
+    mesh_extents_mm: tuple[float, float, float],
+    mesh_xy_radius_mm: float | None = None,
+) -> Tuple[bool, str]:
     """Check whether a mesh fits the printer's build envelope.
 
     Args:
@@ -475,28 +478,38 @@ def fits_bed(profile: PrinterProfile, mesh_extents_mm: tuple[float, float, float
     dx, dy, dz = mesh_extents_mm
     if profile.bed.kind == "rectangular":
         if dx > profile.bed.x_mm:
-            return False, (f"X extent {dx:.1f}mm exceeds bed X "
-                           f"{profile.bed.x_mm:.1f}mm on {profile.profile_id}")
+            return False, (
+                f"X extent {dx:.1f}mm exceeds bed X "
+                f"{profile.bed.x_mm:.1f}mm on {profile.profile_id}"
+            )
         if dy > profile.bed.y_mm:
-            return False, (f"Y extent {dy:.1f}mm exceeds bed Y "
-                           f"{profile.bed.y_mm:.1f}mm on {profile.profile_id}")
+            return False, (
+                f"Y extent {dy:.1f}mm exceeds bed Y "
+                f"{profile.bed.y_mm:.1f}mm on {profile.profile_id}"
+            )
         if dz > profile.z_height_mm:
-            return False, (f"Z extent {dz:.1f}mm exceeds Z height "
-                           f"{profile.z_height_mm:.1f}mm on {profile.profile_id}")
+            return False, (
+                f"Z extent {dz:.1f}mm exceeds Z height "
+                f"{profile.z_height_mm:.1f}mm on {profile.profile_id}"
+            )
         return True, "fits rectangular bed"
 
     if profile.bed.kind == "circular":
-        radius_needed = (mesh_xy_radius_mm
-                         if mesh_xy_radius_mm is not None
-                         else math.hypot(dx, dy) / 2.0)
+        radius_needed = (
+            mesh_xy_radius_mm if mesh_xy_radius_mm is not None else math.hypot(dx, dy) / 2.0
+        )
         bed_radius = profile.bed.diameter_mm / 2.0
         if radius_needed > bed_radius:
-            return False, (f"XY radius {radius_needed:.1f}mm exceeds bed "
-                           f"radius {bed_radius:.1f}mm on "
-                           f"{profile.profile_id} (delta circular bed)")
+            return False, (
+                f"XY radius {radius_needed:.1f}mm exceeds bed "
+                f"radius {bed_radius:.1f}mm on "
+                f"{profile.profile_id} (delta circular bed)"
+            )
         if dz > profile.z_height_mm:
-            return False, (f"Z extent {dz:.1f}mm exceeds Z height "
-                           f"{profile.z_height_mm:.1f}mm on {profile.profile_id}")
+            return False, (
+                f"Z extent {dz:.1f}mm exceeds Z height "
+                f"{profile.z_height_mm:.1f}mm on {profile.profile_id}"
+            )
         return True, "fits circular bed"
 
     return False, f"unknown bed kind {profile.bed.kind!r}"

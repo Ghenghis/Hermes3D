@@ -20,6 +20,7 @@ its own.
 
 This is the "last line of defense" before filament is committed.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -30,8 +31,8 @@ from typing import Any
 
 class PreflightOutcome(str, enum.Enum):
     PASS = "pass"
-    WARN = "warn"   # proceed, but the user should know
-    FAIL = "fail"   # do not proceed
+    WARN = "warn"  # proceed, but the user should know
+    FAIL = "fail"  # do not proceed
 
 
 @dataclass(frozen=True)
@@ -64,10 +65,7 @@ class PreflightReport:
             "passed": self.passed,
             "has_warnings": self.has_warnings,
             "timestamp_unix": self.timestamp_unix,
-            "checks": [
-                {**dataclasses.asdict(c), "outcome": c.outcome.value}
-                for c in self.checks
-            ],
+            "checks": [{**dataclasses.asdict(c), "outcome": c.outcome.value} for c in self.checks],
         }
 
 
@@ -116,8 +114,7 @@ def check_printer_state(live_state: dict[str, Any]) -> CheckResult:
     )
 
 
-def check_spool(spool, required_grams: float, required_material: str
-                ) -> CheckResult:
+def check_spool(spool, required_grams: float, required_material: str) -> CheckResult:
     """Verify a loaded spool has enough filament of the right material.
 
     ``spool`` may be None (no spool tracked). In that case, the check is
@@ -133,15 +130,16 @@ def check_spool(spool, required_grams: float, required_material: str
         return CheckResult(
             name="spool",
             outcome=PreflightOutcome.FAIL,
-            message=(f"Loaded spool is {spool.material} but job needs "
-                     f"{required_material}"),
+            message=(f"Loaded spool is {spool.material} but job needs {required_material}"),
         )
     if spool.remaining_grams < required_grams:
         return CheckResult(
             name="spool",
             outcome=PreflightOutcome.FAIL,
-            message=(f"Loaded spool has only {spool.remaining_grams:.0f}g; "
-                     f"job needs {required_grams:.0f}g"),
+            message=(
+                f"Loaded spool has only {spool.remaining_grams:.0f}g; "
+                f"job needs {required_grams:.0f}g"
+            ),
         )
     margin = spool.remaining_grams - required_grams
     if margin < 50:
@@ -182,8 +180,9 @@ def check_budget(cost_estimate, budget_usd: float | None) -> CheckResult:
         return CheckResult(
             name="budget",
             outcome=PreflightOutcome.FAIL,
-            message=(f"Estimated ${cost_estimate.total_cost_usd:.2f} exceeds "
-                     f"cap ${budget_usd:.2f}"),
+            message=(
+                f"Estimated ${cost_estimate.total_cost_usd:.2f} exceeds cap ${budget_usd:.2f}"
+            ),
         )
     return CheckResult(
         name="budget",
@@ -208,29 +207,36 @@ def check_gcode_risks(analysis) -> CheckResult:
     )
 
 
-def run_preflight(*, printer_id: str, job_id: str | None = None,
-                   truth_gate_report=None,
-                   live_state: dict[str, Any] | None = None,
-                   spool=None, required_grams: float = 0.0,
-                   required_material: str = "PLA",
-                   schedule_decision=None,
-                   cost_estimate=None, budget_usd: float | None = None,
-                   gcode_analysis=None,
-                   ) -> PreflightReport:
+def run_preflight(
+    *,
+    printer_id: str,
+    job_id: str | None = None,
+    truth_gate_report=None,
+    live_state: dict[str, Any] | None = None,
+    spool=None,
+    required_grams: float = 0.0,
+    required_material: str = "PLA",
+    schedule_decision=None,
+    cost_estimate=None,
+    budget_usd: float | None = None,
+    gcode_analysis=None,
+) -> PreflightReport:
     """Run the full preflight checklist. Each input is optional — the
     corresponding check is skipped when its data is missing.
     """
     import time
+
     report = PreflightReport(
-        printer_id=printer_id, job_id=job_id, timestamp_unix=time.time(),
+        printer_id=printer_id,
+        job_id=job_id,
+        timestamp_unix=time.time(),
     )
     if truth_gate_report is not None:
         report.checks.append(check_truth_gate(truth_gate_report))
     if live_state is not None:
         report.checks.append(check_printer_state(live_state))
     if spool is not None or required_grams > 0:
-        report.checks.append(
-            check_spool(spool, required_grams, required_material))
+        report.checks.append(check_spool(spool, required_grams, required_material))
     if schedule_decision is not None:
         report.checks.append(check_schedule(schedule_decision))
     if cost_estimate is not None:

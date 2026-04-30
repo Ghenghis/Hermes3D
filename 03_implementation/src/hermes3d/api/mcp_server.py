@@ -25,6 +25,7 @@ Run with::
 
     python -m hermes3d.api.mcp_server
 """
+
 from __future__ import annotations
 
 import json
@@ -46,8 +47,11 @@ log = logging.getLogger("hermes3d.mcp")
 
 def _tool_dispatch(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.dispatcher import (
-        DispatchRequest, DispatchStrategy, dispatch,
+        DispatchRequest,
+        DispatchStrategy,
+        dispatch,
     )
+
     req = DispatchRequest(
         mesh_extents_mm=tuple(arguments["mesh_extents_mm"]),
         mesh_xy_radius_mm=arguments.get("mesh_xy_radius_mm"),
@@ -62,8 +66,12 @@ def _tool_dispatch(arguments: dict[str, Any]) -> dict[str, Any]:
         "selected_printer_id": decision.selected_printer_id,
         "rationale": decision.rationale,
         "candidates": [
-            {"printer_id": c.printer_id, "score": c.score,
-             "eligible": c.eligible, "blockers": list(c.blockers)}
+            {
+                "printer_id": c.printer_id,
+                "score": c.score,
+                "eligible": c.eligible,
+                "blockers": list(c.blockers),
+            }
             for c in decision.candidates[:5]
         ],
     }
@@ -73,20 +81,21 @@ def _tool_fleet_status(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.farm.dashboard import collect_fleet_status
     from hermes3d.core.agents.job_queue import JobQueue
     from hermes3d.core.farm.spool_tracker import SpoolTracker
+
     qpath = arguments.get("queue_path", os.environ.get("HERMES3D_QUEUE", ""))
     spath = arguments.get("spools_path", os.environ.get("HERMES3D_SPOOLS", ""))
     queue = JobQueue(qpath) if qpath and Path(qpath).exists() else None
     spools = SpoolTracker(spath) if spath and Path(spath).exists() else None
-    entries = collect_fleet_status(queue=queue, spool_tracker=spools,
-                                    timeout_s=float(arguments.get("timeout_s", 2.5)))
+    entries = collect_fleet_status(
+        queue=queue, spool_tracker=spools, timeout_s=float(arguments.get("timeout_s", 2.5))
+    )
     return {"fleet": [e.to_dict() for e in entries]}
 
 
 def _tool_queue_list(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.job_queue import JobQueue, JobState
-    qpath = arguments.get("queue_path",
-                            os.environ.get("HERMES3D_QUEUE",
-                                            "./var/queue.json"))
+
+    qpath = arguments.get("queue_path", os.environ.get("HERMES3D_QUEUE", "./var/queue.json"))
     queue = JobQueue(qpath)
     state = arguments.get("state")
     jobs = queue.list(state=JobState(state) if state else None)
@@ -95,9 +104,8 @@ def _tool_queue_list(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _tool_queue_enqueue(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.job_queue import JobQueue
-    qpath = arguments.get("queue_path",
-                            os.environ.get("HERMES3D_QUEUE",
-                                            "./var/queue.json"))
+
+    qpath = arguments.get("queue_path", os.environ.get("HERMES3D_QUEUE", "./var/queue.json"))
     queue = JobQueue(qpath)
     j = queue.enqueue(
         mesh_path=arguments["mesh_path"],
@@ -113,43 +121,51 @@ def _tool_queue_enqueue(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _tool_queue_cancel(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.job_queue import JobQueue, JobState
-    qpath = arguments.get("queue_path",
-                            os.environ.get("HERMES3D_QUEUE",
-                                            "./var/queue.json"))
+
+    qpath = arguments.get("queue_path", os.environ.get("HERMES3D_QUEUE", "./var/queue.json"))
     queue = JobQueue(qpath)
-    j = queue.transition_job(arguments["job_id"], JobState.CANCELLED,
-                                reason="cancel via MCP")
+    j = queue.transition_job(arguments["job_id"], JobState.CANCELLED, reason="cancel via MCP")
     return {"job": j.to_dict()}
 
 
 def _tool_spool_list(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.farm.spool_tracker import SpoolTracker
-    spath = arguments.get("spools_path",
-                            os.environ.get("HERMES3D_SPOOLS",
-                                            "./var/spools.json"))
+
+    spath = arguments.get("spools_path", os.environ.get("HERMES3D_SPOOLS", "./var/spools.json"))
     st = SpoolTracker(spath)
-    return {"spools": [s.to_dict() for s in st.list(
-        printer_id=arguments.get("printer_id"),
-        material=arguments.get("material"),
-    )]}
+    return {
+        "spools": [
+            s.to_dict()
+            for s in st.list(
+                printer_id=arguments.get("printer_id"),
+                material=arguments.get("material"),
+            )
+        ]
+    }
 
 
 def _tool_proof_verify(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.proof.proof_envelope import (
-        ProofVerificationError, verify_proof,
+        ProofVerificationError,
+        verify_proof,
     )
+
     try:
-        env = verify_proof(arguments["proof_path"],
-                            check_files=bool(arguments.get("check_files", True)))
-        return {"verified": True,
-                "schema_version": env.schema_version,
-                "mesh_sha256": env.mesh.get("sha256")}
+        env = verify_proof(
+            arguments["proof_path"], check_files=bool(arguments.get("check_files", True))
+        )
+        return {
+            "verified": True,
+            "schema_version": env.schema_version,
+            "mesh_sha256": env.mesh.get("sha256"),
+        }
     except ProofVerificationError as exc:
         return {"verified": False, "error": str(exc)}
 
 
 def _tool_estimate_cost(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.farm.cost_estimator import estimate_cost
+
     e = estimate_cost(
         printer_id=arguments["printer_id"],
         material=arguments["material"],
@@ -163,19 +179,25 @@ def _tool_estimate_cost(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _tool_list_materials(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.materials import MATERIALS
-    return {"materials": [
-        {"material": m.material,
-         "hotend_typical_c": m.hotend_typical_c,
-         "bed_typical_c": m.bed_typical_c,
-         "requires_enclosure": m.requires_enclosure,
-         "requires_direct_drive": m.requires_direct_drive,
-         "notes": m.notes}
-        for m in MATERIALS
-    ]}
+
+    return {
+        "materials": [
+            {
+                "material": m.material,
+                "hotend_typical_c": m.hotend_typical_c,
+                "bed_typical_c": m.bed_typical_c,
+                "requires_enclosure": m.requires_enclosure,
+                "requires_direct_drive": m.requires_direct_drive,
+                "notes": m.notes,
+            }
+            for m in MATERIALS
+        ]
+    }
 
 
 def _tool_truth_gate(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.validation.truth_gate import TruthGateConfig, run_truth_gate
+
     cfg = TruthGateConfig(printer_profile_id=arguments.get("printer_id"))
     rep = run_truth_gate(arguments["mesh_path"], cfg)
     return {
@@ -183,8 +205,12 @@ def _tool_truth_gate(arguments: dict[str, Any]) -> dict[str, Any]:
         "overall_status": rep.overall_status.value,
         "duration_seconds": rep.duration_seconds,
         "checks": [
-            {"name": c.name, "status": c.status.value, "message": c.message,
-             "measurement": c.measurement}
+            {
+                "name": c.name,
+                "status": c.status.value,
+                "message": c.message,
+                "measurement": c.measurement,
+            }
             for c in rep.checks
         ],
     }
@@ -192,9 +218,8 @@ def _tool_truth_gate(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _tool_skill_list(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.memory import SkillKind, SkillStore
-    spath = arguments.get("skills_path",
-                            os.environ.get("HERMES3D_SKILLS",
-                                            "./var/skills.json"))
+
+    spath = arguments.get("skills_path", os.environ.get("HERMES3D_SKILLS", "./var/skills.json"))
     store = SkillStore(spath)
     kind = SkillKind(arguments["kind"]) if "kind" in arguments else None
     return {"skills": [s.to_dict() for s in store.list(kind=kind)]}
@@ -202,9 +227,8 @@ def _tool_skill_list(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _tool_skill_lookup(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.memory import SkillKind, SkillStore
-    spath = arguments.get("skills_path",
-                            os.environ.get("HERMES3D_SKILLS",
-                                            "./var/skills.json"))
+
+    spath = arguments.get("skills_path", os.environ.get("HERMES3D_SKILLS", "./var/skills.json"))
     store = SkillStore(spath)
     matches = store.lookup(
         kind=SkillKind(arguments["kind"]),
@@ -221,30 +245,31 @@ def _tool_predict_failure(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.farm.print_history import PrintHistory
     from hermes3d.core.intelligence import predict_failure
     from hermes3d.core.memory import SkillStore
-    hpath = arguments.get("history_path",
-                            os.environ.get("HERMES3D_HISTORY", ""))
-    spath = arguments.get("skills_path",
-                            os.environ.get("HERMES3D_SKILLS", ""))
+
+    hpath = arguments.get("history_path", os.environ.get("HERMES3D_HISTORY", ""))
+    spath = arguments.get("skills_path", os.environ.get("HERMES3D_SKILLS", ""))
     history = PrintHistory(hpath) if hpath else None
     skills = SkillStore(spath) if spath else None
     f = predict_failure(
         printer_id=arguments["printer_id"],
         material=arguments["material"],
-        history=history, skills=skills,
+        history=history,
+        skills=skills,
     )
     return f.to_dict()
 
 
 def _tool_analyze_mesh(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.mesh_analyzer import analyze_mesh_file
+
     return analyze_mesh_file(arguments["mesh_path"]).to_dict()
 
 
 def _tool_generate_profile(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.memory import SkillStore
     from hermes3d.core.slicer.profile_generator import generate_profile
-    spath = arguments.get("skills_path",
-                            os.environ.get("HERMES3D_SKILLS", ""))
+
+    spath = arguments.get("skills_path", os.environ.get("HERMES3D_SKILLS", ""))
     skills = SkillStore(spath) if spath else None
     p = generate_profile(
         printer_id=arguments["printer_id"],
@@ -266,8 +291,10 @@ def _tool_generate_profile(arguments: dict[str, Any]) -> dict[str, Any]:
 
 def _tool_parallel_plan(arguments: dict[str, Any]) -> dict[str, Any]:
     from hermes3d.core.agents.parallel_planner import (
-        PartRequest, plan_parallel_print,
+        PartRequest,
+        plan_parallel_print,
     )
+
     parts = [
         PartRequest(
             part_id=p["part_id"],
@@ -292,28 +319,40 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.dispatch",
         "description": "Pick the best printer in the 12-printer fleet for a "
-                       "given mesh + material + strategy. Returns the chosen "
-                       "printer plus full candidate scoring table.",
+        "given mesh + material + strategy. Returns the chosen "
+        "printer plus full candidate scoring table.",
         "inputSchema": {
             "type": "object",
             "required": ["mesh_extents_mm"],
             "properties": {
                 "mesh_extents_mm": {
-                    "type": "array", "items": {"type": "number"},
-                    "minItems": 3, "maxItems": 3,
+                    "type": "array",
+                    "items": {"type": "number"},
+                    "minItems": 3,
+                    "maxItems": 3,
                     "description": "Bounding-box dimensions (dx, dy, dz) in mm",
                 },
                 "mesh_xy_radius_mm": {"type": ["number", "null"]},
                 "material": {"type": "string", "default": "PLA"},
-                "quality_level": {"type": "string",
-                                   "enum": ["draft", "normal", "fine"],
-                                   "default": "normal"},
-                "strategy": {"type": "string",
-                              "enum": ["auto", "fastest", "quality",
-                                       "largest_bed", "smallest_fit",
-                                       "least_busy", "delta_prefer",
-                                       "cartesian_prefer"],
-                              "default": "auto"},
+                "quality_level": {
+                    "type": "string",
+                    "enum": ["draft", "normal", "fine"],
+                    "default": "normal",
+                },
+                "strategy": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "fastest",
+                        "quality",
+                        "largest_bed",
+                        "smallest_fit",
+                        "least_busy",
+                        "delta_prefer",
+                        "cartesian_prefer",
+                    ],
+                    "default": "auto",
+                },
                 "excluded_printers": {"type": "array", "items": {"type": "string"}},
                 "allowed_printers": {"type": "array", "items": {"type": "string"}},
             },
@@ -323,7 +362,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.fleet_status",
         "description": "Get live state (reachable, klippy_state, active job, "
-                       "loaded spool) of every printer in the fleet.",
+        "loaded spool) of every printer in the fleet.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -381,7 +420,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.spool_list",
         "description": "Inventory of registered filament spools "
-                       "(material, color, vendor, remaining grams, loaded printer).",
+        "(material, color, vendor, remaining grams, loaded printer).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -407,8 +446,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "hermes3d.estimate_cost",
-        "description": "Compute filament + electricity cost for a print "
-                       "(USD + Wh).",
+        "description": "Compute filament + electricity cost for a print (USD + Wh).",
         "inputSchema": {
             "type": "object",
             "required": ["printer_id", "material", "filament_g", "duration_hours"],
@@ -425,15 +463,14 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "hermes3d.list_materials",
-        "description": "Catalog of supported filament materials and their "
-                       "printer requirements.",
+        "description": "Catalog of supported filament materials and their printer requirements.",
         "inputSchema": {"type": "object", "properties": {}},
         "_handler": _tool_list_materials,
     },
     {
         "name": "hermes3d.truth_gate",
         "description": "Run the Truth Gate (printability validation) on a mesh "
-                       "file. Optionally validates against a specific printer.",
+        "file. Optionally validates against a specific printer.",
         "inputSchema": {
             "type": "object",
             "required": ["mesh_path"],
@@ -447,9 +484,9 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.skill_list",
         "description": "List all skills the agent has learned. Optional kind "
-                       "filter (parameter_override, printer_quirk, "
-                       "material_quirk, scheduling_pref, user_preference, "
-                       "failure_pattern).",
+        "filter (parameter_override, printer_quirk, "
+        "material_quirk, scheduling_pref, user_preference, "
+        "failure_pattern).",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -462,7 +499,7 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.skill_lookup",
         "description": "Look up skills matching a specific (printer × material "
-                       "× quality × hour) scope. Returns most-specific first.",
+        "× quality × hour) scope. Returns most-specific first.",
         "inputSchema": {
             "type": "object",
             "required": ["kind"],
@@ -481,9 +518,9 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.predict_failure",
         "description": "Estimate failure probability for a (printer × "
-                       "material) combo. Blends print history, material "
-                       "history, and skill signals into a calibrated "
-                       "probability with citations.",
+        "material) combo. Blends print history, material "
+        "history, and skill signals into a calibrated "
+        "probability with citations.",
         "inputSchema": {
             "type": "object",
             "required": ["printer_id", "material"],
@@ -499,9 +536,9 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.analyze_mesh",
         "description": "Geometric analysis: bbox, volume, overhang area + "
-                       "percentage, support volume estimate, bridge spans, "
-                       "first-layer area, height/aspect ratio, COM offset, "
-                       "thin-wall counts, and risk flags.",
+        "percentage, support volume estimate, bridge spans, "
+        "first-layer area, height/aspect ratio, COM offset, "
+        "thin-wall counts, and risk flags.",
         "inputSchema": {
             "type": "object",
             "required": ["mesh_path"],
@@ -512,8 +549,8 @@ TOOLS: list[dict[str, Any]] = [
     {
         "name": "hermes3d.generate_profile",
         "description": "Auto-generate a PrusaSlicer/OrcaSlicer .ini profile "
-                       "for a (printer × material × quality) combo. Applies "
-                       "matching parameter-override skills.",
+        "for a (printer × material × quality) combo. Applies "
+        "matching parameter-override skills.",
         "inputSchema": {
             "type": "object",
             "required": ["printer_id", "material"],
@@ -529,8 +566,7 @@ TOOLS: list[dict[str, Any]] = [
     },
     {
         "name": "hermes3d.parallel_plan",
-        "description": "Plan a parallel print across multiple idle printers, "
-                       "one part per printer.",
+        "description": "Plan a parallel print across multiple idle printers, one part per printer.",
         "inputSchema": {
             "type": "object",
             "required": ["parts"],
@@ -542,9 +578,12 @@ TOOLS: list[dict[str, Any]] = [
                         "required": ["part_id", "mesh_extents_mm"],
                         "properties": {
                             "part_id": {"type": "string"},
-                            "mesh_extents_mm": {"type": "array",
-                                                  "items": {"type": "number"},
-                                                  "minItems": 3, "maxItems": 3},
+                            "mesh_extents_mm": {
+                                "type": "array",
+                                "items": {"type": "number"},
+                                "minItems": 3,
+                                "maxItems": 3,
+                            },
                             "mesh_xy_radius_mm": {"type": "number"},
                             "material": {"type": "string"},
                             "quality_level": {"type": "string"},
@@ -553,8 +592,7 @@ TOOLS: list[dict[str, Any]] = [
                     },
                 },
                 "max_parallel_printers": {"type": "integer"},
-                "excluded_printers": {"type": "array",
-                                       "items": {"type": "string"}},
+                "excluded_printers": {"type": "array", "items": {"type": "string"}},
             },
         },
         "_handler": _tool_parallel_plan,
@@ -589,8 +627,7 @@ def _ok(req_id: Any, result: Any) -> None:
 
 
 def _err(req_id: Any, code: int, message: str) -> None:
-    _send({"jsonrpc": "2.0", "id": req_id,
-            "error": {"code": code, "message": message}})
+    _send({"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}})
 
 
 def serve_stdio() -> int:
@@ -610,12 +647,14 @@ def serve_stdio() -> int:
         params = msg.get("params") or {}
         try:
             if method == "initialize":
-                _ok(req_id, {
-                    "protocolVersion": "2024-11-05",
-                    "capabilities": {"tools": {}},
-                    "serverInfo": {"name": "hermes3d-os-lite",
-                                    "version": "5.0.0"},
-                })
+                _ok(
+                    req_id,
+                    {
+                        "protocolVersion": "2024-11-05",
+                        "capabilities": {"tools": {}},
+                        "serverInfo": {"name": "hermes3d-os-lite", "version": "5.0.0"},
+                    },
+                )
             elif method == "tools/list":
                 _ok(req_id, {"tools": _public_tools()})
             elif method == "tools/call":
@@ -623,10 +662,12 @@ def serve_stdio() -> int:
                 args = params.get("arguments", {})
                 handler = get_handler(name)
                 result = handler(args)
-                _ok(req_id, {
-                    "content": [{"type": "text",
-                                  "text": json.dumps(result, indent=2)}],
-                })
+                _ok(
+                    req_id,
+                    {
+                        "content": [{"type": "text", "text": json.dumps(result, indent=2)}],
+                    },
+                )
             elif method == "ping":
                 _ok(req_id, {})
             elif method == "shutdown":
@@ -642,9 +683,9 @@ def serve_stdio() -> int:
 
 
 def main() -> int:
-    logging.basicConfig(level=logging.INFO,
-                          format="%(asctime)s mcp %(levelname)s %(message)s",
-                          stream=sys.stderr)
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s mcp %(levelname)s %(message)s", stream=sys.stderr
+    )
     return serve_stdio()
 
 

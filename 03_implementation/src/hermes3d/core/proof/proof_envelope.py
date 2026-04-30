@@ -21,6 +21,7 @@ it is unset, a default key is used which is logged (proof remains valid for
 self-check but is NOT cryptographically sealed against tampering by anyone
 who has the source). Production deployments MUST set HERMES3D_PROOF_KEY.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -58,6 +59,7 @@ class ProofVerificationError(Exception):
 @dataclass
 class VisualEvidence:
     """Path + hash + view name for a single rendered evidence image."""
+
     path: str
     sha256: str
     view_name: str
@@ -105,8 +107,7 @@ class ProofEnvelope:
             mesh=d["mesh"],
             truth_gate_report=d["truth_gate_report"],
             slicer_report=d.get("slicer_report"),
-            visual_evidence=[VisualEvidence.from_dict(v)
-                             for v in d.get("visual_evidence", [])],
+            visual_evidence=[VisualEvidence.from_dict(v) for v in d.get("visual_evidence", [])],
             signature=d.get("signature"),
         )
 
@@ -176,9 +177,7 @@ def write_proof(
     truth_gate_config: TruthGateConfig | None = None,
     truth_gate_report: TruthGateReport | dict[str, Any] | None = None,
     slicer_report: dict[str, Any] | None = None,
-    visual_evidence_paths: (
-        list[tuple[str, str | Path]] | list[Path] | list[str] | None
-    ) = None,
+    visual_evidence_paths: (list[tuple[str, str | Path]] | list[Path] | list[str] | None) = None,
     timestamp_unix: float | None = None,
 ) -> Path:
     """Build, sign, and write a proof envelope JSON file.
@@ -243,11 +242,13 @@ def write_proof(
     for view_name, ep in normalised:
         if not ep.is_file():
             raise FileNotFoundError(f"visual evidence not found: {ep}")
-        visual_evidence.append(VisualEvidence(
-            path=str(ep.resolve()),
-            sha256=_file_sha256(ep),
-            view_name=view_name,
-        ))
+        visual_evidence.append(
+            VisualEvidence(
+                path=str(ep.resolve()),
+                sha256=_file_sha256(ep),
+                view_name=view_name,
+            )
+        )
 
     ts = float(timestamp_unix) if timestamp_unix is not None else time.time()
     envelope = ProofEnvelope(
@@ -320,9 +321,7 @@ def verify_proof(proof_path: str | Path, *, check_files: bool = True) -> ProofEn
             if not ep.is_file():
                 raise ProofVerificationError(f"visual evidence not found: {ep}")
             if _file_sha256(ep) != ve.sha256:
-                raise ProofVerificationError(
-                    f"visual evidence hash mismatch: {ep}"
-                )
+                raise ProofVerificationError(f"visual evidence hash mismatch: {ep}")
 
     return envelope
 

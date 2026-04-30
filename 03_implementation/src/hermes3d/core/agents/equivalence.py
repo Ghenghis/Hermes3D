@@ -15,6 +15,7 @@ dispatcher can:
 Equivalence groups are defined declaratively (no LLM judgement needed).
 The user can extend the catalog by editing config/equivalence_groups.toml.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -29,7 +30,7 @@ class EquivalenceGroup:
     """A set of printers treated as interchangeable."""
 
     group_id: str
-    members: tuple[str, ...]      # profile_ids
+    members: tuple[str, ...]  # profile_ids
     description: str = ""
 
     def to_dict(self) -> dict[str, Any]:
@@ -52,18 +53,20 @@ def list_groups(extra: Iterable[EquivalenceGroup] = ()) -> list[EquivalenceGroup
     return list(DEFAULT_GROUPS) + list(extra)
 
 
-def find_group_for(printer_id: str,
-                   groups: Iterable[EquivalenceGroup] = DEFAULT_GROUPS,
-                   ) -> EquivalenceGroup | None:
+def find_group_for(
+    printer_id: str,
+    groups: Iterable[EquivalenceGroup] = DEFAULT_GROUPS,
+) -> EquivalenceGroup | None:
     for g in groups:
         if printer_id in g.members:
             return g
     return None
 
 
-def least_busy_member(group: EquivalenceGroup,
-                       live_state: dict[str, dict[str, Any]],
-                       ) -> str:
+def least_busy_member(
+    group: EquivalenceGroup,
+    live_state: dict[str, dict[str, Any]],
+) -> str:
     """Pick the least-busy member of a group given Moonraker live state.
 
     Order of preference:
@@ -91,10 +94,11 @@ def least_busy_member(group: EquivalenceGroup,
     return min(group.members, key=rank)
 
 
-def expand_pool_request(printer_id: str,
-                         live_state: dict[str, dict[str, Any]] | None = None,
-                         groups: Iterable[EquivalenceGroup] = DEFAULT_GROUPS,
-                         ) -> str:
+def expand_pool_request(
+    printer_id: str,
+    live_state: dict[str, dict[str, Any]] | None = None,
+    groups: Iterable[EquivalenceGroup] = DEFAULT_GROUPS,
+) -> str:
     """If ``printer_id`` names a group, resolve to a concrete printer.
 
     If ``printer_id`` names a real printer, return it unchanged.

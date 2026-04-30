@@ -15,6 +15,7 @@ Each notification is dispatched best-effort — failures are logged but do
 not raise. Crucial: the calling pipeline must never wedge because a Slack
 outage prevented a "print started" message from sending.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -62,8 +63,13 @@ class NotificationResult:
 # =============================================================================
 
 
-def _post_json(url: str, payload: dict[str, Any], *, timeout_s: float = 5.0,
-               headers: dict[str, str] | None = None) -> tuple[bool, str | None]:
+def _post_json(
+    url: str,
+    payload: dict[str, Any],
+    *,
+    timeout_s: float = 5.0,
+    headers: dict[str, str] | None = None,
+) -> tuple[bool, str | None]:
     """POST JSON to a webhook. Returns (sent, error_message)."""
     body = json.dumps(payload).encode("utf-8")
     h = {"Content-Type": "application/json"}
@@ -86,10 +92,10 @@ def _post_json(url: str, payload: dict[str, Any], *, timeout_s: float = 5.0,
 # -- Discord -----------------------------------------------------------------
 
 _DISCORD_COLOR = {
-    NotificationLevel.INFO: 0x3498DB,     # blue
+    NotificationLevel.INFO: 0x3498DB,  # blue
     NotificationLevel.SUCCESS: 0x2ECC71,  # green
     NotificationLevel.WARNING: 0xF39C12,  # orange
-    NotificationLevel.ERROR: 0xE74C3C,    # red
+    NotificationLevel.ERROR: 0xE74C3C,  # red
 }
 
 
@@ -102,19 +108,22 @@ def discord_payload(event: NotificationEvent) -> dict[str, Any]:
     for k, v in event.extra.items():
         fields.append({"name": str(k), "value": str(v)[:200], "inline": True})
     return {
-        "embeds": [{
-            "title": event.title[:256],
-            "description": event.message[:4000],
-            "color": _DISCORD_COLOR[event.level],
-            "fields": fields[:25],
-            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-            "footer": {"text": "Hermes3D-OS Lite"},
-        }],
+        "embeds": [
+            {
+                "title": event.title[:256],
+                "description": event.message[:4000],
+                "color": _DISCORD_COLOR[event.level],
+                "fields": fields[:25],
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "footer": {"text": "Hermes3D-OS Lite"},
+            }
+        ],
     }
 
 
-def send_discord(url: str, event: NotificationEvent, *,
-                 timeout_s: float = 5.0) -> NotificationResult:
+def send_discord(
+    url: str, event: NotificationEvent, *, timeout_s: float = 5.0
+) -> NotificationResult:
     sent, err = _post_json(url, discord_payload(event), timeout_s=timeout_s)
     return NotificationResult(channel="discord", sent=sent, error=err)
 
@@ -138,19 +147,20 @@ def slack_payload(event: NotificationEvent) -> dict[str, Any]:
     for k, v in event.extra.items():
         fields.append({"title": str(k), "value": str(v)[:200], "short": True})
     return {
-        "attachments": [{
-            "color": _SLACK_COLOR[event.level],
-            "title": event.title[:256],
-            "text": event.message[:4000],
-            "fields": fields[:20],
-            "footer": "Hermes3D-OS Lite",
-            "ts": int(time.time()),
-        }],
+        "attachments": [
+            {
+                "color": _SLACK_COLOR[event.level],
+                "title": event.title[:256],
+                "text": event.message[:4000],
+                "fields": fields[:20],
+                "footer": "Hermes3D-OS Lite",
+                "ts": int(time.time()),
+            }
+        ],
     }
 
 
-def send_slack(url: str, event: NotificationEvent, *,
-               timeout_s: float = 5.0) -> NotificationResult:
+def send_slack(url: str, event: NotificationEvent, *, timeout_s: float = 5.0) -> NotificationResult:
     sent, err = _post_json(url, slack_payload(event), timeout_s=timeout_s)
     return NotificationResult(channel="slack", sent=sent, error=err)
 
@@ -158,8 +168,9 @@ def send_slack(url: str, event: NotificationEvent, *,
 # -- Generic webhook ---------------------------------------------------------
 
 
-def send_generic(url: str, event: NotificationEvent, *,
-                 timeout_s: float = 5.0) -> NotificationResult:
+def send_generic(
+    url: str, event: NotificationEvent, *, timeout_s: float = 5.0
+) -> NotificationResult:
     payload = {
         "title": event.title,
         "message": event.message,
@@ -180,10 +191,14 @@ def send_generic(url: str, event: NotificationEvent, *,
 class Notifier:
     """Dispatches an event to every channel configured via env vars."""
 
-    def __init__(self, *, timeout_s: float = 5.0,
-                 discord_url: str | None = None,
-                 slack_url: str | None = None,
-                 generic_url: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        timeout_s: float = 5.0,
+        discord_url: str | None = None,
+        slack_url: str | None = None,
+        generic_url: str | None = None,
+    ) -> None:
         self.timeout_s = timeout_s
         self.discord_url = discord_url or os.environ.get("HERMES3D_DISCORD_WEBHOOK")
         self.slack_url = slack_url or os.environ.get("HERMES3D_SLACK_WEBHOOK")

@@ -17,6 +17,7 @@ The dispatcher's "least-busy" and future ML-driven scoring strategies can
 read these aggregates to bias selection — e.g. avoid the printer with a
 70% recent failure rate.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -83,9 +84,17 @@ class PrintHistory:
         self.path = Path(path)
         self._lock = threading.RLock()
 
-    def append(self, *, job_id: str, printer_id: str, material: str,
-               started_unix: float, ended_unix: float, success: bool,
-               **kwargs: Any) -> PrintRecord:
+    def append(
+        self,
+        *,
+        job_id: str,
+        printer_id: str,
+        material: str,
+        started_unix: float,
+        ended_unix: float,
+        success: bool,
+        **kwargs: Any,
+    ) -> PrintRecord:
         record = PrintRecord(
             record_id=uuid.uuid4().hex,
             job_id=job_id,
@@ -99,11 +108,16 @@ class PrintHistory:
         with self._lock:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as fh:
-                fh.write(json.dumps({
-                    "schema_version": SCHEMA_VERSION,
-                    "record": record.to_dict(),
-                    "appended_unix": time.time(),
-                }) + "\n")
+                fh.write(
+                    json.dumps(
+                        {
+                            "schema_version": SCHEMA_VERSION,
+                            "record": record.to_dict(),
+                            "appended_unix": time.time(),
+                        }
+                    )
+                    + "\n"
+                )
         return record
 
     def iter_records(self) -> Iterable[PrintRecord]:
@@ -165,9 +179,9 @@ class FleetMetrics:
     window_end_unix: float | None = None
 
 
-def aggregate_metrics(history: PrintHistory, *,
-                       since_unix: float | None = None,
-                       until_unix: float | None = None) -> FleetMetrics:
+def aggregate_metrics(
+    history: PrintHistory, *, since_unix: float | None = None, until_unix: float | None = None
+) -> FleetMetrics:
     metrics = FleetMetrics()
     earliest = None
     latest = None
@@ -180,8 +194,7 @@ def aggregate_metrics(history: PrintHistory, *,
         latest = r.ended_unix if latest is None else max(latest, r.ended_unix)
         metrics.total_prints += 1
 
-        pa = metrics.per_printer.setdefault(
-            r.printer_id, PrinterAggregate(printer_id=r.printer_id))
+        pa = metrics.per_printer.setdefault(r.printer_id, PrinterAggregate(printer_id=r.printer_id))
         pa.total_prints += 1
         if r.success:
             pa.successful += 1
@@ -194,8 +207,8 @@ def aggregate_metrics(history: PrintHistory, *,
             pa.total_filament_grams += r.filament_used_g
 
         ma = metrics.per_material.setdefault(
-            r.material.upper(),
-            MaterialAggregate(material=r.material.upper()))
+            r.material.upper(), MaterialAggregate(material=r.material.upper())
+        )
         ma.total_prints += 1
         if r.success:
             ma.successful += 1

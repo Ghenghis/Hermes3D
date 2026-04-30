@@ -18,6 +18,7 @@ Built-in skill packs ship in `config/skill_packs/`:
 Users export their own packs to share with the community (no PII —
 the export filter strips spool_id, job_id, and any user-named fields).
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -31,7 +32,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from hermes3d.core.memory import (
-    Skill, SkillKind, SkillScope, SkillStore, SCHEMA_VERSION,
+    Skill,
+    SkillKind,
+    SkillScope,
+    SkillStore,
+    SCHEMA_VERSION,
 )
 
 
@@ -42,9 +47,9 @@ PACK_SCHEMA_VERSION = "1.0.0"
 
 
 class ImportMode(str, enum.Enum):
-    MERGE = "merge"          # add new, skip duplicates by name
+    MERGE = "merge"  # add new, skip duplicates by name
     OVERWRITE = "overwrite"  # add new, replace duplicates by name
-    AUDIT = "audit"          # don't change anything, return diff
+    AUDIT = "audit"  # don't change anything, return diff
 
 
 @dataclass
@@ -79,12 +84,16 @@ class SkillPackImportReport:
 # =============================================================================
 
 
-def export_pack(store: SkillStore, *,
-                 pack_name: str, description: str = "",
-                 author: str = "", pack_version: str = "1.0.0",
-                 only_kinds: Iterable[SkillKind] | None = None,
-                 min_confidence: float = 0.0,
-                 ) -> SkillPack:
+def export_pack(
+    store: SkillStore,
+    *,
+    pack_name: str,
+    description: str = "",
+    author: str = "",
+    pack_version: str = "1.0.0",
+    only_kinds: Iterable[SkillKind] | None = None,
+    min_confidence: float = 0.0,
+) -> SkillPack:
     """Serialize learned skills into a sharable pack.
 
     PII strip:
@@ -100,11 +109,11 @@ def export_pack(store: SkillStore, *,
             continue
         # Strip PII / regenerate metadata on export
         clean = Skill(
-            skill_id=sk.skill_id,         # regenerated on import
+            skill_id=sk.skill_id,  # regenerated on import
             skill_kind=sk.skill_kind,
             name=sk.name,
             scope=sk.scope,
-            body=dict(sk.body),           # body is opaque — caller's job to clean
+            body=dict(sk.body),  # body is opaque — caller's job to clean
             confidence=sk.confidence,
             evidence_count=sk.evidence_count,
             source="imported",
@@ -139,8 +148,7 @@ def write_pack(pack: SkillPack, path: str | Path) -> Path:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(p.suffix + ".tmp")
-    tmp.write_text(json.dumps(out, indent=2, sort_keys=True),
-                    encoding="utf-8")
+    tmp.write_text(json.dumps(out, indent=2, sort_keys=True), encoding="utf-8")
     tmp.replace(p)
     return p
 
@@ -169,16 +177,21 @@ def read_pack(path: str | Path) -> SkillPack:
             f"(manifest={expected_sha!r}, computed={actual_sha!r})"
         )
     skills = [Skill.from_dict(s) for s in data.get("skills", [])]
-    manifest = SkillPackManifest(**{k: v for k, v in m.items()
-                                     if k in SkillPackManifest.__dataclass_fields__})
+    manifest = SkillPackManifest(
+        **{k: v for k, v in m.items() if k in SkillPackManifest.__dataclass_fields__}
+    )
     return SkillPack(manifest=manifest, skills=skills)
 
 
-def import_pack(store: SkillStore, pack: SkillPack, *,
-                 mode: ImportMode = ImportMode.MERGE,
-                 ) -> SkillPackImportReport:
+def import_pack(
+    store: SkillStore,
+    pack: SkillPack,
+    *,
+    mode: ImportMode = ImportMode.MERGE,
+) -> SkillPackImportReport:
     """Apply (or audit) a skill pack against a local store."""
     import uuid
+
     report = SkillPackImportReport(audit_only=(mode is ImportMode.AUDIT))
     existing_by_name = {s.name: s for s in store.list()}
     for sk in pack.skills:
@@ -189,17 +202,19 @@ def import_pack(store: SkillStore, pack: SkillPack, *,
             if mode is ImportMode.OVERWRITE:
                 if not report.audit_only:
                     store.delete(existing_by_name[sk.name].skill_id)
-                report.replaced_skill_ids.append(
-                    existing_by_name[sk.name].skill_id)
+                report.replaced_skill_ids.append(existing_by_name[sk.name].skill_id)
         if report.audit_only:
             report.added_skill_ids.append("(audit)")
         else:
             try:
                 added = store.add(
-                    skill_kind=sk.skill_kind, name=sk.name,
-                    scope=sk.scope, body=dict(sk.body),
+                    skill_kind=sk.skill_kind,
+                    name=sk.name,
+                    scope=sk.scope,
+                    body=dict(sk.body),
                     confidence=sk.confidence,
-                    source="imported", notes=sk.notes,
+                    source="imported",
+                    notes=sk.notes,
                 )
                 report.added_skill_ids.append(added.skill_id)
             except Exception as exc:  # noqa: BLE001
@@ -208,7 +223,13 @@ def import_pack(store: SkillStore, pack: SkillPack, *,
 
 
 __all__ = [
-    "ImportMode", "PACK_SCHEMA_VERSION",
-    "SkillPack", "SkillPackImportReport", "SkillPackManifest",
-    "export_pack", "import_pack", "read_pack", "write_pack",
+    "ImportMode",
+    "PACK_SCHEMA_VERSION",
+    "SkillPack",
+    "SkillPackImportReport",
+    "SkillPackManifest",
+    "export_pack",
+    "import_pack",
+    "read_pack",
+    "write_pack",
 ]

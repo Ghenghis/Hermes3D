@@ -18,6 +18,7 @@ Design principles:
     requirement (bed too small, hotend too cold, no enclosure for ASA) is
     eliminated before any soft scoring.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -40,14 +41,14 @@ from hermes3d.core.agents.materials import MaterialProfile, get_material
 class DispatchStrategy(str, Enum):
     """Selection strategy."""
 
-    FASTEST = "fastest"            # Highest max_print_speed_mm_s
-    QUALITY = "quality"            # Lowest accel + direct drive (less ringing)
-    LARGEST_BED = "largest_bed"    # Pick biggest bed that fits
+    FASTEST = "fastest"  # Highest max_print_speed_mm_s
+    QUALITY = "quality"  # Lowest accel + direct drive (less ringing)
+    LARGEST_BED = "largest_bed"  # Pick biggest bed that fits
     SMALLEST_FIT = "smallest_fit"  # Smallest bed that fits — efficient farm use
-    LEAST_BUSY = "least_busy"      # Idle preferred over printing
-    DELTA_PREFER = "delta_prefer"      # Tall/cylindrical -> delta
+    LEAST_BUSY = "least_busy"  # Idle preferred over printing
+    DELTA_PREFER = "delta_prefer"  # Tall/cylindrical -> delta
     CARTESIAN_PREFER = "cartesian_prefer"  # Wide/flat -> cartesian
-    AUTO = "auto"                  # Multi-criteria weighted blend
+    AUTO = "auto"  # Multi-criteria weighted blend
 
 
 @dataclass(frozen=True)
@@ -69,7 +70,7 @@ class DispatchRequest:
     mesh_xy_radius_mm: float | None = None
     material: str = "PLA"
     layer_height_mm: float = 0.2
-    quality_level: str = "normal"   # "draft" | "normal" | "fine"
+    quality_level: str = "normal"  # "draft" | "normal" | "fine"
     strategy: DispatchStrategy = DispatchStrategy.AUTO
     # Optional live state from probe_fleet()
     live_state: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -110,8 +111,9 @@ class DispatchDecision:
 # =============================================================================
 
 
-def _check_eligibility(profile: PrinterProfile, req: DispatchRequest,
-                       material: MaterialProfile) -> tuple[bool, list[str]]:
+def _check_eligibility(
+    profile: PrinterProfile, req: DispatchRequest, material: MaterialProfile
+) -> tuple[bool, list[str]]:
     """Return (eligible, blockers).
 
     Hard checks:
@@ -148,8 +150,7 @@ def _check_eligibility(profile: PrinterProfile, req: DispatchRequest,
     # 4. Enclosure
     if material.requires_enclosure and not profile.enclosed:
         blockers.append(
-            f"enclosure: {material.material} requires enclosure; "
-            f"{profile.profile_id} is open-frame"
+            f"enclosure: {material.material} requires enclosure; {profile.profile_id} is open-frame"
         )
 
     # 5. Direct drive
@@ -198,6 +199,7 @@ def _score_largest_bed(profile: PrinterProfile, req: DispatchRequest) -> float:
         area = profile.bed.x_mm * profile.bed.y_mm
     else:
         import math
+
         area = math.pi * (profile.bed.diameter_mm / 2) ** 2
     max_area = 0.0
     for p in FLEET:
@@ -205,6 +207,7 @@ def _score_largest_bed(profile: PrinterProfile, req: DispatchRequest) -> float:
             a = p.bed.x_mm * p.bed.y_mm
         else:
             import math
+
             a = math.pi * (p.bed.diameter_mm / 2) ** 2
         max_area = max(max_area, a)
     return area / max_area if max_area else 0.0
@@ -263,8 +266,9 @@ _SINGLE_STRATEGIES = {
 }
 
 
-def _score_auto(profile: PrinterProfile, req: DispatchRequest,
-                material: MaterialProfile) -> tuple[float, list[str]]:
+def _score_auto(
+    profile: PrinterProfile, req: DispatchRequest, material: MaterialProfile
+) -> tuple[float, list[str]]:
     """Multi-criteria weighted blend with rationale building.
 
     Weights are tuned for the user's typical workflow: prototyping speed
@@ -342,13 +346,15 @@ def dispatch(req: DispatchRequest) -> DispatchDecision:
         fits, _ = fits_bed(profile, req.mesh_extents_mm, req.mesh_xy_radius_mm)
 
         if not eligible:
-            candidates.append(DispatchScore(
-                printer_id=profile.profile_id,
-                score=0.0,
-                fits=fits,
-                eligible=False,
-                blockers=tuple(blockers),
-            ))
+            candidates.append(
+                DispatchScore(
+                    printer_id=profile.profile_id,
+                    score=0.0,
+                    fits=fits,
+                    eligible=False,
+                    blockers=tuple(blockers),
+                )
+            )
             continue
 
         # Eligible — score it
@@ -362,13 +368,15 @@ def dispatch(req: DispatchRequest) -> DispatchDecision:
             score = scorer(profile, req)
             reasons = (f"{req.strategy.value}_score={score:.2f}",)
 
-        candidates.append(DispatchScore(
-            printer_id=profile.profile_id,
-            score=float(score),
-            fits=True,
-            eligible=True,
-            reasons=reasons,
-        ))
+        candidates.append(
+            DispatchScore(
+                printer_id=profile.profile_id,
+                score=float(score),
+                fits=True,
+                eligible=True,
+                reasons=reasons,
+            )
+        )
 
     # Pick the best eligible candidate
     eligible_only = [c for c in candidates if c.eligible]
@@ -378,8 +386,7 @@ def dispatch(req: DispatchRequest) -> DispatchDecision:
             f"at extents={req.mesh_extents_mm}. "
             f"Blockers across fleet: "
             + "; ".join(
-                f"{c.printer_id}: {', '.join(c.blockers)}"
-                for c in candidates if c.blockers
+                f"{c.printer_id}: {', '.join(c.blockers)}" for c in candidates if c.blockers
             )
         )
         return DispatchDecision(

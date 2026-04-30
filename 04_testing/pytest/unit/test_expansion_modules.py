@@ -1,4 +1,5 @@
 """Tests for the second-wave expansion modules."""
+
 from __future__ import annotations
 
 import time
@@ -16,6 +17,7 @@ import trimesh
 
 def test_mesh_analyzer_simple_cube_no_overhangs():
     from hermes3d.core.agents.mesh_analyzer import analyze_mesh
+
     cube = trimesh.creation.box(extents=(40, 30, 20))
     a = analyze_mesh(cube)
     assert a.triangle_count == 12
@@ -29,6 +31,7 @@ def test_mesh_analyzer_simple_cube_no_overhangs():
 def test_mesh_analyzer_tip_down_cone_flags_low_bed():
     from hermes3d.core.agents.mesh_analyzer import analyze_mesh
     import trimesh.transformations as tt
+
     cone = trimesh.creation.cone(radius=20, height=40)
     cone.apply_transform(tt.rotation_matrix(np.pi, (1, 0, 0)))
     a = analyze_mesh(cone)
@@ -39,6 +42,7 @@ def test_mesh_analyzer_tip_down_cone_flags_low_bed():
 
 def test_mesh_analyzer_tall_thin_rod_flags_aspect():
     from hermes3d.core.agents.mesh_analyzer import analyze_mesh
+
     rod = trimesh.creation.cylinder(radius=5, height=80)
     a = analyze_mesh(rod)
     assert a.height_to_min_xy_aspect == pytest.approx(8.0, abs=0.1)
@@ -48,6 +52,7 @@ def test_mesh_analyzer_tall_thin_rod_flags_aspect():
 def test_mesh_analyzer_with_real_overhangs():
     """A box with a downward overhanging surface should flag overhangs."""
     from hermes3d.core.agents.mesh_analyzer import analyze_mesh
+
     # Two stacked boxes forming a T-shape (top bar hangs over the stem)
     top = trimesh.creation.box(extents=(40, 10, 5))
     top.apply_translation((0, 0, 30))
@@ -56,13 +61,13 @@ def test_mesh_analyzer_with_real_overhangs():
     a = analyze_mesh(t)
     assert a.overhang_area_mm2 > 0
     # Overhang flags present (either moderate or high)
-    overhang_flags = [f for f in a.risk_flags
-                      if "overhang" in f or "bridge" in f]
+    overhang_flags = [f for f in a.risk_flags if "overhang" in f or "bridge" in f]
     assert len(overhang_flags) > 0
 
 
 def test_mesh_analyzer_volume_metric():
     from hermes3d.core.agents.mesh_analyzer import analyze_mesh
+
     cube = trimesh.creation.box(extents=(10, 10, 10))
     a = analyze_mesh(cube)
     assert a.volume_mm3 == pytest.approx(1000.0)
@@ -77,8 +82,10 @@ def test_mesh_analyzer_volume_metric():
 def test_parallel_planner_assigns_distinct_printers():
     from hermes3d.core.agents.dispatcher import DispatchStrategy
     from hermes3d.core.agents.parallel_planner import (
-        PartRequest, plan_parallel_print,
+        PartRequest,
+        plan_parallel_print,
     )
+
     parts = [
         PartRequest("a", (180, 100, 30), 90, "PLA", "normal", 240),
         PartRequest("b", (160, 100, 5), 92, "PLA", "normal", 90),
@@ -95,8 +102,10 @@ def test_parallel_planner_assigns_distinct_printers():
 
 def test_parallel_planner_respects_max_parallel():
     from hermes3d.core.agents.parallel_planner import (
-        PartRequest, plan_parallel_print,
+        PartRequest,
+        plan_parallel_print,
     )
+
     parts = [PartRequest(f"p{i}", (50, 50, 30), 35, "PLA") for i in range(8)]
     plan = plan_parallel_print(parts, max_parallel_printers=3)
     assert plan.parallel_count == 3
@@ -105,11 +114,12 @@ def test_parallel_planner_respects_max_parallel():
 
 def test_parallel_planner_excluded_printers_respected():
     from hermes3d.core.agents.parallel_planner import (
-        PartRequest, plan_parallel_print,
+        PartRequest,
+        plan_parallel_print,
     )
+
     parts = [PartRequest("only_one", (180, 100, 55), 90, "PLA")]
-    plan = plan_parallel_print(parts, excluded_printers=("prusa_mk3s",
-                                                            "flsun_t1_a"))
+    plan = plan_parallel_print(parts, excluded_printers=("prusa_mk3s", "flsun_t1_a"))
     selected = plan.items[0].selected_printer_id
     assert selected not in ("prusa_mk3s", "flsun_t1_a")
 
@@ -121,8 +131,8 @@ def test_parallel_planner_excluded_printers_respected():
 
 def test_generate_profile_pla_normal_basic():
     from hermes3d.core.slicer.profile_generator import generate_profile
-    p = generate_profile(printer_id="flsun_t1_a", material="PLA",
-                          quality_level="normal")
+
+    p = generate_profile(printer_id="flsun_t1_a", material="PLA", quality_level="normal")
     assert "bed_shape" in p.settings
     assert p.settings["layer_height"] == "0.2"
     # PLA wants 100% fan
@@ -133,10 +143,9 @@ def test_generate_profile_pla_normal_basic():
 
 def test_generate_profile_quality_levels_differ():
     from hermes3d.core.slicer.profile_generator import generate_profile
-    draft = generate_profile(printer_id="prusa_mk3s", material="PLA",
-                                 quality_level="draft")
-    fine = generate_profile(printer_id="prusa_mk3s", material="PLA",
-                              quality_level="fine")
+
+    draft = generate_profile(printer_id="prusa_mk3s", material="PLA", quality_level="draft")
+    fine = generate_profile(printer_id="prusa_mk3s", material="PLA", quality_level="fine")
     assert float(draft.settings["layer_height"]) > float(fine.settings["layer_height"])
     assert int(draft.settings["perimeters"]) < int(fine.settings["perimeters"])
 
@@ -144,15 +153,16 @@ def test_generate_profile_quality_levels_differ():
 def test_generate_profile_skill_overrides_applied(tmp_path: Path):
     from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
     from hermes3d.core.slicer.profile_generator import generate_profile
+
     sk = SkillStore(tmp_path / "sk.json")
-    sk.add(skill_kind=SkillKind.PARAMETER_OVERRIDE,
-            name="test_override",
-            scope=SkillScope(printer_id="flsun_t1_a", material="PLA"),
-            body={"first_layer_temperature": "220",
-                  "fill_density": "30%"},
-            confidence=0.8)
-    p = generate_profile(printer_id="flsun_t1_a", material="PLA",
-                          skills=sk)
+    sk.add(
+        skill_kind=SkillKind.PARAMETER_OVERRIDE,
+        name="test_override",
+        scope=SkillScope(printer_id="flsun_t1_a", material="PLA"),
+        body={"first_layer_temperature": "220", "fill_density": "30%"},
+        confidence=0.8,
+    )
+    p = generate_profile(printer_id="flsun_t1_a", material="PLA", skills=sk)
     assert p.settings["first_layer_temperature"] == "220"
     assert p.settings["fill_density"] == "30%"
     assert any("test_override" in s for s in p.applied_skills)
@@ -160,6 +170,7 @@ def test_generate_profile_skill_overrides_applied(tmp_path: Path):
 
 def test_generate_profile_writes_ini(tmp_path: Path):
     from hermes3d.core.slicer.profile_generator import generate_profile
+
     p = generate_profile(printer_id="prusa_mk3s", material="PETG")
     out = p.write(tmp_path / "out.ini")
     text = out.read_text(encoding="utf-8")
@@ -170,6 +181,7 @@ def test_generate_profile_writes_ini(tmp_path: Path):
 
 def test_generate_profile_delta_uses_octagonal_bed():
     from hermes3d.core.slicer.profile_generator import generate_profile
+
     p = generate_profile(printer_id="flsun_t1_a", material="PLA")
     # 8-point polygon for delta circular bed
     points = p.settings["bed_shape"].split(",")
@@ -178,6 +190,7 @@ def test_generate_profile_delta_uses_octagonal_bed():
 
 def test_generate_profile_cartesian_uses_rectangular_bed():
     from hermes3d.core.slicer.profile_generator import generate_profile
+
     p = generate_profile(printer_id="prusa_mk3s", material="PLA")
     # 4 corners for rectangular bed
     points = p.settings["bed_shape"].split(",")
@@ -192,14 +205,28 @@ def test_generate_profile_cartesian_uses_rectangular_bed():
 def test_skill_pack_export_then_import(tmp_path: Path):
     from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
     from hermes3d.core.memory.skill_pack import (
-        ImportMode, export_pack, import_pack, read_pack, write_pack,
+        ImportMode,
+        export_pack,
+        import_pack,
+        read_pack,
+        write_pack,
     )
+
     src = SkillStore(tmp_path / "src.json")
-    src.add(skill_kind=SkillKind.PARAMETER_OVERRIDE, name="a",
-            scope=SkillScope(material="ASA"), body={"k": "v"}, confidence=0.7)
-    src.add(skill_kind=SkillKind.MATERIAL_QUIRK, name="b",
-            scope=SkillScope(material="PETG"),
-            body={"observation": "stringes"}, confidence=0.6)
+    src.add(
+        skill_kind=SkillKind.PARAMETER_OVERRIDE,
+        name="a",
+        scope=SkillScope(material="ASA"),
+        body={"k": "v"},
+        confidence=0.7,
+    )
+    src.add(
+        skill_kind=SkillKind.MATERIAL_QUIRK,
+        name="b",
+        scope=SkillScope(material="PETG"),
+        body={"observation": "stringes"},
+        confidence=0.6,
+    )
     pack = export_pack(src, pack_name="t", author="test")
     pack_path = write_pack(pack, tmp_path / "p.json")
     re_pack = read_pack(pack_path)
@@ -215,17 +242,32 @@ def test_skill_pack_export_then_import(tmp_path: Path):
 def test_skill_pack_merge_skips_duplicates(tmp_path: Path):
     from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
     from hermes3d.core.memory.skill_pack import (
-        ImportMode, export_pack, import_pack, write_pack, read_pack,
+        ImportMode,
+        export_pack,
+        import_pack,
+        write_pack,
+        read_pack,
     )
+
     src = SkillStore(tmp_path / "src.json")
-    src.add(skill_kind=SkillKind.PARAMETER_OVERRIDE, name="dup",
-            scope=SkillScope(), body={"x": 1}, confidence=0.5)
+    src.add(
+        skill_kind=SkillKind.PARAMETER_OVERRIDE,
+        name="dup",
+        scope=SkillScope(),
+        body={"x": 1},
+        confidence=0.5,
+    )
     pack = export_pack(src, pack_name="t")
     pack_path = write_pack(pack, tmp_path / "p.json")
     re_pack = read_pack(pack_path)
     target = SkillStore(tmp_path / "tgt.json")
-    target.add(skill_kind=SkillKind.PARAMETER_OVERRIDE, name="dup",
-                scope=SkillScope(), body={"x": 99}, confidence=0.5)
+    target.add(
+        skill_kind=SkillKind.PARAMETER_OVERRIDE,
+        name="dup",
+        scope=SkillScope(),
+        body={"x": 99},
+        confidence=0.5,
+    )
     report = import_pack(target, re_pack, mode=ImportMode.MERGE)
     assert len(report.skipped_skill_names) == 1
     assert "dup" in report.skipped_skill_names
@@ -235,11 +277,19 @@ def test_skill_pack_corrupt_hash_rejected(tmp_path: Path):
     import json
     from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
     from hermes3d.core.memory.skill_pack import (
-        export_pack, write_pack, read_pack,
+        export_pack,
+        write_pack,
+        read_pack,
     )
+
     src = SkillStore(tmp_path / "src.json")
-    src.add(skill_kind=SkillKind.PARAMETER_OVERRIDE, name="x",
-            scope=SkillScope(), body={"y": 1}, confidence=0.5)
+    src.add(
+        skill_kind=SkillKind.PARAMETER_OVERRIDE,
+        name="x",
+        scope=SkillScope(),
+        body={"y": 1},
+        confidence=0.5,
+    )
     pack = export_pack(src, pack_name="t")
     pack_path = write_pack(pack, tmp_path / "p.json")
     # Corrupt the body
@@ -261,14 +311,15 @@ def test_supervisor_constructs_and_starts(tmp_path: Path):
     from hermes3d.core.memory import SkillStore
     from hermes3d.core.notifications import Notifier
     from hermes3d.core.supervisor import (
-        PrintSupervisor, SupervisorPolicy,
+        PrintSupervisor,
+        SupervisorPolicy,
     )
+
     sup = PrintSupervisor(
         history=PrintHistory(tmp_path / "h.jsonl"),
         spools=SpoolTracker(tmp_path / "s.json"),
         skills=SkillStore(tmp_path / "sk.json"),
-        notifier=Notifier(discord_url=None, slack_url=None,
-                            generic_url=None),
+        notifier=Notifier(discord_url=None, slack_url=None, generic_url=None),
         policy=SupervisorPolicy(poll_interval_s=0.05),
     )
     assert not sup.is_running()
@@ -286,14 +337,16 @@ def test_supervisor_event_listeners_fire(tmp_path: Path):
     from hermes3d.core.memory import SkillStore
     from hermes3d.core.notifications import Notifier
     from hermes3d.core.supervisor import (
-        PrintSupervisor, PrinterState, SupervisorEvent,
+        PrintSupervisor,
+        PrinterState,
+        SupervisorEvent,
     )
+
     sup = PrintSupervisor(
         history=PrintHistory(tmp_path / "h.jsonl"),
         spools=SpoolTracker(tmp_path / "s.json"),
         skills=SkillStore(tmp_path / "sk.json"),
-        notifier=Notifier(discord_url=None, slack_url=None,
-                           generic_url=None),
+        notifier=Notifier(discord_url=None, slack_url=None, generic_url=None),
     )
     captured = []
     sup.on_event(lambda evt, ps, det: captured.append((evt, ps.printer_id)))
@@ -309,6 +362,7 @@ def test_supervisor_event_listeners_fire(tmp_path: Path):
 
 def test_mcp_catalog_includes_new_tools():
     from hermes3d.api.mcp_server import TOOLS
+
     names = {t["name"] for t in TOOLS}
     expected = {
         "hermes3d.skill_list",
@@ -323,34 +377,52 @@ def test_mcp_catalog_includes_new_tools():
 
 def test_mcp_predict_failure_baseline():
     from hermes3d.api.mcp_server import get_handler
-    result = get_handler("hermes3d.predict_failure")({
-        "printer_id": "flsun_t1_a", "material": "PLA",
-    })
+
+    result = get_handler("hermes3d.predict_failure")(
+        {
+            "printer_id": "flsun_t1_a",
+            "material": "PLA",
+        }
+    )
     assert "failure_probability" in result
     assert result["failure_probability"] == pytest.approx(0.10, abs=0.01)
 
 
 def test_mcp_analyze_mesh(tmp_path: Path):
     from hermes3d.api.mcp_server import get_handler
+
     stl = tmp_path / "x.stl"
     trimesh.creation.box(extents=(40, 30, 20)).export(stl)
-    result = get_handler("hermes3d.analyze_mesh")({
-        "mesh_path": str(stl),
-    })
+    result = get_handler("hermes3d.analyze_mesh")(
+        {
+            "mesh_path": str(stl),
+        }
+    )
     assert result["triangle_count"] == 12
     assert result["overhang_pct"] == 0.0
 
 
 def test_mcp_parallel_plan():
     from hermes3d.api.mcp_server import get_handler
-    result = get_handler("hermes3d.parallel_plan")({
-        "parts": [
-            {"part_id": "a", "mesh_extents_mm": [50, 50, 30],
-             "mesh_xy_radius_mm": 35, "material": "PLA"},
-            {"part_id": "b", "mesh_extents_mm": [80, 80, 40],
-             "mesh_xy_radius_mm": 56.6, "material": "PETG"},
-        ],
-    })
+
+    result = get_handler("hermes3d.parallel_plan")(
+        {
+            "parts": [
+                {
+                    "part_id": "a",
+                    "mesh_extents_mm": [50, 50, 30],
+                    "mesh_xy_radius_mm": 35,
+                    "material": "PLA",
+                },
+                {
+                    "part_id": "b",
+                    "mesh_extents_mm": [80, 80, 40],
+                    "mesh_xy_radius_mm": 56.6,
+                    "material": "PETG",
+                },
+            ],
+        }
+    )
     assert "items" in result
     assert len(result["items"]) == 2
     assert result["parallel_count"] >= 2
@@ -358,10 +430,14 @@ def test_mcp_parallel_plan():
 
 def test_mcp_generate_profile():
     from hermes3d.api.mcp_server import get_handler
-    result = get_handler("hermes3d.generate_profile")({
-        "printer_id": "flsun_t1_a", "material": "PLA",
-        "quality_level": "normal",
-    })
+
+    result = get_handler("hermes3d.generate_profile")(
+        {
+            "printer_id": "flsun_t1_a",
+            "material": "PLA",
+            "quality_level": "normal",
+        }
+    )
     assert "settings" in result
     assert result["settings"]["layer_height"] == "0.2"
     assert "ini_text" in result

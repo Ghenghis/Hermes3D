@@ -8,6 +8,7 @@ how much is left, vendor/material/color metadata. The dispatcher and
 scheduler can use this to filter printers by available filament colour or
 to warn when a print would deplete the loaded spool.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -27,11 +28,11 @@ SCHEMA_VERSION = "1.0.0"
 @dataclass
 class Spool:
     spool_id: str
-    material: str            # e.g. "PLA", "PETG", "ABS"
-    color: str               # human label, e.g. "matte black"
-    color_hex: str           # "#1a1a1a"
-    vendor: str              # e.g. "Polymaker", "eSun", "Prusament"
-    diameter_mm: float       # 1.75 or 2.85
+    material: str  # e.g. "PLA", "PETG", "ABS"
+    color: str  # human label, e.g. "matte black"
+    color_hex: str  # "#1a1a1a"
+    vendor: str  # e.g. "Polymaker", "eSun", "Prusament"
+    diameter_mm: float  # 1.75 or 2.85
     initial_grams: float
     remaining_grams: float
     loaded_on_printer: str | None = None  # profile_id
@@ -72,8 +73,7 @@ class SpoolTracker:
                     f"Spool schema mismatch: got {data.get('schema_version')!r}, "
                     f"expected {SCHEMA_VERSION!r}"
                 )
-            self._spools = {s["spool_id"]: Spool.from_dict(s)
-                            for s in data.get("spools", [])}
+            self._spools = {s["spool_id"]: Spool.from_dict(s) for s in data.get("spools", [])}
 
     def save(self) -> None:
         with self._lock:
@@ -84,13 +84,20 @@ class SpoolTracker:
                 "spools": [s.to_dict() for s in self._spools.values()],
             }
             tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-            tmp.write_text(json.dumps(payload, indent=2, sort_keys=True),
-                           encoding="utf-8")
+            tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
             os.replace(tmp, self.path)
 
-    def add(self, *, material: str, color: str, color_hex: str,
-            vendor: str, initial_grams: float,
-            diameter_mm: float = 1.75, notes: str = "") -> Spool:
+    def add(
+        self,
+        *,
+        material: str,
+        color: str,
+        color_hex: str,
+        vendor: str,
+        initial_grams: float,
+        diameter_mm: float = 1.75,
+        notes: str = "",
+    ) -> Spool:
         with self._lock:
             now = time.time()
             spool = Spool(
@@ -105,8 +112,7 @@ class SpoolTracker:
                 created_unix=now,
                 updated_unix=now,
                 notes=notes,
-                history=[{"event": "registered", "at_unix": now,
-                          "grams": initial_grams}],
+                history=[{"event": "registered", "at_unix": now, "grams": initial_grams}],
             )
             self._spools[spool.spool_id] = spool
             self.save()
@@ -118,8 +124,7 @@ class SpoolTracker:
                 raise KeyError(spool_id)
             return self._spools[spool_id]
 
-    def list(self, *, printer_id: str | None = None,
-             material: str | None = None) -> list[Spool]:
+    def list(self, *, printer_id: str | None = None, material: str | None = None) -> list[Spool]:
         with self._lock:
             out = list(self._spools.values())
             if printer_id is not None:
@@ -135,36 +140,38 @@ class SpoolTracker:
                 if s.loaded_on_printer == printer_id and s.spool_id != spool_id:
                     s.loaded_on_printer = None
                     s.updated_unix = time.time()
-                    s.history.append({"event": "unloaded", "from": printer_id,
-                                      "at_unix": s.updated_unix})
+                    s.history.append(
+                        {"event": "unloaded", "from": printer_id, "at_unix": s.updated_unix}
+                    )
             spool = self.get(spool_id)
             spool.loaded_on_printer = printer_id
             spool.updated_unix = time.time()
-            spool.history.append({"event": "loaded", "on": printer_id,
-                                  "at_unix": spool.updated_unix})
+            spool.history.append(
+                {"event": "loaded", "on": printer_id, "at_unix": spool.updated_unix}
+            )
             self.save()
             return spool
 
-    def consume(self, spool_id: str, grams: float, *,
-                job_id: str | None = None) -> Spool:
+    def consume(self, spool_id: str, grams: float, *, job_id: str | None = None) -> Spool:
         if grams < 0:
             raise ValueError("grams must be non-negative")
         with self._lock:
             spool = self.get(spool_id)
             spool.remaining_grams = max(0.0, spool.remaining_grams - grams)
             spool.updated_unix = time.time()
-            spool.history.append({
-                "event": "consumed",
-                "grams": grams,
-                "remaining": spool.remaining_grams,
-                "job_id": job_id,
-                "at_unix": spool.updated_unix,
-            })
+            spool.history.append(
+                {
+                    "event": "consumed",
+                    "grams": grams,
+                    "remaining": spool.remaining_grams,
+                    "job_id": job_id,
+                    "at_unix": spool.updated_unix,
+                }
+            )
             self.save()
             return spool
 
-    def find_for_material(self, material: str, *,
-                          loaded_only: bool = False) -> list[Spool]:
+    def find_for_material(self, material: str, *, loaded_only: bool = False) -> list[Spool]:
         out = self.list(material=material)
         if loaded_only:
             out = [s for s in out if s.loaded_on_printer is not None]

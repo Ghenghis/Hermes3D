@@ -43,8 +43,8 @@ class IncidentType(str, Enum):
 
 
 class IncidentSeverity(str, Enum):
-    INFO = "info"      # log, no user action
-    WARN = "warn"      # notify user
+    INFO = "info"  # log, no user action
+    WARN = "warn"  # notify user
     CRITICAL = "critical"  # auto-pause + notify
 
 
@@ -78,8 +78,8 @@ class PrinterPing:
     timestamp: float
     reachable: bool
     klippy_state: str | None = None  # "ready", "shutdown", "error", "startup"
-    print_state: str | None = None   # "printing", "paused", "complete", "error", "standby"
-    progress: float | None = None    # 0..1
+    print_state: str | None = None  # "printing", "paused", "complete", "error", "standby"
+    progress: float | None = None  # 0..1
     hotend_temp_c: float | None = None
     hotend_target_c: float | None = None
     bed_temp_c: float | None = None
@@ -89,11 +89,11 @@ class PrinterPing:
 
 
 # Tunables — conservative defaults so we don't false-alarm.
-NETWORK_LOSS_PINGS = 3            # 3 consecutive misses = network loss
-STALL_PROGRESS_SECONDS = 600      # 10 minutes with no progress change
-RUNAWAY_HOTEND_OFFSET_C = 25      # actual > target + 25°C
+NETWORK_LOSS_PINGS = 3  # 3 consecutive misses = network loss
+STALL_PROGRESS_SECONDS = 600  # 10 minutes with no progress change
+RUNAWAY_HOTEND_OFFSET_C = 25  # actual > target + 25°C
 RUNAWAY_BED_OFFSET_C = 15
-FAN_FAILURE_DRIFT_OFFSET_C = 12   # target unchanged, actual climbs >12°C
+FAN_FAILURE_DRIFT_OFFSET_C = 12  # target unchanged, actual climbs >12°C
 FAN_FAILURE_WINDOW_PINGS = 5
 OBICO_FAILURE_THRESHOLD = 0.45
 
@@ -110,9 +110,7 @@ class IncidentDetector:
     ) -> None:
         self._network_loss_pings = network_loss_pings
         self._stall_seconds = stall_seconds
-        self._pings: dict[str, deque[PrinterPing]] = defaultdict(
-            lambda: deque(maxlen=ping_window)
-        )
+        self._pings: dict[str, deque[PrinterPing]] = defaultdict(lambda: deque(maxlen=ping_window))
 
     def ingest_ping(self, ping: PrinterPing) -> list[IncidentEvent]:
         history = self._pings[ping.printer_id]
@@ -133,9 +131,7 @@ class IncidentDetector:
     # Detection rules
     # -----------------------------------------------------------------
 
-    def _check_network(
-        self, ping: PrinterPing, history: deque[PrinterPing]
-    ) -> list[IncidentEvent]:
+    def _check_network(self, ping: PrinterPing, history: deque[PrinterPing]) -> list[IncidentEvent]:
         if ping.reachable:
             return []
         recent = list(history)[-self._network_loss_pings :]
@@ -155,9 +151,7 @@ class IncidentDetector:
             ]
         return []
 
-    def _check_klippy(
-        self, ping: PrinterPing, history: deque[PrinterPing]
-    ) -> list[IncidentEvent]:
+    def _check_klippy(self, ping: PrinterPing, history: deque[PrinterPing]) -> list[IncidentEvent]:
         events: list[IncidentEvent] = []
         if ping.klippy_state == "error":
             events.append(
@@ -172,9 +166,7 @@ class IncidentDetector:
                 )
             )
 
-        prior_active = any(
-            p.print_state == "printing" for p in list(history)[:-1]
-        )
+        prior_active = any(p.print_state == "printing" for p in list(history)[:-1])
         if (
             prior_active
             and ping.klippy_state in {"shutdown", "startup"}
@@ -243,9 +235,7 @@ class IncidentDetector:
             )
         return events
 
-    def _check_stall(
-        self, ping: PrinterPing, history: deque[PrinterPing]
-    ) -> list[IncidentEvent]:
+    def _check_stall(self, ping: PrinterPing, history: deque[PrinterPing]) -> list[IncidentEvent]:
         if ping.print_state != "printing" or ping.progress is None:
             return []
         baseline_ts: float | None = None
@@ -267,18 +257,14 @@ class IncidentDetector:
                     severity=IncidentSeverity.WARN,
                     printer_id=ping.printer_id,
                     detected_at=ping.timestamp,
-                    description=(
-                        f"Progress unchanged for {int(ping.timestamp - baseline_ts)}s"
-                    ),
+                    description=(f"Progress unchanged for {int(ping.timestamp - baseline_ts)}s"),
                     suggested_action="Check for clogged nozzle, jammed extruder, or paused console.",
                     context={"progress": ping.progress},
                 )
             ]
         return []
 
-    def _check_fan(
-        self, ping: PrinterPing, history: deque[PrinterPing]
-    ) -> list[IncidentEvent]:
+    def _check_fan(self, ping: PrinterPing, history: deque[PrinterPing]) -> list[IncidentEvent]:
         if (
             ping.hotend_temp_c is None
             or ping.hotend_target_c is None
@@ -288,11 +274,7 @@ class IncidentDetector:
         recent = list(history)[-FAN_FAILURE_WINDOW_PINGS:]
         if len(recent) < FAN_FAILURE_WINDOW_PINGS:
             return []
-        targets = {
-            round(p.hotend_target_c, 0)
-            for p in recent
-            if p.hotend_target_c is not None
-        }
+        targets = {round(p.hotend_target_c, 0) for p in recent if p.hotend_target_c is not None}
         if len(targets) > 1:
             return []
         # Target stable; is actual climbing?

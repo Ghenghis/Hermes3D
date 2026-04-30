@@ -14,6 +14,7 @@ state. It composes:
 
 Returns a list of FleetEntry rows ready for table rendering.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -59,7 +60,7 @@ def _bed_descr(p: PrinterProfile) -> str:
 def collect_fleet_status(
     *,
     queue: JobQueue | None = None,
-    spool_tracker: Any | None = None,    # SpoolTracker, kept loose for testability
+    spool_tracker: Any | None = None,  # SpoolTracker, kept loose for testability
     timeout_s: float = 2.5,
 ) -> list[FleetEntry]:
     """Build a fleet status snapshot.
@@ -71,8 +72,13 @@ def collect_fleet_status(
     probe = {p["profile_id"]: p for p in probe_fleet(timeout_s=timeout_s)}
 
     # Active jobs per printer (in-flight states)
-    active_states = {JobState.DISPATCHED, JobState.VALIDATED, JobState.SLICED,
-                     JobState.UPLOADED, JobState.PRINTING}
+    active_states = {
+        JobState.DISPATCHED,
+        JobState.VALIDATED,
+        JobState.SLICED,
+        JobState.UPLOADED,
+        JobState.PRINTING,
+    }
     jobs_by_printer: dict[str, Job] = {}
     if queue is not None:
         for job in queue.list():
@@ -98,7 +104,7 @@ def collect_fleet_status(
             moonraker_version=live.get("moonraker_version"),
             error=live.get("error"),
         )
-        if (j := jobs_by_printer.get(p.profile_id)):
+        if j := jobs_by_printer.get(p.profile_id):
             entry.active_job_id = j.job_id
             entry.active_job_state = j.state.value
         if spool_tracker is not None:
@@ -106,9 +112,7 @@ def collect_fleet_status(
             if spools:
                 s = spools[-1]  # most recent
                 entry.loaded_spool_id = s.spool_id
-                entry.loaded_spool_label = (
-                    f"{s.vendor} {s.material} {s.color}"
-                )
+                entry.loaded_spool_label = f"{s.vendor} {s.material} {s.color}"
                 entry.loaded_spool_remaining_g = s.remaining_grams
         out.append(entry)
     return out

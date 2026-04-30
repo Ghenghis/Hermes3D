@@ -50,10 +50,10 @@ class OrganizerSpec:
     """
 
     # Outer envelope
-    width_mm: float = 180.0   # X
-    depth_mm: float = 100.0   # Y
-    height_mm: float = 55.0   # Z (low body) — phone dock rises above
-    wall_mm: float = 2.0      # all walls and dividers
+    width_mm: float = 180.0  # X
+    depth_mm: float = 100.0  # Y
+    height_mm: float = 55.0  # Z (low body) — phone dock rises above
+    wall_mm: float = 2.0  # all walls and dividers
     floor_mm: float = 2.0
 
     # Tray compartments (along X)
@@ -112,6 +112,7 @@ class OrganizerSpec:
         """Deterministic short hash of the parameters — for output naming."""
         import hashlib
         import json
+
         payload = json.dumps(self.__dict__, sort_keys=True).encode()
         return hashlib.sha256(payload).hexdigest()[:10]
 
@@ -121,15 +122,17 @@ class OrganizerSpec:
 # ---------------------------------------------------------------------------
 
 
-def _box(size: tuple[float, float, float], translate: tuple[float, float, float]) -> trimesh.Trimesh:
+def _box(
+    size: tuple[float, float, float], translate: tuple[float, float, float]
+) -> trimesh.Trimesh:
     m = trimesh.creation.box(extents=size)
     m.apply_translation(translate)
     return m
 
 
-def _cylinder(radius: float, height: float,
-              translate: tuple[float, float, float],
-              sections: int = 64) -> trimesh.Trimesh:
+def _cylinder(
+    radius: float, height: float, translate: tuple[float, float, float], sections: int = 64
+) -> trimesh.Trimesh:
     m = trimesh.creation.cylinder(radius=radius, height=height, sections=sections)
     m.apply_translation(translate)
     return m
@@ -196,8 +199,7 @@ def build_organizer(spec: OrganizerSpec | None = None) -> trimesh.Trimesh:
         overlap = 0.5
         dock_z_size = dock_h + overlap
         dock_z_center = H + dock_h / 2 - overlap / 2
-        parts.append(_box((dock_w, dock_d, dock_z_size),
-                          (dock_x, dock_y, dock_z_center)))
+        parts.append(_box((dock_w, dock_d, dock_z_size), (dock_x, dock_y, dock_z_center)))
 
     outer = _union(parts)
 
@@ -214,18 +216,18 @@ def build_organizer(spec: OrganizerSpec | None = None) -> trimesh.Trimesh:
     else:
         compartment_w = (inner_w - (s.tray_count - 1) * s.wall_mm) / s.tray_count
     if compartment_w <= 0:
-        raise ValueError(
-            f"tray_count={s.tray_count} too high for width={W} with wall={s.wall_mm}."
-        )
+        raise ValueError(f"tray_count={s.tray_count} too high for width={W} with wall={s.wall_mm}.")
 
     cuts: list[trimesh.Trimesh] = []
     for i in range(s.tray_count):
         x_start = -W / 2 + s.wall_mm + i * (compartment_w + s.wall_mm)
         x_center = x_start + compartment_w / 2
-        cuts.append(_box(
-            (compartment_w, tray_inner_y, tray_inner_z),
-            (x_center, tray_y_center, tray_z_center),
-        ))
+        cuts.append(
+            _box(
+                (compartment_w, tray_inner_y, tray_inner_z),
+                (x_center, tray_y_center, tray_z_center),
+            )
+        )
 
     # --- 3. Pen holes (back band, top-down cylinders) -------------------
     if s.pen_count > 0:
@@ -240,28 +242,36 @@ def build_organizer(spec: OrganizerSpec | None = None) -> trimesh.Trimesh:
             dock_x = W / 2 - (s.phone_slot_length_mm + 2 * s.wall_mm) / 2 - s.wall_mm
             dock_x_min = dock_x - (s.phone_slot_length_mm + 2 * s.wall_mm) / 2
             dock_x_max = dock_x + (s.phone_slot_length_mm + 2 * s.wall_mm) / 2
-            xs = [x for x in xs if not (dock_x_min - s.pen_diameter_mm / 2
-                                         <= x
-                                         <= dock_x_max + s.pen_diameter_mm / 2)]
+            xs = [
+                x
+                for x in xs
+                if not (
+                    dock_x_min - s.pen_diameter_mm / 2 <= x <= dock_x_max + s.pen_diameter_mm / 2
+                )
+            ]
         pen_z_center = H - s.pen_depth_mm / 2 + 0.005  # slight overshoot at top
         for x in xs:
-            cuts.append(_cylinder(
-                radius=s.pen_diameter_mm / 2,
-                height=s.pen_depth_mm + 0.02,
-                translate=(x, back_band_y_center, pen_z_center),
-                sections=64,
-            ))
+            cuts.append(
+                _cylinder(
+                    radius=s.pen_diameter_mm / 2,
+                    height=s.pen_depth_mm + 0.02,
+                    translate=(x, back_band_y_center, pen_z_center),
+                    sections=64,
+                )
+            )
 
     # --- 4. Cable passthrough (notch in back wall) -----------------------
     if s.cable_passthrough:
-        cuts.append(_box(
-            size=(s.cable_notch_width_mm, s.wall_mm * 4, s.cable_notch_height_mm),
-            translate=(
-                0.0,
-                D / 2,
-                s.cable_notch_height_mm / 2 + s.floor_mm,
-            ),
-        ))
+        cuts.append(
+            _box(
+                size=(s.cable_notch_width_mm, s.wall_mm * 4, s.cable_notch_height_mm),
+                translate=(
+                    0.0,
+                    D / 2,
+                    s.cable_notch_height_mm / 2 + s.floor_mm,
+                ),
+            )
+        )
 
     # --- 5. Phone slot cut (inside the raised dock area) -----------------
     if dock_present:
@@ -306,8 +316,7 @@ def build_organizer(spec: OrganizerSpec | None = None) -> trimesh.Trimesh:
         body.process(validate=True)
     if not (body.is_watertight and body.is_winding_consistent):
         raise RuntimeError(
-            "CSG produced a non-manifold body (bug in generator or backend); "
-            f"spec={s!r}"
+            f"CSG produced a non-manifold body (bug in generator or backend); spec={s!r}"
         )
 
     return body
@@ -341,18 +350,42 @@ def acceptance_variants() -> list[tuple[str, OrganizerSpec]]:
     """The canonical set of variants used by the acceptance run."""
     return [
         ("default", OrganizerSpec()),
-        ("compact",  OrganizerSpec(
-            width_mm=120, depth_mm=80, height_mm=45,
-            tray_count=2, pen_count=2, phone_slot=False, cable_passthrough=True,
-        )),
-        ("wide_pens", OrganizerSpec(
-            width_mm=210, depth_mm=110, height_mm=55,
-            tray_count=4, pen_count=6, pen_diameter_mm=12, pen_depth_mm=40,
-        )),
-        ("no_pens_no_phone", OrganizerSpec(
-            width_mm=160, depth_mm=90, height_mm=50,
-            tray_count=3, pen_count=0, phone_slot=False, cable_passthrough=False,
-        )),
+        (
+            "compact",
+            OrganizerSpec(
+                width_mm=120,
+                depth_mm=80,
+                height_mm=45,
+                tray_count=2,
+                pen_count=2,
+                phone_slot=False,
+                cable_passthrough=True,
+            ),
+        ),
+        (
+            "wide_pens",
+            OrganizerSpec(
+                width_mm=210,
+                depth_mm=110,
+                height_mm=55,
+                tray_count=4,
+                pen_count=6,
+                pen_diameter_mm=12,
+                pen_depth_mm=40,
+            ),
+        ),
+        (
+            "no_pens_no_phone",
+            OrganizerSpec(
+                width_mm=160,
+                depth_mm=90,
+                height_mm=50,
+                tray_count=3,
+                pen_count=0,
+                phone_slot=False,
+                cable_passthrough=False,
+            ),
+        ),
     ]
 
 

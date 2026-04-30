@@ -1,4 +1,5 @@
 """Visual evidence harness — the renderer used for the Visual Gate."""
+
 from hermes3d.core.visual.render import (
     CANONICAL_VIEWS,
     ViewSpec,

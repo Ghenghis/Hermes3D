@@ -171,8 +171,10 @@ def _load_mesh(mesh_path: Path) -> trimesh.Trimesh:
 def _check_watertight(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     if not cfg.require_watertight:
         return CheckResult(
-            "watertight", CheckStatus.SKIP,
-            {"required": False}, {"watertight": bool(mesh.is_watertight)},
+            "watertight",
+            CheckStatus.SKIP,
+            {"required": False},
+            {"watertight": bool(mesh.is_watertight)},
             "Watertight check skipped by config.",
         )
     measured = bool(mesh.is_watertight)
@@ -181,16 +183,19 @@ def _check_watertight(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResul
         status=CheckStatus.PASS if measured else CheckStatus.FAIL,
         threshold={"required": True},
         measured={"watertight": measured, "open_edges": int(len(mesh.facets_boundary or []))},
-        message="Mesh is watertight." if measured else
-                "Mesh is NOT watertight; open edges detected.",
+        message="Mesh is watertight."
+        if measured
+        else "Mesh is NOT watertight; open edges detected.",
     )
 
 
 def _check_manifold(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     if not cfg.require_manifold:
         return CheckResult(
-            "manifold", CheckStatus.SKIP,
-            {"required": False}, {},
+            "manifold",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
             "Manifold check skipped by config.",
         )
     is_winding = bool(mesh.is_winding_consistent)
@@ -205,8 +210,9 @@ def _check_manifold(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
             "is_watertight": bool(mesh.is_watertight),
             "euler_number": euler,
         },
-        message="Mesh is 2-manifold." if is_manifold else
-                "Mesh is NOT 2-manifold (winding inconsistent or non-watertight).",
+        message="Mesh is 2-manifold."
+        if is_manifold
+        else "Mesh is NOT 2-manifold (winding inconsistent or non-watertight).",
     )
 
 
@@ -217,8 +223,11 @@ def _check_normals(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     """
     if not cfg.require_consistent_normals:
         return CheckResult(
-            "normals", CheckStatus.SKIP,
-            {"required": False}, {}, "Normal check skipped.",
+            "normals",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
+            "Normal check skipped.",
         )
     volume = float(mesh.volume)
     is_winding = bool(mesh.is_winding_consistent)
@@ -228,16 +237,20 @@ def _check_normals(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
         status=CheckStatus.PASS if ok else CheckStatus.FAIL,
         threshold={"is_winding_consistent": True, "volume_sign": "positive"},
         measured={"is_winding_consistent": is_winding, "volume_mm3": volume},
-        message="Face normals are consistent and outward-facing." if ok else
-                "Face normals are inconsistent or inverted (negative signed volume).",
+        message="Face normals are consistent and outward-facing."
+        if ok
+        else "Face normals are inconsistent or inverted (negative signed volume).",
     )
 
 
 def _check_bed_fit(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     if not cfg.require_bed_fit:
         return CheckResult(
-            "bed_fit", CheckStatus.SKIP,
-            {"required": False}, {}, "Bed fit check skipped.",
+            "bed_fit",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
+            "Bed fit check skipped.",
         )
     extents = mesh.extents.astype(float)
     bx, by, bz = cfg.bed_size_mm
@@ -247,8 +260,9 @@ def _check_bed_fit(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
         status=CheckStatus.PASS if fits else CheckStatus.FAIL,
         threshold={"bed_size_mm": [bx, by, bz]},
         measured={"extents_mm": [float(e) for e in extents]},
-        message=f"Mesh fits within {bx}x{by}x{bz} mm build volume." if fits else
-                f"Mesh ({extents.tolist()}) exceeds bed {[bx, by, bz]}.",
+        message=f"Mesh fits within {bx}x{by}x{bz} mm build volume."
+        if fits
+        else f"Mesh ({extents.tolist()}) exceeds bed {[bx, by, bz]}.",
     )
 
 
@@ -262,15 +276,19 @@ def _check_printer_fit(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResu
     """
     if cfg.printer_profile_id is None:
         return CheckResult(
-            "printer_fit", CheckStatus.SKIP,
-            {"required": False}, {},
+            "printer_fit",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
             "No printer_profile_id set; check skipped.",
         )
     if not cfg.require_printer_fit:
         return CheckResult(
-            "printer_fit", CheckStatus.SKIP,
+            "printer_fit",
+            CheckStatus.SKIP,
             {"required": False, "printer_profile_id": cfg.printer_profile_id},
-            {}, "Printer-specific fit check disabled.",
+            {},
+            "Printer-specific fit check disabled.",
         )
 
     # Local import to keep the truth_gate -> printers dependency optional
@@ -322,8 +340,11 @@ def _check_printer_fit(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResu
 def _check_volume(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     if not cfg.require_minimum_volume:
         return CheckResult(
-            "minimum_volume", CheckStatus.SKIP,
-            {"required": False}, {}, "Minimum volume check skipped.",
+            "minimum_volume",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
+            "Minimum volume check skipped.",
         )
     vol = float(abs(mesh.volume))
     ok = vol >= cfg.min_volume_mm3
@@ -332,8 +353,9 @@ def _check_volume(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
         status=CheckStatus.PASS if ok else CheckStatus.FAIL,
         threshold={"min_volume_mm3": cfg.min_volume_mm3},
         measured={"volume_mm3": vol},
-        message=f"Volume {vol:.1f} mm³ meets minimum." if ok else
-                f"Volume {vol:.1f} mm³ below minimum {cfg.min_volume_mm3} mm³.",
+        message=f"Volume {vol:.1f} mm³ meets minimum."
+        if ok
+        else f"Volume {vol:.1f} mm³ below minimum {cfg.min_volume_mm3} mm³.",
     )
 
 
@@ -418,8 +440,11 @@ def _estimate_min_wall_thickness(mesh: trimesh.Trimesh, samples: int) -> tuple[f
 def _check_thickness(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     if not cfg.require_thickness:
         return CheckResult(
-            "wall_thickness", CheckStatus.SKIP,
-            {"required": False}, {}, "Thickness check skipped.",
+            "wall_thickness",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
+            "Thickness check skipped.",
         )
     try:
         min_t, hits = _estimate_min_wall_thickness(mesh, cfg.thickness_sample_count)
@@ -446,16 +471,20 @@ def _check_thickness(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult
         status=CheckStatus.PASS if ok else CheckStatus.FAIL,
         threshold={"min_mm": cfg.min_wall_thickness_mm},
         measured={"min_mm": min_t, "samples_hit": hits},
-        message=f"Min wall thickness {min_t:.3f} mm." if ok else
-                f"Min wall thickness {min_t:.3f} mm < required {cfg.min_wall_thickness_mm} mm.",
+        message=f"Min wall thickness {min_t:.3f} mm."
+        if ok
+        else f"Min wall thickness {min_t:.3f} mm < required {cfg.min_wall_thickness_mm} mm.",
     )
 
 
 def _check_self_intersection(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult:
     if not cfg.require_no_self_intersection:
         return CheckResult(
-            "self_intersection", CheckStatus.SKIP,
-            {"required": False}, {}, "Self-intersection check skipped.",
+            "self_intersection",
+            CheckStatus.SKIP,
+            {"required": False},
+            {},
+            "Self-intersection check skipped.",
         )
     # Use trimesh.repair detection of broken faces as a lower-bound proxy;
     # a fully manifold + watertight + winding-consistent mesh has zero by
@@ -474,9 +503,8 @@ def _check_self_intersection(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> Che
             "total_faces": int(len(mesh.faces)),
             "ratio": ratio,
         },
-        message=f"Broken faces {broken_count}/{len(mesh.faces)}" + (
-            " within tolerance." if ok else " exceed tolerance."
-        ),
+        message=f"Broken faces {broken_count}/{len(mesh.faces)}"
+        + (" within tolerance." if ok else " exceed tolerance."),
     )
 
 
@@ -521,13 +549,15 @@ def run_truth_gate(
         try:
             results.append(check_fn(mesh, cfg))
         except Exception as exc:  # noqa: BLE001
-            results.append(CheckResult(
-                name=check_fn.__name__.lstrip("_check_"),
-                status=CheckStatus.ERROR,
-                threshold={},
-                measured={"error_type": type(exc).__name__, "error": str(exc)},
-                message=f"Check raised exception: {exc}",
-            ))
+            results.append(
+                CheckResult(
+                    name=check_fn.__name__.lstrip("_check_"),
+                    status=CheckStatus.ERROR,
+                    threshold={},
+                    measured={"error_type": type(exc).__name__, "error": str(exc)},
+                    message=f"Check raised exception: {exc}",
+                )
+            )
 
     statuses = {r.status for r in results}
     if CheckStatus.FAIL in statuses or CheckStatus.ERROR in statuses:

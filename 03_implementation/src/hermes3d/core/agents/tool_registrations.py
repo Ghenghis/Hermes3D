@@ -64,8 +64,7 @@ def _sha256_of_file(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def _tool_fleet_status(include_offline: bool = True,
-                        timeout_s: float = 2.5) -> dict[str, Any]:
+def _tool_fleet_status(include_offline: bool = True, timeout_s: float = 2.5) -> dict[str, Any]:
     """Return a snapshot of every printer in the fleet.
 
     Composes static profile data with a live Moonraker reachability probe.
@@ -131,9 +130,7 @@ def _tool_dispatch(
         strat = DispatchStrategy(strategy)
     except ValueError as exc:
         valid = [s.value for s in DispatchStrategy]
-        raise ValueError(
-            f"unknown strategy {strategy!r}. valid: {valid}"
-        ) from exc
+        raise ValueError(f"unknown strategy {strategy!r}. valid: {valid}") from exc
 
     extents = (float(stl_x_mm), float(stl_y_mm), float(stl_z_mm))
     # Worst-case enclosing-circle radius for a centered bbox
@@ -219,9 +216,7 @@ def _tool_queue_status(state: str | None = None) -> dict[str, Any]:
             state_filter = JobState(state)
         except ValueError as exc:
             valid = [s.value for s in JobState]
-            raise ValueError(
-                f"unknown state {state!r}. valid: {valid}"
-            ) from exc
+            raise ValueError(f"unknown state {state!r}. valid: {valid}") from exc
 
     jobs = q.list(state=state_filter)
     by_state: dict[str, int] = {}
@@ -241,8 +236,7 @@ def _tool_queue_status(state: str | None = None) -> dict[str, Any]:
     return {"total": len(jobs), "by_state": by_state, "jobs": items}
 
 
-def _tool_spool_list(material: str | None = None,
-                     printer_id: str | None = None) -> dict[str, Any]:
+def _tool_spool_list(material: str | None = None, printer_id: str | None = None) -> dict[str, Any]:
     """List filament spools, optionally filtered by material or printer."""
     from ..farm.spool_tracker import SpoolTracker
 
@@ -317,9 +311,7 @@ def _tool_calibration_macro(*, kind: str = "input_shaper") -> dict[str, Any]:
         ckind = CalibrationKind(kind)
     except ValueError as exc:
         valid = [k.value for k in CalibrationKind]
-        raise ValueError(
-            f"unknown calibration kind {kind!r}. valid: {valid}"
-        ) from exc
+        raise ValueError(f"unknown calibration kind {kind!r}. valid: {valid}") from exc
 
     return {"kind": ckind.value, "macro": get_macro_for(ckind)}
 
@@ -368,9 +360,8 @@ def _tool_failure_forecast(
     history = None
     try:
         from ..farm.print_history import PrintHistory  # type: ignore[attr-defined]
-        history_path = os.environ.get(
-            "HERMES3D_PRINT_HISTORY", "./var/print_history.json"
-        )
+
+        history_path = os.environ.get("HERMES3D_PRINT_HISTORY", "./var/print_history.json")
         if Path(history_path).exists():
             history = PrintHistory(history_path)
     except Exception:  # noqa: BLE001 - history is optional
@@ -418,9 +409,7 @@ def _tool_skill_lookup(
         skill_kind = SkillKind(kind)
     except ValueError as exc:
         valid = [k.value for k in SkillKind]
-        raise ValueError(
-            f"unknown skill kind {kind!r}. valid: {valid}"
-        ) from exc
+        raise ValueError(f"unknown skill kind {kind!r}. valid: {valid}") from exc
 
     skills_path = _skills_path()
     if not Path(skills_path).exists():

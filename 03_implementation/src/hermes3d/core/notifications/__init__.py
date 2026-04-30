@@ -1,4 +1,5 @@
 """Hermes3D notification dispatch — Discord/Slack/Generic webhooks."""
+
 from .notifier import (
     NotificationEvent,
     NotificationLevel,

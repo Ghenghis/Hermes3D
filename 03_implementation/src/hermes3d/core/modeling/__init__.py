@@ -1,4 +1,5 @@
 """Modeling layer: Blender MCP server (spec-only in this kit; see file docstring)."""
+
 from hermes3d.core.modeling.blender_mcp_server import (
     SERVER_VERSION,
     TOOL_SCHEMAS,

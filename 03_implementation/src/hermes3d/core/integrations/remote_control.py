@@ -66,15 +66,12 @@ class RemoteControlConfig:
     def from_env(cls) -> "RemoteControlConfig":
         token = os.getenv("HERMES3D_TELEGRAM_BOT_TOKEN")
         allowlist_raw = os.getenv("HERMES3D_TELEGRAM_ALLOWLIST", "")
-        allowlist = tuple(
-            x.strip() for x in allowlist_raw.split(",") if x.strip()
-        )
+        allowlist = tuple(x.strip() for x in allowlist_raw.split(",") if x.strip())
         # Per A.7: discord webhook is read from HERMES3D_DISCORD_WEBHOOK.
         # The legacy env var ``HERMES3D_DISCORD_CONTROL_WEBHOOK`` is also
         # accepted as a fallback for compatibility with existing deployments.
-        discord_webhook = (
-            os.getenv("HERMES3D_DISCORD_WEBHOOK")
-            or os.getenv("HERMES3D_DISCORD_CONTROL_WEBHOOK")
+        discord_webhook = os.getenv("HERMES3D_DISCORD_WEBHOOK") or os.getenv(
+            "HERMES3D_DISCORD_CONTROL_WEBHOOK"
         )
         return cls(
             telegram_bot_token=token,
@@ -156,9 +153,7 @@ class CommandRouter:
         command_table: tuple[CommandSpec, ...] = COMMAND_TABLE,
     ) -> None:
         self._registry = registry or tool_registry
-        self._table: dict[str, CommandSpec] = {
-            spec.command: spec for spec in command_table
-        }
+        self._table: dict[str, CommandSpec] = {spec.command: spec for spec in command_table}
 
     @property
     def commands(self) -> tuple[str, ...]:
@@ -200,7 +195,7 @@ class CommandRouter:
         spec = self._table.get(head)
         if spec is not None:
             if len(args) < len(spec.positional_args):
-                missing = ", ".join(spec.positional_args[len(args):])
+                missing = ", ".join(spec.positional_args[len(args) :])
                 return self._response(
                     command,
                     f"Missing argument(s) for {head}: {missing}.\nUsage: {spec.description}",
@@ -364,10 +359,7 @@ class TelegramTransport:
             if not msg:
                 continue
             chat_id = str(msg["chat"]["id"])
-            if (
-                self._config.telegram_allowlist
-                and chat_id not in self._config.telegram_allowlist
-            ):
+            if self._config.telegram_allowlist and chat_id not in self._config.telegram_allowlist:
                 LOG.info("dropping telegram message from non-allowlisted chat %s", chat_id)
                 continue
             commands.append(

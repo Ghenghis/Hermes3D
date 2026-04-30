@@ -12,6 +12,7 @@ Public API:
     list_ids()             -> list[str]
     fits_bed(spec, mesh)   -> tuple[bool, str]
 """
+
 from __future__ import annotations
 
 from .printer_profiles import (

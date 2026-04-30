@@ -28,6 +28,7 @@ Note: this is *opportunistic*. We never silently mutate user data — the
 caller must pass a fresh mesh and decide whether to keep the repaired
 version. The Truth Gate then runs on whichever mesh the caller chooses.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -92,13 +93,16 @@ def _safe_count(mesh: trimesh.Trimesh) -> tuple[int, int]:
     return int(len(mesh.faces)), int(len(mesh.vertices))
 
 
-def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
-                ) -> tuple[trimesh.Trimesh, RepairReport]:
+def repair_mesh(
+    mesh: trimesh.Trimesh,
+    config: RepairConfig | None = None,
+) -> tuple[trimesh.Trimesh, RepairReport]:
     """Run the configured repair stages on a copy of ``mesh``.
 
     Returns ``(repaired_mesh, report)``. The original is never mutated.
     """
     import time
+
     cfg = config or RepairConfig()
     started = time.time()
 
@@ -109,22 +113,24 @@ def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
 
     steps: list[RepairStep] = []
 
-    def _record(name: str, applied: bool, detail: str,
-                before_f: int, before_v: int) -> None:
+    def _record(name: str, applied: bool, detail: str, before_f: int, before_v: int) -> None:
         af, av = _safe_count(m)
-        steps.append(RepairStep(
-            name=name, applied=applied, detail=detail,
-            delta_face_count=af - before_f,
-            delta_vertex_count=av - before_v,
-        ))
+        steps.append(
+            RepairStep(
+                name=name,
+                applied=applied,
+                detail=detail,
+                delta_face_count=af - before_f,
+                delta_vertex_count=av - before_v,
+            )
+        )
 
     # ---- 1. Remove duplicate vertices ----
     if cfg.remove_duplicate_vertices:
         bf, bv = _safe_count(m)
         try:
             m.merge_vertices()
-            _record("remove_duplicate_vertices", True,
-                    f"epsilon={cfg.duplicate_epsilon}", bf, bv)
+            _record("remove_duplicate_vertices", True, f"epsilon={cfg.duplicate_epsilon}", bf, bv)
         except Exception as exc:  # noqa: BLE001
             _record("remove_duplicate_vertices", False, f"error: {exc}", bf, bv)
 
@@ -135,8 +141,9 @@ def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
             mask = m.nondegenerate_faces()
             removed = int((~mask).sum())
             m.update_faces(mask)
-            _record("remove_degenerate_faces", True,
-                    f"removed {removed} zero-area triangles", bf, bv)
+            _record(
+                "remove_degenerate_faces", True, f"removed {removed} zero-area triangles", bf, bv
+            )
         except Exception as exc:  # noqa: BLE001
             _record("remove_degenerate_faces", False, f"error: {exc}", bf, bv)
 
@@ -145,9 +152,13 @@ def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
         bf, bv = _safe_count(m)
         try:
             holes_filled = int(m.fill_holes())
-            _record("fill_holes", True,
-                    f"filled {holes_filled} edge loops "
-                    f"(max_perimeter={cfg.max_hole_perimeter_mm}mm)", bf, bv)
+            _record(
+                "fill_holes",
+                True,
+                f"filled {holes_filled} edge loops (max_perimeter={cfg.max_hole_perimeter_mm}mm)",
+                bf,
+                bv,
+            )
         except Exception as exc:  # noqa: BLE001
             _record("fill_holes", False, f"error: {exc}", bf, bv)
 
@@ -171,8 +182,9 @@ def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
         bf, bv = _safe_count(m)
         try:
             m.remove_unreferenced_vertices()
-            _record("remove_unreferenced", True,
-                    "stripped vertices not referenced by any face", bf, bv)
+            _record(
+                "remove_unreferenced", True, "stripped vertices not referenced by any face", bf, bv
+            )
         except Exception as exc:  # noqa: BLE001
             _record("remove_unreferenced", False, f"error: {exc}", bf, bv)
 
@@ -183,8 +195,7 @@ def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
             # trimesh's merge_vertices accepts an explicit digit count
             digits = max(1, int(round(-np.log10(cfg.duplicate_epsilon))))
             m.merge_vertices(digits_vertex=digits)
-            _record("merge_close_vertices", True,
-                    f"digits_vertex={digits}", bf, bv)
+            _record("merge_close_vertices", True, f"digits_vertex={digits}", bf, bv)
         except Exception as exc:  # noqa: BLE001
             _record("merge_close_vertices", False, f"error: {exc}", bf, bv)
 
@@ -193,8 +204,7 @@ def repair_mesh(mesh: trimesh.Trimesh, config: RepairConfig | None = None,
         bf, bv = _safe_count(m)
         try:
             m.process(validate=True)
-            _record("run_trimesh_process", True, "process(validate=True)",
-                    bf, bv)
+            _record("run_trimesh_process", True, "process(validate=True)", bf, bv)
         except Exception as exc:  # noqa: BLE001
             _record("run_trimesh_process", False, f"error: {exc}", bf, bv)
 

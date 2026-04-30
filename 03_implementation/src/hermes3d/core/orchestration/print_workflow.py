@@ -35,6 +35,7 @@ Usage::
     })
     final = graph.run(state)
 """
+
 from __future__ import annotations
 
 import functools
@@ -75,19 +76,18 @@ def _retry_node(fn):
             except Exception as repair_exc:  # noqa: BLE001
                 log.exception("RepairAgent failed: %s", repair_exc)
                 return NodeResult(
-                    node_name=getattr(fn, "__name__", "unknown")
-                        .removeprefix("_node_"),
+                    node_name=getattr(fn, "__name__", "unknown").removeprefix("_node_"),
                     outcome=NodeOutcome.FAIL,
-                    started_unix=_now(), ended_unix=_now(),
+                    started_unix=_now(),
+                    ended_unix=_now(),
                     error=f"escalation + repair failure: {esc.cause!r}",
                 )
-            outcome = (NodeOutcome.PASS if repair.outcome == "fixed"
-                       else NodeOutcome.FAIL)
+            outcome = NodeOutcome.PASS if repair.outcome == "fixed" else NodeOutcome.FAIL
             return NodeResult(
-                node_name=getattr(fn, "__name__", "unknown")
-                    .removeprefix("_node_"),
+                node_name=getattr(fn, "__name__", "unknown").removeprefix("_node_"),
                 outcome=outcome,
-                started_unix=_now(), ended_unix=_now(),
+                started_unix=_now(),
+                ended_unix=_now(),
                 error=None if outcome == NodeOutcome.PASS else repr(esc.cause),
                 state_patch={
                     "repair_outcome": repair.outcome,
@@ -156,7 +156,9 @@ def _node_enqueue(state: WorkflowState) -> NodeResult:
 
 def _node_truth_gate(state: WorkflowState) -> NodeResult:
     from hermes3d.core.validation.truth_gate import (
-        TruthGateConfig, run_truth_gate, CheckStatus,
+        TruthGateConfig,
+        run_truth_gate,
+        CheckStatus,
     )
 
     started = _now()
@@ -170,8 +172,10 @@ def _node_truth_gate(state: WorkflowState) -> NodeResult:
     }
     if rep.passed:
         return NodeResult(
-            node_name="truth_gate", outcome=NodeOutcome.PASS,
-            started_unix=started, ended_unix=_now(),
+            node_name="truth_gate",
+            outcome=NodeOutcome.PASS,
+            started_unix=started,
+            ended_unix=_now(),
             state_patch=patch,
         )
     # Detect specific failures the repair node might be able to fix
@@ -181,15 +185,18 @@ def _node_truth_gate(state: WorkflowState) -> NodeResult:
     if can_repair:
         # Mark for repair, then re-validate
         return NodeResult(
-            node_name="truth_gate", outcome=NodeOutcome.PASS,
-            started_unix=started, ended_unix=_now(),
-            state_patch={**patch, "needs_repair": True,
-                         "repairable_failures": fails},
+            node_name="truth_gate",
+            outcome=NodeOutcome.PASS,
+            started_unix=started,
+            ended_unix=_now(),
+            state_patch={**patch, "needs_repair": True, "repairable_failures": fails},
             notes=[f"truth gate failed but repair is possible: {fails}"],
         )
     return NodeResult(
-        node_name="truth_gate", outcome=NodeOutcome.FAIL,
-        started_unix=started, ended_unix=_now(),
+        node_name="truth_gate",
+        outcome=NodeOutcome.FAIL,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch=patch,
         error=f"unrepairable failures: {fails}",
     )
@@ -198,15 +205,18 @@ def _node_truth_gate(state: WorkflowState) -> NodeResult:
 def _node_repair(state: WorkflowState) -> NodeResult:
     if not state.data.get("needs_repair", False):
         return NodeResult(
-            node_name="repair_if_needed", outcome=NodeOutcome.SKIP,
-            started_unix=_now(), ended_unix=_now(),
+            node_name="repair_if_needed",
+            outcome=NodeOutcome.SKIP,
+            started_unix=_now(),
+            ended_unix=_now(),
             notes=["repair not requested by truth_gate"],
         )
 
     import trimesh
     from hermes3d.core.agents.mesh_repair import RepairConfig, repair_mesh
     from hermes3d.core.validation.truth_gate import (
-        TruthGateConfig, run_truth_gate,
+        TruthGateConfig,
+        run_truth_gate,
     )
 
     started = _now()
@@ -214,8 +224,10 @@ def _node_repair(state: WorkflowState) -> NodeResult:
     fixed, report = repair_mesh(src, RepairConfig())
     if not report.succeeded:
         return NodeResult(
-            node_name="repair_if_needed", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="repair_if_needed",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error="repair pipeline could not produce a watertight mesh",
             state_patch={"repair_report": report.to_dict()},
         )
@@ -232,8 +244,10 @@ def _node_repair(state: WorkflowState) -> NodeResult:
     rep2 = run_truth_gate(repaired_path, cfg)
     if not rep2.passed:
         return NodeResult(
-            node_name="repair_if_needed", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="repair_if_needed",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error="repaired mesh still fails truth gate",
             state_patch={
                 "repair_report": report.to_dict(),
@@ -242,23 +256,26 @@ def _node_repair(state: WorkflowState) -> NodeResult:
             },
         )
     return NodeResult(
-        node_name="repair_if_needed", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="repair_if_needed",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={
             "repair_report": report.to_dict(),
             "mesh_path": str(repaired_path),  # downstream uses the repaired one
             "truth_gate_passed": True,
         },
-        notes=[f"mesh repaired: faces {report.initial_face_count} -> "
-               f"{report.final_face_count}"],
+        notes=[f"mesh repaired: faces {report.initial_face_count} -> {report.final_face_count}"],
     )
 
 
 def _node_auto_orient(state: WorkflowState) -> NodeResult:
     if not state.data.get("auto_orient_enabled", True):
         return NodeResult(
-            node_name="auto_orient", outcome=NodeOutcome.SKIP,
-            started_unix=_now(), ended_unix=_now(),
+            node_name="auto_orient",
+            outcome=NodeOutcome.SKIP,
+            started_unix=_now(),
+            ended_unix=_now(),
             notes=["auto-orient disabled by caller"],
         )
     import trimesh
@@ -270,10 +287,11 @@ def _node_auto_orient(state: WorkflowState) -> NodeResult:
     chosen = decision.chosen
     if chosen.candidate_name == "identity":
         return NodeResult(
-            node_name="auto_orient", outcome=NodeOutcome.PASS,
-            started_unix=started, ended_unix=_now(),
-            state_patch={"orient_choice": "identity",
-                         "orient_score": chosen.score},
+            node_name="auto_orient",
+            outcome=NodeOutcome.PASS,
+            started_unix=started,
+            ended_unix=_now(),
+            state_patch={"orient_choice": "identity", "orient_score": chosen.score},
             notes=["original orientation already optimal"],
         )
     # Apply transform and re-export
@@ -284,8 +302,10 @@ def _node_auto_orient(state: WorkflowState) -> NodeResult:
     oriented_path = src_path.with_name(src_path.stem + ".oriented.stl")
     mesh.export(oriented_path)
     return NodeResult(
-        node_name="auto_orient", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="auto_orient",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={
             "mesh_path": str(oriented_path),
             "orient_choice": chosen.candidate_name,
@@ -298,7 +318,9 @@ def _node_auto_orient(state: WorkflowState) -> NodeResult:
 def _node_dispatch(state: WorkflowState) -> NodeResult:
     import trimesh
     from hermes3d.core.agents.dispatcher import (
-        DispatchRequest, DispatchStrategy, dispatch,
+        DispatchRequest,
+        DispatchStrategy,
+        dispatch,
     )
 
     started = _now()
@@ -308,6 +330,7 @@ def _node_dispatch(state: WorkflowState) -> NodeResult:
     radius = None
     if xy.size:
         import numpy as np
+
         center = (xy.min(axis=0) + xy.max(axis=0)) / 2.0
         radius = float(np.max(np.linalg.norm(xy - center, axis=1)))
 
@@ -324,13 +347,17 @@ def _node_dispatch(state: WorkflowState) -> NodeResult:
     decision = dispatch(req)
     if decision.selected_printer_id is None:
         return NodeResult(
-            node_name="dispatch", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="dispatch",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error=f"no eligible printer: {decision.rationale[:200]}",
         )
     return NodeResult(
-        node_name="dispatch", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="dispatch",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={
             "selected_printer_id": decision.selected_printer_id,
             "dispatch_rationale": decision.rationale,
@@ -354,8 +381,7 @@ def _node_preflight(state: WorkflowState) -> NodeResult:
         printer_id=state.data["selected_printer_id"],
         job_id=state.data.get("job_id"),
         truth_gate_report=_TGFacade(),
-        live_state=state.data.get("live_state", {}).get(
-            state.data["selected_printer_id"]),
+        live_state=state.data.get("live_state", {}).get(state.data["selected_printer_id"]),
         spool=state.data.get("loaded_spool"),
         required_grams=float(state.data.get("required_grams", 0.0)),
         required_material=state.data.get("material", "PLA"),
@@ -366,24 +392,33 @@ def _node_preflight(state: WorkflowState) -> NodeResult:
     if not rep.passed:
         fails = [c.message for c in rep.checks if c.outcome.value == "fail"]
         return NodeResult(
-            node_name="preflight", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="preflight",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error="; ".join(fails),
             state_patch={"preflight_report": rep.to_dict()},
         )
     return NodeResult(
-        node_name="preflight", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="preflight",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={"preflight_report": rep.to_dict()},
         notes=[f"{len(rep.checks)} checks passed"]
-              + ([f"{sum(1 for c in rep.checks if c.outcome.value == 'warn')} "
-                  "warnings"] if rep.has_warnings else []),
+        + (
+            [f"{sum(1 for c in rep.checks if c.outcome.value == 'warn')} warnings"]
+            if rep.has_warnings
+            else []
+        ),
     )
 
 
 def _node_slice(state: WorkflowState) -> NodeResult:
     from hermes3d.core.slicer.slicer_runner import (
-        slice_mesh, SlicerError, SlicerNotFound,
+        slice_mesh,
+        SlicerError,
+        SlicerNotFound,
     )
 
     started = _now()
@@ -401,24 +436,32 @@ def _node_slice(state: WorkflowState) -> NodeResult:
         # No slicer installed — non-fatal in dry-run mode
         if state.data.get("dry_run", True):
             return NodeResult(
-                node_name="slice", outcome=NodeOutcome.SKIP,
-                started_unix=started, ended_unix=_now(),
+                node_name="slice",
+                outcome=NodeOutcome.SKIP,
+                started_unix=started,
+                ended_unix=_now(),
                 notes=[f"no slicer available (dry_run): {exc}"],
             )
         return NodeResult(
-            node_name="slice", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="slice",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error=f"slicer not found: {exc}",
         )
     except SlicerError as exc:
         return NodeResult(
-            node_name="slice", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="slice",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error=str(exc),
         )
     return NodeResult(
-        node_name="slice", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="slice",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={
             "sliced_gcode_path": str(result.gcode_path),
             "slicer_metadata": result.metadata,
@@ -432,8 +475,10 @@ def _node_analyze_gcode(state: WorkflowState) -> NodeResult:
     started = _now()
     a = analyze_gcode(state.data["sliced_gcode_path"])
     return NodeResult(
-        node_name="analyze_gcode", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="analyze_gcode",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={
             "gcode_analysis": a,
             "estimated_print_time_min": a.estimated_print_time_min,
@@ -452,21 +497,28 @@ def _node_cost_estimate(state: WorkflowState) -> NodeResult:
     dur = (state.data.get("estimated_print_time_min") or 0.0) / 60.0
     if fil == 0.0 and dur == 0.0:
         return NodeResult(
-            node_name="cost_estimate", outcome=NodeOutcome.SKIP,
-            started_unix=started, ended_unix=_now(),
+            node_name="cost_estimate",
+            outcome=NodeOutcome.SKIP,
+            started_unix=started,
+            ended_unix=_now(),
             notes=["no filament/time data — cost calc skipped"],
         )
     e = estimate_cost(
         printer_id=state.data["selected_printer_id"],
         material=state.data.get("material", "PLA"),
-        filament_g=fil, duration_hours=dur,
+        filament_g=fil,
+        duration_hours=dur,
     )
     return NodeResult(
-        node_name="cost_estimate", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="cost_estimate",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={"cost_estimate": e},
-        notes=[f"${e.total_cost_usd:.2f} (filament ${e.filament_cost_usd} + "
-               f"energy ${e.energy_cost_usd})"],
+        notes=[
+            f"${e.total_cost_usd:.2f} (filament ${e.filament_cost_usd} + "
+            f"energy ${e.energy_cost_usd})"
+        ],
     )
 
 
@@ -474,8 +526,10 @@ def _node_upload(state: WorkflowState) -> NodeResult:
     """Upload sliced gcode to Moonraker. Skipped if 'dry_run' set."""
     if state.data.get("dry_run", True):
         return NodeResult(
-            node_name="upload", outcome=NodeOutcome.SKIP,
-            started_unix=_now(), ended_unix=_now(),
+            node_name="upload",
+            outcome=NodeOutcome.SKIP,
+            started_unix=_now(),
+            ended_unix=_now(),
             notes=["dry_run=True — no upload"],
         )
     from hermes3d.core.printers import get_profile
@@ -483,21 +537,26 @@ def _node_upload(state: WorkflowState) -> NodeResult:
 
     started = _now()
     profile = get_profile(state.data["selected_printer_id"])
-    client = MoonrakerClient(profile.moonraker_url_default,
-                              api_key=state.data.get("moonraker_api_key"),
-                              timeout_s=float(state.data.get("upload_timeout_s",
-                                                                 60.0)))
+    client = MoonrakerClient(
+        profile.moonraker_url_default,
+        api_key=state.data.get("moonraker_api_key"),
+        timeout_s=float(state.data.get("upload_timeout_s", 60.0)),
+    )
     try:
         item_path = client.upload_gcode(state.data["sliced_gcode_path"])
     except Exception as exc:  # noqa: BLE001
         return NodeResult(
-            node_name="upload", outcome=NodeOutcome.RETRY,
-            started_unix=started, ended_unix=_now(),
+            node_name="upload",
+            outcome=NodeOutcome.RETRY,
+            started_unix=started,
+            ended_unix=_now(),
             error=str(exc),
         )
     return NodeResult(
-        node_name="upload", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="upload",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={"moonraker_item_path": item_path},
     )
 
@@ -505,8 +564,10 @@ def _node_upload(state: WorkflowState) -> NodeResult:
 def _node_start_print(state: WorkflowState) -> NodeResult:
     if state.data.get("dry_run", True):
         return NodeResult(
-            node_name="start_print", outcome=NodeOutcome.SKIP,
-            started_unix=_now(), ended_unix=_now(),
+            node_name="start_print",
+            outcome=NodeOutcome.SKIP,
+            started_unix=_now(),
+            ended_unix=_now(),
             notes=["dry_run=True — no start"],
         )
     from hermes3d.core.printers import get_profile
@@ -514,47 +575,59 @@ def _node_start_print(state: WorkflowState) -> NodeResult:
 
     started = _now()
     profile = get_profile(state.data["selected_printer_id"])
-    client = MoonrakerClient(profile.moonraker_url_default,
-                              api_key=state.data.get("moonraker_api_key"))
+    client = MoonrakerClient(
+        profile.moonraker_url_default, api_key=state.data.get("moonraker_api_key")
+    )
     item = state.data.get("moonraker_item_path") or state.data["sliced_gcode_path"]
     try:
         client.start_print(item)
     except Exception as exc:  # noqa: BLE001
         return NodeResult(
-            node_name="start_print", outcome=NodeOutcome.FAIL,
-            started_unix=started, ended_unix=_now(),
+            node_name="start_print",
+            outcome=NodeOutcome.FAIL,
+            started_unix=started,
+            ended_unix=_now(),
             error=str(exc),
         )
     return NodeResult(
-        node_name="start_print", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="start_print",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         state_patch={"print_started_unix": _now()},
     )
 
 
 def _node_notify_started(state: WorkflowState) -> NodeResult:
     from hermes3d.core.notifications import (
-        Notifier, event_print_started,
+        Notifier,
+        event_print_started,
     )
 
     started = _now()
     n = Notifier()
     if not n.configured_channels:
         return NodeResult(
-            node_name="notify_started", outcome=NodeOutcome.SKIP,
-            started_unix=started, ended_unix=_now(),
+            node_name="notify_started",
+            outcome=NodeOutcome.SKIP,
+            started_unix=started,
+            ended_unix=_now(),
             notes=["no notification channels configured"],
         )
     filename = Path(state.data.get("sliced_gcode_path", "?")).name
-    results = n.notify(event_print_started(
-        printer_id=state.data["selected_printer_id"],
-        job_id=state.data.get("job_id", "?"),
-        filename=filename,
-    ))
+    results = n.notify(
+        event_print_started(
+            printer_id=state.data["selected_printer_id"],
+            job_id=state.data.get("job_id", "?"),
+            filename=filename,
+        )
+    )
     sent = sum(1 for r in results if r.sent)
     return NodeResult(
-        node_name="notify_started", outcome=NodeOutcome.PASS,
-        started_unix=started, ended_unix=_now(),
+        node_name="notify_started",
+        outcome=NodeOutcome.PASS,
+        started_unix=started,
+        ended_unix=_now(),
         notes=[f"{sent}/{len(results)} channels delivered"],
     )
 
@@ -564,77 +637,115 @@ def _node_notify_started(state: WorkflowState) -> NodeResult:
 # =============================================================================
 
 
-def build_print_workflow(*, checkpoint_dir: str | Path | None = None,
-                          ) -> WorkflowGraph:
+def build_print_workflow(
+    *,
+    checkpoint_dir: str | Path | None = None,
+) -> WorkflowGraph:
     g = WorkflowGraph("PrintWorkflow", checkpoint_dir=checkpoint_dir)
-    g.add_node(GraphNode(
-        name="enqueue", fn=_retry_node(_node_enqueue),
-        expected_inputs=("mesh_path",),
-        description="Persist a Job in the queue",
-    ))
-    g.add_node(GraphNode(
-        name="truth_gate", fn=_retry_node(_node_truth_gate),
-        expected_inputs=("mesh_path",),
-        description="Run printability validation",
-    ))
-    g.add_node(GraphNode(
-        name="repair_if_needed", fn=_retry_node(_node_repair),
-        expected_inputs=("mesh_path",),
-        description="Auto-repair non-watertight or flipped meshes",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="auto_orient", fn=_retry_node(_node_auto_orient),
-        expected_inputs=("mesh_path",),
-        description="Find optimal print orientation",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="dispatch", fn=_retry_node(_node_dispatch),
-        expected_inputs=("mesh_path",),
-        description="Pick the best printer in the fleet",
-    ))
-    g.add_node(GraphNode(
-        name="preflight", fn=_retry_node(_node_preflight),
-        expected_inputs=("selected_printer_id",),
-        description="Run preflight safety checklist",
-    ))
-    g.add_node(GraphNode(
-        name="slice", fn=_retry_node(_node_slice),
-        expected_inputs=("mesh_path", "selected_printer_id"),
-        description="Slice mesh to G-code",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="analyze_gcode", fn=_retry_node(_node_analyze_gcode),
-        expected_inputs=("sliced_gcode_path",),
-        description="Parse G-code metadata + raise risk flags",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="cost_estimate", fn=_retry_node(_node_cost_estimate),
-        expected_inputs=("selected_printer_id",),
-        description="Estimate filament + electricity cost",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="upload", fn=_retry_node(_node_upload),
-        expected_inputs=("sliced_gcode_path", "selected_printer_id"),
-        description="Upload G-code to Moonraker",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="start_print", fn=_retry_node(_node_start_print),
-        expected_inputs=("selected_printer_id",),
-        description="Tell Klipper to start the print",
-        optional=True,
-    ))
-    g.add_node(GraphNode(
-        name="notify_started", fn=_retry_node(_node_notify_started),
-        expected_inputs=("selected_printer_id",),
-        description="Send Discord/Slack notification",
-        optional=True,
-    ))
+    g.add_node(
+        GraphNode(
+            name="enqueue",
+            fn=_retry_node(_node_enqueue),
+            expected_inputs=("mesh_path",),
+            description="Persist a Job in the queue",
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="truth_gate",
+            fn=_retry_node(_node_truth_gate),
+            expected_inputs=("mesh_path",),
+            description="Run printability validation",
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="repair_if_needed",
+            fn=_retry_node(_node_repair),
+            expected_inputs=("mesh_path",),
+            description="Auto-repair non-watertight or flipped meshes",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="auto_orient",
+            fn=_retry_node(_node_auto_orient),
+            expected_inputs=("mesh_path",),
+            description="Find optimal print orientation",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="dispatch",
+            fn=_retry_node(_node_dispatch),
+            expected_inputs=("mesh_path",),
+            description="Pick the best printer in the fleet",
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="preflight",
+            fn=_retry_node(_node_preflight),
+            expected_inputs=("selected_printer_id",),
+            description="Run preflight safety checklist",
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="slice",
+            fn=_retry_node(_node_slice),
+            expected_inputs=("mesh_path", "selected_printer_id"),
+            description="Slice mesh to G-code",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="analyze_gcode",
+            fn=_retry_node(_node_analyze_gcode),
+            expected_inputs=("sliced_gcode_path",),
+            description="Parse G-code metadata + raise risk flags",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="cost_estimate",
+            fn=_retry_node(_node_cost_estimate),
+            expected_inputs=("selected_printer_id",),
+            description="Estimate filament + electricity cost",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="upload",
+            fn=_retry_node(_node_upload),
+            expected_inputs=("sliced_gcode_path", "selected_printer_id"),
+            description="Upload G-code to Moonraker",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="start_print",
+            fn=_retry_node(_node_start_print),
+            expected_inputs=("selected_printer_id",),
+            description="Tell Klipper to start the print",
+            optional=True,
+        )
+    )
+    g.add_node(
+        GraphNode(
+            name="notify_started",
+            fn=_retry_node(_node_notify_started),
+            expected_inputs=("selected_printer_id",),
+            description="Send Discord/Slack notification",
+            optional=True,
+        )
+    )
     return g
 
 

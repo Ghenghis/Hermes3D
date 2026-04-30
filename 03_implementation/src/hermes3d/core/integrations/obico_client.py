@@ -18,6 +18,7 @@ API surface (Obico self-hosted):
 The agent treats prediction > FAILURE_THRESHOLD as a strong signal and
 either pauses or notifies depending on user policy.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -35,8 +36,8 @@ from urllib.error import HTTPError, URLError
 log = logging.getLogger(__name__)
 
 
-DEFAULT_FAILURE_THRESHOLD = 0.45     # Obico's recommended action threshold
-DEFAULT_HEADS_UP_THRESHOLD = 0.20    # warn but don't act
+DEFAULT_FAILURE_THRESHOLD = 0.45  # Obico's recommended action threshold
+DEFAULT_HEADS_UP_THRESHOLD = 0.20  # warn but don't act
 
 
 class ObicoAction(str, enum.Enum):
@@ -77,9 +78,13 @@ class ObicoClient:
             h["Authorization"] = f"Token {token}"
         return h
 
-    def _request(self, method: str, path: str,
-                  *, body: dict[str, Any] | None = None,
-                  ) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         url = self.base_url.rstrip("/") + path
         data = json.dumps(body).encode("utf-8") if body is not None else None
         h = dict(self._headers())
@@ -112,8 +117,7 @@ class ObicoClient:
         data = self._request("GET", f"/api/v1/printers/{printer_id}/")
         current = data.get("current_print") or {}
         prediction = current.get("prediction") or {}
-        prob = float(prediction.get("normalized_p",
-                                       prediction.get("p", 0.0) or 0.0))
+        prob = float(prediction.get("normalized_p", prediction.get("p", 0.0) or 0.0))
         action = ObicoAction.OK
         if prob >= self.failure_threshold:
             action = ObicoAction.PAUSE
@@ -124,15 +128,13 @@ class ObicoClient:
             is_printing=bool(current.get("started_at")),
             failure_probability=prob,
             detective_p=prediction.get("p"),
-            print_filename=(current.get("filename")
-                              or current.get("name")),
+            print_filename=(current.get("filename") or current.get("name")),
             elapsed_seconds=current.get("elapsed_seconds"),
             recommended_action=action,
         )
 
     def cancel_print(self, printer_id: str) -> dict[str, Any]:
-        return self._request("POST",
-                              f"/api/v1/printers/{printer_id}/cancel_print/")
+        return self._request("POST", f"/api/v1/printers/{printer_id}/cancel_print/")
 
 
 __all__ = [

@@ -17,6 +17,7 @@ This module is deliberately read-mostly: it never *applies* a fix — it
 returns a structured ``RepairResult`` that the orchestration layer
 inspects to decide whether to resume, escalate, or abort.
 """
+
 from __future__ import annotations
 
 import logging
@@ -52,11 +53,14 @@ class RepairAgent:
             remedy; below this we still escalate.
     """
 
-    def __init__(self, *,
-                 skill_store: Any = None,
-                 notifier: Any = None,
-                 llm_client: Any = None,
-                 confidence_threshold: float = 0.6) -> None:
+    def __init__(
+        self,
+        *,
+        skill_store: Any = None,
+        notifier: Any = None,
+        llm_client: Any = None,
+        confidence_threshold: float = 0.6,
+    ) -> None:
         self.skill_store = skill_store
         self._notifier = notifier
         self._llm_client = llm_client
@@ -105,28 +109,39 @@ class RepairAgent:
         if best.confidence < self.confidence_threshold:
             # Found a hint, but not strong enough — record it and let the
             # ladder continue (we still escalate, but with a note).
-            return RepairResult(
-                outcome="escalated",
-                strategy_used="skill_store_low_confidence",
-                notes=(f"matching skill {best.skill_id!r} found but "
-                       f"confidence {best.confidence:.2f} < "
-                       f"{self.confidence_threshold:.2f}"),
-                suggested_action={"skill_id": best.skill_id,
-                                  "body": dict(best.body)},
-            ).__post_attach_escalate__() if False else self._escalate_to_human(
-                esc,
-                pre_note=(f"low-confidence skill {best.skill_id!r} "
-                          f"(c={best.confidence:.2f}) suggests "
-                          f"{best.body!r}"),
+            return (
+                RepairResult(
+                    outcome="escalated",
+                    strategy_used="skill_store_low_confidence",
+                    notes=(
+                        f"matching skill {best.skill_id!r} found but "
+                        f"confidence {best.confidence:.2f} < "
+                        f"{self.confidence_threshold:.2f}"
+                    ),
+                    suggested_action={"skill_id": best.skill_id, "body": dict(best.body)},
+                ).__post_attach_escalate__()
+                if False
+                else self._escalate_to_human(
+                    esc,
+                    pre_note=(
+                        f"low-confidence skill {best.skill_id!r} "
+                        f"(c={best.confidence:.2f}) suggests "
+                        f"{best.body!r}"
+                    ),
+                )
             )
         return RepairResult(
             outcome="fixed",
             strategy_used="skill_store",
-            notes=(f"applied failure_pattern skill {best.skill_id!r} "
-                   f"(confidence={best.confidence:.2f})"),
-            suggested_action={"skill_id": best.skill_id,
-                              "body": dict(best.body),
-                              "name": best.name},
+            notes=(
+                f"applied failure_pattern skill {best.skill_id!r} "
+                f"(confidence={best.confidence:.2f})"
+            ),
+            suggested_action={
+                "skill_id": best.skill_id,
+                "body": dict(best.body),
+                "name": best.name,
+            },
         )
 
     def _try_llm(self, esc: RepairEscalation) -> RepairResult | None:
@@ -134,7 +149,8 @@ class RepairAgent:
         if client is None:
             try:
                 from hermes3d.core.llm.providers import (
-                    ProviderUnavailable, select_provider,
+                    ProviderUnavailable,
+                    select_provider,
                 )
             except Exception:  # noqa: BLE001
                 return None
@@ -162,6 +178,7 @@ class RepairAgent:
         suggestion: dict[str, Any] = {"raw": getattr(result, "text", str(result))}
         try:
             from hermes3d.core.llm.providers import extract_json
+
             suggestion = extract_json(getattr(result, "text", "")) or suggestion
         except Exception:  # noqa: BLE001
             pass
@@ -172,26 +189,30 @@ class RepairAgent:
             suggested_action=suggestion,
         )
 
-    def _escalate_to_human(self, esc: RepairEscalation, *,
-                           pre_note: str = "") -> RepairResult:
+    def _escalate_to_human(self, esc: RepairEscalation, *, pre_note: str = "") -> RepairResult:
         notifier = self._notifier
         sent_count = 0
         if notifier is None:
             try:
                 from hermes3d.core.notifications.notifier import Notifier
+
                 notifier = Notifier()
             except Exception:  # noqa: BLE001
                 notifier = None
         if notifier is not None:
             try:
                 from hermes3d.core.notifications.notifier import (
-                    NotificationEvent, NotificationLevel,
+                    NotificationEvent,
+                    NotificationLevel,
                 )
+
                 ctx = esc.context or {}
                 evt = NotificationEvent(
                     title="Hermes3D repair escalation",
-                    message=(f"Node {ctx.get('node_name')!r} failed after "
-                             f"{esc.attempts} attempts: {esc.cause!r}"),
+                    message=(
+                        f"Node {ctx.get('node_name')!r} failed after "
+                        f"{esc.attempts} attempts: {esc.cause!r}"
+                    ),
                     level=NotificationLevel.ERROR,
                     printer_id=ctx.get("printer_id"),
                     job_id=ctx.get("job_id"),
@@ -202,8 +223,7 @@ class RepairAgent:
             except Exception as exc:  # noqa: BLE001
                 log.warning("Notifier escalation failed: %s", exc)
         notes = (pre_note + " | " if pre_note else "") + (
-            f"notified {sent_count} channel(s)"
-            if notifier is not None else "no notifier available"
+            f"notified {sent_count} channel(s)" if notifier is not None else "no notifier available"
         )
         return RepairResult(
             outcome="escalated",

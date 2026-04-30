@@ -1,4 +1,5 @@
 """Parametric design generators (currently: desk_organizer)."""
+
 from hermes3d.core.design.desk_organizer import (
     OrganizerSpec,
     acceptance_variants,

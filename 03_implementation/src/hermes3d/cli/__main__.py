@@ -37,6 +37,7 @@ Commands:
 The CLI's exit code is 0 on success, 1 on a structured error, 2 on usage
 mistakes.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -50,12 +51,18 @@ from typing import Any
 
 def _printers_table_compact() -> str:
     from hermes3d.core.printers import FLEET
+
     lines = []
     for p in FLEET:
-        bed = (f"{p.bed.x_mm:.0f}x{p.bed.y_mm:.0f}" if p.bed.kind == "rectangular"
-               else f"Ø{p.bed.diameter_mm:.0f}")
-        lines.append(f"  {p.profile_id:25s}  {p.manufacturer:18s}  {p.model:24s}  "
-                     f"{p.kinematics.value:9s}  {bed:>9s} × {p.z_height_mm:.0f}")
+        bed = (
+            f"{p.bed.x_mm:.0f}x{p.bed.y_mm:.0f}"
+            if p.bed.kind == "rectangular"
+            else f"Ø{p.bed.diameter_mm:.0f}"
+        )
+        lines.append(
+            f"  {p.profile_id:25s}  {p.manufacturer:18s}  {p.model:24s}  "
+            f"{p.kinematics.value:9s}  {bed:>9s} × {p.z_height_mm:.0f}"
+        )
     return "\n".join(lines)
 
 
@@ -64,6 +71,7 @@ def _printers_table_compact() -> str:
 
 def cmd_fleet_probe(args: argparse.Namespace) -> int:
     from hermes3d.core.printers.moonraker_client import probe_fleet
+
     entries = probe_fleet(timeout_s=args.timeout)
     reachable = sum(1 for e in entries if e["reachable"])
     print(f"Probed {len(entries)} printers — reachable: {reachable}")
@@ -71,11 +79,13 @@ def cmd_fleet_probe(args: argparse.Namespace) -> int:
     print(f"{'profile_id':25s}  {'reach':6s}  {'klippy':12s}  {'moonraker':14s}  url")
     print("-" * 100)
     for e in entries:
-        print(f"{e['profile_id']:25s}  "
-              f"{'yes' if e['reachable'] else 'no':6s}  "
-              f"{(e['klippy_state'] or '-'):12s}  "
-              f"{(e['moonraker_version'] or '-'):14s}  "
-              f"{e['moonraker_url']}")
+        print(
+            f"{e['profile_id']:25s}  "
+            f"{'yes' if e['reachable'] else 'no':6s}  "
+            f"{(e['klippy_state'] or '-'):12s}  "
+            f"{(e['moonraker_version'] or '-'):14s}  "
+            f"{e['moonraker_url']}"
+        )
     return 0
 
 
@@ -83,10 +93,10 @@ def cmd_fleet_status(args: argparse.Namespace) -> int:
     from hermes3d.core.farm import collect_fleet_status, render_dashboard_table
     from hermes3d.core.agents.job_queue import JobQueue
     from hermes3d.core.farm.spool_tracker import SpoolTracker
+
     queue = JobQueue(args.queue) if args.queue and Path(args.queue).exists() else None
     spool = SpoolTracker(args.spools) if args.spools and Path(args.spools).exists() else None
-    entries = collect_fleet_status(queue=queue, spool_tracker=spool,
-                                    timeout_s=args.timeout)
+    entries = collect_fleet_status(queue=queue, spool_tracker=spool, timeout_s=args.timeout)
     print(render_dashboard_table(entries))
     return 0
 
@@ -102,16 +112,18 @@ def cmd_fleet_list(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     from hermes3d.core.validation.truth_gate import (
-        TruthGateConfig, run_truth_gate, CheckStatus,
+        TruthGateConfig,
+        run_truth_gate,
+        CheckStatus,
     )
+
     cfg = TruthGateConfig(printer_profile_id=args.printer)
     rep = run_truth_gate(args.stl, cfg)
     print(f"Truth Gate report — {rep.mesh_path}")
     print(f"  overall: {rep.overall_status.value.upper()}")
     print(f"  duration: {rep.duration_seconds:.2f}s")
     for c in rep.checks:
-        marker = {"pass": "✓", "fail": "✗", "skip": "·",
-                  "error": "!"}.get(c.status.value, "?")
+        marker = {"pass": "✓", "fail": "✗", "skip": "·", "error": "!"}.get(c.status.value, "?")
         print(f"  {marker} {c.name:24s} {c.status.value:5s}  {c.message}")
     if args.json:
         print()
@@ -121,9 +133,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 def cmd_validate_fleet(args: argparse.Namespace) -> int:
     from hermes3d.core.validation.truth_gate import (
-        TruthGateConfig, run_truth_gate, CheckStatus,
+        TruthGateConfig,
+        run_truth_gate,
+        CheckStatus,
     )
     from hermes3d.core.printers import list_ids
+
     fail = 0
     for pid in list_ids():
         cfg = TruthGateConfig(printer_profile_id=pid)
@@ -146,11 +161,17 @@ def cmd_validate_fleet(args: argparse.Namespace) -> int:
 
 def cmd_generate_organizer(args: argparse.Namespace) -> int:
     from hermes3d.core.design.desk_organizer import (
-        OrganizerSpec, build_organizer, export_organizer,
+        OrganizerSpec,
+        build_organizer,
+        export_organizer,
     )
+
     spec = OrganizerSpec(
-        width_mm=args.width, depth_mm=args.depth, height_mm=args.height,
-        tray_count=args.trays, pen_count=args.pens,
+        width_mm=args.width,
+        depth_mm=args.depth,
+        height_mm=args.height,
+        tray_count=args.trays,
+        pen_count=args.pens,
         phone_slot=not args.no_phone_slot,
         cable_passthrough=not args.no_cable,
     )
@@ -166,13 +187,17 @@ def cmd_generate_organizer(args: argparse.Namespace) -> int:
 def cmd_dispatch(args: argparse.Namespace) -> int:
     import trimesh
     from hermes3d.core.agents.dispatcher import (
-        DispatchRequest, DispatchStrategy, dispatch,
+        DispatchRequest,
+        DispatchStrategy,
+        dispatch,
     )
+
     mesh = trimesh.load_mesh(args.stl, force="mesh")
     extents = tuple(float(e) for e in mesh.extents)
     xy = mesh.vertices[:, :2]
     if xy.size:
         import numpy as np
+
         center = (xy.min(axis=0) + xy.max(axis=0)) / 2.0
         radius = float(np.max(np.linalg.norm(xy - center, axis=1)))
     else:
@@ -193,8 +218,7 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
     print("Top candidates:")
     for c in decision.candidates[:5]:
         marker = "✓" if c.eligible else "✗"
-        print(f"  {marker} {c.printer_id:25s} score={c.score:.3f}  "
-              f"eligible={c.eligible}")
+        print(f"  {marker} {c.printer_id:25s} score={c.score:.3f}  eligible={c.eligible}")
         if c.blockers:
             for b in c.blockers[:2]:
                 print(f"        blocker: {b}")
@@ -206,11 +230,15 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
 
 def cmd_slice(args: argparse.Namespace) -> int:
     from hermes3d.core.slicer.slicer_runner import slice_mesh, SlicerError
-    out_dir = Path(args.out_dir) if args.out_dir else Path(tempfile.mkdtemp(prefix="hermes3d_slice_"))
+
+    out_dir = (
+        Path(args.out_dir) if args.out_dir else Path(tempfile.mkdtemp(prefix="hermes3d_slice_"))
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     try:
-        result = slice_mesh(args.stl, profile=args.profile, output_dir=out_dir,
-                             timeout_seconds=args.timeout)
+        result = slice_mesh(
+            args.stl, profile=args.profile, output_dir=out_dir, timeout_seconds=args.timeout
+        )
     except SlicerError as exc:
         print(f"Slice failed: {exc}", file=sys.stderr)
         return 1
@@ -226,6 +254,7 @@ def cmd_slice(args: argparse.Namespace) -> int:
 
 def cmd_analyze_gcode(args: argparse.Namespace) -> int:
     from hermes3d.core.slicer.gcode_analyzer import analyze_gcode
+
     a = analyze_gcode(args.gcode)
     if args.json:
         print(json.dumps(a.to_dict(), indent=2))
@@ -233,8 +262,7 @@ def cmd_analyze_gcode(args: argparse.Namespace) -> int:
     print(f"G-code analysis — {a.path}")
     print(f"  slicer: {a.slicer_name} {a.slicer_version}")
     if a.estimated_print_time_min is not None:
-        print(f"  print time: {a.estimated_print_time_min:.1f} min "
-              f"({a.estimated_print_time_h}h)")
+        print(f"  print time: {a.estimated_print_time_min:.1f} min ({a.estimated_print_time_h}h)")
     if a.filament_used_mm:
         print(f"  filament: {a.filament_used_mm:.0f} mm / {a.filament_used_g:.1f} g")
     if a.layer_count:
@@ -254,6 +282,7 @@ def cmd_analyze_gcode(args: argparse.Namespace) -> int:
 
 def cmd_queue_list(args: argparse.Namespace) -> int:
     from hermes3d.core.agents.job_queue import JobQueue
+
     q = JobQueue(args.queue)
     jobs = q.list()
     if not jobs:
@@ -261,14 +290,17 @@ def cmd_queue_list(args: argparse.Namespace) -> int:
         return 0
     print(f"{len(jobs)} jobs:")
     for j in jobs:
-        print(f"  {j.job_id[:12]}  {j.state.value:11s}  "
-              f"{j.material:6s}  {j.target_printer_id or '-':25s}  "
-              f"{Path(j.mesh_path).name}")
+        print(
+            f"  {j.job_id[:12]}  {j.state.value:11s}  "
+            f"{j.material:6s}  {j.target_printer_id or '-':25s}  "
+            f"{Path(j.mesh_path).name}"
+        )
     return 0
 
 
 def cmd_queue_show(args: argparse.Namespace) -> int:
     from hermes3d.core.agents.job_queue import JobQueue
+
     q = JobQueue(args.queue)
     try:
         j = q.get(args.job_id)
@@ -281,9 +313,9 @@ def cmd_queue_show(args: argparse.Namespace) -> int:
 
 def cmd_queue_cancel(args: argparse.Namespace) -> int:
     from hermes3d.core.agents.job_queue import JobQueue, JobState
+
     q = JobQueue(args.queue)
-    j = q.transition_job(args.job_id, JobState.CANCELLED,
-                          reason="cancelled via CLI")
+    j = q.transition_job(args.job_id, JobState.CANCELLED, reason="cancelled via CLI")
     print(f"Cancelled job {j.job_id[:12]}  state={j.state.value}")
     return 0
 
@@ -293,6 +325,7 @@ def cmd_queue_cancel(args: argparse.Namespace) -> int:
 
 def cmd_spool_list(args: argparse.Namespace) -> int:
     from hermes3d.core.farm.spool_tracker import SpoolTracker
+
     st = SpoolTracker(args.spools)
     entries = st.list()
     if not entries:
@@ -300,24 +333,32 @@ def cmd_spool_list(args: argparse.Namespace) -> int:
         return 0
     for s in entries:
         loaded = f"on {s.loaded_on_printer}" if s.loaded_on_printer else "shelf"
-        print(f"  {s.spool_id[:8]}  {s.material:6s}  {s.color:18s}  "
-              f"{s.vendor:14s}  {s.remaining_grams:6.1f}/{s.initial_grams:.0f}g "
-              f"({s.percent_remaining:5.1f}%)  [{loaded}]")
+        print(
+            f"  {s.spool_id[:8]}  {s.material:6s}  {s.color:18s}  "
+            f"{s.vendor:14s}  {s.remaining_grams:6.1f}/{s.initial_grams:.0f}g "
+            f"({s.percent_remaining:5.1f}%)  [{loaded}]"
+        )
     return 0
 
 
 def cmd_spool_add(args: argparse.Namespace) -> int:
     from hermes3d.core.farm.spool_tracker import SpoolTracker
+
     st = SpoolTracker(args.spools)
-    s = st.add(material=args.material, color=args.color,
-                color_hex=args.color_hex, vendor=args.vendor,
-                initial_grams=args.grams)
+    s = st.add(
+        material=args.material,
+        color=args.color,
+        color_hex=args.color_hex,
+        vendor=args.vendor,
+        initial_grams=args.grams,
+    )
     print(f"Registered spool {s.spool_id}")
     return 0
 
 
 def cmd_spool_load(args: argparse.Namespace) -> int:
     from hermes3d.core.farm.spool_tracker import SpoolTracker
+
     st = SpoolTracker(args.spools)
     s = st.load_on_printer(args.spool_id, args.printer)
     print(f"Loaded {s.spool_id[:8]} ({s.material} {s.color}) on {args.printer}")
@@ -326,10 +367,10 @@ def cmd_spool_load(args: argparse.Namespace) -> int:
 
 def cmd_spool_consume(args: argparse.Namespace) -> int:
     from hermes3d.core.farm.spool_tracker import SpoolTracker
+
     st = SpoolTracker(args.spools)
     s = st.consume(args.spool_id, args.grams, job_id=args.job_id)
-    print(f"Consumed {args.grams}g — remaining {s.remaining_grams}g "
-          f"({s.percent_remaining:.1f}%)")
+    print(f"Consumed {args.grams}g — remaining {s.remaining_grams}g ({s.percent_remaining:.1f}%)")
     return 0
 
 
@@ -338,8 +379,10 @@ def cmd_spool_consume(args: argparse.Namespace) -> int:
 
 def cmd_proof_verify(args: argparse.Namespace) -> int:
     from hermes3d.core.proof.proof_envelope import (
-        verify_proof, ProofVerificationError,
+        verify_proof,
+        ProofVerificationError,
     )
+
     try:
         env = verify_proof(args.proof_path, check_files=not args.skip_files)
     except ProofVerificationError as exc:
@@ -364,8 +407,7 @@ def build_parser() -> argparse.ArgumentParser:
     DEFAULT_QUEUE = os.environ.get("HERMES3D_QUEUE", "./var/queue.json")
     DEFAULT_SPOOLS = os.environ.get("HERMES3D_SPOOLS", "./var/spools.json")
 
-    p = argparse.ArgumentParser(prog="hermes3d",
-                                 description="Hermes3D-OS Lite CLI")
+    p = argparse.ArgumentParser(prog="hermes3d", description="Hermes3D-OS Lite CLI")
     sub = p.add_subparsers(dest="command", required=True)
 
     # fleet -------------------------------------------------------------
@@ -389,8 +431,7 @@ def build_parser() -> argparse.ArgumentParser:
     val.add_argument("--json", action="store_true", help="Print full JSON report")
     val.set_defaults(func=cmd_validate)
 
-    valf = sub.add_parser("validate-fleet",
-                            help="Truth Gate vs every printer in fleet")
+    valf = sub.add_parser("validate-fleet", help="Truth Gate vs every printer in fleet")
     valf.add_argument("stl")
     valf.set_defaults(func=cmd_validate_fleet)
 
@@ -412,12 +453,21 @@ def build_parser() -> argparse.ArgumentParser:
     disp = sub.add_parser("dispatch", help="Pick best printer for a mesh")
     disp.add_argument("stl")
     disp.add_argument("--material", default="PLA")
-    disp.add_argument("--quality", default="normal",
-                       choices=["draft", "normal", "fine"])
-    disp.add_argument("--strategy", default="auto",
-                       choices=["auto", "fastest", "quality", "largest_bed",
-                                "smallest_fit", "least_busy", "delta_prefer",
-                                "cartesian_prefer"])
+    disp.add_argument("--quality", default="normal", choices=["draft", "normal", "fine"])
+    disp.add_argument(
+        "--strategy",
+        default="auto",
+        choices=[
+            "auto",
+            "fastest",
+            "quality",
+            "largest_bed",
+            "smallest_fit",
+            "least_busy",
+            "delta_prefer",
+            "cartesian_prefer",
+        ],
+    )
     disp.set_defaults(func=cmd_dispatch)
 
     # slice -------------------------------------------------------------
@@ -480,8 +530,7 @@ def build_parser() -> argparse.ArgumentParser:
     pr_sub = pr.add_subparsers(dest="proof_command", required=True)
     pv = pr_sub.add_parser("verify")
     pv.add_argument("proof_path")
-    pv.add_argument("--skip-files", action="store_true",
-                     help="Skip mesh/visual file re-hashing")
+    pv.add_argument("--skip-files", action="store_true", help="Skip mesh/visual file re-hashing")
     pv.set_defaults(func=cmd_proof_verify)
 
     return p

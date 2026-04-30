@@ -28,7 +28,7 @@ from enum import Enum
 class PrintOutcome(str, Enum):
     SUCCESS = "success"
     PARTIAL = "partial"  # finished but with visible defects
-    FAILED = "failed"    # mid-print failure, manual abort, etc.
+    FAILED = "failed"  # mid-print failure, manual abort, etc.
     CANCELLED = "cancelled"
     UNKNOWN = "unknown"
 
@@ -123,7 +123,9 @@ def _score_duration_accuracy(
     return 0.1, [f"actual duration far from predicted (ratio={ratio:.2f})"], 1.0
 
 
-def _score_stability(pauses: int, filament_changes: int, obico_pauses: int) -> tuple[float, list[str]]:
+def _score_stability(
+    pauses: int, filament_changes: int, obico_pauses: int
+) -> tuple[float, list[str]]:
     reasons: list[str] = []
     score = 1.0
     if pauses > 0:
@@ -176,10 +178,10 @@ def score_print(inp: ScoringInput) -> QualityReport:
     dims.append(QualityDimension("outcome", s, _DIMENSION_WEIGHTS["outcome"], r))
     confidence_factors.append(0.95 if inp.outcome != PrintOutcome.UNKNOWN else 0.5)
 
-    s, r, cf = _score_duration_accuracy(
-        inp.predicted_duration_seconds, inp.actual_duration_seconds
+    s, r, cf = _score_duration_accuracy(inp.predicted_duration_seconds, inp.actual_duration_seconds)
+    dims.append(
+        QualityDimension("duration_accuracy", s, _DIMENSION_WEIGHTS["duration_accuracy"], r)
     )
-    dims.append(QualityDimension("duration_accuracy", s, _DIMENSION_WEIGHTS["duration_accuracy"], r))
     confidence_factors.append(cf)
 
     s, r = _score_stability(inp.pause_count, inp.filament_change_count, inp.obico_pause_count)
@@ -193,7 +195,9 @@ def score_print(inp: ScoringInput) -> QualityReport:
     s, r = _score_automated_signals(
         inp.gcode_risk_flags, inp.layer_shift_detected, inp.spaghetti_detected
     )
-    dims.append(QualityDimension("automated_signals", s, _DIMENSION_WEIGHTS["automated_signals"], r))
+    dims.append(
+        QualityDimension("automated_signals", s, _DIMENSION_WEIGHTS["automated_signals"], r)
+    )
     confidence_factors.append(0.7)
 
     overall = sum(d.score * d.weight for d in dims)

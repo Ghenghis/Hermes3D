@@ -25,6 +25,7 @@ Built-in graph: PrintWorkflow
        -> preflight -> slice -> analyze_gcode -> upload -> start
        -> monitor -> record_history
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -45,8 +46,8 @@ log = logging.getLogger(__name__)
 class NodeOutcome(str, enum.Enum):
     PASS = "pass"
     FAIL = "fail"
-    SKIP = "skip"     # prerequisites missing — non-fatal
-    RETRY = "retry"   # transient error — runner re-attempts
+    SKIP = "skip"  # prerequisites missing — non-fatal
+    RETRY = "retry"  # transient error — runner re-attempts
 
 
 @dataclass
@@ -107,15 +108,17 @@ class WorkflowState:
             abort_reason=d.get("abort_reason"),
         )
         for h in d.get("history", []):
-            s.history.append(NodeResult(
-                node_name=h["node_name"],
-                outcome=NodeOutcome(h["outcome"]),
-                started_unix=h["started_unix"],
-                ended_unix=h["ended_unix"],
-                state_patch=h.get("state_patch", {}),
-                error=h.get("error"),
-                notes=list(h.get("notes", [])),
-            ))
+            s.history.append(
+                NodeResult(
+                    node_name=h["node_name"],
+                    outcome=NodeOutcome(h["outcome"]),
+                    started_unix=h["started_unix"],
+                    ended_unix=h["ended_unix"],
+                    state_patch=h.get("state_patch", {}),
+                    error=h.get("error"),
+                    notes=list(h.get("notes", [])),
+                )
+            )
         return s
 
 
@@ -133,7 +136,7 @@ class GraphNode:
     fn: NodeFn
     expected_inputs: tuple[str, ...] = ()
     description: str = ""
-    optional: bool = False    # if True, SKIP doesn't abort the workflow
+    optional: bool = False  # if True, SKIP doesn't abort the workflow
 
     def can_run(self, state: WorkflowState) -> tuple[bool, str | None]:
         missing = [k for k in self.expected_inputs if k not in state.data]
@@ -152,8 +155,12 @@ class WorkflowGraph:
     that conditionally write to ``state.data['next_node']`` (see
     :meth:`run`)."""
 
-    def __init__(self, name: str, *, checkpoint_dir: Path | str | None = None,
-                 ) -> None:
+    def __init__(
+        self,
+        name: str,
+        *,
+        checkpoint_dir: Path | str | None = None,
+    ) -> None:
         self.name = name
         self._nodes: list[GraphNode] = []
         self._by_name: dict[str, GraphNode] = {}
@@ -183,38 +190,36 @@ class WorkflowGraph:
             return
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(path.suffix + ".tmp")
-        tmp.write_text(json.dumps(state.to_dict(), indent=2, sort_keys=True),
-                        encoding="utf-8")
+        tmp.write_text(json.dumps(state.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(path)
 
     def load_checkpoint(self, workflow_id: str) -> WorkflowState | None:
         path = self._checkpoint_path(workflow_id)
         if path is None or not path.exists():
             return None
-        return WorkflowState.from_dict(
-            json.loads(path.read_text(encoding="utf-8"))
-        )
+        return WorkflowState.from_dict(json.loads(path.read_text(encoding="utf-8")))
 
     # ---- Execution ---------------------------------------------------------
 
-    def run(self, state: WorkflowState, *,
-             stop_after: str | None = None,
-             max_retries_per_node: int = 1,
-             ) -> WorkflowState:
+    def run(
+        self,
+        state: WorkflowState,
+        *,
+        stop_after: str | None = None,
+        max_retries_per_node: int = 1,
+    ) -> WorkflowState:
         """Run nodes top to bottom. Honour aborts and conditional branches.
 
         A node may write ``state.data['next_node']`` to jump; otherwise
         nodes execute in declaration order.
         """
         # Determine which nodes have already run from the history
-        completed = {h.node_name for h in state.history
-                     if h.outcome is NodeOutcome.PASS}
+        completed = {h.node_name for h in state.history if h.outcome is NodeOutcome.PASS}
 
         idx = 0
         while idx < len(self._nodes):
             if state.aborted:
-                log.info("workflow %s aborted: %s",
-                          state.workflow_id, state.abort_reason)
+                log.info("workflow %s aborted: %s", state.workflow_id, state.abort_reason)
                 break
 
             node = self._nodes[idx]
@@ -232,17 +237,18 @@ class WorkflowGraph:
             if not ok:
                 outcome = NodeOutcome.SKIP
                 result = NodeResult(
-                    node_name=node.name, outcome=outcome,
-                    started_unix=time.time(), ended_unix=time.time(),
-                    error=why, notes=[f"skipped: {why}"],
+                    node_name=node.name,
+                    outcome=outcome,
+                    started_unix=time.time(),
+                    ended_unix=time.time(),
+                    error=why,
+                    notes=[f"skipped: {why}"],
                 )
                 state.history.append(result)
                 self._save_checkpoint(state)
                 if not node.optional:
                     state.aborted = True
-                    state.abort_reason = (
-                        f"required node {node.name} skipped: {why}"
-                    )
+                    state.abort_reason = f"required node {node.name} skipped: {why}"
                 idx += 1
                 continue
 
@@ -255,15 +261,15 @@ class WorkflowGraph:
                     result = node.fn(state)
                 except Exception as exc:  # noqa: BLE001
                     result = NodeResult(
-                        node_name=node.name, outcome=NodeOutcome.FAIL,
-                        started_unix=started, ended_unix=time.time(),
+                        node_name=node.name,
+                        outcome=NodeOutcome.FAIL,
+                        started_unix=started,
+                        ended_unix=time.time(),
                         error=f"{type(exc).__name__}: {exc}",
                         notes=[traceback.format_exc()[-1000:]],
                     )
-                if (result.outcome is NodeOutcome.RETRY
-                        and attempts <= max_retries_per_node):
-                    log.info("retrying node %s (attempt %d)",
-                              node.name, attempts + 1)
+                if result.outcome is NodeOutcome.RETRY and attempts <= max_retries_per_node:
+                    log.info("retrying node %s (attempt %d)", node.name, attempts + 1)
                     continue
                 break
 
@@ -275,9 +281,7 @@ class WorkflowGraph:
 
             if result.outcome is NodeOutcome.FAIL:
                 state.aborted = True
-                state.abort_reason = (
-                    f"node {node.name} failed: {result.error}"
-                )
+                state.abort_reason = f"node {node.name} failed: {result.error}"
 
             if stop_after is not None and node.name == stop_after:
                 break
@@ -291,8 +295,9 @@ def new_workflow_id() -> str:
     return f"wf-{uuid.uuid4().hex[:12]}"
 
 
-def new_state(workflow_id: str | None = None,
-               initial: dict[str, Any] | None = None) -> WorkflowState:
+def new_state(
+    workflow_id: str | None = None, initial: dict[str, Any] | None = None
+) -> WorkflowState:
     return WorkflowState(
         workflow_id=workflow_id or new_workflow_id(),
         created_unix=time.time(),

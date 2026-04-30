@@ -23,6 +23,7 @@ Note: the agentic features in this kit work WITHOUT Ollama. The LLM is
 optional — when unavailable, the system falls back to the deterministic
 scoring functions.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -66,9 +67,9 @@ class OllamaUnavailable(RuntimeError):
 
 
 class OllamaClient:
-    def __init__(self, base_url: str = DEFAULT_BASE_URL,
-                 model: str = DEFAULT_MODEL,
-                 timeout_s: float = 60.0) -> None:
+    def __init__(
+        self, base_url: str = DEFAULT_BASE_URL, model: str = DEFAULT_MODEL, timeout_s: float = 60.0
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_s = timeout_s
@@ -79,7 +80,9 @@ class OllamaClient:
         url = f"{self.base_url}{path}"
         body = json.dumps(payload).encode("utf-8")
         req = urlrequest.Request(
-            url, data=body, method="POST",
+            url,
+            data=body,
+            method="POST",
             headers={"Content-Type": "application/json"},
         )
         try:
@@ -115,9 +118,14 @@ class OllamaClient:
         data = self._get("/api/tags")
         return [m["name"] for m in data.get("models", [])]
 
-    def generate(self, prompt: str, *, system: str | None = None,
-                  temperature: float = 0.2,
-                  max_tokens: int | None = None) -> OllamaResponse:
+    def generate(
+        self,
+        prompt: str,
+        *,
+        system: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ) -> OllamaResponse:
         payload: dict[str, Any] = {
             "model": self.model,
             "prompt": prompt,
@@ -137,9 +145,13 @@ class OllamaClient:
             total_duration_ns=int(d.get("total_duration", 0)),
         )
 
-    def chat(self, messages: list[dict[str, str]], *,
-              temperature: float = 0.2,
-              max_tokens: int | None = None) -> OllamaResponse:
+    def chat(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+    ) -> OllamaResponse:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -157,9 +169,13 @@ class OllamaClient:
             total_duration_ns=int(d.get("total_duration", 0)),
         )
 
-    def json_chat(self, messages: list[dict[str, str]], *,
-                   required_keys: Iterable[str] = (),
-                   temperature: float = 0.0) -> OllamaResponse:
+    def json_chat(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        required_keys: Iterable[str] = (),
+        temperature: float = 0.0,
+    ) -> OllamaResponse:
         """Ask the model to reply with JSON only; parse + validate.
 
         Adds a system-level JSON guard message; tolerant of preamble or
@@ -178,14 +194,10 @@ class OllamaClient:
         resp = self.chat(msgs, temperature=temperature)
         parsed = _extract_json(resp.text)
         if not isinstance(parsed, dict):
-            raise OllamaUnavailable(
-                f"Ollama replied with non-object JSON: {resp.text[:200]}"
-            )
+            raise OllamaUnavailable(f"Ollama replied with non-object JSON: {resp.text[:200]}")
         for k in required_keys:
             if k not in parsed:
-                raise OllamaUnavailable(
-                    f"Ollama JSON missing required key {k!r}: {parsed}"
-                )
+                raise OllamaUnavailable(f"Ollama JSON missing required key {k!r}: {parsed}")
         resp.parsed_json = parsed
         return resp
 
@@ -221,7 +233,7 @@ def _extract_json(text: str) -> Any:
         j = stripped.rfind(closer)
         if 0 <= i < j:
             try:
-                return json.loads(stripped[i:j + 1])
+                return json.loads(stripped[i : j + 1])
             except json.JSONDecodeError:
                 continue
     raise OllamaUnavailable(f"could not extract JSON from: {text[:200]}")

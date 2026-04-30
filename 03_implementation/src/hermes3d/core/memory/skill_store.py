@@ -28,6 +28,7 @@ never starts prints after 11pm even though policy allows". These all
 turn into skills that bias future dispatch and slicing decisions —
 without ever putting the user's preferences in a system prompt.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -48,17 +49,17 @@ SCHEMA_VERSION = "1.0.0"
 
 class SkillKind(str, enum.Enum):
     PARAMETER_OVERRIDE = "parameter_override"
-        # body = {"slicer_setting": "first_layer_temperature", "value": 215}
+    # body = {"slicer_setting": "first_layer_temperature", "value": 215}
     PRINTER_QUIRK = "printer_quirk"
-        # body = {"observation": "Z-wobble at 250mm/s"}
+    # body = {"observation": "Z-wobble at 250mm/s"}
     MATERIAL_QUIRK = "material_quirk"
-        # body = {"observation": "stringes above 240C"}
+    # body = {"observation": "stringes above 240C"}
     SCHEDULING_PREF = "scheduling_pref"
-        # body = {"avoid_hours": [22, 23, 0, 1, 2, 3, 4, 5]}
+    # body = {"avoid_hours": [22, 23, 0, 1, 2, 3, 4, 5]}
     USER_PREFERENCE = "user_preference"
-        # body = {"prefers": "matte finish over speed"}
+    # body = {"prefers": "matte finish over speed"}
     FAILURE_PATTERN = "failure_pattern"
-        # body = {"trigger": "PETG on glass bed without glue", "rate": 0.45}
+    # body = {"trigger": "PETG on glass bed without glue", "rate": 0.45}
 
 
 @dataclass(frozen=True)
@@ -67,14 +68,17 @@ class SkillScope:
 
     printer_id: str | None = None
     material: str | None = None
-    quality_level: str | None = None    # draft / normal / fine
-    hour_of_day: int | None = None       # 0-23
+    quality_level: str | None = None  # draft / normal / fine
+    hour_of_day: int | None = None  # 0-23
 
-    def matches(self, *,
-                printer_id: str | None = None,
-                material: str | None = None,
-                quality_level: str | None = None,
-                hour_of_day: int | None = None) -> bool:
+    def matches(
+        self,
+        *,
+        printer_id: str | None = None,
+        material: str | None = None,
+        quality_level: str | None = None,
+        hour_of_day: int | None = None,
+    ) -> bool:
         if self.printer_id and self.printer_id != printer_id:
             return False
         if self.material and material:
@@ -90,9 +94,11 @@ class SkillScope:
 
     def specificity(self) -> int:
         """How many fields are non-None (more specific = higher priority)."""
-        return sum(1 for v in (self.printer_id, self.material,
-                                self.quality_level, self.hour_of_day)
-                   if v is not None)
+        return sum(
+            1
+            for v in (self.printer_id, self.material, self.quality_level, self.hour_of_day)
+            if v is not None
+        )
 
     def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
@@ -156,8 +162,7 @@ class SkillStore:
                     f"Skill store schema mismatch: got "
                     f"{data.get('schema_version')!r}, expected {SCHEMA_VERSION!r}"
                 )
-            self._skills = {s["skill_id"]: Skill.from_dict(s)
-                            for s in data.get("skills", [])}
+            self._skills = {s["skill_id"]: Skill.from_dict(s) for s in data.get("skills", [])}
 
     def save(self) -> None:
         with self._lock:
@@ -168,22 +173,32 @@ class SkillStore:
                 "skills": [s.to_dict() for s in self._skills.values()],
             }
             tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-            tmp.write_text(json.dumps(payload, indent=2, sort_keys=True),
-                            encoding="utf-8")
+            tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
             os.replace(tmp, self.path)
 
     # ---- CRUD --------------------------------------------------------------
 
-    def add(self, *, skill_kind: SkillKind, name: str, scope: SkillScope,
-            body: dict[str, Any], confidence: float = 0.5,
-            source: str = "agent_observed", notes: str = "") -> Skill:
+    def add(
+        self,
+        *,
+        skill_kind: SkillKind,
+        name: str,
+        scope: SkillScope,
+        body: dict[str, Any],
+        confidence: float = 0.5,
+        source: str = "agent_observed",
+        notes: str = "",
+    ) -> Skill:
         with self._lock:
             sk = Skill(
                 skill_id=uuid.uuid4().hex,
-                skill_kind=skill_kind, name=name,
-                scope=scope, body=dict(body),
+                skill_kind=skill_kind,
+                name=name,
+                scope=scope,
+                body=dict(body),
                 confidence=float(confidence),
-                source=source, notes=notes,
+                source=source,
+                notes=notes,
             )
             self._skills[sk.skill_id] = sk
             self.save()
@@ -202,8 +217,7 @@ class SkillStore:
                 out = [s for s in out if s.skill_kind == kind]
             return sorted(out, key=lambda s: -s.updated_unix)
 
-    def reinforce(self, skill_id: str, *, confidence_delta: float = 0.05,
-                   note: str = "") -> Skill:
+    def reinforce(self, skill_id: str, *, confidence_delta: float = 0.05, note: str = "") -> Skill:
         """Increment evidence count + bump confidence (capped at 1.0)."""
         with self._lock:
             sk = self.get(skill_id)
@@ -215,8 +229,7 @@ class SkillStore:
             self.save()
             return sk
 
-    def weaken(self, skill_id: str, *, confidence_delta: float = 0.10,
-                note: str = "") -> Skill:
+    def weaken(self, skill_id: str, *, confidence_delta: float = 0.10, note: str = "") -> Skill:
         """Bump confidence DOWN; if it falls below threshold, mark stale."""
         with self._lock:
             sk = self.get(skill_id)
@@ -235,12 +248,16 @@ class SkillStore:
 
     # ---- Lookup ------------------------------------------------------------
 
-    def lookup(self, *, kind: SkillKind,
-                printer_id: str | None = None,
-                material: str | None = None,
-                quality_level: str | None = None,
-                hour_of_day: int | None = None,
-                min_confidence: float = 0.0) -> list[Skill]:
+    def lookup(
+        self,
+        *,
+        kind: SkillKind,
+        printer_id: str | None = None,
+        material: str | None = None,
+        quality_level: str | None = None,
+        hour_of_day: int | None = None,
+        min_confidence: float = 0.0,
+    ) -> list[Skill]:
         """Return matching skills, sorted by specificity then confidence.
 
         The most-specific, highest-confidence skill is first.
@@ -253,10 +270,12 @@ class SkillStore:
                     continue
                 if sk.confidence < min_confidence:
                     continue
-                if not sk.scope.matches(printer_id=printer_id,
-                                        material=material,
-                                        quality_level=quality_level,
-                                        hour_of_day=hour_of_day):
+                if not sk.scope.matches(
+                    printer_id=printer_id,
+                    material=material,
+                    quality_level=quality_level,
+                    hour_of_day=hour_of_day,
+                ):
                     continue
                 sk.last_applied_unix = now
                 matches.append(sk)

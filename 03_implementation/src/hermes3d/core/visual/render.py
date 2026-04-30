@@ -12,6 +12,7 @@ is critical for the visual gate to be reproducible.
 
 Output: 800x800 PNG per view, written to the requested directory.
 """
+
 from __future__ import annotations
 
 import logging
@@ -32,8 +33,9 @@ LOG = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class ViewSpec:
     """One named camera view."""
+
     name: str
-    azimuth_deg: float   # rotation around +Z (yaw), 0 = looking down -Y
+    azimuth_deg: float  # rotation around +Z (yaw), 0 = looking down -Y
     elevation_deg: float  # tilt above horizon (pitch)
 
 
@@ -41,12 +43,12 @@ class ViewSpec:
 # Order matters: it's part of the schema. Do NOT reorder without bumping
 # the visual-evidence schema version in proof_envelope.py.
 CANONICAL_VIEWS: tuple[ViewSpec, ...] = (
-    ViewSpec("front",     azimuth_deg=0.0,    elevation_deg=10.0),
-    ViewSpec("back",      azimuth_deg=180.0,  elevation_deg=10.0),
-    ViewSpec("left",      azimuth_deg=270.0,  elevation_deg=10.0),
-    ViewSpec("right",     azimuth_deg=90.0,   elevation_deg=10.0),
-    ViewSpec("top",       azimuth_deg=0.0,    elevation_deg=89.0),
-    ViewSpec("isometric", azimuth_deg=45.0,   elevation_deg=30.0),
+    ViewSpec("front", azimuth_deg=0.0, elevation_deg=10.0),
+    ViewSpec("back", azimuth_deg=180.0, elevation_deg=10.0),
+    ViewSpec("left", azimuth_deg=270.0, elevation_deg=10.0),
+    ViewSpec("right", azimuth_deg=90.0, elevation_deg=10.0),
+    ViewSpec("top", azimuth_deg=0.0, elevation_deg=89.0),
+    ViewSpec("isometric", azimuth_deg=45.0, elevation_deg=30.0),
 )
 
 IMAGE_SIZE_PX = 800
@@ -61,17 +63,21 @@ def _camera_matrix(azimuth_deg: float, elevation_deg: float) -> np.ndarray:
     az = np.radians(azimuth_deg)
     el = np.radians(elevation_deg)
     # Yaw around Z
-    Rz = np.array([
-        [np.cos(az), -np.sin(az), 0.0],
-        [np.sin(az),  np.cos(az), 0.0],
-        [0.0,         0.0,        1.0],
-    ])
+    Rz = np.array(
+        [
+            [np.cos(az), -np.sin(az), 0.0],
+            [np.sin(az), np.cos(az), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
     # Pitch around X (after yaw)
-    Rx = np.array([
-        [1.0, 0.0,           0.0],
-        [0.0, np.cos(el),    np.sin(el)],
-        [0.0, -np.sin(el),   np.cos(el)],
-    ])
+    Rx = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, np.cos(el), np.sin(el)],
+            [0.0, -np.sin(el), np.cos(el)],
+        ]
+    )
     return Rx @ Rz
 
 
@@ -106,16 +112,16 @@ def render_view(
     cam = centered @ R.T
 
     # Project: orthographic. Use (x, z) as image-plane, y as depth.
-    tri_pts = cam[faces]                         # (F, 3, 3)
-    tri_2d = tri_pts[:, :, [0, 2]]               # (F, 3, 2)
-    tri_depth = tri_pts[:, :, 1].mean(axis=1)    # (F,)
+    tri_pts = cam[faces]  # (F, 3, 3)
+    tri_2d = tri_pts[:, :, [0, 2]]  # (F, 3, 2)
+    tri_depth = tri_pts[:, :, 1].mean(axis=1)  # (F,)
 
     # Lighting: directional, head-on (+y axis = into camera).
     light_dir_world = R.T @ np.array([0.0, -1.0, 0.5])
     light_dir_world /= max(np.linalg.norm(light_dir_world), 1e-12)
     intensity = (normals @ light_dir_world).clip(0.0, 1.0)
     # Wrap with ambient term so back-faces aren't pure black.
-    shade = 0.30 + 0.70 * intensity              # (F,)
+    shade = 0.30 + 0.70 * intensity  # (F,)
 
     base = np.array(base_color, dtype=np.float64)
     face_colors = np.clip(shade[:, None] * base[None, :], 0.0, 1.0)
@@ -149,8 +155,12 @@ def render_view(
 
     # Title in upper-left so the view is identifiable.
     ax.text(
-        0.02, 0.97, f"{view.name}  az={view.azimuth_deg:g}°  el={view.elevation_deg:g}°",
-        transform=ax.transAxes, fontsize=10, color=(0.10, 0.10, 0.12),
+        0.02,
+        0.97,
+        f"{view.name}  az={view.azimuth_deg:g}°  el={view.elevation_deg:g}°",
+        transform=ax.transAxes,
+        fontsize=10,
+        color=(0.10, 0.10, 0.12),
         verticalalignment="top",
         bbox={"facecolor": "white", "alpha": 0.7, "pad": 3, "edgecolor": "none"},
     )

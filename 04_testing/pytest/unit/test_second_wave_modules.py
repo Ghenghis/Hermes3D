@@ -11,6 +11,7 @@ import pytest
 # LLM provider abstraction
 # ---------------------------------------------------------------------------
 
+
 def test_llm_provider_config_from_env_defaults(monkeypatch):
     from hermes3d.core.llm.providers import LLMProvider, ProviderConfig
 
@@ -47,7 +48,9 @@ def test_llm_select_provider_returns_correct_class():
         select_provider,
     )
 
-    p = select_provider(ProviderConfig(LLMProvider.OLLAMA, "http://127.0.0.1:11434", "qwen2.5-coder"))
+    p = select_provider(
+        ProviderConfig(LLMProvider.OLLAMA, "http://127.0.0.1:11434", "qwen2.5-coder")
+    )
     assert isinstance(p, OllamaProvider)
     p = select_provider(ProviderConfig(LLMProvider.LMSTUDIO, "http://127.0.0.1:1234/v1", "x"))
     assert isinstance(p, LMStudioProvider)
@@ -94,7 +97,7 @@ def test_llm_extract_json_handles_raw_object():
 def test_llm_extract_json_finds_object_in_prose():
     from hermes3d.core.llm.providers import extract_json
 
-    raw = "yeah I think the answer is {\"verdict\":\"reject\"} based on this stuff"
+    raw = 'yeah I think the answer is {"verdict":"reject"} based on this stuff'
     assert extract_json(raw) == {"verdict": "reject"}
 
 
@@ -123,6 +126,7 @@ def test_llm_provider_unavailable_when_unreachable():
 # ---------------------------------------------------------------------------
 # Tool registry
 # ---------------------------------------------------------------------------
+
 
 def test_tool_registry_register_and_call():
     from hermes3d.core.agents.tool_registry import ToolRegistry, register_tool
@@ -161,6 +165,7 @@ def test_tool_registry_rejects_duplicate_names():
         return 1
 
     with pytest.raises(ValueError):
+
         @register_tool(name="t", description="d", parameters={"type": "object"}, registry=reg)
         def t2() -> int:
             return 2
@@ -186,15 +191,23 @@ def test_tool_registry_filters_by_category_and_tag():
     reg = ToolRegistry()
 
     @register_tool(
-        name="slice_one", description="x", parameters={"type": "object"},
-        category="slicer", tags=("io", "blocking"), registry=reg,
+        name="slice_one",
+        description="x",
+        parameters={"type": "object"},
+        category="slicer",
+        tags=("io", "blocking"),
+        registry=reg,
     )
     def s() -> str:
         return "ok"
 
     @register_tool(
-        name="dispatch_one", description="y", parameters={"type": "object"},
-        category="dispatch", tags=("planning",), registry=reg,
+        name="dispatch_one",
+        description="y",
+        parameters={"type": "object"},
+        category="dispatch",
+        tags=("planning",),
+        registry=reg,
     )
     def d() -> str:
         return "ok"
@@ -233,6 +246,7 @@ def test_tool_registry_manifest_shape():
 # ---------------------------------------------------------------------------
 # Quality scorer
 # ---------------------------------------------------------------------------
+
 
 def test_quality_score_perfect_success_no_feedback():
     from hermes3d.core.agents.quality_scorer import (
@@ -327,6 +341,7 @@ def test_quality_score_explainability():
 # Self-improvement loop
 # ---------------------------------------------------------------------------
 
+
 def _make_obs(printer="prusa_mk3s", material="PLA", outcome="success", params=None):
     from hermes3d.core.agents.quality_scorer import (
         PrintOutcome,
@@ -403,8 +418,9 @@ def test_self_improvement_proposes_new_skills(tmp_path):
 
     store = SkillStore(tmp_path / "skills.json")
     obs = [
-        _make_obs(printer="creality_cr10s", material="PETG",
-                   params={"bed_temp": 80}, outcome="success")
+        _make_obs(
+            printer="creality_cr10s", material="PETG", params={"bed_temp": 80}, outcome="success"
+        )
         for _ in range(4)
     ]
     report = run_once(store, obs)
@@ -438,6 +454,7 @@ def test_self_improvement_retirement_floor(tmp_path):
 # ---------------------------------------------------------------------------
 # Vector memory
 # ---------------------------------------------------------------------------
+
 
 def test_vector_memory_tfidf_finds_relevant_skill(tmp_path):
     from hermes3d.core.memory.skill_store import SkillKind, SkillScope, SkillStore
@@ -498,6 +515,7 @@ def test_vector_memory_handles_empty_store(tmp_path):
 # Incident detector
 # ---------------------------------------------------------------------------
 
+
 def test_incident_detector_network_loss():
     from hermes3d.core.agents.incident_detector import (
         IncidentDetector,
@@ -509,8 +527,7 @@ def test_incident_detector_network_loss():
     events: list = []
     for i in range(3):
         events += det.ingest_ping(
-            PrinterPing(printer_id="flsun_t1_a", timestamp=time.time() + i,
-                         reachable=False)
+            PrinterPing(printer_id="flsun_t1_a", timestamp=time.time() + i, reachable=False)
         )
     types = {e.incident_type for e in events}
     assert IncidentType.NETWORK_LOSS in types
@@ -524,9 +541,7 @@ def test_incident_detector_no_false_alarm_on_single_blip():
     )
 
     det = IncidentDetector(network_loss_pings=3)
-    events = det.ingest_ping(
-        PrinterPing(printer_id="prusa_mk3s", timestamp=1.0, reachable=False)
-    )
+    events = det.ingest_ping(PrinterPing(printer_id="prusa_mk3s", timestamp=1.0, reachable=False))
     types = {e.incident_type for e in events}
     assert IncidentType.NETWORK_LOSS not in types
 
@@ -659,6 +674,7 @@ def test_incident_detector_power_loss_suspected():
 # Remote control bridge
 # ---------------------------------------------------------------------------
 
+
 def test_remote_control_help_command():
     from hermes3d.core.agents.tool_registry import ToolRegistry
     from hermes3d.core.integrations.remote_control import (
@@ -683,8 +699,9 @@ def test_remote_control_list_tools():
 
     reg = ToolRegistry()
 
-    @register_tool(name="ping_fleet", description="ping the fleet",
-                    parameters={"type": "object"}, registry=reg)
+    @register_tool(
+        name="ping_fleet", description="ping the fleet", parameters={"type": "object"}, registry=reg
+    )
     def _ping() -> str:
         return "pong"
 
@@ -702,8 +719,9 @@ def test_remote_control_invokes_tool():
 
     reg = ToolRegistry()
 
-    @register_tool(name="add", description="add two numbers",
-                    parameters={"type": "object"}, registry=reg)
+    @register_tool(
+        name="add", description="add two numbers", parameters={"type": "object"}, registry=reg
+    )
     def add(a: int, b: int) -> int:
         return a + b
 
@@ -754,6 +772,7 @@ def test_remote_control_rate_limit():
 # Farm discovery
 # ---------------------------------------------------------------------------
 
+
 def test_farm_discovery_expand_targets_cidr():
     from hermes3d.core.integrations.farm_discovery import expand_targets
 
@@ -779,6 +798,7 @@ def test_farm_discovery_expand_targets_ignores_garbage():
 # ---------------------------------------------------------------------------
 # LangGraph adapter
 # ---------------------------------------------------------------------------
+
 
 def test_langgraph_adapter_renders_source(tmp_path):
     from hermes3d.core.orchestration.langgraph_adapter import (

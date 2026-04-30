@@ -23,6 +23,7 @@ matrices that lay each face flat). The best score wins.
 This is a *suggestion* — it never silently rotates the mesh. The caller
 chooses whether to apply the recommended transform.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -84,6 +85,7 @@ class OrientDecision:
 # Candidate orientations (6 axis-aligned + identity)
 # -----------------------------------------------------------------------------
 
+
 def _make_axis_candidates() -> list[OrientCandidate]:
     """Six basis orientations: identity + rotations putting each face down."""
     I = np.eye(4)
@@ -119,8 +121,10 @@ def _candidate_by_name(name: str) -> OrientCandidate:
 # -----------------------------------------------------------------------------
 
 
-def _score_orientation(mesh: trimesh.Trimesh, candidate: OrientCandidate,
-                        ) -> OrientScore:
+def _score_orientation(
+    mesh: trimesh.Trimesh,
+    candidate: OrientCandidate,
+) -> OrientScore:
     transformed = mesh.copy()
     transformed.apply_transform(candidate.matrix())
     # Translate so min-Z = 0 (resting on bed)
@@ -152,14 +156,13 @@ def _score_orientation(mesh: trimesh.Trimesh, candidate: OrientCandidate,
     h_penalty = min(1.0, height_mm / max(extents))
 
     score = (
-        2.0 * bed_pct          # reward bed contact
-        - 1.5 * overhang_pct   # punish overhangs
-        - 0.5 * h_penalty      # gentle nudge toward shorter prints
+        2.0 * bed_pct  # reward bed contact
+        - 1.5 * overhang_pct  # punish overhangs
+        - 0.5 * h_penalty  # gentle nudge toward shorter prints
     )
 
     rationale = (
-        f"bed={bed_pct:.1%} overhang={overhang_pct:.1%} "
-        f"h={height_mm:.0f}mm score={score:.3f}"
+        f"bed={bed_pct:.1%} overhang={overhang_pct:.1%} h={height_mm:.0f}mm score={score:.3f}"
     )
     return OrientScore(
         candidate_name=candidate.name,

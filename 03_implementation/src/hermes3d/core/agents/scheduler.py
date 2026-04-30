@@ -12,6 +12,7 @@ Includes:
 The scheduler is a pure function — no side effects. Callers (the orchestrator)
 consume its decision and either start the print or queue it for later.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -37,13 +38,13 @@ class SchedulerPolicy:
     Times are integers 0-23.
     """
 
-    quiet_hours_start: int = 23   # don't START prints after this hour
-    quiet_hours_end: int = 6      # ...until this hour the next morning
+    quiet_hours_start: int = 23  # don't START prints after this hour
+    quiet_hours_end: int = 6  # ...until this hour the next morning
     max_print_duration_minutes: int = 720  # 12h default ceiling
-    max_finish_after_minutes: int = 1440   # ETA can't be > 24h from now
+    max_finish_after_minutes: int = 1440  # ETA can't be > 24h from now
     allow_quiet_finish: bool = True
-        # If True, a print started at 5pm that ends at 1am is OK (it just
-        # crosses quiet hours). Only the START time is constrained.
+    # If True, a print started at 5pm that ends at 1am is OK (it just
+    # crosses quiet hours). Only the START time is constrained.
 
     def __post_init__(self) -> None:
         for v in (self.quiet_hours_start, self.quiet_hours_end):
@@ -55,7 +56,7 @@ class SchedulerPolicy:
 class ScheduleDecision:
     allowed: bool
     reasons: tuple[str, ...]
-    estimated_finish_local: str    # ISO8601 local time
+    estimated_finish_local: str  # ISO8601 local time
     suggested_start_local: str | None = None  # if not allowed, when to retry
 
 
@@ -68,8 +69,9 @@ def _is_in_quiet_hours(hour: int, start: int, end: int) -> bool:
     return hour >= start or hour < end
 
 
-def schedule_window(*, duration_minutes: float, policy: SchedulerPolicy,
-                    now: _dt.datetime | None = None) -> ScheduleDecision:
+def schedule_window(
+    *, duration_minutes: float, policy: SchedulerPolicy, now: _dt.datetime | None = None
+) -> ScheduleDecision:
     """Decide whether NOW is a valid start time for a print of given duration.
 
     Args:
@@ -87,21 +89,18 @@ def schedule_window(*, duration_minutes: float, policy: SchedulerPolicy,
     if duration_minutes > policy.max_print_duration_minutes:
         hours = duration_minutes / 60.0
         cap = policy.max_print_duration_minutes / 60.0
-        reasons.append(
-            f"duration {hours:.1f}h exceeds policy cap {cap:.1f}h"
-        )
+        reasons.append(f"duration {hours:.1f}h exceeds policy cap {cap:.1f}h")
 
     # Rule 2: ETA cap
     eta_delta_min = duration_minutes
     if eta_delta_min > policy.max_finish_after_minutes:
         reasons.append(
-            f"ETA {eta_delta_min/60.0:.1f}h exceeds policy cap "
-            f"{policy.max_finish_after_minutes/60.0:.1f}h"
+            f"ETA {eta_delta_min / 60.0:.1f}h exceeds policy cap "
+            f"{policy.max_finish_after_minutes / 60.0:.1f}h"
         )
 
     # Rule 3: quiet hours START check
-    if _is_in_quiet_hours(now.hour, policy.quiet_hours_start,
-                          policy.quiet_hours_end):
+    if _is_in_quiet_hours(now.hour, policy.quiet_hours_start, policy.quiet_hours_end):
         reasons.append(
             f"current time {now.strftime('%H:%M')} is inside quiet hours "
             f"({policy.quiet_hours_start:02d}:00-{policy.quiet_hours_end:02d}:00)"
@@ -117,23 +116,18 @@ def schedule_window(*, duration_minutes: float, policy: SchedulerPolicy,
 
     # Rule 4: finish-time check (only if allow_quiet_finish=False)
     if not policy.allow_quiet_finish:
-        if _is_in_quiet_hours(finish.hour, policy.quiet_hours_start,
-                              policy.quiet_hours_end):
-            reasons.append(
-                f"finish time {finish.strftime('%H:%M')} is inside quiet hours"
-            )
+        if _is_in_quiet_hours(finish.hour, policy.quiet_hours_start, policy.quiet_hours_end):
+            reasons.append(f"finish time {finish.strftime('%H:%M')} is inside quiet hours")
 
     return ScheduleDecision(
         allowed=not reasons,
         reasons=tuple(reasons),
         estimated_finish_local=finish.strftime("%Y-%m-%dT%H:%M:%S"),
-        suggested_start_local=(suggested.strftime("%Y-%m-%dT%H:%M:%S")
-                                if suggested else None),
+        suggested_start_local=(suggested.strftime("%Y-%m-%dT%H:%M:%S") if suggested else None),
     )
 
 
-def estimated_completion(duration_minutes: float,
-                         now: _dt.datetime | None = None) -> _dt.datetime:
+def estimated_completion(duration_minutes: float, now: _dt.datetime | None = None) -> _dt.datetime:
     """Convenience: returns wall-clock ETA for a print of given duration."""
     now = now or _dt.datetime.now()
     return now + _dt.timedelta(minutes=duration_minutes)
@@ -154,10 +148,14 @@ class CameraSnapshot:
     saved_to: str | None = None
 
 
-def fetch_camera_snapshot(*, moonraker_base_url: str, printer_id: str,
-                          stream_path: str = "/webcam/?action=snapshot",
-                          timeout_s: float = 8.0,
-                          save_to: str | Path | None = None) -> CameraSnapshot:
+def fetch_camera_snapshot(
+    *,
+    moonraker_base_url: str,
+    printer_id: str,
+    stream_path: str = "/webcam/?action=snapshot",
+    timeout_s: float = 8.0,
+    save_to: str | Path | None = None,
+) -> CameraSnapshot:
     """Pull a single still frame from a printer's webcam.
 
     The default ``stream_path`` matches mjpg-streamer / Crowsnest default

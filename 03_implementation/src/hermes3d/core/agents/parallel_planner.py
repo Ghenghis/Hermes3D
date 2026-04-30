@@ -19,6 +19,7 @@ The planner does NOT actually start prints — it produces a Plan that
 the user reviews and can apply. Each PlanItem links one part to one
 printer with a justification.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -27,7 +28,9 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable
 
 from hermes3d.core.agents.dispatcher import (
-    DispatchRequest, DispatchStrategy, dispatch as run_dispatch,
+    DispatchRequest,
+    DispatchStrategy,
+    dispatch as run_dispatch,
 )
 
 
@@ -38,12 +41,12 @@ log = logging.getLogger(__name__)
 class PartRequest:
     """One part to print, with its constraints."""
 
-    part_id: str                       # caller-chosen ID
+    part_id: str  # caller-chosen ID
     mesh_extents_mm: tuple[float, float, float]
     mesh_xy_radius_mm: float | None
     material: str
     quality_level: str = "normal"
-    estimated_time_min: float = 0.0    # optional, helps total ETA estimate
+    estimated_time_min: float = 0.0  # optional, helps total ETA estimate
 
 
 @dataclass
@@ -59,7 +62,7 @@ class PlanItem:
 class ParallelPlan:
     items: list[PlanItem] = field(default_factory=list)
     unscheduled: list[str] = field(default_factory=list)  # part_ids
-    parallel_count: int = 0           # number of distinct printers used
+    parallel_count: int = 0  # number of distinct printers used
     estimated_wallclock_min: float = 0.0
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,11 +72,13 @@ class ParallelPlan:
 # =============================================================================
 
 
-def plan_parallel_print(parts: Iterable[PartRequest], *,
-                         max_parallel_printers: int | None = None,
-                         excluded_printers: tuple[str, ...] = (),
-                         strategy: DispatchStrategy = DispatchStrategy.AUTO,
-                         ) -> ParallelPlan:
+def plan_parallel_print(
+    parts: Iterable[PartRequest],
+    *,
+    max_parallel_printers: int | None = None,
+    excluded_printers: tuple[str, ...] = (),
+    strategy: DispatchStrategy = DispatchStrategy.AUTO,
+) -> ParallelPlan:
     """Pack parts onto distinct printers when possible.
 
     Each part runs through the regular dispatcher (with its own bed/
@@ -88,8 +93,7 @@ def plan_parallel_print(parts: Iterable[PartRequest], *,
 
     for part in parts_list:
         # Already at parallel limit? — skip
-        if (max_parallel_printers is not None and
-                plan.parallel_count >= max_parallel_printers):
+        if max_parallel_printers is not None and plan.parallel_count >= max_parallel_printers:
             plan.unscheduled.append(part.part_id)
             continue
 
@@ -104,13 +108,14 @@ def plan_parallel_print(parts: Iterable[PartRequest], *,
         decision = run_dispatch(req)
         if decision.selected_printer_id is None:
             # Could not schedule this part on a fresh printer
-            plan.items.append(PlanItem(
-                part_id=part.part_id,
-                selected_printer_id=None,
-                rationale=decision.rationale,
-                blockers=[
-                    "no eligible idle printer (try shrinking exclusions)"],
-            ))
+            plan.items.append(
+                PlanItem(
+                    part_id=part.part_id,
+                    selected_printer_id=None,
+                    rationale=decision.rationale,
+                    blockers=["no eligible idle printer (try shrinking exclusions)"],
+                )
+            )
             plan.unscheduled.append(part.part_id)
             continue
 
@@ -120,16 +125,18 @@ def plan_parallel_print(parts: Iterable[PartRequest], *,
             if c.printer_id == decision.selected_printer_id:
                 chosen_score = c.score
                 break
-        plan.items.append(PlanItem(
-            part_id=part.part_id,
-            selected_printer_id=decision.selected_printer_id,
-            score=chosen_score,
-            rationale=decision.rationale,
-        ))
+        plan.items.append(
+            PlanItem(
+                part_id=part.part_id,
+                selected_printer_id=decision.selected_printer_id,
+                score=chosen_score,
+                rationale=decision.rationale,
+            )
+        )
         busy_printers.add(decision.selected_printer_id)
-        plan.parallel_count = len({i.selected_printer_id
-                                    for i in plan.items
-                                    if i.selected_printer_id})
+        plan.parallel_count = len(
+            {i.selected_printer_id for i in plan.items if i.selected_printer_id}
+        )
         times.append(part.estimated_time_min)
 
     # Wall-clock estimate: max of the per-printer times (since they run

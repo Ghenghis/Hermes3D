@@ -29,6 +29,7 @@ support generator — they're for high-level decisions like "this mesh
 has a lot of overhangs, prefer a printer with good cooling" or "this
 mesh is tall and thin, prefer a CoreXY for stability."
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -44,8 +45,8 @@ import trimesh
 # Configuration
 # =============================================================================
 
-DEFAULT_OVERHANG_THRESHOLD_DEG = 50.0   # Klipper's typical "needs support" angle
-THIN_WALL_DEFAULT_MIN_MM = 0.8          # 2 perimeters at 0.4mm nozzle
+DEFAULT_OVERHANG_THRESHOLD_DEG = 50.0  # Klipper's typical "needs support" angle
+THIN_WALL_DEFAULT_MIN_MM = 0.8  # 2 perimeters at 0.4mm nozzle
 BRIDGE_MAX_SPAN_DEFAULT_MM = 25.0
 
 
@@ -88,9 +89,9 @@ def _ensure_z_up(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     return out
 
 
-def _overhang_face_mask(mesh: trimesh.Trimesh,
-                         threshold_deg: float,
-                         bed_mask: np.ndarray | None = None) -> np.ndarray:
+def _overhang_face_mask(
+    mesh: trimesh.Trimesh, threshold_deg: float, bed_mask: np.ndarray | None = None
+) -> np.ndarray:
     """Faces that need support material.
 
     Definition: a face needs support when its overhang angle from the
@@ -114,14 +115,12 @@ def _overhang_face_mask(mesh: trimesh.Trimesh,
     return overhang
 
 
-def _bed_contact_mask(mesh: trimesh.Trimesh,
-                       z_tolerance_mm: float = 0.5) -> np.ndarray:
+def _bed_contact_mask(mesh: trimesh.Trimesh, z_tolerance_mm: float = 0.5) -> np.ndarray:
     """Faces whose centroid Z is within ``z_tolerance_mm`` of the lowest
     point AND whose normal points down."""
     centroids = mesh.triangles.mean(axis=1)
     minz = float(mesh.vertices[:, 2].min())
-    return ((centroids[:, 2] - minz) < z_tolerance_mm) & (
-        mesh.face_normals[:, 2] < -0.95)
+    return ((centroids[:, 2] - minz) < z_tolerance_mm) & (mesh.face_normals[:, 2] < -0.95)
 
 
 # =============================================================================
@@ -129,10 +128,12 @@ def _bed_contact_mask(mesh: trimesh.Trimesh,
 # =============================================================================
 
 
-def analyze_mesh(mesh: trimesh.Trimesh, *,
-                  overhang_threshold_deg: float = DEFAULT_OVERHANG_THRESHOLD_DEG,
-                  thin_wall_min_mm: float = THIN_WALL_DEFAULT_MIN_MM,
-                  ) -> MeshAnalysis:
+def analyze_mesh(
+    mesh: trimesh.Trimesh,
+    *,
+    overhang_threshold_deg: float = DEFAULT_OVERHANG_THRESHOLD_DEG,
+    thin_wall_min_mm: float = THIN_WALL_DEFAULT_MIN_MM,
+) -> MeshAnalysis:
     """Return a comprehensive geometric report on the mesh.
 
     Mesh is normalized to bed (lowest Z = 0). Original is not mutated.
@@ -169,11 +170,14 @@ def analyze_mesh(mesh: trimesh.Trimesh, *,
     longest_bridge = 0.0
     if overhang_mask.any():
         tris = m.triangles[overhang_mask]
-        edges_xy = np.stack([
-            tris[:, 0, :2] - tris[:, 1, :2],
-            tris[:, 1, :2] - tris[:, 2, :2],
-            tris[:, 2, :2] - tris[:, 0, :2],
-        ], axis=1)
+        edges_xy = np.stack(
+            [
+                tris[:, 0, :2] - tris[:, 1, :2],
+                tris[:, 1, :2] - tris[:, 2, :2],
+                tris[:, 2, :2] - tris[:, 0, :2],
+            ],
+            axis=1,
+        )
         edge_lengths = np.linalg.norm(edges_xy, axis=2)
         max_edge_per_tri = edge_lengths.max(axis=1)
         bridges = max_edge_per_tri > BRIDGE_MAX_SPAN_DEFAULT_MM
@@ -195,11 +199,14 @@ def analyze_mesh(mesh: trimesh.Trimesh, *,
 
     # Thin-wall face count: faces whose smallest edge is < min_thickness.
     # This is a lower bound on thin features.
-    edges = np.stack([
-        m.triangles[:, 0] - m.triangles[:, 1],
-        m.triangles[:, 1] - m.triangles[:, 2],
-        m.triangles[:, 2] - m.triangles[:, 0],
-    ], axis=1)
+    edges = np.stack(
+        [
+            m.triangles[:, 0] - m.triangles[:, 1],
+            m.triangles[:, 1] - m.triangles[:, 2],
+            m.triangles[:, 2] - m.triangles[:, 0],
+        ],
+        axis=1,
+    )
     edge_norms = np.linalg.norm(edges, axis=2)
     min_edge_per_tri = edge_norms.min(axis=1)
     thin = min_edge_per_tri < thin_wall_min_mm
@@ -210,29 +217,30 @@ def analyze_mesh(mesh: trimesh.Trimesh, *,
     if overhang_pct > 0.30:
         flags.append(
             f"high-overhang: {overhang_pct:.0%} of faces overhanging "
-            f"(threshold {overhang_threshold_deg}°)")
+            f"(threshold {overhang_threshold_deg}°)"
+        )
     elif overhang_pct > 0.15:
-        flags.append(
-            f"moderate-overhang: {overhang_pct:.0%} of faces overhanging")
+        flags.append(f"moderate-overhang: {overhang_pct:.0%} of faces overhanging")
     if aspect > 4.0:
         flags.append(
-            f"tall-thin: H/min(XY) ratio = {aspect:.1f} — risk of "
-            f"toppling on cartesian printers")
+            f"tall-thin: H/min(XY) ratio = {aspect:.1f} — risk of toppling on cartesian printers"
+        )
     if bed_area < max(50.0, 0.05 * total_area):
         flags.append(
             f"low-bed-contact: only {bed_area:.0f}mm² touching the bed — "
-            f"adhesion failure is likely, consider a brim or different orientation")
+            f"adhesion failure is likely, consider a brim or different orientation"
+        )
     if com_xy_offset > min(extents[0], extents[1]) * 0.4:
         flags.append(
             f"off-center-mass: COM is {com_xy_offset:.1f}mm from "
-            f"bed-projection centroid — print may tip")
+            f"bed-projection centroid — print may tip"
+        )
     if longest_bridge > BRIDGE_MAX_SPAN_DEFAULT_MM:
-        flags.append(
-            f"long-bridge: longest unsupported span ~{longest_bridge:.1f}mm")
+        flags.append(f"long-bridge: longest unsupported span ~{longest_bridge:.1f}mm")
     if thin_wall_count > 50:
         flags.append(
-            f"thin-features: {thin_wall_count} triangles with edges "
-            f"< {thin_wall_min_mm}mm")
+            f"thin-features: {thin_wall_count} triangles with edges < {thin_wall_min_mm}mm"
+        )
 
     return MeshAnalysis(
         bbox_mm=extents,

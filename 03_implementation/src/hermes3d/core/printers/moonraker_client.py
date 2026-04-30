@@ -26,6 +26,7 @@ or 80 via Mainsail/Fluidd's bundled nginx) for these calls to succeed.
 Stack assumed: Klipper + Moonraker + (Fluidd or Mainsail) — the firmware
 combination Dave runs on the fleet.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -48,8 +49,9 @@ DEFAULT_TIMEOUT_S = 15.0
 class MoonrakerError(RuntimeError):
     """Raised when Moonraker returns an error envelope or HTTP non-2xx."""
 
-    def __init__(self, message: str, *, status: int | None = None,
-                 url: str | None = None, body: Any = None) -> None:
+    def __init__(
+        self, message: str, *, status: int | None = None, url: str | None = None, body: Any = None
+    ) -> None:
         super().__init__(message)
         self.status = status
         self.url = url
@@ -73,8 +75,8 @@ class PrinterState:
 
     state: str  # "ready" | "printing" | "paused" | "error" | ...
     state_message: str
-    progress: float        # 0.0 - 1.0
-    filename: str          # currently printing file ("" if idle)
+    progress: float  # 0.0 - 1.0
+    filename: str  # currently printing file ("" if idle)
     print_duration_s: float
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -83,8 +85,8 @@ class PrinterState:
 class UploadResult:
     """Result of ``server.files.upload``."""
 
-    item_path: str    # path within virtual_sdcard, e.g. "hermes3d/desk_organizer.gcode"
-    item_root: str    # always "gcodes" for prints
+    item_path: str  # path within virtual_sdcard, e.g. "hermes3d/desk_organizer.gcode"
+    item_root: str  # always "gcodes" for prints
     print_started: bool
     raw: dict[str, Any] = field(default_factory=dict)
 
@@ -106,8 +108,9 @@ class MoonrakerClient:
         favour of Moonraker's REST endpoints, which are stable and simpler.
     """
 
-    def __init__(self, base_url: str, *, api_key: str | None = None,
-                 timeout_s: float = DEFAULT_TIMEOUT_S) -> None:
+    def __init__(
+        self, base_url: str, *, api_key: str | None = None, timeout_s: float = DEFAULT_TIMEOUT_S
+    ) -> None:
         if not base_url:
             raise ValueError("base_url is required")
         self.base_url = base_url.rstrip("/")
@@ -124,11 +127,16 @@ class MoonrakerClient:
             h.update(extra)
         return h
 
-    def _request(self, method: str, path: str, *,
-                 query: dict[str, str] | None = None,
-                 body: bytes | None = None,
-                 content_type: str | None = None,
-                 timeout_s: float | None = None) -> dict[str, Any]:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        query: dict[str, str] | None = None,
+        body: bytes | None = None,
+        content_type: str | None = None,
+        timeout_s: float | None = None,
+    ) -> dict[str, Any]:
         url = self.base_url + path
         if query:
             qs = "&".join(f"{k}={quote(str(v), safe='')}" for k, v in query.items())
@@ -136,8 +144,7 @@ class MoonrakerClient:
         headers = self._headers()
         if content_type and body is not None:
             headers["Content-Type"] = content_type
-        req = urlrequest.Request(url=url, method=method.upper(), headers=headers,
-                                 data=body)
+        req = urlrequest.Request(url=url, method=method.upper(), headers=headers, data=body)
         try:
             with urlrequest.urlopen(req, timeout=timeout_s or self.timeout_s) as resp:
                 raw = resp.read()
@@ -148,7 +155,9 @@ class MoonrakerClient:
                 except json.JSONDecodeError as exc:
                     raise MoonrakerError(
                         f"Non-JSON response from {url}: {exc}",
-                        status=resp.status, url=url, body=raw[:200],
+                        status=resp.status,
+                        url=url,
+                        body=raw[:200],
                     ) from exc
         except HTTPError as exc:
             payload: Any = None
@@ -156,15 +165,19 @@ class MoonrakerClient:
                 payload = json.loads(exc.read().decode("utf-8"))
             except Exception:  # noqa: BLE001
                 payload = None
-            err_msg = (payload.get("error", {}).get("message")
-                       if isinstance(payload, dict) else None) or str(exc)
+            err_msg = (
+                payload.get("error", {}).get("message") if isinstance(payload, dict) else None
+            ) or str(exc)
             raise MoonrakerError(
                 f"HTTP {exc.code} on {url}: {err_msg}",
-                status=exc.code, url=url, body=payload,
+                status=exc.code,
+                url=url,
+                body=payload,
             ) from exc
         except (URLError, socket.timeout) as exc:
             raise MoonrakerError(
-                f"Network error on {url}: {exc}", url=url,
+                f"Network error on {url}: {exc}",
+                url=url,
             ) from exc
 
     # -- public API ---------------------------------------------------------
@@ -181,13 +194,13 @@ class MoonrakerClient:
             raw=result,
         )
 
-    def printer_state(self,
-                      objects: Iterable[str] = ("print_stats", "virtual_sdcard"),
-                      ) -> PrinterState:
+    def printer_state(
+        self,
+        objects: Iterable[str] = ("print_stats", "virtual_sdcard"),
+    ) -> PrinterState:
         """Query live print_stats + virtual_sdcard via printer.objects.query."""
         # Moonraker query string: ?print_stats&virtual_sdcard
-        qs_path = "/printer/objects/query?" + "&".join(quote(o, safe="")
-                                                        for o in objects)
+        qs_path = "/printer/objects/query?" + "&".join(quote(o, safe="") for o in objects)
         data = self._request("GET", qs_path)
         result = data.get("result", {}) if isinstance(data, dict) else {}
         status = result.get("status", {})
@@ -202,10 +215,14 @@ class MoonrakerClient:
             raw=result,
         )
 
-    def upload_gcode(self, gcode_path: str | Path, *,
-                     remote_subdir: str = "hermes3d",
-                     start_print: bool = False,
-                     timeout_s: float = 300.0) -> UploadResult:
+    def upload_gcode(
+        self,
+        gcode_path: str | Path,
+        *,
+        remote_subdir: str = "hermes3d",
+        start_print: bool = False,
+        timeout_s: float = 300.0,
+    ) -> UploadResult:
         """Upload a sliced .gcode file to Moonraker's `gcodes` root.
 
         Args:
@@ -222,7 +239,7 @@ class MoonrakerClient:
         if gcode_path.suffix.lower() not in (".gcode", ".g"):
             raise ValueError(f"Expected .gcode file, got {gcode_path.suffix}")
 
-        boundary = f"----HermesBoundary{int(time.time()*1000)}"
+        boundary = f"----HermesBoundary{int(time.time() * 1000)}"
         crlf = b"\r\n"
         parts: list[bytes] = []
 
@@ -243,8 +260,7 @@ class MoonrakerClient:
         parts.append(f"--{boundary}".encode())
         parts.append(crlf)
         parts.append(
-            f'Content-Disposition: form-data; name="file"; '
-            f'filename="{gcode_path.name}"'.encode()
+            f'Content-Disposition: form-data; name="file"; filename="{gcode_path.name}"'.encode()
         )
         parts.append(crlf)
         parts.append(b"Content-Type: application/octet-stream")
@@ -256,7 +272,8 @@ class MoonrakerClient:
 
         body = b"".join(parts)
         result = self._request(
-            "POST", "/server/files/upload",
+            "POST",
+            "/server/files/upload",
             body=body,
             content_type=f"multipart/form-data; boundary={boundary}",
             timeout_s=timeout_s,
@@ -273,8 +290,7 @@ class MoonrakerClient:
 
     def start_print(self, filename: str) -> dict[str, Any]:
         """Start printing a file already present on the printer."""
-        return self._request("POST", "/printer/print/start",
-                             query={"filename": filename})
+        return self._request("POST", "/printer/print/start", query={"filename": filename})
 
     def cancel_print(self) -> dict[str, Any]:
         return self._request("POST", "/printer/print/cancel")

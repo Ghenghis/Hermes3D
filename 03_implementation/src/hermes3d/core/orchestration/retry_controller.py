@@ -14,6 +14,7 @@ Why a custom controller (vs ``tenacity``):
   - The decorator preserves wrapped function metadata so existing tests
     keep working.
 """
+
 from __future__ import annotations
 
 import functools
@@ -52,8 +53,7 @@ class RepairEscalation(Exception):
     Carries the failure context the Repair agent needs to suggest a fix.
     """
 
-    def __init__(self, *, cause: BaseException, attempts: int,
-                 context: dict[str, Any]) -> None:
+    def __init__(self, *, cause: BaseException, attempts: int, context: dict[str, Any]) -> None:
         self.cause = cause
         self.attempts = attempts
         self.context = context
@@ -63,9 +63,10 @@ class RepairEscalation(Exception):
         )
 
 
-def with_retry(budget: RetryBudget | None = None,
-               on_failure: Callable[[BaseException, int], None] | None = None
-               ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+def with_retry(
+    budget: RetryBudget | None = None,
+    on_failure: Callable[[BaseException, int], None] | None = None,
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Decorator that retries a function within a ``RetryBudget``.
 
     On terminal failure (budget exhausted) raises ``RepairEscalation``.
@@ -107,7 +108,9 @@ def with_retry(budget: RetryBudget | None = None,
                     log.warning(
                         "with_retry: %s attempt %d/%d failed: %r",
                         getattr(fn, "__name__", "fn"),
-                        attempt, total_attempts, exc,
+                        attempt,
+                        total_attempts,
+                        exc,
                     )
             # Budget exhausted
             assert last_exc is not None

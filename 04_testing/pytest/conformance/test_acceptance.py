@@ -15,6 +15,7 @@ Some printers may legitimately fail bed_fit for some variants — those are
 recorded as expected failures (xfail) so the suite remains green while
 honestly reflecting reality.
 """
+
 from __future__ import annotations
 
 import tempfile
@@ -101,9 +102,7 @@ def test_organizer_passes_truth_gate_on_printer(
     failed = [c for c in report.checks if c.status == CheckStatus.FAIL]
     if failed:
         msgs = "\n".join(f"  - {c.name}: {c.message}" for c in failed)
-        pytest.fail(
-            f"{variant_name} on {printer_id} failed Truth Gate:\n{msgs}"
-        )
+        pytest.fail(f"{variant_name} on {printer_id} failed Truth Gate:\n{msgs}")
     assert report.overall_status == CheckStatus.PASS
 
 
@@ -121,6 +120,5 @@ def test_default_organizer_fits_all_printers_in_fleet(cache_root: Path) -> None:
             failed = [c for c in report.checks if c.status == CheckStatus.FAIL]
             failures.append((pid, "; ".join(c.message for c in failed)))
     assert not failures, (
-        "Default organizer must pass on every printer in the fleet. "
-        f"Failures: {failures}"
+        f"Default organizer must pass on every printer in the fleet. Failures: {failures}"
     )

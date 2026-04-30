@@ -116,9 +116,7 @@ def _matching_skills(store: SkillStore, obs: PrintObservation) -> list[Skill]:
     return matches
 
 
-def reinforce_or_weaken(
-    store: SkillStore, observations: Iterable[PrintObservation]
-) -> LoopReport:
+def reinforce_or_weaken(store: SkillStore, observations: Iterable[PrintObservation]) -> LoopReport:
     """Walk a batch of observations and apply skill updates.
 
     The function never deletes a skill outright — retirement candidates are
@@ -189,9 +187,7 @@ def reinforce_or_weaken(
     return report
 
 
-def propose_new_skills(
-    store: SkillStore, observations: Iterable[PrintObservation]
-) -> list[Skill]:
+def propose_new_skills(store: SkillStore, observations: Iterable[PrintObservation]) -> list[Skill]:
     """Look for unfamiliar parameter patterns that correlate with outcomes.
 
     Heuristic: group observations by (printer_id, material, parameter_key,
@@ -205,9 +201,7 @@ def propose_new_skills(
     grouped: dict[tuple[str, str, str, str], list[PrintObservation]] = {}
     for obs in observations:
         for key, value in obs.parameters.items():
-            grouped.setdefault(
-                (obs.printer_id, obs.material, key, str(value)), []
-            ).append(obs)
+            grouped.setdefault((obs.printer_id, obs.material, key, str(value)), []).append(obs)
 
     existing_names = {s.name for s in store.list()}
     proposals: list[Skill] = []

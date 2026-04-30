@@ -62,9 +62,7 @@ def _make_registry() -> ToolRegistry:
     reg.register(ToolSpec("fleet_status", "fleet status", schema, fleet_status))
     reg.register(ToolSpec("queue_list", "queue list", schema, queue_list))
     reg.register(ToolSpec("spool_list", "spool list", schema, spool_list))
-    reg.register(
-        ToolSpec("dispatch_print", "dispatch", schema_with_path, dispatch_print)
-    )
+    reg.register(ToolSpec("dispatch_print", "dispatch", schema_with_path, dispatch_print))
     reg.register(ToolSpec("cancel_job", "cancel", schema_with_id, cancel_job))
     reg.register(ToolSpec("fleet_health", "health", schema, fleet_health))
     return reg
@@ -312,9 +310,7 @@ class TestDiscordTransport:
         assert d.enabled is False
 
     def test_send_posts_to_webhook(self) -> None:
-        cfg = RemoteControlConfig(
-            discord_webhook_url="https://discord.example/webhooks/abc"
-        )
+        cfg = RemoteControlConfig(discord_webhook_url="https://discord.example/webhooks/abc")
         fake_post = MagicMock(return_value=None)
         d = DiscordTransport(cfg, http_post=fake_post)
         from hermes3d.core.integrations.remote_control import RemoteResponse
@@ -326,9 +322,7 @@ class TestDiscordTransport:
         assert payload == {"content": "result"}
 
     def test_send_truncates_long_content(self) -> None:
-        cfg = RemoteControlConfig(
-            discord_webhook_url="https://discord.example/webhooks/abc"
-        )
+        cfg = RemoteControlConfig(discord_webhook_url="https://discord.example/webhooks/abc")
         fake_post = MagicMock(return_value=None)
         d = DiscordTransport(cfg, http_post=fake_post)
         from hermes3d.core.integrations.remote_control import RemoteResponse

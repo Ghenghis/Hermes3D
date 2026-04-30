@@ -1,4 +1,5 @@
 """Tests for retry_controller — RetryBudget + with_retry decorator."""
+
 from __future__ import annotations
 
 import pytest
@@ -59,8 +60,7 @@ def test_exponential_backoff_increasing_delays(monkeypatch):
         lambda s: seen.append(s),
     )
 
-    budget = RetryBudget(max_retries=4, backoff="exponential",
-                          initial_delay=1.0)
+    budget = RetryBudget(max_retries=4, backoff="exponential", initial_delay=1.0)
 
     @with_retry(budget)
     def always_fails():

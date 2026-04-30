@@ -4,6 +4,7 @@ We monkeypatch the slicer node so it fails twice with a transient error
 then succeeds. With ``RetryBudget(max_retries=3)`` the workflow should
 complete and the slice node should record success.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -20,8 +21,9 @@ def _has_matplotlib() -> bool:
         return False
 
 
-@pytest.mark.skipif(not _has_matplotlib(),
-                    reason="matplotlib missing — full pipeline cannot render")
+@pytest.mark.skipif(
+    not _has_matplotlib(), reason="matplotlib missing — full pipeline cannot render"
+)
 def test_workflow_retries_transient_slice_failure(monkeypatch, tmp_path):
     from hermes3d.core.design.desk_organizer import OrganizerSpec, build_organizer
     from hermes3d.core.orchestration.agent_graph import new_state
@@ -48,23 +50,26 @@ def test_workflow_retries_transient_slice_failure(monkeypatch, tmp_path):
         # On the 3rd attempt, return a SKIP outcome (slicer not installed)
         # so downstream nodes degrade gracefully.
         return NodeResult(
-            node_name="slice", outcome=NodeOutcome.SKIP,
-            started_unix=0.0, ended_unix=0.0,
+            node_name="slice",
+            outcome=NodeOutcome.SKIP,
+            started_unix=0.0,
+            ended_unix=0.0,
             notes=["test stub: slice succeeded on retry"],
         )
 
     monkeypatch.setattr(print_workflow, "_node_slice", flaky_slice)
 
-    graph = print_workflow.build_print_workflow(
-        checkpoint_dir=str(tmp_path / "wf"))
-    state = new_state(initial={
-        "mesh_path": str(stl),
-        "material": "PLA",
-        "strategy": "auto",
-        "dry_run": True,
-        "queue_path": str(tmp_path / "queue.json"),
-        "preferred_printer_id": "prusa_mk3s",
-    })
+    graph = print_workflow.build_print_workflow(checkpoint_dir=str(tmp_path / "wf"))
+    state = new_state(
+        initial={
+            "mesh_path": str(stl),
+            "material": "PLA",
+            "strategy": "auto",
+            "dry_run": True,
+            "queue_path": str(tmp_path / "queue.json"),
+            "preferred_printer_id": "prusa_mk3s",
+        }
+    )
     final = graph.run(state)
 
     assert calls["n"] == 3, "slicer should have been retried twice"

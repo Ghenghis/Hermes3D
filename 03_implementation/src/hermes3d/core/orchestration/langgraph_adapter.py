@@ -39,8 +39,7 @@ def to_langgraph_source(graph: WorkflowGraph, *, function_name: str = "build_pip
         wrappers.append(_render_wrapper(name))
 
     add_node_lines = [
-        f'    workflow.add_node("{name}", node_{_safe_id(name)})'
-        for name in node_names
+        f'    workflow.add_node("{name}", node_{_safe_id(name)})' for name in node_names
     ]
 
     # Linear edge wiring.
@@ -78,10 +77,10 @@ def to_langgraph_source(graph: WorkflowGraph, *, function_name: str = "build_pip
     body += "\n\n\n".join(wrappers)
     body += "\n\n\n"
     body += textwrap.dedent(
-        f'''
+        f"""
         def {function_name}() -> StateGraph:
             workflow = StateGraph(HermesState)
-        '''
+        """
     ).strip()
     body += "\n"
     body += "\n".join(add_node_lines)
@@ -121,8 +120,9 @@ def _render_wrapper(name: str) -> str:
     ).strip()
 
 
-def export_to_file(graph: WorkflowGraph, target_path: str, *,
-                    function_name: str = "build_pipeline") -> str:
+def export_to_file(
+    graph: WorkflowGraph, target_path: str, *, function_name: str = "build_pipeline"
+) -> str:
     """Write the rendered source to disk and return the path."""
     src = to_langgraph_source(graph, function_name=function_name)
     with open(target_path, "w", encoding="utf-8") as fh:

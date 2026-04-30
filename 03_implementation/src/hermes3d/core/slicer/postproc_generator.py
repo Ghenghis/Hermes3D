@@ -21,6 +21,7 @@ path as the only argument — exactly the contract the slicers expect.
 The generator stays in pure-Python deliberately: portable, no native
 deps, easy for users to inspect before running.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -245,7 +246,7 @@ def _mitigation_z_hop_retract_boost(lines: list[str]) -> list[str]:
 '''
 
 
-_SCRIPT_FOOTER = '''
+_SCRIPT_FOOTER = """
 def main(gcode_path: str) -> int:
     p = Path(gcode_path)
     if not p.exists():
@@ -263,7 +264,7 @@ _MITIGATIONS = [{mitigation_fns}]
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else ""))
-'''
+"""
 
 
 @dataclass
@@ -273,53 +274,53 @@ class GeneratedScript:
     mitigation_count: int
 
 
-def generate_script(mitigations: list[Mitigation], *,
-                     output_path: Path | str | None = None,
-                     context: str = "(unknown)",
-                     ) -> GeneratedScript:
+def generate_script(
+    mitigations: list[Mitigation],
+    *,
+    output_path: Path | str | None = None,
+    context: str = "(unknown)",
+) -> GeneratedScript:
     """Compose a runnable post-processing script from a list of mitigations.
 
     The slicer is configured to call:: ``python scriptpath ${{output_path}}``
     """
     bullets = "\n".join(
-        f"    {i+1}. [{m.kind.value}] {m.rationale or '(no rationale)'}"
+        f"    {i + 1}. [{m.kind.value}] {m.rationale or '(no rationale)'}"
         for i, m in enumerate(mitigations)
     )
     fns: list[str] = []
     bodies: list[str] = []
     for m in mitigations:
-        rationale = (m.rationale or "no rationale provided").replace(
-            '"', "'")
+        rationale = (m.rationale or "no rationale provided").replace('"', "'")
         if m.kind is MitigationKind.TEMP_BUMP_FROM_LAYER:
-            bodies.append(_emit_temp_bump(
-                int(m.params["layer"]),
-                int(m.params.get("delta_c", 5)),
-                rationale))
+            bodies.append(
+                _emit_temp_bump(int(m.params["layer"]), int(m.params.get("delta_c", 5)), rationale)
+            )
             fns.append("_mitigation_temp_bump_from_layer")
         elif m.kind is MitigationKind.SPEED_REDUCE_BELOW_Z:
-            bodies.append(_emit_speed_reduce(
-                float(m.params.get("z_max_mm", 1.0)),
-                float(m.params.get("factor", 0.5)),
-                rationale))
+            bodies.append(
+                _emit_speed_reduce(
+                    float(m.params.get("z_max_mm", 1.0)),
+                    float(m.params.get("factor", 0.5)),
+                    rationale,
+                )
+            )
             fns.append("_mitigation_speed_reduce_below_z")
         elif m.kind is MitigationKind.INSERT_PAUSE_AT_LAYER:
-            bodies.append(_emit_pause(
-                int(m.params["layer"]), rationale))
+            bodies.append(_emit_pause(int(m.params["layer"]), rationale))
             fns.append("_mitigation_insert_pause_at_layer")
         elif m.kind is MitigationKind.INSERT_M600_AT_LAYER:
-            bodies.append(_emit_m600(
-                int(m.params["layer"]), rationale))
+            bodies.append(_emit_m600(int(m.params["layer"]), rationale))
             fns.append("_mitigation_insert_m600_at_layer")
         elif m.kind is MitigationKind.FAN_RAMP_AT_LAYER:
-            bodies.append(_emit_fan_ramp(
-                int(m.params["layer"]),
-                int(m.params.get("target_pct", 100)),
-                rationale))
+            bodies.append(
+                _emit_fan_ramp(
+                    int(m.params["layer"]), int(m.params.get("target_pct", 100)), rationale
+                )
+            )
             fns.append("_mitigation_fan_ramp_at_layer")
         elif m.kind is MitigationKind.Z_HOP_RETRACT_BOOST:
-            bodies.append(_emit_retract_boost(
-                float(m.params.get("extra_mm", 0.5)),
-                rationale))
+            bodies.append(_emit_retract_boost(float(m.params.get("extra_mm", 0.5)), rationale))
             fns.append("_mitigation_z_hop_retract_boost")
         else:
             raise ValueError(f"unknown mitigation kind: {m.kind!r}")
@@ -338,8 +339,7 @@ def generate_script(mitigations: list[Mitigation], *,
     src = (
         _SCRIPT_HEADER.format(mitigation_list=bullets, context=context)
         + "\n".join(unique_bodies)
-        + _SCRIPT_FOOTER.format(
-            mitigation_fns=", ".join(fns) or "")
+        + _SCRIPT_FOOTER.format(mitigation_fns=", ".join(fns) or "")
     )
 
     written: Path | None = None
@@ -351,8 +351,7 @@ def generate_script(mitigations: list[Mitigation], *,
             written.chmod(0o755)
         except (OSError, NotImplementedError):
             pass
-    return GeneratedScript(
-        path=written, source=src, mitigation_count=len(mitigations))
+    return GeneratedScript(path=written, source=src, mitigation_count=len(mitigations))
 
 
 __all__ = [

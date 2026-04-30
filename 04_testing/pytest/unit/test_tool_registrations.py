@@ -26,8 +26,14 @@ def _write_minimal_stl(path: Path) -> None:
     """Write a binary STL file describing a unit cube (12 triangles)."""
     # 8 vertices of a 10x10x10 cube
     v = [
-        (0, 0, 0), (10, 0, 0), (10, 10, 0), (0, 10, 0),  # bottom
-        (0, 0, 10), (10, 0, 10), (10, 10, 10), (0, 10, 10),  # top
+        (0, 0, 0),
+        (10, 0, 0),
+        (10, 10, 0),
+        (0, 10, 0),  # bottom
+        (0, 0, 10),
+        (10, 0, 10),
+        (10, 10, 10),
+        (0, 10, 10),  # top
     ]
     # 12 triangles (2 per face), normals approximate
     faces = [
@@ -51,7 +57,7 @@ def _write_minimal_stl(path: Path) -> None:
         ((1, 0, 0), v[1], v[6], v[5]),
     ]
     with path.open("wb") as fh:
-        fh.write(b"\x00" * 80)              # header
+        fh.write(b"\x00" * 80)  # header
         fh.write(struct.pack("<I", len(faces)))
         for normal, a, b, c in faces:
             fh.write(struct.pack("<3f", *normal))
@@ -69,9 +75,7 @@ def isolated_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("HERMES3D_QUEUE", str(var / "queue.json"))
     monkeypatch.setenv("HERMES3D_SPOOLS", str(var / "spools.json"))
     monkeypatch.setenv("HERMES3D_SKILLS", str(var / "skills.json"))
-    monkeypatch.setenv(
-        "HERMES3D_PRINT_HISTORY", str(var / "print_history.json")
-    )
+    monkeypatch.setenv("HERMES3D_PRINT_HISTORY", str(var / "print_history.json"))
     return var
 
 
@@ -156,9 +160,7 @@ def test_is_builtin_recognises_known_names():
 def test_dispatch_pla_auto_returns_real_decision():
     from hermes3d.core.agents.tool_registrations import _tool_dispatch
 
-    result = _tool_dispatch(
-        stl_x_mm=120, stl_y_mm=80, stl_z_mm=50, material="PLA", strategy="auto"
-    )
+    result = _tool_dispatch(stl_x_mm=120, stl_y_mm=80, stl_z_mm=50, material="PLA", strategy="auto")
     assert result["selected_printer_id"] is not None
     assert len(result["candidates"]) == 12  # full fleet considered
     assert result["strategy_used"] == "auto"
@@ -184,8 +186,11 @@ def test_dispatch_invalid_strategy_raises():
 
     with pytest.raises(ValueError, match="unknown strategy"):
         _tool_dispatch(
-            stl_x_mm=10, stl_y_mm=10, stl_z_mm=10,
-            material="PLA", strategy="not_a_real_strategy",
+            stl_x_mm=10,
+            stl_y_mm=10,
+            stl_z_mm=10,
+            material="PLA",
+            strategy="not_a_real_strategy",
         )
 
 
@@ -203,9 +208,7 @@ def test_queue_add_with_real_file_and_status(tmp_path, isolated_paths):
     stl = tmp_path / "cube.stl"
     _write_minimal_stl(stl)
 
-    add_result = _tool_queue_add(
-        mesh_path=str(stl), material="PETG", quality_level="normal"
-    )
+    add_result = _tool_queue_add(mesh_path=str(stl), material="PETG", quality_level="normal")
     assert add_result["ok"] is True
     assert add_result["state"] == "queued"
     assert len(add_result["mesh_sha256"]) == 64  # full SHA256 hex
@@ -223,9 +226,7 @@ def test_queue_add_with_real_file_and_status(tmp_path, isolated_paths):
 def test_queue_add_refuses_missing_file_without_explicit_sha(isolated_paths):
     from hermes3d.core.agents.tool_registrations import _tool_queue_add
 
-    result = _tool_queue_add(
-        mesh_path="/does/not/exist/at/all.stl", material="PLA"
-    )
+    result = _tool_queue_add(mesh_path="/does/not/exist/at/all.stl", material="PLA")
     assert result["ok"] is False
     assert "does not exist" in result["error"]
 
@@ -266,12 +267,20 @@ def test_spool_list_empty_then_populated(isolated_paths):
     # Populate via the real SpoolTracker, then read back through the shim
     tracker = SpoolTracker(os.environ["HERMES3D_SPOOLS"])
     tracker.add(
-        material="PLA", color="matte black", color_hex="#1a1a1a",
-        vendor="Polymaker", initial_grams=1000.0, diameter_mm=1.75,
+        material="PLA",
+        color="matte black",
+        color_hex="#1a1a1a",
+        vendor="Polymaker",
+        initial_grams=1000.0,
+        diameter_mm=1.75,
     )
     tracker.add(
-        material="PETG", color="translucent blue", color_hex="#3344aa",
-        vendor="eSun", initial_grams=750.0, diameter_mm=1.75,
+        material="PETG",
+        color="translucent blue",
+        color_hex="#3344aa",
+        vendor="eSun",
+        initial_grams=750.0,
+        diameter_mm=1.75,
     )
 
     result = _tool_spool_list()
@@ -422,16 +431,12 @@ def test_skill_lookup_with_real_skills(isolated_paths):
         confidence=0.65,
     )
 
-    result = _tool_skill_lookup(
-        kind="failure_pattern", printer_id="prusa_mk3s", material="PETG"
-    )
+    result = _tool_skill_lookup(kind="failure_pattern", printer_id="prusa_mk3s", material="PETG")
     assert result["count"] == 1
     assert result["skills"][0]["name"] == "petg_glass_no_glue_lifts"
 
     # Different scope shouldn't match
-    miss = _tool_skill_lookup(
-        kind="failure_pattern", printer_id="flsun_s1", material="ASA"
-    )
+    miss = _tool_skill_lookup(kind="failure_pattern", printer_id="flsun_s1", material="ASA")
     assert miss["count"] == 0
 
 
@@ -508,8 +513,11 @@ def test_call_via_registry_dispatch_returns_dict(fresh_registry):
     register_builtin_tools(fresh_registry)
     result = fresh_registry.call(
         "dispatch",
-        stl_x_mm=50.0, stl_y_mm=50.0, stl_z_mm=50.0,
-        material="PLA", strategy="fastest",
+        stl_x_mm=50.0,
+        stl_y_mm=50.0,
+        stl_z_mm=50.0,
+        material="PLA",
+        strategy="fastest",
     )
     assert isinstance(result, dict)
     assert "selected_printer_id" in result

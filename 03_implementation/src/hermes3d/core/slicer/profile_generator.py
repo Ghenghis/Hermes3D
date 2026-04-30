@@ -21,6 +21,7 @@ caller can write it to disk and pass it to `slice_mesh(profile=...)`.
 This module is the bridge between the kit's structured printer/material
 data and the slicer's flat key/value config files.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -37,6 +38,7 @@ from hermes3d.core.printers import get_profile, PrinterProfile, Kinematics
 # Quality presets
 # =============================================================================
 
+
 @dataclass(frozen=True)
 class QualityPreset:
     name: str
@@ -49,18 +51,33 @@ class QualityPreset:
 
 
 QUALITY_PRESETS: dict[str, QualityPreset] = {
-    "draft":  QualityPreset(name="draft",  layer_height_mm=0.28,
-                              first_layer_height_mm=0.32, perimeters=2,
-                              top_solid_layers=3, bottom_solid_layers=3,
-                              fill_density_pct=15),
-    "normal": QualityPreset(name="normal", layer_height_mm=0.20,
-                              first_layer_height_mm=0.24, perimeters=3,
-                              top_solid_layers=4, bottom_solid_layers=4,
-                              fill_density_pct=20),
-    "fine":   QualityPreset(name="fine",   layer_height_mm=0.12,
-                              first_layer_height_mm=0.20, perimeters=4,
-                              top_solid_layers=5, bottom_solid_layers=5,
-                              fill_density_pct=25),
+    "draft": QualityPreset(
+        name="draft",
+        layer_height_mm=0.28,
+        first_layer_height_mm=0.32,
+        perimeters=2,
+        top_solid_layers=3,
+        bottom_solid_layers=3,
+        fill_density_pct=15,
+    ),
+    "normal": QualityPreset(
+        name="normal",
+        layer_height_mm=0.20,
+        first_layer_height_mm=0.24,
+        perimeters=3,
+        top_solid_layers=4,
+        bottom_solid_layers=4,
+        fill_density_pct=20,
+    ),
+    "fine": QualityPreset(
+        name="fine",
+        layer_height_mm=0.12,
+        first_layer_height_mm=0.20,
+        perimeters=4,
+        top_solid_layers=5,
+        bottom_solid_layers=5,
+        fill_density_pct=25,
+    ),
 }
 
 
@@ -113,6 +130,7 @@ def _bed_shape_for(profile: PrinterProfile) -> str:
         r = d / 2.0
         # 8-point polygon
         import math
+
         pts = []
         for i in range(8):
             a = i * math.pi / 4
@@ -125,12 +143,15 @@ def _bed_shape_for(profile: PrinterProfile) -> str:
     return f"0x0,{w}x0,{w}x{h},0x{h}"
 
 
-def generate_profile(*, printer_id: str, material: str,
-                      quality_level: str = "normal",
-                      skills: SkillStore | None = None,
-                      nozzle_diameter_mm: float = 0.4,
-                      filament_diameter_mm: float = 1.75,
-                      ) -> GeneratedProfile:
+def generate_profile(
+    *,
+    printer_id: str,
+    material: str,
+    quality_level: str = "normal",
+    skills: SkillStore | None = None,
+    nozzle_diameter_mm: float = 0.4,
+    filament_diameter_mm: float = 1.75,
+) -> GeneratedProfile:
     """Build a slicer profile for the given combo.
 
     Skill overrides (when ``skills`` is provided) are applied last and
@@ -174,10 +195,17 @@ def generate_profile(*, printer_id: str, material: str,
     # Cooling — material-specific defaults
     # PLA wants 100% fan; ABS/ASA need almost none; PETG wants moderate
     fan_pct_by_material: dict[str, int] = {
-        "PLA": 100, "PLA+": 100, "CF-PLA": 80,
-        "PETG": 50, "TPU": 80,
-        "ABS": 10, "ASA": 15,
-        "PA": 30, "PA-CF": 30, "PC": 25, "PVA": 40,
+        "PLA": 100,
+        "PLA+": 100,
+        "CF-PLA": 80,
+        "PETG": 50,
+        "TPU": 80,
+        "ABS": 10,
+        "ASA": 15,
+        "PA": 30,
+        "PA-CF": 30,
+        "PC": 25,
+        "PVA": 40,
     }
     fan_pct = fan_pct_by_material.get(material.upper(), 60)
     settings["fan_always_on"] = "1" if fan_pct > 0 else "0"
@@ -186,8 +214,7 @@ def generate_profile(*, printer_id: str, material: str,
     settings["disable_fan_first_layers"] = "3"
 
     # Retraction
-    settings["retract_length"] = (
-        "0.8" if profile.direct_drive else "5.0")
+    settings["retract_length"] = "0.8" if profile.direct_drive else "5.0"
     settings["retract_speed"] = "30"
     settings["retract_lift"] = "0.2"
 
@@ -224,7 +251,8 @@ def generate_profile(*, printer_id: str, material: str,
     if skills is not None:
         matches = skills.lookup(
             kind=SkillKind.PARAMETER_OVERRIDE,
-            printer_id=printer_id, material=material,
+            printer_id=printer_id,
+            material=material,
             quality_level=quality_level,
             min_confidence=0.4,
         )
@@ -239,17 +267,14 @@ def generate_profile(*, printer_id: str, material: str,
             else:
                 # Multi-key form — every body entry maps to a setting
                 for k, v in body.items():
-                    if k in {"observed_failure_rate", "observation_count",
-                              "delta_c", "trigger"}:
+                    if k in {"observed_failure_rate", "observation_count", "delta_c", "trigger"}:
                         continue
                     settings[str(k)] = str(v)
                     applied_any = True
             if applied_any:
-                applied_skill_names.append(
-                    f"{sk.name} (conf={sk.confidence:.2f})")
+                applied_skill_names.append(f"{sk.name} (conf={sk.confidence:.2f})")
 
-    profile_id = (f"hermes3d:{printer_id}:{material.lower()}:"
-                   f"{quality_level}")
+    profile_id = f"hermes3d:{printer_id}:{material.lower()}:{quality_level}"
     return GeneratedProfile(
         profile_id=profile_id,
         printer_id=printer_id,

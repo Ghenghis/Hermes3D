@@ -18,6 +18,7 @@ The agent never powers anything off. It only invokes Moonraker endpoints
 that are safe to call when no print is active. Callers MUST verify there
 is no active print before invoking — the agent itself does this check.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -64,32 +65,36 @@ class RecoveryResult:
         return d
 
 
-def auto_recover(printer_id: str, *,
-                  api_key: str | None = None,
-                  initial_wait_s: float = 5.0,
-                  firmware_restart_wait_s: float = 30.0,
-                  poll_interval_s: float = 2.0,
-                  max_total_s: float = 90.0,
-                  ) -> RecoveryResult:
+def auto_recover(
+    printer_id: str,
+    *,
+    api_key: str | None = None,
+    initial_wait_s: float = 5.0,
+    firmware_restart_wait_s: float = 30.0,
+    poll_interval_s: float = 2.0,
+    max_total_s: float = 90.0,
+) -> RecoveryResult:
     """Attempt to recover a printer in error/shutdown state.
 
     Returns a RecoveryResult with the outcome and full audit trail.
     """
     profile = get_profile(printer_id)
-    client = MoonrakerClient(profile.moonraker_url_default,
-                              api_key=api_key, timeout_s=5.0)
+    client = MoonrakerClient(profile.moonraker_url_default, api_key=api_key, timeout_s=5.0)
     started = time.time()
-    result = RecoveryResult(printer_id=printer_id,
-                              outcome=RecoveryOutcome.GAVE_UP)
+    result = RecoveryResult(printer_id=printer_id, outcome=RecoveryOutcome.GAVE_UP)
 
     # Initial state probe
     try:
         state = client.printer_state()
     except Exception as exc:  # noqa: BLE001
-        result.attempts.append(RecoveryAttempt(
-            step="initial_probe", sent_unix=time.time(),
-            outcome="error", detail=f"unreachable: {exc}",
-        ))
+        result.attempts.append(
+            RecoveryAttempt(
+                step="initial_probe",
+                sent_unix=time.time(),
+                outcome="error",
+                detail=f"unreachable: {exc}",
+            )
+        )
         result.final_state = {"reachable": False, "error": str(exc)}
         result.duration_seconds = time.time() - started
         return result
@@ -102,33 +107,41 @@ def auto_recover(printer_id: str, *,
         return result
     if klippy_state in ("printing", "paused"):
         result.outcome = RecoveryOutcome.BLOCKED
-        result.attempts.append(RecoveryAttempt(
-            step="block_check", sent_unix=time.time(),
-            outcome="blocked",
-            detail=f"klippy_state={klippy_state} — refusing to restart "
-                    "during active print",
-        ))
+        result.attempts.append(
+            RecoveryAttempt(
+                step="block_check",
+                sent_unix=time.time(),
+                outcome="blocked",
+                detail=f"klippy_state={klippy_state} — refusing to restart during active print",
+            )
+        )
         result.final_state = state
         result.duration_seconds = time.time() - started
         return result
 
-    log.info("Recovery starting for %s (klippy_state=%s)",
-             printer_id, klippy_state)
+    log.info("Recovery starting for %s (klippy_state=%s)", printer_id, klippy_state)
 
     # ---- Step 1: soft restart ----
     time.sleep(initial_wait_s)
     try:
         client._request("POST", "/printer/restart")
-        result.attempts.append(RecoveryAttempt(
-            step="soft_restart", sent_unix=time.time(),
-            outcome="sent",
-            detail="POST /printer/restart issued",
-        ))
+        result.attempts.append(
+            RecoveryAttempt(
+                step="soft_restart",
+                sent_unix=time.time(),
+                outcome="sent",
+                detail="POST /printer/restart issued",
+            )
+        )
     except Exception as exc:  # noqa: BLE001
-        result.attempts.append(RecoveryAttempt(
-            step="soft_restart", sent_unix=time.time(),
-            outcome="error", detail=str(exc),
-        ))
+        result.attempts.append(
+            RecoveryAttempt(
+                step="soft_restart",
+                sent_unix=time.time(),
+                outcome="error",
+                detail=str(exc),
+            )
+        )
 
     # Poll for ready
     soft_deadline = time.time() + 20.0
@@ -146,24 +159,30 @@ def auto_recover(printer_id: str, *,
             pass
 
     # ---- Step 2: firmware restart ----
-    time.sleep(min(firmware_restart_wait_s,
-                    max(0.0, max_total_s - (time.time() - started))))
+    time.sleep(min(firmware_restart_wait_s, max(0.0, max_total_s - (time.time() - started))))
     if time.time() - started >= max_total_s:
         result.outcome = RecoveryOutcome.GAVE_UP
         result.duration_seconds = time.time() - started
         return result
     try:
         client._request("POST", "/printer/firmware_restart")
-        result.attempts.append(RecoveryAttempt(
-            step="firmware_restart", sent_unix=time.time(),
-            outcome="sent",
-            detail="POST /printer/firmware_restart issued",
-        ))
+        result.attempts.append(
+            RecoveryAttempt(
+                step="firmware_restart",
+                sent_unix=time.time(),
+                outcome="sent",
+                detail="POST /printer/firmware_restart issued",
+            )
+        )
     except Exception as exc:  # noqa: BLE001
-        result.attempts.append(RecoveryAttempt(
-            step="firmware_restart", sent_unix=time.time(),
-            outcome="error", detail=str(exc),
-        ))
+        result.attempts.append(
+            RecoveryAttempt(
+                step="firmware_restart",
+                sent_unix=time.time(),
+                outcome="error",
+                detail=str(exc),
+            )
+        )
 
     fw_deadline = time.time() + 30.0
     while time.time() < fw_deadline and time.time() - started < max_total_s:

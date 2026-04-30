@@ -1,4 +1,5 @@
 """Tests for the agentic dispatcher and material catalog."""
+
 from __future__ import annotations
 
 import pytest
@@ -13,6 +14,7 @@ from hermes3d.core.agents.materials import MATERIALS, get_material, list_materia
 
 
 # -- materials ----------------------------------------------------------------
+
 
 def test_materials_catalog_has_core_set():
     names = set(list_materials())
@@ -53,6 +55,7 @@ def test_pc_temperature_requirements_above_typical_printer():
 
 # -- dispatcher ---------------------------------------------------------------
 
+
 def _small_pla_request(strategy=DispatchStrategy.AUTO) -> DispatchRequest:
     return DispatchRequest(
         mesh_extents_mm=(180, 100, 55),
@@ -91,8 +94,12 @@ def test_dispatch_eliminates_for_tpu_when_no_direct_drive():
     d = dispatch(req)
     eligible = [c.printer_id for c in d.candidates if c.eligible]
     direct_drive_set = {
-        "prusa_mk3s", "sovol_sv01",
-        "flsun_t1_a", "flsun_t1_b", "flsun_s1", "flsun_v400",
+        "prusa_mk3s",
+        "sovol_sv01",
+        "flsun_t1_a",
+        "flsun_t1_b",
+        "flsun_s1",
+        "flsun_v400",
     }
     assert set(eligible) <= direct_drive_set
 
@@ -231,7 +238,7 @@ def test_dispatch_decision_candidates_sorted_by_score():
 def test_dispatch_decision_is_immutable():
     """DispatchDecision is frozen; mutating attempts must raise."""
     from dataclasses import FrozenInstanceError
+
     d = dispatch(_small_pla_request())
     with pytest.raises((AttributeError, FrozenInstanceError)):
         d.selected_printer_id = "x"  # type: ignore[misc]
-

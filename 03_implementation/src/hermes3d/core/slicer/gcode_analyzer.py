@@ -18,6 +18,7 @@ This is a passive read-only analyzer. It reads the head/tail of the file
 (slicer summaries always sit there) and a sample of the body for move
 counts. We never replay the whole file in memory.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -85,36 +86,25 @@ _RE_TIME_PRUSA = re.compile(
     r"(?:(\d+)d\s*)?(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?",
     re.IGNORECASE,
 )
-_RE_TIME_HMS_COLON = re.compile(
-    r";\s*total\s+print\s+time:\s*(\d+):(\d+):(\d+)", re.IGNORECASE)
-_RE_TIME_SECS = re.compile(
-    r";\s*time:\s*(\d+(?:\.\d+)?)\s*(?:seconds?|s)?\b", re.IGNORECASE)
+_RE_TIME_HMS_COLON = re.compile(r";\s*total\s+print\s+time:\s*(\d+):(\d+):(\d+)", re.IGNORECASE)
+_RE_TIME_SECS = re.compile(r";\s*time:\s*(\d+(?:\.\d+)?)\s*(?:seconds?|s)?\b", re.IGNORECASE)
 _RE_FIL_MM = re.compile(
-    r";\s*filament\s+used\s*\[?(?:mm|millimet[er]+s?)?\]?\s*=\s*([\d.]+)",
-    re.IGNORECASE)
-_RE_FIL_G = re.compile(
-    r";\s*filament\s+used\s*\[?g\]?\s*=\s*([\d.]+)", re.IGNORECASE)
-_RE_LAYER_HEIGHT = re.compile(
-    r";\s*(?:layer_height|layer height)\s*=\s*([\d.]+)", re.IGNORECASE)
-_RE_LAYER_COUNT = re.compile(
-    r";\s*total\s+layer\s+count\s*=\s*(\d+)", re.IGNORECASE)
+    r";\s*filament\s+used\s*\[?(?:mm|millimet[er]+s?)?\]?\s*=\s*([\d.]+)", re.IGNORECASE
+)
+_RE_FIL_G = re.compile(r";\s*filament\s+used\s*\[?g\]?\s*=\s*([\d.]+)", re.IGNORECASE)
+_RE_LAYER_HEIGHT = re.compile(r";\s*(?:layer_height|layer height)\s*=\s*([\d.]+)", re.IGNORECASE)
+_RE_LAYER_COUNT = re.compile(r";\s*total\s+layer\s+count\s*=\s*(\d+)", re.IGNORECASE)
 _RE_LAYER_NUM = re.compile(r";\s*LAYER:(\d+)", re.IGNORECASE)
 _RE_NOZZLE = re.compile(
-    r";\s*(?:nozzle_temperature|nozzle temperature|temperature)\s*=\s*([\d.]+)",
-    re.IGNORECASE)
-_RE_BED = re.compile(
-    r";\s*(?:bed_temperature|bed temperature)\s*=\s*([\d.]+)",
-    re.IGNORECASE)
-_RE_SUPPORT = re.compile(
-    r";\s*support_material\s*=\s*([01])", re.IGNORECASE)
-_RE_INFILL = re.compile(
-    r";\s*fill_density\s*=\s*([\d.]+)\s*%?", re.IGNORECASE)
-_RE_GENERATOR = re.compile(
-    r";\s*generated\s+(?:with|by)\s+(\S+)\s*([\w.\-]*)", re.IGNORECASE)
+    r";\s*(?:nozzle_temperature|nozzle temperature|temperature)\s*=\s*([\d.]+)", re.IGNORECASE
+)
+_RE_BED = re.compile(r";\s*(?:bed_temperature|bed temperature)\s*=\s*([\d.]+)", re.IGNORECASE)
+_RE_SUPPORT = re.compile(r";\s*support_material\s*=\s*([01])", re.IGNORECASE)
+_RE_INFILL = re.compile(r";\s*fill_density\s*=\s*([\d.]+)\s*%?", re.IGNORECASE)
+_RE_GENERATOR = re.compile(r";\s*generated\s+(?:with|by)\s+(\S+)\s*([\w.\-]*)", re.IGNORECASE)
 
 
-def _parse_hms(d: str | None, h: str | None,
-               m: str | None, s: str | None) -> float | None:
+def _parse_hms(d: str | None, h: str | None, m: str | None, s: str | None) -> float | None:
     if not any((d, h, m, s)):
         return None
     di, hi, mi, si = (int(x or 0) for x in (d, h, m, s))
@@ -148,26 +138,25 @@ def _parse_header(text: str) -> dict[str, object]:
             if m:
                 out["estimated_print_time_min"] = float(m.group(1)) / 60.0
 
-    if (m := _RE_FIL_MM.search(text)):
+    if m := _RE_FIL_MM.search(text):
         out["filament_used_mm"] = float(m.group(1))
-    if (m := _RE_FIL_G.search(text)):
+    if m := _RE_FIL_G.search(text):
         out["filament_used_g"] = float(m.group(1))
-    if (m := _RE_LAYER_HEIGHT.search(text)):
+    if m := _RE_LAYER_HEIGHT.search(text):
         out["layer_height_mm"] = float(m.group(1))
-    if (m := _RE_LAYER_COUNT.search(text)):
+    if m := _RE_LAYER_COUNT.search(text):
         out["layer_count"] = int(m.group(1))
-    if (m := _RE_NOZZLE.search(text)):
+    if m := _RE_NOZZLE.search(text):
         out["nozzle_temp_c"] = float(m.group(1))
-    if (m := _RE_BED.search(text)):
+    if m := _RE_BED.search(text):
         out["bed_temp_c"] = float(m.group(1))
-    if (m := _RE_SUPPORT.search(text)):
+    if m := _RE_SUPPORT.search(text):
         out["support_used"] = bool(int(m.group(1)))
-    if (m := _RE_INFILL.search(text)):
+    if m := _RE_INFILL.search(text):
         out["infill_density_pct"] = float(m.group(1))
 
     out["bed_mesh_loaded"] = "BED_MESH_PROFILE LOAD" in text or "G29" in text
-    out["pressure_advance_set"] = ("SET_PRESSURE_ADVANCE" in text
-                                   or "M900" in text)
+    out["pressure_advance_set"] = "SET_PRESSURE_ADVANCE" in text or "M900" in text
     return out
 
 
@@ -262,14 +251,14 @@ def analyze_gcode(path: str | Path) -> GcodeAnalysis:
         slicer_name=str(parsed.get("slicer_name", "")),
         slicer_version=str(parsed.get("slicer_version", "")),
         estimated_print_time_min=parsed.get("estimated_print_time_min"),  # type: ignore[arg-type]
-        filament_used_mm=parsed.get("filament_used_mm"),                  # type: ignore[arg-type]
-        filament_used_g=parsed.get("filament_used_g"),                    # type: ignore[arg-type]
-        layer_count=(parsed.get("layer_count") or layer_fallback),        # type: ignore[arg-type]
-        layer_height_mm=parsed.get("layer_height_mm"),                    # type: ignore[arg-type]
-        nozzle_temp_c=parsed.get("nozzle_temp_c"),                        # type: ignore[arg-type]
-        bed_temp_c=parsed.get("bed_temp_c"),                              # type: ignore[arg-type]
-        support_used=parsed.get("support_used"),                          # type: ignore[arg-type]
-        infill_density_pct=parsed.get("infill_density_pct"),              # type: ignore[arg-type]
+        filament_used_mm=parsed.get("filament_used_mm"),  # type: ignore[arg-type]
+        filament_used_g=parsed.get("filament_used_g"),  # type: ignore[arg-type]
+        layer_count=(parsed.get("layer_count") or layer_fallback),  # type: ignore[arg-type]
+        layer_height_mm=parsed.get("layer_height_mm"),  # type: ignore[arg-type]
+        nozzle_temp_c=parsed.get("nozzle_temp_c"),  # type: ignore[arg-type]
+        bed_temp_c=parsed.get("bed_temp_c"),  # type: ignore[arg-type]
+        support_used=parsed.get("support_used"),  # type: ignore[arg-type]
+        infill_density_pct=parsed.get("infill_density_pct"),  # type: ignore[arg-type]
         bed_mesh_loaded=bool(parsed.get("bed_mesh_loaded", False)),
         pressure_advance_set=bool(parsed.get("pressure_advance_set", False)),
         extrusion_moves_sampled=extr,

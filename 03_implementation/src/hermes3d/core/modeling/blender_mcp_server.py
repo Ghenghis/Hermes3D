@@ -21,6 +21,7 @@ fixed by this file. To implement, vendor Blender alongside this kit and
 replace each ``NotImplementedError`` body with a real bpy call. See
 docs/AI_PROGRAMMER_GUIDE.md §"Implementing the modeling MCP".
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -35,8 +36,8 @@ SERVER_VERSION = "0.1.0-spec"
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "import_and_repair": {
         "description": "Import a .glb mesh, run Blender's repair operators, "
-                       "and uniformly scale so the longest extent equals "
-                       "target_scale_mm.",
+        "and uniformly scale so the longest extent equals "
+        "target_scale_mm.",
         "input_schema": {
             "type": "object",
             "additionalProperties": False,
@@ -58,7 +59,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
     "run_python_script": {
         "description": "Execute the given Python source inside Blender's "
-                       "embedded interpreter. The bpy module is available.",
+        "embedded interpreter. The bpy module is available.",
         "input_schema": {
             "type": "object",
             "additionalProperties": False,
@@ -114,6 +115,7 @@ TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
 @dataclass
 class _NotImpl:
     """Single source of truth for every spec-only tool implementation."""
+
     tool: str
 
     def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -146,6 +148,7 @@ def health() -> dict[str, Any]:
 
 class MCPHandler(Protocol):
     """Type contract that any real implementation must satisfy."""
+
     def import_and_repair(self, glb_path: str, target_scale_mm: float) -> dict[str, Any]: ...
     def run_python_script(self, script: str) -> dict[str, Any]: ...
     def export_stl(self, output_path: str) -> dict[str, Any]: ...

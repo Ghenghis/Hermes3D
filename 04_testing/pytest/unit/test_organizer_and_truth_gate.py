@@ -1,4 +1,5 @@
 """Unit tests — small, fast, real code paths only."""
+
 from __future__ import annotations
 
 import tempfile
@@ -56,8 +57,9 @@ class TestOrganizerSpec:
 # ---------------------------------------------------------------------------
 
 
-def _write_box_stl(tmp: Path, name: str = "box.stl",
-                  size: tuple[float, float, float] = (50, 30, 20)) -> Path:
+def _write_box_stl(
+    tmp: Path, name: str = "box.stl", size: tuple[float, float, float] = (50, 30, 20)
+) -> Path:
     """Write a 50x30x20 mm watertight box STL — known good geometry."""
     box = trimesh.creation.box(extents=size)
     p = tmp / name
@@ -95,8 +97,7 @@ class TestTruthGate:
         p = tmp_path / "shell.stl"
         shell.export(str(p))
         report = run_truth_gate(p, TruthGateConfig())
-        thickness = next(c for c in report.checks
-                         if c.name == "wall_thickness")
+        thickness = next(c for c in report.checks if c.name == "wall_thickness")
         assert thickness.status is CheckStatus.FAIL
         assert thickness.measured["min_mm"] < 1.2
 
@@ -110,8 +111,7 @@ class TestTruthGate:
 
     def test_skip_flags_honoured(self, tmp_path: Path) -> None:
         p = _write_box_stl(tmp_path)
-        cfg = TruthGateConfig(require_thickness=False,
-                              require_no_self_intersection=False)
+        cfg = TruthGateConfig(require_thickness=False, require_no_self_intersection=False)
         report = run_truth_gate(p, cfg)
         thickness = next(c for c in report.checks if c.name == "wall_thickness")
         assert thickness.status is CheckStatus.SKIP

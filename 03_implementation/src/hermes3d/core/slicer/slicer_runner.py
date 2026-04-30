@@ -12,6 +12,7 @@ Public API:
     slice_mesh(stl_path, *, slicer=None, profile=None, output_dir=None)
         -> SliceResult
 """
+
 from __future__ import annotations
 
 import logging
@@ -39,6 +40,7 @@ class SlicerNotFound(SlicerError):
 @dataclass
 class SliceResult:
     """Outcome of a slice operation."""
+
     slicer_binary: str
     stl_path: str
     gcode_path: str
@@ -88,28 +90,38 @@ def _windows_candidates() -> list[Path]:
         ):
             cand.append(Path(root) / sub)
     for p in portable:
-        cand.extend([
-            Path(p) / "prusa-slicer-console.exe",
-            Path(p) / "prusa-slicer.exe",
-            Path(p) / "orca-slicer-console.exe",
-            Path(p) / "orca-slicer.exe",
-        ])
+        cand.extend(
+            [
+                Path(p) / "prusa-slicer-console.exe",
+                Path(p) / "prusa-slicer.exe",
+                Path(p) / "orca-slicer-console.exe",
+                Path(p) / "orca-slicer.exe",
+            ]
+        )
     return cand
 
 
 def _posix_candidates() -> list[Path]:
     out: list[Path] = []
-    for name in ("prusa-slicer", "PrusaSlicer", "prusaslicer",
-                 "orca-slicer", "OrcaSlicer", "orcaslicer"):
+    for name in (
+        "prusa-slicer",
+        "PrusaSlicer",
+        "prusaslicer",
+        "orca-slicer",
+        "OrcaSlicer",
+        "orcaslicer",
+    ):
         which = shutil.which(name)
         if which:
             out.append(Path(which))
-    out.extend([
-        Path.home() / "PrusaSlicer/prusa-slicer",
-        Path("/opt/PrusaSlicer/prusa-slicer"),
-        Path("/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"),
-        Path("/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer"),
-    ])
+    out.extend(
+        [
+            Path.home() / "PrusaSlicer/prusa-slicer",
+            Path("/opt/PrusaSlicer/prusa-slicer"),
+            Path("/Applications/PrusaSlicer.app/Contents/MacOS/PrusaSlicer"),
+            Path("/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer"),
+        ]
+    )
     return out
 
 
@@ -146,12 +158,9 @@ _TIME_PATTERNS = (
     re.compile(r"; *estimated printing time *= *(.+)$", re.IGNORECASE),
     re.compile(r"; *total estimated time *: *(.+)$", re.IGNORECASE),
 )
-_FILAMENT_USED_MM = re.compile(
-    r"; *filament used \[mm\] *= *([0-9.]+)", re.IGNORECASE)
-_FILAMENT_USED_G = re.compile(
-    r"; *filament used \[g\] *= *([0-9.]+)", re.IGNORECASE)
-_LAYER_COUNT = re.compile(r"; *(?:total layer number|num layers) *: *([0-9]+)",
-                          re.IGNORECASE)
+_FILAMENT_USED_MM = re.compile(r"; *filament used \[mm\] *= *([0-9.]+)", re.IGNORECASE)
+_FILAMENT_USED_G = re.compile(r"; *filament used \[g\] *= *([0-9.]+)", re.IGNORECASE)
+_LAYER_COUNT = re.compile(r"; *(?:total layer number|num layers) *: *([0-9]+)", re.IGNORECASE)
 
 
 def _hms_to_minutes(text: str) -> float | None:
@@ -160,7 +169,8 @@ def _hms_to_minutes(text: str) -> float | None:
     # h/m/s with units
     m = re.match(
         r"(?:(\d+)\s*d)?\s*(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?\s*(?:(\d+)\s*s)?\s*$",
-        text, flags=re.IGNORECASE,
+        text,
+        flags=re.IGNORECASE,
     )
     if m and any(m.groups()):
         d, h, mi, s = (int(g) if g else 0 for g in m.groups())
@@ -177,8 +187,9 @@ def _hms_to_minutes(text: str) -> float | None:
     return None
 
 
-def parse_gcode_metadata(gcode_path: str | Path, head_bytes: int = 65536,
-                         tail_bytes: int = 65536) -> dict[str, Any]:
+def parse_gcode_metadata(
+    gcode_path: str | Path, head_bytes: int = 65536, tail_bytes: int = 65536
+) -> dict[str, Any]:
     """Read the head + tail of a g-code file and parse the standard metadata."""
     p = Path(gcode_path)
     if not p.is_file():
@@ -264,7 +275,8 @@ def slice_mesh(
     cmd: list[str] = [
         str(bin_path),
         "--export-gcode",
-        "--output", str(gcode_path),
+        "--output",
+        str(gcode_path),
     ]
     if profile is not None:
         cmd.extend(["--load", str(profile)])
@@ -273,15 +285,16 @@ def slice_mesh(
     LOG.info("Running slicer: %s", " ".join(cmd))
     t0 = time.time()
     proc = subprocess.run(
-        cmd, capture_output=True, text=True, timeout=timeout_seconds, check=False,
+        cmd,
+        capture_output=True,
+        text=True,
+        timeout=timeout_seconds,
+        check=False,
     )
     duration = time.time() - t0
 
     if proc.returncode != 0 or not gcode_path.is_file():
-        raise SlicerError(
-            f"Slicer failed (rc={proc.returncode}). "
-            f"STDERR: {proc.stderr[-2000:]}"
-        )
+        raise SlicerError(f"Slicer failed (rc={proc.returncode}). STDERR: {proc.stderr[-2000:]}")
 
     metadata = parse_gcode_metadata(gcode_path)
     return SliceResult(

@@ -17,6 +17,7 @@ What is SPEC-only:
     - ``LangGraphOrchestrator`` raises NotImplementedError until the user
       runs the installer to provision LangGraph + an LLM endpoint.
 """
+
 from __future__ import annotations
 
 import enum
@@ -45,23 +46,24 @@ class Stage(str, enum.Enum):
 # Allowed transitions. Any orchestrator implementation that takes a path
 # not in this dict is non-conformant.
 TRANSITIONS: dict[Stage, frozenset[Stage]] = {
-    Stage.INIT:       frozenset({Stage.VISION, Stage.GENERATE, Stage.FAILED}),
-    Stage.VISION:     frozenset({Stage.GENERATE, Stage.FAILED}),
-    Stage.GENERATE:   frozenset({Stage.REPAIR, Stage.TRUTH_GATE, Stage.FAILED}),
-    Stage.REPAIR:     frozenset({Stage.TRUTH_GATE, Stage.GENERATE, Stage.FAILED}),
+    Stage.INIT: frozenset({Stage.VISION, Stage.GENERATE, Stage.FAILED}),
+    Stage.VISION: frozenset({Stage.GENERATE, Stage.FAILED}),
+    Stage.GENERATE: frozenset({Stage.REPAIR, Stage.TRUTH_GATE, Stage.FAILED}),
+    Stage.REPAIR: frozenset({Stage.TRUTH_GATE, Stage.GENERATE, Stage.FAILED}),
     # Truth Gate failure can loop back to REPAIR up to a bounded retry count.
     Stage.TRUTH_GATE: frozenset({Stage.SLICE, Stage.REPAIR, Stage.FAILED}),
-    Stage.SLICE:      frozenset({Stage.PRINT, Stage.REPORT, Stage.FAILED}),
-    Stage.PRINT:      frozenset({Stage.REPORT, Stage.FAILED}),
-    Stage.REPORT:     frozenset({Stage.DONE, Stage.FAILED}),
-    Stage.DONE:       frozenset(),
-    Stage.FAILED:     frozenset(),
+    Stage.SLICE: frozenset({Stage.PRINT, Stage.REPORT, Stage.FAILED}),
+    Stage.PRINT: frozenset({Stage.REPORT, Stage.FAILED}),
+    Stage.REPORT: frozenset({Stage.DONE, Stage.FAILED}),
+    Stage.DONE: frozenset(),
+    Stage.FAILED: frozenset(),
 }
 
 
 @dataclass
 class OrchestratorState:
     """All state the orchestrator carries from stage to stage."""
+
     job_id: str = field(default_factory=lambda: uuid.uuid4().hex)
     stage: Stage = Stage.INIT
     # Inputs
@@ -108,14 +110,14 @@ class DryRunOrchestrator:
 
     def __init__(self) -> None:
         self.nodes: dict[Stage, NodeFn] = {
-            Stage.INIT:       self._init,
-            Stage.VISION:     self._vision,
-            Stage.GENERATE:   self._generate,
-            Stage.REPAIR:     self._repair,
+            Stage.INIT: self._init,
+            Stage.VISION: self._vision,
+            Stage.GENERATE: self._generate,
+            Stage.REPAIR: self._repair,
             Stage.TRUTH_GATE: self._truth_gate,
-            Stage.SLICE:      self._slice,
-            Stage.PRINT:      self._print,
-            Stage.REPORT:     self._report,
+            Stage.SLICE: self._slice,
+            Stage.PRINT: self._print,
+            Stage.REPORT: self._report,
         }
 
     def run(self, state: OrchestratorState, *, max_steps: int = 50) -> OrchestratorState:

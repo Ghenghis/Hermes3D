@@ -1,4 +1,5 @@
 """Pytest configuration: make `hermes3d` importable from 03_implementation/src/."""
+
 from __future__ import annotations
 
 import sys

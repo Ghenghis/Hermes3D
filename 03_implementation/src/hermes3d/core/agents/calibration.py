@@ -20,6 +20,7 @@ Real-world note: each calibration takes 5-30 minutes. The agent never
 blocks; it returns immediately after sending the macro, and the caller
 polls.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -43,17 +44,12 @@ class CalibrationKind(str, enum.Enum):
 # Klippain-shaketune or Klipper3D plugin is installed. The agent gracefully
 # reports "macro not found" if it isn't.
 _MACROS: dict[CalibrationKind, str] = {
-    CalibrationKind.PRESSURE_ADVANCE:
-        "TUNING_TOWER COMMAND=SET_PRESSURE_ADVANCE PARAMETER=ADVANCE "
-        "START=0 FACTOR=0.005",
-    CalibrationKind.INPUT_SHAPER:
-        "SHAPER_CALIBRATE",
-    CalibrationKind.FLOW_RATIO:
-        "TUNING_TOWER COMMAND=SET_FLOW PARAMETER=FLOW START=90 FACTOR=2",
-    CalibrationKind.SHAPER_AUTOCALIBRATE:
-        "AXES_SHAPER_CALIBRATION",
-    CalibrationKind.BED_MESH:
-        "BED_MESH_CALIBRATE ADAPTIVE=1",
+    CalibrationKind.PRESSURE_ADVANCE: "TUNING_TOWER COMMAND=SET_PRESSURE_ADVANCE PARAMETER=ADVANCE "
+    "START=0 FACTOR=0.005",
+    CalibrationKind.INPUT_SHAPER: "SHAPER_CALIBRATE",
+    CalibrationKind.FLOW_RATIO: "TUNING_TOWER COMMAND=SET_FLOW PARAMETER=FLOW START=90 FACTOR=2",
+    CalibrationKind.SHAPER_AUTOCALIBRATE: "AXES_SHAPER_CALIBRATION",
+    CalibrationKind.BED_MESH: "BED_MESH_CALIBRATE ADAPTIVE=1",
 }
 
 
@@ -62,7 +58,7 @@ class CalibrationRequest:
     printer_id: str
     moonraker_url: str
     kind: CalibrationKind
-    extra_args: str = ""             # appended to the macro call
+    extra_args: str = ""  # appended to the macro call
 
 
 @dataclass
@@ -81,10 +77,12 @@ class CalibrationResult:
         return d
 
 
-def run_calibration(request: CalibrationRequest, *,
-                     api_key: str | None = None,
-                     timeout_s: float = 10.0,
-                     ) -> CalibrationResult:
+def run_calibration(
+    request: CalibrationRequest,
+    *,
+    api_key: str | None = None,
+    timeout_s: float = 10.0,
+) -> CalibrationResult:
     """Send the calibration macro and return immediately.
 
     The actual calibration runs on the printer for several minutes;
@@ -94,8 +92,7 @@ def run_calibration(request: CalibrationRequest, *,
     macro = _MACROS[request.kind]
     if request.extra_args:
         macro = f"{macro} {request.extra_args}"
-    client = MoonrakerClient(request.moonraker_url, api_key=api_key,
-                              timeout_s=timeout_s)
+    client = MoonrakerClient(request.moonraker_url, api_key=api_key, timeout_s=timeout_s)
     result = CalibrationResult(
         printer_id=request.printer_id,
         kind=request.kind,
@@ -104,8 +101,7 @@ def run_calibration(request: CalibrationRequest, *,
     )
     try:
         # Klipper expects gcode commands at /printer/gcode/script
-        resp = client._request("POST", "/printer/gcode/script",
-                                params={"script": macro})
+        resp = client._request("POST", "/printer/gcode/script", params={"script": macro})
         result.moonraker_response = resp if isinstance(resp, dict) else {}
         result.succeeded = True
     except Exception as exc:  # noqa: BLE001

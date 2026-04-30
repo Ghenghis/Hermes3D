@@ -24,6 +24,7 @@ Default price points:
 Printer wattages from manufacturer specs and community measurements
 (verified for FLSUN T1 ~250W typical, S1 ~350W typical, MK3S ~120W).
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -58,18 +59,18 @@ DEFAULT_FILAMENT_PRICES_USD_PER_KG: dict[str, float] = {
 # higher (300-500W on big-bed printers) but averages are what matter
 # for energy cost.
 _PRINTER_WATTAGE_TYPICAL: dict[str, float] = {
-    "flsun_qqs_pro":     200.0,
-    "flsun_t1_a":        250.0,
-    "flsun_t1_b":        250.0,
+    "flsun_qqs_pro": 200.0,
+    "flsun_t1_a": 250.0,
+    "flsun_t1_b": 250.0,
     "flsun_super_racer": 200.0,
-    "flsun_s1":          350.0,
-    "flsun_v400":        320.0,
-    "creality_cr10s":    220.0,  # 300x300 heated bed dominates
-    "creality_cr6_max":  330.0,  # 400x400 heated bed
-    "tronxy_d01_pro":    180.0,
-    "tronxy_x5sa_pro":   260.0,
-    "prusa_mk3s":        120.0,
-    "sovol_sv01":        220.0,
+    "flsun_s1": 350.0,
+    "flsun_v400": 320.0,
+    "creality_cr10s": 220.0,  # 300x300 heated bed dominates
+    "creality_cr6_max": 330.0,  # 400x400 heated bed
+    "tronxy_d01_pro": 180.0,
+    "tronxy_x5sa_pro": 260.0,
+    "prusa_mk3s": 120.0,
+    "sovol_sv01": 220.0,
 }
 
 
@@ -104,11 +105,15 @@ def get_typical_wattage(profile_id: str) -> float:
     return _PRINTER_WATTAGE_TYPICAL.get(profile_id, 250.0)
 
 
-def estimate_cost(*, printer_id: str, material: str, filament_g: float,
-                  duration_hours: float,
-                  price_per_kg_usd: float | None = None,
-                  price_per_kwh_usd: float | None = None,
-                  ) -> CostEstimate:
+def estimate_cost(
+    *,
+    printer_id: str,
+    material: str,
+    filament_g: float,
+    duration_hours: float,
+    price_per_kg_usd: float | None = None,
+    price_per_kwh_usd: float | None = None,
+) -> CostEstimate:
     """Compute cost components with sensible defaults.
 
     The user can override either price (e.g. they paid $35/kg for
@@ -120,12 +125,9 @@ def estimate_cost(*, printer_id: str, material: str, filament_g: float,
 
     mat_key = material.upper()
     if price_per_kg_usd is None:
-        price_per_kg_usd = DEFAULT_FILAMENT_PRICES_USD_PER_KG.get(
-            mat_key, 25.0)
+        price_per_kg_usd = DEFAULT_FILAMENT_PRICES_USD_PER_KG.get(mat_key, 25.0)
         if mat_key not in DEFAULT_FILAMENT_PRICES_USD_PER_KG:
-            notes.append(
-                f"unknown material '{material}' — using $25/kg fallback"
-            )
+            notes.append(f"unknown material '{material}' — using $25/kg fallback")
     if price_per_kwh_usd is None:
         price_per_kwh_usd = DEFAULT_PRICE_PER_KWH_USD
 
@@ -156,8 +158,9 @@ def estimate_cost(*, printer_id: str, material: str, filament_g: float,
     )
 
 
-def estimate_from_gcode_analysis(analysis, printer_id: str, material: str,
-                                  **prices: float) -> CostEstimate:
+def estimate_from_gcode_analysis(
+    analysis, printer_id: str, material: str, **prices: float
+) -> CostEstimate:
     """Convenience: take a GcodeAnalysis instead of raw numbers.
 
     Falls back to zero filament/duration for missing fields rather than
@@ -171,8 +174,11 @@ def estimate_from_gcode_analysis(analysis, printer_id: str, material: str,
     if dur_h == 0.0:
         notes_extra.append("g-code did not report time; energy cost will be 0")
     estimate = estimate_cost(
-        printer_id=printer_id, material=material,
-        filament_g=fil_g, duration_hours=dur_h, **prices,
+        printer_id=printer_id,
+        material=material,
+        filament_g=fil_g,
+        duration_hours=dur_h,
+        **prices,
     )
     estimate.notes.extend(notes_extra)
     return estimate

@@ -23,6 +23,7 @@ SkillStore + PrintHistory. The agents are deterministic (no LLM calls in
 the default path) — when an Ollama instance is available, the
 CriticAgent can opt into LLM-based critique for richer reasoning.
 """
+
 from __future__ import annotations
 
 import dataclasses
@@ -33,10 +34,14 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hermes3d.core.agents.dispatcher import (
-    DispatchDecision, DispatchRequest, DispatchStrategy, dispatch,
+    DispatchDecision,
+    DispatchRequest,
+    DispatchStrategy,
+    dispatch,
 )
 from hermes3d.core.farm.print_history import (
-    PrintHistory, aggregate_metrics,
+    PrintHistory,
+    aggregate_metrics,
 )
 from hermes3d.core.memory import Skill, SkillKind, SkillStore
 
@@ -80,8 +85,7 @@ class CriticAgent:
     # Below this many prints, success rate is too noisy to weigh
     min_evidence_prints: int = 5
 
-    def critique(self, decision: DispatchDecision,
-                 request: DispatchRequest) -> CritiqueReport:
+    def critique(self, decision: DispatchDecision, request: DispatchRequest) -> CritiqueReport:
         if decision.selected_printer_id is None:
             return CritiqueReport(
                 verdict=Verdict.REJECT,
@@ -105,8 +109,7 @@ class CriticAgent:
                         f"{pa.success_rate:.1%} success rate over "
                         f"{pa.total_prints} prints — below acceptable threshold"
                     )
-                    citations.append(
-                        f"PrintHistory[{decision.selected_printer_id}]")
+                    citations.append(f"PrintHistory[{decision.selected_printer_id}]")
                     # Suggest excluding this printer
                     suggestions["exclude_printer"] = decision.selected_printer_id
 
@@ -120,12 +123,12 @@ class CriticAgent:
             )
             for f in failures:
                 reasons.append(
-                    f"skill: known failure pattern '{f.name}' "
-                    f"(confidence {f.confidence:.2f})"
+                    f"skill: known failure pattern '{f.name}' (confidence {f.confidence:.2f})"
                 )
                 citations.append(f"Skill[{f.skill_id[:8]}]")
                 suggestions.setdefault("flagged_skills", []).append(
-                    {"name": f.name, "body": f.body})
+                    {"name": f.name, "body": f.body}
+                )
 
             # 3. Skill-based suggestion: is there a parameter override?
             params = self.skills.lookup(
@@ -136,7 +139,8 @@ class CriticAgent:
             )
             if params:
                 suggestions["parameter_overrides"] = [
-                    {"name": p.name, "body": p.body} for p in params]
+                    {"name": p.name, "body": p.body} for p in params
+                ]
 
         # Verdict
         if reasons:
@@ -171,16 +175,16 @@ class CriticAgent:
 class OptimizerAgent:
     """Given a critique that asks for revision, propose a new request."""
 
-    def revise(self, original: DispatchRequest,
-                critique: CritiqueReport) -> DispatchRequest:
+    def revise(self, original: DispatchRequest, critique: CritiqueReport) -> DispatchRequest:
         if critique.verdict is not Verdict.REVISE:
             return original
         excludes = list(original.excluded_printers)
-        if (pid := critique.suggestions.get("exclude_printer")):
+        if pid := critique.suggestions.get("exclude_printer"):
             if pid not in excludes:
                 excludes.append(pid)
         return dataclasses.replace(
-            original, excluded_printers=tuple(excludes),
+            original,
+            excluded_printers=tuple(excludes),
         )
 
 
@@ -193,33 +197,39 @@ class OptimizerAgent:
 class ExecutorAgent:
     """Runs the actual print workflow given an approved decision."""
 
-    def execute(self, decision: DispatchDecision,
-                 request: DispatchRequest, *,
-                 dry_run: bool = True,
-                 mesh_path: str | None = None,
-                 queue_path: str | None = None,
-                 ) -> dict[str, Any]:
+    def execute(
+        self,
+        decision: DispatchDecision,
+        request: DispatchRequest,
+        *,
+        dry_run: bool = True,
+        mesh_path: str | None = None,
+        queue_path: str | None = None,
+    ) -> dict[str, Any]:
         if not decision.has_selection:
-            return {"executed": False,
-                    "reason": "no eligible printer"}
+            return {"executed": False, "reason": "no eligible printer"}
         if mesh_path is None:
             return {
                 "executed": False,
                 "reason": "executor requires mesh_path to start the workflow",
             }
         from hermes3d.core.orchestration import (
-            build_print_workflow, new_state,
+            build_print_workflow,
+            new_state,
         )
+
         graph = build_print_workflow()
-        state = new_state(initial={
-            "mesh_path": mesh_path,
-            "material": request.material,
-            "strategy": request.strategy.value,
-            "preferred_printer_id": decision.selected_printer_id,
-            "queue_path": queue_path or "./var/queue.json",
-            "dry_run": dry_run,
-            "auto_orient_enabled": False,
-        })
+        state = new_state(
+            initial={
+                "mesh_path": mesh_path,
+                "material": request.material,
+                "strategy": request.strategy.value,
+                "preferred_printer_id": decision.selected_printer_id,
+                "queue_path": queue_path or "./var/queue.json",
+                "dry_run": dry_run,
+                "auto_orient_enabled": False,
+            }
+        )
         final = graph.run(state)
         return {
             "executed": True,
@@ -245,16 +255,17 @@ class MultiAgentResult:
     executor_result: dict[str, Any] | None = None
 
 
-def run_multi_agent(*,
-                     request: DispatchRequest,
-                     history: PrintHistory | None = None,
-                     skills: SkillStore | None = None,
-                     max_rounds: int = 3,
-                     execute: bool = False,
-                     mesh_path: str | None = None,
-                     queue_path: str | None = None,
-                     dry_run: bool = True,
-                     ) -> MultiAgentResult:
+def run_multi_agent(
+    *,
+    request: DispatchRequest,
+    history: PrintHistory | None = None,
+    skills: SkillStore | None = None,
+    max_rounds: int = 3,
+    execute: bool = False,
+    mesh_path: str | None = None,
+    queue_path: str | None = None,
+    dry_run: bool = True,
+) -> MultiAgentResult:
     """Critic ↔ Optimizer loop, then optional Executor.
 
     Returns the final decision plus a structured trace of every round.
@@ -293,8 +304,11 @@ def run_multi_agent(*,
     if approved and execute and final_decision is not None:
         executor = ExecutorAgent()
         executor_result = executor.execute(
-            final_decision, current_request,
-            dry_run=dry_run, mesh_path=mesh_path, queue_path=queue_path,
+            final_decision,
+            current_request,
+            dry_run=dry_run,
+            mesh_path=mesh_path,
+            queue_path=queue_path,
         )
 
     return MultiAgentResult(

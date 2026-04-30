@@ -9,6 +9,7 @@ Each test:
 The build script is invoked in-process (via ``scripts/_build_bundle.py``)
 to keep tests fast and OS-portable.
 """
+
 from __future__ import annotations
 
 import importlib.util
@@ -58,7 +59,10 @@ def _verify(zip_path: Path, key: str) -> tuple[int, str]:
     env["HERMES3D_PROOF_KEY"] = key
     proc = subprocess.run(
         [sys.executable, str(RUNNER), "--bundle", str(zip_path), "--json"],
-        capture_output=True, text=True, env=env, timeout=60,
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=60,
     )
     return proc.returncode, proc.stdout + proc.stderr
 
@@ -83,7 +87,10 @@ def test_bundle_signature_tampered(tmp_path: Path):
 
     # Rewrite the zip with a mutated manifest.json (bump duration).
     tampered = tmp_path / "tampered.zip"
-    with zipfile.ZipFile(bundle, "r") as src, zipfile.ZipFile(tampered, "w", zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(bundle, "r") as src,
+        zipfile.ZipFile(tampered, "w", zipfile.ZIP_DEFLATED) as dst,
+    ):
         for item in src.infolist():
             data = src.read(item.filename)
             if item.filename == "manifest.json":
@@ -108,15 +115,20 @@ def test_bundle_missing_file(tmp_path: Path):
         names = set(zf.namelist())
 
     droppable = next(
-        (e["path"] for e in manifest["files"]
-         if e["path"] not in ("manifest.json", "manifest.sig")
-         and e["path"] in names),
+        (
+            e["path"]
+            for e in manifest["files"]
+            if e["path"] not in ("manifest.json", "manifest.sig") and e["path"] in names
+        ),
         None,
     )
     assert droppable is not None, "bundle had no droppable file — fixture broken"
 
     pruned = tmp_path / "pruned.zip"
-    with zipfile.ZipFile(bundle, "r") as src, zipfile.ZipFile(pruned, "w", zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(bundle, "r") as src,
+        zipfile.ZipFile(pruned, "w", zipfile.ZIP_DEFLATED) as dst,
+    ):
         for item in src.infolist():
             if item.filename == droppable:
                 continue

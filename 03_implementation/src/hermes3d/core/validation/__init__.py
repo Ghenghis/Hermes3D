@@ -1,4 +1,5 @@
 """Validation: the Truth Gate."""
+
 from hermes3d.core.validation.truth_gate import (
     CheckResult,
     CheckStatus,

@@ -15,6 +15,7 @@ Per the contract (§3.1): nothing in this launcher is a fake button. Every
 visible control either does real work or is conspicuously disabled with an
 explanation. There is no "Coming Soon".
 """
+
 from __future__ import annotations
 
 import json
@@ -56,9 +57,14 @@ def _validate_stl(stl_path: str | None) -> tuple[str, str]:
 
 
 def _generate_organizer(
-    width_mm: float, depth_mm: float, height_mm: float,
-    tray_count: int, pen_count: int, pen_diameter_mm: float,
-    phone_slot: bool, phone_slot_angle_deg: float,
+    width_mm: float,
+    depth_mm: float,
+    height_mm: float,
+    tray_count: int,
+    pen_count: int,
+    pen_diameter_mm: float,
+    phone_slot: bool,
+    phone_slot_angle_deg: float,
     cable_passthrough: bool,
     output_dir: str | None,
 ) -> tuple[str, str | None, str | None]:
@@ -67,7 +73,9 @@ def _generate_organizer(
     Returns (markdown_summary, stl_path_for_download, proof_path_for_download).
     """
     spec = OrganizerSpec(
-        width_mm=float(width_mm), depth_mm=float(depth_mm), height_mm=float(height_mm),
+        width_mm=float(width_mm),
+        depth_mm=float(depth_mm),
+        height_mm=float(height_mm),
         tray_count=int(tray_count),
         pen_count=int(pen_count),
         pen_diameter_mm=float(pen_diameter_mm),
@@ -79,8 +87,9 @@ def _generate_organizer(
     out_dir.mkdir(parents=True, exist_ok=True)
     stl_path = out_dir / f"organizer_{spec.signature()}.stl"
     export_organizer(spec, stl_path)
-    rendered = render_all_views(stl_path, out_dir / "renders",
-                                name_prefix=f"organizer_{spec.signature()}")
+    rendered = render_all_views(
+        stl_path, out_dir / "renders", name_prefix=f"organizer_{spec.signature()}"
+    )
     proof_path = out_dir / f"organizer_{spec.signature()}.proof.json"
     write_proof(
         mesh_path=stl_path,
@@ -162,8 +171,18 @@ def build_app():  # type: ignore[no-untyped-def]
             proof_dl = gr.File(label="Proof envelope")
             gen_btn.click(
                 _generate_organizer,
-                inputs=[width, depth, height, trays, pens, pen_dia,
-                        slot, slot_angle, cable, outdir],
+                inputs=[
+                    width,
+                    depth,
+                    height,
+                    trays,
+                    pens,
+                    pen_dia,
+                    slot,
+                    slot_angle,
+                    cable,
+                    outdir,
+                ],
                 outputs=[md, stl_dl, proof_dl],
             )
 
@@ -187,8 +206,9 @@ def build_app():  # type: ignore[no-untyped-def]
 
 def main() -> None:
     """Module entrypoint: ``python -m hermes3d.app.launcher`` or via run.bat."""
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     app = build_app()
     host = os.environ.get("HERMES3D_HOST", "127.0.0.1")
     port = int(os.environ.get("HERMES3D_PORT", "7860"))
