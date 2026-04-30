@@ -14,7 +14,15 @@ predicts failures, learns from outcomes, signs every decision with HMAC-SHA256.
 |---|---|
 | **v5.0 baseline** | tagged `v5.0.0-baseline` (initial commit `13c04e6`) |
 | **A — Kit hardening** | in progress on `feat/kit-hardening-v5.3` |
-| **B — v5.3 product build** | queued (post-A) |
+| **B — v5.3 product build** | in progress: B-PR4 promotes the LangGraph runtime + real multi-agent loop |
+
+### Phase B status (2026-04)
+
+- `core/agents/orchestrator.py` — **runnable**. `LangGraphOrchestrator.run(state, *, max_steps, checkpoint_dir)` drives the 12-node `print_workflow` graph. With the optional `[langgraph]` extra installed it builds a real `StateGraph` (conditional edges + checkpointer); without it, transparently falls back to the hand-rolled `WorkflowGraph` and emits a `LangGraphUnavailableWarning`. Final state always carries `terminal=True`, `aborted: bool`, and `node_results` (alias of `history`).
+- `core/agents/multi_agent.py` — **runnable**. New `MultiAgentLoop` runs Executor → Critic → Optimizer against any configured LLM provider (Ollama by default) and captures prompt/response/latency/token-count per round. When no backend is reachable it returns `outcome="no-llm"` instead of failing.
+- `print_workflow.run_with_langgraph(state)` is the public entry point that wires the orchestrator into the existing pipeline; the legacy `WorkflowGraph` path is preserved as the default.
+- New agent manifests: `agents/orchestrator.yaml`, `agents/multi_agent.yaml` (12/12 manifests valid).
+- Optional install: `pip install -e ".[langgraph]"` or `".[all]"`.
 
 The kit's pre-hardening state, gap inventory, and rubric assessment live in
 [`var/audit/baseline_v5.0.md`](var/audit/baseline_v5.0.md).

@@ -90,3 +90,5 @@ for manifest in glob("agents/*.yaml"):
 | `preflight`   | runs `scripts/preflight.sh`; gates on required tools present              |
 | `branchguard` | pre-push hook checks; gates on branch != main/master and tests green      |
 | `bundlesigner`| produces signed proof bundle zip; gates on signature verification         |
+| `orchestrator`| drives WorkflowState through the 12-node print_workflow via LangGraph (or fallback) |
+| `multi_agent` | runs Executor/Critic/Optimizer loop against a local LLM; degrades to no-llm |

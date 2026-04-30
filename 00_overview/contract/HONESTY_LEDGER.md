@@ -24,7 +24,7 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 | `core/visual/render.py` | ✓ deterministic | 6-view STL render via trimesh+pyglet |
 | `core/slicer/slicer_runner.py` | ✓ smoke | PrusaSlicer + OrcaSlicer CLI auto-discovery |
 | `core/slicer/gcode_analyzer.py` | ✓ 2 tests | parses time/filament/risk flags |
-| `core/agents/orchestrator.py` | ✓ DryRun | state machine end-to-end |
+| `core/agents/orchestrator.py` | ✓ DryRun + 5 LangGraph runtime tests | LangGraphOrchestrator runnable with optional langgraph extra; transparent fallback to WorkflowGraph |
 
 ## Tier 2 — Agentic + Automation (all **runnable**)
 
@@ -59,7 +59,7 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 | `core/memory/skill_store.py` | ✓ 4 tests | persistent typed skills, scope matching, reinforce |
 | `core/memory/skill_pack.py` | ✓ 3 tests | hash-verified import/export bundles |
 | `core/llm/ollama_client.py` | ✓ 4 tests | local LLM, graceful when unavailable |
-| `core/agents/multi_agent.py` | ✓ 3 tests | Critic + Optimizer + Executor |
+| `core/agents/multi_agent.py` | ✓ 7 tests (3 dispatch + 4 LLM loop) | Critic+Optimizer+Executor (deterministic) plus real Executor/Critic/Optimizer LLM loop with graceful no-llm degradation |
 | `core/integrations/octoprint_client.py` | ✓ 1 test | mirror Moonraker shape |
 | `core/integrations/obico_client.py` | ✓ 2 tests | spaghetti detection + actions |
 | `core/intelligence/failure_predictor.py` | ✓ 3 tests | calibrated probability + citations |
