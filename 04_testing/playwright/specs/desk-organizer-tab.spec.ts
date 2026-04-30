@@ -15,23 +15,23 @@ test('Generate Desk Organizer tab produces a downloadable STL + signed proof', a
   await widthSlider.focus();
   await page.keyboard.press('ArrowRight');
 
-  await page.getByRole('button', { name: /Generate \+ Validate \+ Sign/i }).click();
+  await page.locator('#og-generate').click();
 
-  // The summary markdown contains "Organizer generated" plus an STL path.
-  await expect(page.locator('text=/Organizer generated/i')).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('text=/Spec signature/i')).toBeVisible();
-  await expect(page.locator('text=/Signed proof envelope/i')).toBeVisible();
+  // Scope summary assertions to the app-owned summary markdown (#og-summary).
+  const summary = page.locator('#og-summary');
+  await expect(summary).toContainText(/Organizer generated/i, { timeout: 30_000 });
+  await expect(summary).toContainText(/Spec signature/i);
+  await expect(summary).toContainText(/Signed proof envelope/i);
 
-  // The STL download component renders an <a> with a downloadable href.
-  const stlLink = page.locator('a[href*=".stl"]').first();
+  // The STL download component (#og-stl-download) renders a Gradio File with
+  // an <a> pointing to the produced .stl. Match the link inside that hook so
+  // we don't pick up unrelated links elsewhere on the page.
+  const stlLink = page.locator('#og-stl-download a[href*=".stl"]').first();
   await expect(stlLink).toBeVisible({ timeout: 15_000 });
 
-  await expect(page).toHaveScreenshot('desk-organizer-tab.png', {
+  // Visual proof artifact (no pixel-diff; see truth-gate-tab.spec.ts).
+  await page.screenshot({
+    path: 'test-results/visual/desk-organizer-tab.png',
     fullPage: true,
-    mask: [
-      // Mask dynamic temp paths and byte counts.
-      page.locator('text=/hermes3d_[a-z0-9]+/'),
-      page.locator('text=/\\d+\\s+bytes/'),
-    ],
   });
 });

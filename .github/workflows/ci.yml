@@ -97,14 +97,13 @@ jobs:
     # startup blow past the 30s health-check budget). We pin Layer D to
     # Linux + Python 3.11 + Node 24 only.
     #
-    # ADVISORY (continue-on-error: true) until the upstream gradio_client
-    # boolean-schema TypeError is fixed (gradio_client/utils.py:863). The
-    # Playwright suite + run-e2e.sh + this workflow ship green; the actual
-    # Gradio bootstrap is the blocker, tracked as a v5.1 follow-up.
-    name: Layer D — UI E2E (Linux × py3.11) [advisory]
+    # HARD GATE — release-quality standard requires every gate green before
+    # any RC tag. The launcher uses defensive kwarg filtering for forward
+    # gradio compatibility, and the Playwright specs use stable app-owned
+    # selectors (elem_id hooks) rather than framework-internal DOM.
+    name: Layer D — UI E2E (Linux × py3.11)
     needs: [layer_a_static_gates, layer_b_smoke_and_acceptance]
     runs-on: ubuntu-latest
-    continue-on-error: true
     env:
       HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
     steps:

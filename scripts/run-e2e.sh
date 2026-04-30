@@ -27,6 +27,18 @@ mkdir -p "$RUN_DIR"
 API_PORT="${HERMES3D_API_PORT:-8765}"
 UI_PORT="${HERMES3D_UI_PORT:-7860}"
 
+# Bind both servers to 0.0.0.0 by default in this script. This is the
+# canonical containerized-server pattern: GitHub Actions Linux runners
+# fail gradio's is_localhost_accessible() check when binding to
+# 127.0.0.1, which makes gradio fall back to share-mode and triggers
+# the upstream gradio_client schema-bool TypeError. Binding to all
+# interfaces sidesteps the check; loopback connections from Playwright
+# (HERMES3D_UI_URL stays 127.0.0.1) still work because 0.0.0.0 listeners
+# accept loopback traffic.
+HOST_BIND="${HERMES3D_HOST:-0.0.0.0}"
+export HERMES3D_HOST="$HOST_BIND"
+export HERMES3D_API_HOST="${HERMES3D_API_HOST:-$HOST_BIND}"
+
 export PYTHONPATH="$REPO_ROOT/03_implementation/src:${PYTHONPATH:-}"
 export HERMES3D_PROOF_KEY="${HERMES3D_PROOF_KEY:-hermes3d-default-proof-key-not-secret}"
 export HERMES3D_API_URL="http://127.0.0.1:${API_PORT}"
@@ -68,14 +80,14 @@ trap cleanup EXIT INT TERM
 
 echo "[run-e2e] artifacts -> $RUN_DIR"
 
-echo "[run-e2e] starting FastAPI on :$API_PORT ..."
+echo "[run-e2e] starting FastAPI on $HERMES3D_API_HOST:$API_PORT ..."
 $PY -m uvicorn hermes3d.api.server:app \
-    --host 127.0.0.1 --port "$API_PORT" --log-level info \
+    --host "$HERMES3D_API_HOST" --port "$API_PORT" --log-level info \
     > "$API_LOG" 2>&1 &
 PIDS+=("$!")
 
-echo "[run-e2e] starting Gradio launcher on :$UI_PORT ..."
-HERMES3D_HOST=127.0.0.1 HERMES3D_PORT="$UI_PORT" \
+echo "[run-e2e] starting Gradio launcher on $HERMES3D_HOST:$UI_PORT ..."
+HERMES3D_PORT="$UI_PORT" \
     $PY -m hermes3d.app.launcher \
     > "$UI_LOG" 2>&1 &
 PIDS+=("$!")
