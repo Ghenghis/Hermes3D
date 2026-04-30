@@ -141,17 +141,21 @@ def build_app():  # type: ignore[no-untyped-def]
         gr.Markdown(
             "# Hermes3D-OS Lite — Contract Kit v5\n"
             "Live, working tabs are green. Tabs that require provisioning "
-            "(Blender / ComfyUI / LLM keys) are disabled and labelled."
+            "(Blender / ComfyUI / LLM keys) are disabled and labelled.",
+            elem_id="hermes-intro",
         )
 
-        with gr.Tab("✅ Truth Gate Validator"):
-            stl_in = gr.File(label="Upload STL", file_types=[".stl"], type="filepath")
-            run_btn = gr.Button("Run Truth Gate", variant="primary")
-            md_out = gr.Markdown()
-            json_out = gr.Code(label="Full report (JSON)", language="json")
+        with gr.Tab("✅ Truth Gate Validator", elem_id="tab-truth-gate"):
+            stl_in = gr.File(
+                label="Upload STL", file_types=[".stl"], type="filepath",
+                elem_id="tg-stl-input",
+            )
+            run_btn = gr.Button("Run Truth Gate", variant="primary", elem_id="tg-run")
+            md_out = gr.Markdown(elem_id="tg-summary")
+            json_out = gr.Code(label="Full report (JSON)", language="json", elem_id="tg-json")
             run_btn.click(_validate_stl, inputs=stl_in, outputs=[md_out, json_out])
 
-        with gr.Tab("✅ Generate Desk Organizer"):
+        with gr.Tab("✅ Generate Desk Organizer", elem_id="tab-organizer"):
             with gr.Row():
                 width = gr.Slider(80, 220, value=180, step=5, label="Width (mm)")
                 depth = gr.Slider(60, 220, value=100, step=5, label="Depth (mm)")
@@ -165,10 +169,12 @@ def build_app():  # type: ignore[no-untyped-def]
                 slot_angle = gr.Slider(0, 12, value=8, step=1, label="Phone slot tilt (°)")
                 cable = gr.Checkbox(value=True, label="Cable passthrough")
             outdir = gr.Textbox(value="", label="Output directory (blank = temp)")
-            gen_btn = gr.Button("Generate + Validate + Sign", variant="primary")
-            md = gr.Markdown()
-            stl_dl = gr.File(label="STL")
-            proof_dl = gr.File(label="Proof envelope")
+            gen_btn = gr.Button(
+                "Generate + Validate + Sign", variant="primary", elem_id="og-generate"
+            )
+            md = gr.Markdown(elem_id="og-summary")
+            stl_dl = gr.File(label="STL", elem_id="og-stl-download")
+            proof_dl = gr.File(label="Proof envelope", elem_id="og-proof-download")
             gen_btn.click(
                 _generate_organizer,
                 inputs=[
@@ -186,20 +192,23 @@ def build_app():  # type: ignore[no-untyped-def]
                 outputs=[md, stl_dl, proof_dl],
             )
 
-        with gr.Tab("✅ Pipeline (Dry-Run)"):
-            prompt = gr.Textbox(label="Text prompt", value="a small desk bracket")
-            dry_btn = gr.Button("Walk state machine", variant="primary")
-            dry_md = gr.Markdown()
+        with gr.Tab("✅ Pipeline (Dry-Run)", elem_id="tab-dry-run"):
+            prompt = gr.Textbox(
+                label="Text prompt", value="a small desk bracket", elem_id="dr-prompt"
+            )
+            dry_btn = gr.Button("Walk state machine", variant="primary", elem_id="dr-run")
+            dry_md = gr.Markdown(elem_id="dr-summary")
             dry_btn.click(_run_dry_pipeline, inputs=prompt, outputs=dry_md)
 
-        with gr.Tab("⛔ Full Autonomous Pipeline (disabled)"):
+        with gr.Tab("⛔ Full Autonomous Pipeline (disabled)", elem_id="tab-disabled"):
             gr.Markdown(
                 "This tab is **disabled** in the kit-only build.\n\n"
                 "It enables itself automatically once "
                 "`06_release/installer/install.ps1` has provisioned Blender 4.2+, "
                 "ComfyUI with TRELLIS.2 / Hunyuan3D-2.1, and an LLM API key. "
                 "See `01_requirements/AI_PROGRAMMER_GUIDE.md` §'Implementing the "
-                "modeling MCP' and §'Implementing the orchestrator'."
+                "modeling MCP' and §'Implementing the orchestrator'.",
+                elem_id="disabled-disclosure",
             )
     return app
 
@@ -212,7 +221,14 @@ def main() -> None:
     app = build_app()
     host = os.environ.get("HERMES3D_HOST", "127.0.0.1")
     port = int(os.environ.get("HERMES3D_PORT", "7860"))
-    app.launch(server_name=host, server_port=port, show_api=False)
+    # gradio 6.x dropped show_api from Blocks.launch; filter to whatever the
+    # installed version actually accepts so the launcher survives minor API drift.
+    import inspect
+    launch_params = inspect.signature(app.launch).parameters
+    launch_kwargs = {"server_name": host, "server_port": port}
+    if "show_api" in launch_params:
+        launch_kwargs["show_api"] = False
+    app.launch(**launch_kwargs)
 
 
 if __name__ == "__main__":
