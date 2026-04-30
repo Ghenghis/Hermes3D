@@ -6,4 +6,6 @@ pytest>=8,<9
 pytest-cov>=5,<6
 ruff==0.14.14   # pin: format rules drift across minor versions (see ci.yml note)
 mypy>=1.10,<2
-gradio>=4.30,<5
+gradio>=4.36,<4.45            # 4.45+ trips gradio_client/utils.py:863 boolean-schema TypeError
+gradio_client>=1.0,<1.4
+huggingface_hub>=0.23,<0.30   # gradio 4.x uses HfFolder which 0.30 removed
