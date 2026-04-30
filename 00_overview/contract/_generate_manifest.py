@@ -1,7 +1,7 @@
 """Generate KIT_MANIFEST.json with file inventory and tier annotations.
 
 Run from repo root:
-    python 00-CONTRACT/_generate_manifest.py
+    python 00_overview/contract/_generate_manifest.py
 """
 
 from __future__ import annotations
@@ -13,34 +13,34 @@ import time
 from pathlib import Path
 
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 EXCLUDE_DIRS = {"__pycache__", ".pytest_cache", "var", ".git"}
 
 # (path_glob, tier, role) — first match wins
 TIER_RULES: list[tuple[str, str, str]] = [
     # Contract layer
-    ("00-CONTRACT/", "runnable", "contract_doc"),
+    ("00_overview/contract/", "runnable", "contract_doc"),
     # Architecture / contracts (mostly empty in v5; markers for v5.1)
-    ("01-ARCHITECTURE/diagrams/", "spec", "diagram"),
-    ("01-ARCHITECTURE/contracts/", "spec", "contract_schema"),
-    ("01-ARCHITECTURE/", "spec", "architecture_doc"),
+    ("02_architecture/diagrams/", "spec", "diagram"),
+    ("02_architecture/contracts/", "spec", "contract_schema"),
+    ("02_architecture/", "spec", "architecture_doc"),
     # Source code — every module under src/hermes3d has a real
     # implementation backed by tests in v5; classify as runnable.
-    ("02-SCAFFOLDING/src/hermes3d/", "runnable", "module"),
-    ("02-SCAFFOLDING/tests/", "runnable", "test"),
-    ("02-SCAFFOLDING/config/klipper/", "runnable", "klipper_config"),
-    ("02-SCAFFOLDING/config/", "runnable", "config"),
-    ("02-SCAFFOLDING/scripts/", "runnable", "script"),
-    ("02-SCAFFOLDING/.github/workflows/", "runnable", "ci_workflow"),
-    ("02-SCAFFOLDING/", "runnable", "infrastructure"),
+    ("03_implementation/src/hermes3d/", "runnable", "module"),
+    ("04_testing/pytest/", "runnable", "test"),
+    ("03_implementation/config/klipper/", "runnable", "klipper_config"),
+    ("03_implementation/config/", "runnable", "config"),
+    ("scripts/scaffolding/", "runnable", "script"),
+    (".github/workflows/", "runnable", "ci_workflow"),
+    ("03_implementation/", "runnable", "infrastructure"),
     # Proof system
-    ("03-PROOF-SYSTEM/", "runnable", "proof"),
+    ("05_truth_proof/", "runnable", "proof"),
     # Test case
-    ("04-TEST-CASE-DESK-ORGANIZER/", "runnable", "acceptance_test"),
+    ("04_testing/acceptance/", "runnable", "acceptance_test"),
     # Installer
-    ("05-INSTALLER/", "runnable", "installer"),
+    ("06_release/installer/", "runnable", "installer"),
     # Docs
-    ("07-DOCS/", "runnable", "doc"),
+    ("01_requirements/", "runnable", "doc"),
     # Top-level
     ("env/", "runnable", "env_template"),
     ("pyproject.toml", "runnable", "config"),
@@ -81,8 +81,8 @@ def collect_files() -> list[dict]:
                 continue
             rel = full.relative_to(REPO_ROOT).as_posix()
             # Skip the manifest itself + the generator
-            if rel in {"00-CONTRACT/KIT_MANIFEST.json",
-                       "00-CONTRACT/_generate_manifest.py"}:
+            if rel in {"00_overview/contract/KIT_MANIFEST.json",
+                       "00_overview/contract/_generate_manifest.py"}:
                 continue
             tier, role = classify(rel)
             files.append({
@@ -121,7 +121,7 @@ def main() -> None:
         "summary": summarise(files),
         "files": files,
     }
-    out = REPO_ROOT / "00-CONTRACT" / "KIT_MANIFEST.json"
+    out = REPO_ROOT / "00_overview/contract" / "KIT_MANIFEST.json"
     out.write_text(json.dumps(manifest, indent=2, sort_keys=False), encoding="utf-8")
     print(f"Wrote {out}")
     print(f"Files: {manifest['summary']['total_files']}, "

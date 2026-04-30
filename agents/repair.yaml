@@ -19,7 +19,7 @@ action_sequence:
   - run: python -m hermes3d.core.memory.skill_lookup --kind FAILURE_PATTERN --signature "$FAILURE_SIGNATURE" --json > var/repair/skill_hits.json
   - prompt: If skill_hits.json contains a matching repair skill, apply its body as a patch and stop. Otherwise produce an LLM patch using the diff between HEAD and {last_good_state} as context.
   - run: git apply var/repair/patch.diff
-  - run: pytest 02-SCAFFOLDING/tests/
+  - run: pytest 04_testing/pytest/
 outputs:
   - path: var/repair/diagnosis.md
     description: Human-readable failure diagnosis.
@@ -31,7 +31,7 @@ gates:
   - name: tests_pass_after_patch
     threshold: exit==0
     blocking: true
-    command: pytest 02-SCAFFOLDING/tests/
+    command: pytest 04_testing/pytest/
   - name: patch_applies_cleanly
     threshold: exit==0
     blocking: true

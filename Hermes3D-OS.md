@@ -21,7 +21,7 @@ Concrete code gaps from audit:
 - `core/modeling/blender_mcp_server.py` — 4 tool fns raise `NotImplementedError`
 - `core/integrations/remote_control.py:91-100` — Telegram/Discord routing partial
 - `pyproject.toml` — `matplotlib` missing → integration test collect fails on clean clone
-- `01-ARCHITECTURE/diagrams/` — empty
+- `02_architecture/diagrams/` — empty
 - `app/launcher.py` — 1 of 4 tabs disabled; v5.1 promised 6 more tabs (dispatch, skill browser, incident log, remote-control test, LLM provider switcher, calibration timeline)
 - LangGraphOrchestrator + Blender MCP are deferred to v5.2; v5.3 promises live cost widget + spool deduction trace + failure forecast tile + calibration history per printer
 
@@ -47,14 +47,14 @@ Each macro-phase is decomposed into the user's Phase 0–5 model.
 ### A.1 Restructure to user's folder schema
 Reorganize repo (git mv preserves history). Mapping:
 ```
-00-CONTRACT          → 00_overview/contract/
-01-ARCHITECTURE      → 02_architecture/
-02-SCAFFOLDING/src   → 03_implementation/src/
-02-SCAFFOLDING/tests → 04_testing/pytest/
-02-SCAFFOLDING/scripts→ scripts/scaffolding/
-03-PROOF-SYSTEM      → 05_truth_proof/
+00_overview/contract          → 00_overview/contract/
+02_architecture      → 02_architecture/
+03_implementation/src   → 03_implementation/src/
+04_testing/pytest → 04_testing/pytest/
+scripts/scaffolding→ scripts/scaffolding/
+05_truth_proof      → 05_truth_proof/
 04-TEST-CASE-...     → 04_testing/acceptance/
-05-INSTALLER         → 06_release/installer/
+06_release/installer         → 06_release/installer/
 07-DOCS              → 01_requirements/ + 02_architecture/docs/
 ```
 New top-level dirs added:
@@ -68,9 +68,9 @@ scripts that reference old paths, `KIT_MANIFEST.json`, all docs cross-refs.
 
 **Critical files modified:**
 - `pyproject.toml` (package roots)
-- `02-SCAFFOLDING/scripts/*.{sh,ps1}` (path constants)
+- `scripts/scaffolding/*.{sh,ps1}` (path constants)
 - `.github/workflows/ci.yml`
-- `00-CONTRACT/KIT_MANIFEST.json`
+- `00_overview/contract/KIT_MANIFEST.json`
 - All `07-DOCS/*.md` (cross-refs)
 
 **Gate A1**: `pytest` still collects same number of tests post-move; `python -m hermes3d --help` works.
@@ -104,7 +104,7 @@ Roles to define (initial set):
 - `Architect`, `Implementer`, `QA`, `Repair`, `Reviewer`, `Releaser`, `Auditor`,
   `Preflight`, `BranchGuard`, `BundleSigner`
 
-Reference existing patterns: `02-SCAFFOLDING/src/hermes3d/core/agents/multi_agent.py`
+Reference existing patterns: `03_implementation/src/hermes3d/core/agents/multi_agent.py`
 (Critic/Optimizer/Executor) — reuse the role-protocol shape; do not reinvent.
 
 **Gate A2**: every role manifest validates against `agents/_schema.json`; CI step
@@ -153,7 +153,7 @@ Reference existing patterns: `02-SCAFFOLDING/src/hermes3d/core/agents/multi_agen
   - `proof/envelopes/*.json` (existing HMAC envelopes)
   - `evidence_ledger.md` (auto-generated: every claim → its proof file path)
   - `.sig` (HMAC over manifest.json, key from `HERMES3D_PROOF_KEY`)
-- Verifier: extend existing `03-PROOF-SYSTEM/conformance_runner.py` to validate bundle.
+- Verifier: extend existing `05_truth_proof/conformance_runner.py` to validate bundle.
 
 **Gate A6**: `python 05_truth_proof/conformance_runner.py --bundle <zip>` validates manifest + signature + cross-refs.
 
@@ -262,11 +262,11 @@ A run is **complete** when:
 ## Critical files (most-touched)
 
 - `pyproject.toml` — package paths, matplotlib dep, optional groups
-- `00-CONTRACT/HONESTY_LEDGER.md` → `00_overview/contract/HONESTY_LEDGER.md`
-- `02-SCAFFOLDING/src/hermes3d/app/launcher.py` (Gradio tabs)
-- `02-SCAFFOLDING/src/hermes3d/core/agents/orchestrator.py`
-- `02-SCAFFOLDING/src/hermes3d/core/integrations/remote_control.py`
-- `02-SCAFFOLDING/src/hermes3d/core/orchestration/print_workflow.py` (retry wiring)
+- `00_overview/contract/HONESTY_LEDGER.md` → `00_overview/contract/HONESTY_LEDGER.md`
+- `03_implementation/src/hermes3d/app/launcher.py` (Gradio tabs)
+- `03_implementation/src/hermes3d/core/agents/orchestrator.py`
+- `03_implementation/src/hermes3d/core/integrations/remote_control.py`
+- `03_implementation/src/hermes3d/core/orchestration/print_workflow.py` (retry wiring)
 - `.github/workflows/ci.yml` (matrix + branch-guard)
 - New: `agents/*.yaml`, `scripts/*.{sh,ps1}` (preflight, wizard, build-bundle, install-hooks, new-feature, run-e2e, validate-agents)
 - New: `04_testing/playwright/**`

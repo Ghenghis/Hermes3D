@@ -1,7 +1,7 @@
 """Print history + metrics collector.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §20 (Print History)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §20 (Print History)
 
 Records the outcome of every print job: which printer, material, duration,
 filament used, success/failure. The data is persisted as JSONL (one JSON

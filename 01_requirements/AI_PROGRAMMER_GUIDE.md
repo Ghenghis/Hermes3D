@@ -2,7 +2,7 @@
 
 > Read this when you're going to add code to the kit. It is written
 > for both humans and AI assistants. The contract
-> (`00-CONTRACT/MASTER_CONTRACT.md`) is the law; this file is the
+> (`00_overview/contract/MASTER_CONTRACT.md`) is the law; this file is the
 > field manual.
 
 ---
@@ -31,7 +31,7 @@ documenting exactly what's missing and why.
 
 ```bash
 git clone <kit>
-cd hermes3d-os-v5-contract-kit/02-SCAFFOLDING
+cd hermes3d-os-v5-contract-kit/03_implementation
 python3.11 -m venv .venv
 source .venv/bin/activate          # or .venv\Scripts\Activate.ps1
 pip install -e .
@@ -52,9 +52,9 @@ A typical contributor commit touches all five of these areas:
 ```
 src/hermes3d/<layer>/<module>.py        # the code
 tests/unit/test_<module>.py             # at least one real test
-00-CONTRACT/HONESTY_LEDGER.md           # claim what you built
-00-CONTRACT/FEATURES.md                 # if user-visible
-07-DOCS/<relevant>.md                   # if architecture-relevant
+00_overview/contract/HONESTY_LEDGER.md           # claim what you built
+00_overview/contract/FEATURES.md                 # if user-visible
+01_requirements/<relevant>.md                   # if architecture-relevant
 ```
 
 If the change adds a tool, also update:
@@ -74,7 +74,7 @@ tests/unit/test_tool_registrations.py            # cover it
    `config/klipper/<id>.printer.cfg`. Copy from a similar printer.
 4. Run `pytest tests/unit/test_printer_profiles.py -v`. The fleet
    count assertion will tell you if you forgot anything.
-5. Update `07-DOCS/PRINTER_FLEET_GUIDE.md` to add the new printer to
+5. Update `01_requirements/PRINTER_FLEET_GUIDE.md` to add the new printer to
    the table.
 6. (Optional) Build a printer-specific skill pack under
    `config/skill_packs/`.
@@ -189,9 +189,9 @@ v5. To replace the placeholder with a real implementation:
    structure.
 5. Add an integration test under `tests/integration/test_langgraph_orchestrator.py`
    that runs the full 12-node graph against a fixture STL.
-6. Update `00-CONTRACT/HONESTY_LEDGER.md` — promote
+6. Update `00_overview/contract/HONESTY_LEDGER.md` — promote
    `core.agents.orchestrator` from spec to runnable.
-7. Update `07-DOCS/CHANGELOG.md` under v5.x → "LangGraph runtime
+7. Update `02_architecture/CHANGELOG.md` under v5.x → "LangGraph runtime
    adapter promoted from spec to runnable."
 
 The drop-in linear executor (`DryRunOrchestrator`) is what every
@@ -252,7 +252,7 @@ def quality_score(printer_id: str, material: str) -> dict:
 Add the endpoint to:
 
 - `tests/conformance/test_rest_contract.py` — schema check
-- `07-DOCS/ARCHITECTURE.md` §7 — endpoint count
+- `02_architecture/ARCHITECTURE.md` §7 — endpoint count
 
 ---
 
@@ -269,7 +269,7 @@ Add the endpoint to:
 | Type alias | `PascalCase` |
 | Enum value | `UPPER_SNAKE_CASE` |
 | Env var | `HERMES3D_<UPPER_SNAKE_CASE>` |
-| Path component | `kebab-case` for top-level dirs (`02-SCAFFOLDING/`), `snake_case` for code |
+| Path component | `kebab-case` for top-level dirs (`03_implementation/`), `snake_case` for code |
 
 ---
 
@@ -284,7 +284,7 @@ Add the endpoint to:
 - `except: pass` empty handlers.
 
 To opt out a line legitimately, append `# noqa: forbidden_pattern_scan`
-on the same line *and* document why in `00-CONTRACT/HONESTY_LEDGER.md`
+on the same line *and* document why in `00_overview/contract/HONESTY_LEDGER.md`
 under the relevant tier section.
 
 The current opt-outs (as of v5.0):
@@ -299,7 +299,7 @@ without contract-level review.
 
 ## 12. The honesty ledger, in detail
 
-`00-CONTRACT/HONESTY_LEDGER.md` is the canonical tier classifier for
+`00_overview/contract/HONESTY_LEDGER.md` is the canonical tier classifier for
 every module. It has three sections:
 
 - **Runnable** — has tests, fully implemented, no surprises.
@@ -309,14 +309,14 @@ every module. It has three sections:
   remediation message. Activation requires external setup.
 
 `scripts/honesty_diff.py` checks the ledger against
-`00-CONTRACT/KIT_MANIFEST.json`. Any disagreement is drift and must be
+`00_overview/contract/KIT_MANIFEST.json`. Any disagreement is drift and must be
 resolved before merging.
 
 When you change a module's behaviour:
 
 1. Decide its honest tier.
 2. Update the ledger.
-3. Run `python 00-CONTRACT/_generate_manifest.py`.
+3. Run `python 00_overview/contract/_generate_manifest.py`.
 4. Run `python scripts/honesty_diff.py` — it must report zero drift.
 
 ---

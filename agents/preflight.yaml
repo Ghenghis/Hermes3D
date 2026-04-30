@@ -20,7 +20,7 @@ gates:
   - name: doctor_ok
     threshold: exit==0
     blocking: true
-    command: bash 02-SCAFFOLDING/scripts/doctor.sh
+    command: bash scripts/scaffolding/doctor.sh
 retry_policy:
   max_retries: 0
   backoff_strategy: linear

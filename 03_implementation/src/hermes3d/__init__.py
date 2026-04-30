@@ -1,6 +1,6 @@
 """Hermes3D-OS Lite — Contract Kit v5 reference implementation.
 
-This package is the runnable backbone behind 00-CONTRACT/MASTER_CONTRACT.md.
+This package is the runnable backbone behind 00_overview/contract/MASTER_CONTRACT.md.
 Each subpackage corresponds to one section of the agent pipeline:
 
     hermes3d.core.validation : Truth Gate (real, runnable)

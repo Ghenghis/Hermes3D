@@ -90,7 +90,7 @@ look like it's "doing the same thing each time."
 
 | Rule | Pass when |
 |------|-----------|
-| **G1: Manifest matches reality** | `python 00-CONTRACT/_generate_manifest.py` after the run produces zero `unmentioned` files |
+| **G1: Manifest matches reality** | `python 00_overview/contract/_generate_manifest.py` after the run produces zero `unmentioned` files |
 | **G2: Honesty diff clean** | `python scripts/honesty_diff.py` reports `drift=0` |
 | **G3: No forbidden patterns** | `python scripts/forbidden_pattern_scan.py` reports `[OK] no forbidden patterns found.` |
 

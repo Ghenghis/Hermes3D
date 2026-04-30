@@ -12,8 +12,8 @@ inputs:
     description: Git ref to diff against for the honesty check. Defaults to origin/main.
 action_sequence:
   - run: mkdir -p var/audit
-  - run: python 02-SCAFFOLDING/scripts/forbidden_pattern_scan.py --json > var/audit/forbidden.json
-  - run: python 02-SCAFFOLDING/scripts/honesty_diff.py --baseline "${BASELINE_REF:-origin/main}" --json > var/audit/honesty.json
+  - run: python scripts/scaffolding/forbidden_pattern_scan.py --json > var/audit/forbidden.json
+  - run: python scripts/scaffolding/honesty_diff.py --baseline "${BASELINE_REF:-origin/main}" --json > var/audit/honesty.json
 outputs:
   - path: var/audit/forbidden.json
     description: forbidden_pattern_scan report.
@@ -23,11 +23,11 @@ gates:
   - name: forbidden_pattern_scan
     threshold: 0 violations
     blocking: true
-    command: python 02-SCAFFOLDING/scripts/forbidden_pattern_scan.py
+    command: python scripts/scaffolding/forbidden_pattern_scan.py
   - name: honesty_diff
     threshold: 0 violations
     blocking: true
-    command: python 02-SCAFFOLDING/scripts/honesty_diff.py --baseline "${BASELINE_REF:-origin/main}"
+    command: python scripts/scaffolding/honesty_diff.py --baseline "${BASELINE_REF:-origin/main}"
 retry_policy:
   max_retries: 1
   backoff_strategy: linear

@@ -1,7 +1,7 @@
 """Mesh geometric analyzer.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §40 (Mesh Analyzer)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §40 (Mesh Analyzer)
 
 Provides rich geometric metrics that an agentic system can reason
 about when picking slicing parameters or supports:

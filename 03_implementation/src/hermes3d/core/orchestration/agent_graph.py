@@ -1,7 +1,7 @@
 """LangGraph-style orchestration brain.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §30 (Orchestration Brain)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §30 (Orchestration Brain)
 
 Composes the existing agents into a single, replayable, stateful
 workflow graph. Each node is a function ``state -> state`` that mutates

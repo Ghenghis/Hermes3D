@@ -12,8 +12,8 @@ inputs:
     description: Branch under test.
 action_sequence:
   - run: mkdir -p var/qa/screenshots
-  - run: pytest --junitxml=var/qa/pytest.xml --html=var/qa/pytest.html --self-contained-html 02-SCAFFOLDING/tests/
-  - run: pytest --junitxml=var/qa/playwright.xml -m playwright 02-SCAFFOLDING/tests/e2e/
+  - run: pytest --junitxml=var/qa/pytest.xml --html=var/qa/pytest.html --self-contained-html 04_testing/pytest/
+  - run: pytest --junitxml=var/qa/playwright.xml -m playwright 04_testing/pytest/e2e/
   - run: python -c "import xml.etree.ElementTree as ET, sys; t=ET.parse('var/qa/pytest.xml').getroot(); f=int(t.attrib.get('failures',0))+int(t.attrib.get('errors',0)); sys.exit(0 if f==0 else 1)"
 outputs:
   - path: var/qa/pytest.xml
@@ -28,11 +28,11 @@ gates:
   - name: pytest_all_pass
     threshold: 100% pass
     blocking: true
-    command: pytest 02-SCAFFOLDING/tests/
+    command: pytest 04_testing/pytest/
   - name: playwright_all_pass
     threshold: 100% pass
     blocking: true
-    command: pytest -m playwright 02-SCAFFOLDING/tests/e2e/
+    command: pytest -m playwright 04_testing/pytest/e2e/
 retry_policy:
   max_retries: 3
   backoff_strategy: exponential

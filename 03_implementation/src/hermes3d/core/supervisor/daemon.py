@@ -1,7 +1,7 @@
 """Print supervisor daemon.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §41 (Print Supervisor)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §41 (Print Supervisor)
 
 A long-running, reactive agent that watches every printer in the fleet
 and reacts to events:

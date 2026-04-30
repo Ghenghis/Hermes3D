@@ -53,4 +53,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run forbidden pattern scan
-        run: python 02-SCAFFOLDING/scripts/forbidden_pattern_scan.py
+        run: python scripts/scaffolding/forbidden_pattern_scan.py

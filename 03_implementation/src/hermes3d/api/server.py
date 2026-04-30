@@ -1,7 +1,7 @@
 """REST API server (FastAPI).
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §26 (REST API)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §26 (REST API)
 
 Run with::
 

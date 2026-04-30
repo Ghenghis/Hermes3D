@@ -1,7 +1,7 @@
 """Material profiles — filament-to-printer compatibility data.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §10 (Material-Aware Dispatch)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §10 (Material-Aware Dispatch)
 
 Encodes the temperature, enclosure, and extruder requirements for the
 filaments the user prints with. The dispatcher uses this data to filter

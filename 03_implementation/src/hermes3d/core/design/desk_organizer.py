@@ -2,7 +2,7 @@
 Hermes3D-OS — Parametric Desk Organizer.
 
 Status: runnable
-Contract: 04-TEST-CASE-DESK-ORGANIZER/DESIGN_BRIEF.md
+Contract: 04_testing/acceptance/DESIGN_BRIEF.md
 
 This is the kit's official acceptance test design. It is a real,
 customisable, useful object — not a toy primitive. It tests every

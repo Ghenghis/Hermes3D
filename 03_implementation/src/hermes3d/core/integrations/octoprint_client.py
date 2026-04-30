@@ -1,7 +1,7 @@
 """OctoPrint REST client.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §34 (OctoPrint Bridge)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §34 (OctoPrint Bridge)
 
 For users running OctoPrint instead of (or alongside) Moonraker. Same
 shape as MoonrakerClient — reachable, state, upload, start, cancel —

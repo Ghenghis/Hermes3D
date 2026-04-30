@@ -1,7 +1,7 @@
 """Skill packs — import/export bundles for community skill sharing.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §42 (Skill Packs)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §42 (Skill Packs)
 
 Lets users share learned skills with each other. A skill pack is a JSON
 file with a manifest + a list of skills. Importing applies them to the

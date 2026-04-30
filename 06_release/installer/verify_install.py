@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-05-INSTALLER/verify_install.py — post-install sanity check.
+06_release/installer/verify_install.py — post-install sanity check.
 
 After install.{ps1,sh} runs, this script confirms that:
 
@@ -136,9 +136,9 @@ def check_proof_key(results: list) -> None:
 
 
 def check_directories(results: list) -> None:
-    # Path resolution: if running from repo root, look at 02-SCAFFOLDING/var/.
+    # Path resolution: if running from repo root, look at var/.
     # Otherwise use the current working dir's var/.
-    candidates = [Path("02-SCAFFOLDING/var"), Path("var")]
+    candidates = [Path("var"), Path("var")]
     found = next((p for p in candidates if p.exists()), None)
     if found:
         _record(results, "PASS", "var/ directory", f"exists at {found}")

@@ -46,41 +46,44 @@ bash scripts/preflight.sh
 bash scripts/install-hooks.sh
 
 # 3. Install Python deps + run tests
-cd 02-SCAFFOLDING && pip install -e ".[all]" && pytest -q && cd ..
+pip install -e ".[all]" && pytest -q
 
 # 4. Or — for non-coders — guided wizard (zero to UI)
 bash scripts/wizard.sh
 ```
 
-## Repository layout (current; A.1 restructure pending)
+## Repository layout
 
 ```
-00-CONTRACT/         contract docs, manifest, ledger, gates
-01-ARCHITECTURE/     architecture diagrams (.mmd source)
-02-SCAFFOLDING/      runnable codebase, tests, CI, scripts
-  src/hermes3d/      75 modules, 12-printer fleet, 8 dispatch strategies
-  tests/             unit + conformance + integration
-03-PROOF-SYSTEM/     PROOF_PROTOCOL + bundle conformance verifier
-04-TEST-CASE-DESK-ORGANIZER/   48-cell acceptance suite
-05-INSTALLER/        cross-platform installer + verify
-06_release/          rollback runbook, branch strategy, release artifacts (new)
-07-DOCS/             architecture, security, troubleshooting, guides
-agents/              machine-readable agent role manifests (new in A.2)
-scripts/             top-level entry scripts (preflight, wizard, build-bundle, hooks)
-var/                 runtime artifacts (gitignored)
+00_overview/contract/   binding contract: master spec, ledger, manifest, gates
+01_requirements/        product README, AI programmer + agentic + brain + fleet guides
+02_architecture/        ARCHITECTURE.md, SECURITY, TROUBLESHOOTING, CHANGELOG, diagrams
+03_implementation/      runnable codebase
+  src/hermes3d/         75+ modules, 12-printer fleet, 8 dispatch strategies
+  config/               printer + slicer + skill-pack configs
+04_testing/             tests
+  pytest/               unit + conformance + integration
+  acceptance/           48-cell desk-organizer acceptance suite
+  (playwright/          to be added in PR #3)
+05_truth_proof/         PROOF_PROTOCOL, bundle conformance verifier, evidence schemas, bundles/
+06_release/             rollback runbook, branch strategy, release docs
+  installer/            cross-platform installer + verify_install
+agents/                 machine-readable agent role manifests
+scripts/                top-level entry scripts (preflight, wizard, build-bundle, hooks)
+  scaffolding/          scaffolding-era scripts (test, build, lint, release, doctor, ...)
+env/                    environment templates
+var/                    runtime artifacts (gitignored)
 ```
-
-A planned restructure to `00_overview / 01_requirements / 02_architecture / 03_implementation / 04_testing / 05_truth_proof / 06_release / agents / scripts` will land as a dedicated PR (`feat/kit-restructure-A1`) after the additive hardening work merges to `develop`.
 
 ## Truth + proof
 
 Every dispatch, acceptance, and release emits an HMAC-SHA256 signed proof envelope
 (`HERMES3D_PROOF_KEY`). Per-build aggregated proof bundles (zip with logs +
-screenshots + test reports + signed manifest) land in `05-truth-proof/bundles/`
+screenshots + test reports + signed manifest) land in `05_truth_proof/bundles/`
 via `bash scripts/build-bundle.sh`.
 
 The product is offline-capable. No telemetry, no cloud requirement, no vendor
-lock-in. See [`00-CONTRACT/MASTER_CONTRACT.md`](00-CONTRACT/MASTER_CONTRACT.md)
+lock-in. See [`00_overview/contract/MASTER_CONTRACT.md`](00_overview/contract/MASTER_CONTRACT.md)
 §0–§44 for the binding spec.
 
 ## License + delivery

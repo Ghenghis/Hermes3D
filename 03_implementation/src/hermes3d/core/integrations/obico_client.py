@@ -1,7 +1,7 @@
 """Obico bridge — closed-loop AI failure detection.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §35 (Obico Failure Detection)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §35 (Obico Failure Detection)
 
 Obico (formerly The Spaghetti Detective) provides ML-based print failure
 detection. Self-hosted via Docker, free for personal use, no telemetry.

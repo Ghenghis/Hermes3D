@@ -16,22 +16,22 @@
 
 ```
 hermes3d-os-v5-contract-kit/
-├── 00-CONTRACT/              # 7 contract docs + KIT_MANIFEST.json
-├── 01-ARCHITECTURE/          # (spec-tier; covered by 07-DOCS/ARCHITECTURE.md)
-├── 02-SCAFFOLDING/           # the runnable codebase + scripts + tests + CI
+├── 00_overview/contract/              # 7 contract docs + KIT_MANIFEST.json
+├── 02_architecture/          # (spec-tier; covered by 02_architecture/ARCHITECTURE.md)
+├── 03_implementation/           # the runnable codebase + scripts + tests + CI
 │   ├── src/hermes3d/         # 75 modules, 12-printer fleet
 │   ├── tests/                # 14 test modules, 264 tests
 │   ├── scripts/              # 20 scripts: doctor/run-dev/test/lint/build/release/proof-collect (.sh + .ps1)
 │   ├── config/skill_packs/   # 3 signed skill packs
 │   └── .github/workflows/    # 5-layer CI
-├── 03-PROOF-SYSTEM/          # PROOF_PROTOCOL.md + conformance_runner.py
-├── 04-TEST-CASE-DESK-ORGANIZER/
+├── 05_truth_proof/          # PROOF_PROTOCOL.md + conformance_runner.py
+├── 04_testing/acceptance/
 │   ├── README.md
 │   ├── DESIGN_BRIEF.md
 │   ├── ACCEPTANCE_CRITERIA.md
 │   └── run_acceptance.py     # 48-cell (4 variants × 12 printers)
-├── 05-INSTALLER/             # manifest.json + install.{sh,ps1} + verify_install.py
-├── 07-DOCS/                  # README, ARCHITECTURE, CHANGELOG, SECURITY, TROUBLESHOOTING,
+├── 06_release/installer/             # manifest.json + install.{sh,ps1} + verify_install.py
+├── 01_requirements/                  # README, ARCHITECTURE, CHANGELOG, SECURITY, TROUBLESHOOTING,
 │                             # PRINTER_FLEET_GUIDE, AI_PROGRAMMER_GUIDE,
 │                             # AGENTIC_AUTOMATION, BRAIN_LAYER_GUIDE
 ├── env/.env.example          # all HERMES3D_* env vars documented
@@ -44,8 +44,8 @@ hermes3d-os-v5-contract-kit/
 ```bash
 unzip hermes3d_os_lite_v5_FINAL.zip
 cd hermes3d-os-v5-contract-kit
-bash 05-INSTALLER/install.sh
-cd 02-SCAFFOLDING
+bash 06_release/installer/install.sh
+cd 03_implementation
 bash scripts/run-dev.sh
 ```
 
@@ -53,8 +53,8 @@ bash scripts/run-dev.sh
 ```powershell
 Expand-Archive hermes3d_os_lite_v5_FINAL.zip -DestinationPath .
 cd hermes3d-os-v5-contract-kit
-.\05-INSTALLER\install.ps1
-cd 02-SCAFFOLDING
+.\06_release/installer\install.ps1
+cd 03_implementation
 .\scripts\run-dev.ps1
 ```
 
@@ -66,32 +66,32 @@ run.bat
 ## How to verify it yourself
 
 ```bash
-cd hermes3d-os-v5-contract-kit/02-SCAFFOLDING
+cd hermes3d-os-v5-contract-kit/03_implementation
 python -m pytest tests/                        # 264 tests
 python scripts/forbidden_pattern_scan.py        # zero placeholders
 python scripts/honesty_diff.py                  # zero drift
 
 cd ..
-python 04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py   # 48 cells
-python 03-PROOF-SYSTEM/conformance_runner.py --root var/acceptance-results
+python 04_testing/acceptance/run_acceptance.py   # 48 cells
+python 05_truth_proof/conformance_runner.py --root var/acceptance-results
 ```
 
 Every command above runs on a clean clone with stdlib + `pip install -e .`
-in the kit's `02-SCAFFOLDING` dir. No paid services, no external accounts.
+in the kit's `03_implementation` dir. No paid services, no external accounts.
 
 ## What's deferred (honestly)
 
-- `01-ARCHITECTURE/diagrams/` — empty in v5; the rendered text in
-  `07-DOCS/ARCHITECTURE.md` is the canonical architecture doc.
+- `02_architecture/diagrams/` — empty in v5; the rendered text in
+  `02_architecture/ARCHITECTURE.md` is the canonical architecture doc.
   Mermaid diagrams render in any Markdown viewer.
 - `core.agents.orchestrator.LangGraphOrchestrator` — spec-only
   (`raise NotImplementedError`); the deterministic
   `DryRunOrchestrator` is what every test uses. Promotion path
-  documented in `07-DOCS/AI_PROGRAMMER_GUIDE.md` §7.
+  documented in `01_requirements/AI_PROGRAMMER_GUIDE.md` §7.
 - `core.modeling.blender_mcp_server` — spec-only; activate by
   installing Blender + bpy.
 - Gradio UI launcher exists but with placeholder tabs — flagged in
-  `00-CONTRACT/HONESTY_LEDGER.md` as v5.3 promotion.
+  `00_overview/contract/HONESTY_LEDGER.md` as v5.3 promotion.
 
 These are the only acceptable opt-outs. Every runnable module has at
 least one test exercising it.

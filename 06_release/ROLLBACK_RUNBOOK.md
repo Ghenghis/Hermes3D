@@ -42,7 +42,7 @@ git cherry-pick <sha1> [<sha2> ...]
 Run the fast test subset locally:
 
 ```bash
-bash 02-SCAFFOLDING/scripts/test.sh --fast
+bash scripts/scaffolding/test.sh --fast
 ```
 
 ## Step 4 — Open expedited PR through the release gateway

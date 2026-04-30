@@ -2,8 +2,8 @@
 Hermes3D-OS — Printability Truth Gate.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §6 (Printability Truth Gate)
-Schema:   01-ARCHITECTURE/contracts/truth_gate_report.schema.json
+Contract: 00_overview/contract/MASTER_CONTRACT.md §6 (Printability Truth Gate)
+Schema:   02_architecture/contracts/truth_gate_report.schema.json
 
 This module is intentionally self-contained: it depends only on numpy and
 trimesh (with the manifold3d backend for boolean / volume operations).

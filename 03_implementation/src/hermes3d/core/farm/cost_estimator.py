@@ -1,7 +1,7 @@
 """Cost estimator — filament + electricity per print job.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §21 (Cost Estimation)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §21 (Cost Estimation)
 
 Computes the rough monetary + energy cost of a print:
 

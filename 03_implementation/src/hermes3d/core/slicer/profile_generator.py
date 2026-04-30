@@ -1,7 +1,7 @@
 """Slicer profile generator.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §44 (Slicer Profile Generator)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §44 (Slicer Profile Generator)
 
 Auto-builds a working PrusaSlicer/OrcaSlicer .ini profile for any
 (printer × material × quality_level) combination. The profile blends:

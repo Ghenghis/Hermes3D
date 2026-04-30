@@ -1,7 +1,7 @@
 """Repair agent — strategy ladder for resolving ``RepairEscalation``.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §30 (Orchestration Brain)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §30 (Orchestration Brain)
 
 When a workflow node exhausts its retry budget the orchestrator hands the
 escalation to a ``RepairAgent``. The agent walks an ordered ladder of

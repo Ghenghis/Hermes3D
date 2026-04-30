@@ -177,9 +177,9 @@ def build_app():  # type: ignore[no-untyped-def]
             gr.Markdown(
                 "This tab is **disabled** in the kit-only build.\n\n"
                 "It enables itself automatically once "
-                "`05-INSTALLER/install.ps1` has provisioned Blender 4.2+, "
+                "`06_release/installer/install.ps1` has provisioned Blender 4.2+, "
                 "ComfyUI with TRELLIS.2 / Hunyuan3D-2.1, and an LLM API key. "
-                "See `07-DOCS/AI_PROGRAMMER_GUIDE.md` §'Implementing the "
+                "See `01_requirements/AI_PROGRAMMER_GUIDE.md` §'Implementing the "
                 "modeling MCP' and §'Implementing the orchestrator'."
             )
     return app

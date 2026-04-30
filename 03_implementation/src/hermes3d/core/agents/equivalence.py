@@ -1,7 +1,7 @@
 """Printer equivalence groups.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §22 (Equivalence Pools)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §22 (Equivalence Pools)
 
 The user has two FLSUN T1 units (`flsun_t1_a` and `flsun_t1_b`). For
 dispatch purposes they are interchangeable — same firmware, same nozzle,

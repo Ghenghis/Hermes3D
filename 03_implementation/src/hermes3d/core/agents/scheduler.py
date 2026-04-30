@@ -1,7 +1,7 @@
 """Risk-aware print scheduler + camera utilities.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §14 (Scheduling & Cameras)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §14 (Scheduling & Cameras)
 
 Includes:
   - schedule_window():   policy-driven "should we start this print now?"

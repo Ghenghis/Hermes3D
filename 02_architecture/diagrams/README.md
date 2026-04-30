@@ -24,5 +24,5 @@ npx -p @mermaid-js/mermaid-cli mmdc -i dispatcher-decision.mmd -o dispatcher-dec
 ```
 
 You can also render to PNG/PDF by changing the output extension. The
-canonical authoritative architecture document remains `07-DOCS/ARCHITECTURE.md`;
+canonical authoritative architecture document remains `02_architecture/ARCHITECTURE.md`;
 these diagrams are visual companions to that text.

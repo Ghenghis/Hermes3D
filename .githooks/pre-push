@@ -21,7 +21,7 @@ case "$branch" in
 esac
 
 repo_root="$(git rev-parse --show-toplevel)"
-test_script="$repo_root/02-SCAFFOLDING/scripts/test.sh"
+test_script="$repo_root/scripts/scaffolding/test.sh"
 
 if [ -x "$test_script" ] || [ -f "$test_script" ]; then
   printf "${GRN}pre-push:${NC} running fast test subset...\n"

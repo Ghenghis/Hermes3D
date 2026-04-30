@@ -2,7 +2,7 @@
 
 > How the system is put together. Read this after `README.md` and
 > before `AI_PROGRAMMER_GUIDE.md`. Diagrams live alongside this file
-> in Mermaid and (where useful) under `01-ARCHITECTURE/diagrams/`.
+> in Mermaid and (where useful) under `02_architecture/diagrams/`.
 
 ---
 
@@ -136,7 +136,7 @@ flowchart LR
     SCHEMA -.fail.-> REJECT[Reject + sign FAIL envelope]
 ```
 
-See `00-CONTRACT/TRUTH_AND_PROOF_SYSTEM.md` for the envelope format
+See `00_overview/contract/TRUTH_AND_PROOF_SYSTEM.md` for the envelope format
 and verification protocol.
 
 ---
@@ -251,7 +251,7 @@ tests/
 └── integration/          real persistence, real slicer, real Moonraker (best-effort)
 ```
 
-The acceptance runner (`04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py`)
+The acceptance runner (`04_testing/acceptance/run_acceptance.py`)
 is end-to-end: 4 design variants × 12 printers, every cell producing a
 signed proof envelope. It runs in <10 seconds on the test machine and
 in CI.
@@ -284,7 +284,7 @@ without intent:
 
 ## 12. What's deferred
 
-See `00-CONTRACT/ROADMAP.md`. The headline items:
+See `00_overview/contract/ROADMAP.md`. The headline items:
 
 - v5.1 hardens every Tier-2 module to runnable + tested.
 - v5.2 turns the multi-agent scaffolding into daily use.

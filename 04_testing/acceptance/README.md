@@ -53,13 +53,13 @@ From the kit root:
 
 ```bash
 # Full run: 4 × 12 = 48 cells
-python 04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py
+python 04_testing/acceptance/run_acceptance.py
 
 # Single variant
-python 04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py --variant tall
+python 04_testing/acceptance/run_acceptance.py --variant tall
 
 # JSON output for downstream processing
-python 04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py --json
+python 04_testing/acceptance/run_acceptance.py --json
 ```
 
 Outputs:
@@ -99,7 +99,7 @@ as an artifact. The job fails if:
   outcome).
 - The summary proof envelope can't be verified.
 - The variant×printer fit matrix differs from the expected matrix in
-  `04-TEST-CASE-DESK-ORGANIZER/expected/fit_matrix.json` (when it
+  `04_testing/acceptance/expected/fit_matrix.json` (when it
   exists).
 
 ---
@@ -143,4 +143,4 @@ not a synthetic cube.
 - `DESIGN_BRIEF.md` — the original design brief for the parametric model.
 - `ACCEPTANCE_CRITERIA.md` — the explicit pass/fail rules.
 - `run_acceptance.py` — the runner. ~250 lines, no surprises.
-- `00-CONTRACT/TRUTH_AND_PROOF_SYSTEM.md` — the proof envelope format.
+- `00_overview/contract/TRUTH_AND_PROOF_SYSTEM.md` — the proof envelope format.

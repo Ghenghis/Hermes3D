@@ -1,7 +1,7 @@
 """Mesh auto-repair pipeline.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §18 (Mesh Auto-Repair)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §18 (Mesh Auto-Repair)
 
 Real-world meshes from AI generators (DreamGaussian, TripoSR, ComfyUI 3D
 nodes, Trellis), photogrammetry, or downloaded STLs frequently arrive

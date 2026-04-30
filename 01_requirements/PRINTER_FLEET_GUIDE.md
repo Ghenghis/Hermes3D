@@ -131,7 +131,7 @@ python -m hermes3d.cli skill import config/skill_packs/flsun_t1_essentials.json
    pick up the new printer automatically.
 5. (Optional) Build a printer-specific skill pack and put it under
    `config/skill_packs/`.
-6. Update `00-CONTRACT/HONESTY_LEDGER.md` if the new printer changes
+6. Update `00_overview/contract/HONESTY_LEDGER.md` if the new printer changes
    any tier annotation.
 
 ---

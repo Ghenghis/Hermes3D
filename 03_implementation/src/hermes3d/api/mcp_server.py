@@ -1,7 +1,7 @@
 """MCP (Model Context Protocol) server.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §27 (MCP Integration)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §27 (MCP Integration)
 
 Exposes Hermes3D-OS Lite to MCP-compatible agentic clients (Claude Code,
 DaveAI-IDE, Roo Code, Continue). The server speaks STDIO MCP and offers

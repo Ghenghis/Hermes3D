@@ -243,7 +243,7 @@ FLEET: Tuple[PrinterProfile, ...] = (
         ),
         moonraker_url_default="http://flsun-s1.local",
         notes="Reachable Z varies across XY — 432mm at center, ~383mm at "
-              "diameter edge. See 01-ARCHITECTURE/printer_envelopes.md.",
+              "diameter edge. See 02_architecture/printer_envelopes.md.",
     ),
     PrinterProfile(
         profile_id="flsun_v400",

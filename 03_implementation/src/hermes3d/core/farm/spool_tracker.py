@@ -1,7 +1,7 @@
 """Filament spool tracker.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §15 (Filament Tracking)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §15 (Filament Tracking)
 
 Persistent JSON-backed registry of spools — what's loaded on which printer,
 how much is left, vendor/material/color metadata. The dispatcher and

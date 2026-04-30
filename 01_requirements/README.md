@@ -36,7 +36,7 @@ incrementally into a daily driver.
 ```powershell
 git clone <this-repo> hermes3d-os-lite
 cd hermes3d-os-lite
-pwsh 05-INSTALLER\install.ps1
+pwsh 06_release/installer\install.ps1
 ```
 
 The installer is interactive. It asks about each optional component
@@ -47,7 +47,7 @@ automatically.
 After it finishes, run the doctor to confirm the environment is sane:
 
 ```powershell
-pwsh 02-SCAFFOLDING\scripts\doctor.ps1
+pwsh scripts\scaffolding\doctor.ps1
 ```
 
 ## Install (Linux / WSL)
@@ -55,8 +55,8 @@ pwsh 02-SCAFFOLDING\scripts\doctor.ps1
 ```bash
 git clone <this-repo> hermes3d-os-lite
 cd hermes3d-os-lite
-bash 05-INSTALLER/install.sh
-bash 02-SCAFFOLDING/scripts/doctor.sh
+bash 06_release/installer/install.sh
+bash scripts/scaffolding/doctor.sh
 ```
 
 ## Run
@@ -66,12 +66,12 @@ bash 02-SCAFFOLDING/scripts/doctor.sh
 run.bat
 
 # Or via PowerShell
-pwsh 02-SCAFFOLDING\scripts\run-dev.ps1
+pwsh scripts\scaffolding\run-dev.ps1
 ```
 
 ```bash
 # Linux / WSL
-bash 02-SCAFFOLDING/scripts/run-dev.sh
+bash scripts/scaffolding/run-dev.sh
 ```
 
 The Gradio UI starts at `http://127.0.0.1:7860`, the REST API at
@@ -81,15 +81,15 @@ background. Logs go to `logs/`.
 ## Test
 
 ```powershell
-pwsh 02-SCAFFOLDING\scripts\test.ps1                # Layer A + B (fast)
-pwsh 02-SCAFFOLDING\scripts\test.ps1 -Integration   # + Layer C
-pwsh 02-SCAFFOLDING\scripts\test.ps1 -E2E           # + Layer D
+pwsh scripts\scaffolding\test.ps1                # Layer A + B (fast)
+pwsh scripts\scaffolding\test.ps1 -Integration   # + Layer C
+pwsh scripts\scaffolding\test.ps1 -E2E           # + Layer D
 ```
 
 ```bash
-bash 02-SCAFFOLDING/scripts/test.sh
-bash 02-SCAFFOLDING/scripts/test.sh --integration
-bash 02-SCAFFOLDING/scripts/test.sh --e2e
+bash scripts/scaffolding/test.sh
+bash scripts/scaffolding/test.sh --integration
+bash scripts/scaffolding/test.sh --e2e
 ```
 
 The acceptance runner — 4 desk-organiser variants × 12 printers — is
@@ -100,30 +100,30 @@ included in Layer B and produces signed proof envelopes under
 
 | Audience | File |
 |----------|------|
-| First-time user | this file + `07-DOCS/TROUBLESHOOTING.md` |
-| Operator | `07-DOCS/PRINTER_FLEET_GUIDE.md`, `07-DOCS/AGENTIC_AUTOMATION.md` |
-| Contributor / AI programmer | `07-DOCS/AI_PROGRAMMER_GUIDE.md`, `00-CONTRACT/MASTER_CONTRACT.md` |
-| Architecture | `07-DOCS/ARCHITECTURE.md`, `01-ARCHITECTURE/diagrams/*` |
-| Brain layer | `07-DOCS/BRAIN_LAYER_GUIDE.md` |
-| Security | `07-DOCS/SECURITY.md` |
-| Changes | `07-DOCS/CHANGELOG.md` |
-| Honest feature inventory | `00-CONTRACT/FEATURES.md`, `00-CONTRACT/HONESTY_LEDGER.md` |
+| First-time user | this file + `02_architecture/TROUBLESHOOTING.md` |
+| Operator | `01_requirements/PRINTER_FLEET_GUIDE.md`, `01_requirements/AGENTIC_AUTOMATION.md` |
+| Contributor / AI programmer | `01_requirements/AI_PROGRAMMER_GUIDE.md`, `00_overview/contract/MASTER_CONTRACT.md` |
+| Architecture | `02_architecture/ARCHITECTURE.md`, `02_architecture/diagrams/*` |
+| Brain layer | `01_requirements/BRAIN_LAYER_GUIDE.md` |
+| Security | `02_architecture/SECURITY.md` |
+| Changes | `02_architecture/CHANGELOG.md` |
+| Honest feature inventory | `00_overview/contract/FEATURES.md`, `00_overview/contract/HONESTY_LEDGER.md` |
 
 ## Repository layout
 
 ```
-00-CONTRACT/                  the contract: MASTER, DOD, GATES, FEATURES, ROADMAP, ...
-01-ARCHITECTURE/              diagrams, JSON schemas
-02-SCAFFOLDING/               the actual code
+00_overview/contract/                  the contract: MASTER, DOD, GATES, FEATURES, ROADMAP, ...
+02_architecture/              diagrams, JSON schemas
+03_implementation/               the actual code
    src/hermes3d/              Python package
    tests/                     264 tests
    config/                    printers.toml + Klipper configs + skill packs
    scripts/                   doctor, test, run-dev, lint, format, build, release
    .github/workflows/ci.yml   CI matrix (Linux + Windows × 3.11 + 3.12)
-03-PROOF-SYSTEM/              conformance runner + protocol docs
-04-TEST-CASE-DESK-ORGANIZER/  acceptance runner + design briefs
-05-INSTALLER/                 install scripts + manifest + post-install verifier
-07-DOCS/                      everything in this Documentation table
+05_truth_proof/              conformance runner + protocol docs
+04_testing/acceptance/  acceptance runner + design briefs
+06_release/installer/                 install scripts + manifest + post-install verifier
+01_requirements/                      everything in this Documentation table
 env/.env.example              template env vars
 run.bat                       Windows one-click launcher
 pyproject.toml                package metadata
@@ -138,16 +138,16 @@ pyproject.toml                package metadata
   message until you install Blender 4.2 and bpy.
 - No LangGraph runtime adapter — only a source exporter. Run the
   workflow with the built-in linear executor, or wire LangGraph
-  yourself per `07-DOCS/AI_PROGRAMMER_GUIDE.md`.
+  yourself per `01_requirements/AI_PROGRAMMER_GUIDE.md`.
 
-The honesty ledger (`00-CONTRACT/HONESTY_LEDGER.md`) is the canonical
+The honesty ledger (`00_overview/contract/HONESTY_LEDGER.md`) is the canonical
 list of "runnable / scaffold / spec" for every module.
 
 ## Credits
 
 This is Dave Lavalley's farm. The kit was assembled with AI assistance
 under a strict no-stubs / real-tests / zero-warnings engineering
-contract (see `00-CONTRACT/MASTER_CONTRACT.md`). Anything you find
+contract (see `00_overview/contract/MASTER_CONTRACT.md`). Anything you find
 here that doesn't work is a contract violation — please file an
 issue, or, better, fix it.
 

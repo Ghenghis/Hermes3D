@@ -1,7 +1,7 @@
 """Parallel print planner.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §43 (Parallel Print Planning)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §43 (Parallel Print Planning)
 
 Given a *set* of meshes (parts of an assembly, or independent jobs) and
 the current fleet state, plan a parallelized print across idle printers

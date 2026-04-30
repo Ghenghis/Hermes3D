@@ -1,7 +1,7 @@
 """Ollama bridge — local LLM client.
 
 Status: runnable (graceful when Ollama isn't running)
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §32 (Local LLM)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §32 (Local LLM)
 
 Talks to a locally-running Ollama instance (default: http://localhost:11434)
 using Ollama's HTTP API. No external services, no API keys, no telemetry —

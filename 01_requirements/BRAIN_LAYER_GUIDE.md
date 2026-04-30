@@ -305,7 +305,7 @@ GET /v1/forecast?printer_id=flsun_t1_a&material=PETG
 ## 10. The brain in pictures
 
 Every brain component has a corresponding diagram under
-`01-ARCHITECTURE/diagrams/`:
+`02_architecture/diagrams/`:
 
 - `brain_layer.svg` — the four components and their data flow
 - `skill_lookup_flow.svg` — scope matching during dispatch

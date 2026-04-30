@@ -134,7 +134,7 @@ won't enqueue against a printer that isn't material-capable.
 
 ### Adding a tool
 
-See `07-DOCS/AI_PROGRAMMER_GUIDE.md` §6 for the canonical recipe.
+See `01_requirements/AI_PROGRAMMER_GUIDE.md` §6 for the canonical recipe.
 
 ### Calling a tool from Python
 
@@ -242,7 +242,7 @@ or for environments where LLM calls aren't allowed.
 
 ## 9. What's deferred
 
-See `00-CONTRACT/ROADMAP.md` for the full list. The headline agentic
+See `00_overview/contract/ROADMAP.md` for the full list. The headline agentic
 items:
 
 - v5.2 promotes calibration auto-fire from "suggest only" to "suggest

@@ -35,7 +35,7 @@ pip install -e .
 
 ### `ModuleNotFoundError: No module named 'hermes3d'` after install
 
-The editable install didn't run. From `02-SCAFFOLDING/`:
+The editable install didn't run. From `03_implementation/`:
 
 ```bash
 pip install -e .
@@ -129,7 +129,7 @@ was edited.
 
 ```bash
 rm -rf var/acceptance-results
-python ../04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py
+python ../04_testing/acceptance/run_acceptance.py
 ```
 
 ---
@@ -152,7 +152,7 @@ Reproduce CI locally:
 
 ```bash
 docker run --rm -v "$PWD:/work" -w /work python:3.11 \
-    bash -c "pip install -r 02-SCAFFOLDING/requirements.txt -r 02-SCAFFOLDING/requirements-dev.txt && cd 02-SCAFFOLDING && pytest"
+    bash -c "pip install -r 03_implementation/requirements.txt -r 03_implementation/requirements-dev.txt && cd 03_implementation && pytest"
 ```
 
 ### A single test flakes
@@ -199,7 +199,7 @@ file's tier. Either:
 Regenerate the manifest after edits:
 
 ```bash
-python 00-CONTRACT/_generate_manifest.py
+python 00_overview/contract/_generate_manifest.py
 ```
 
 ---
@@ -229,5 +229,5 @@ If the troubleshooting steps above don't cover your symptom:
    correctness question.
 4. Open a GitHub issue with all three.
 
-The kit's contract (`00-CONTRACT/MASTER_CONTRACT.md`) means that any
+The kit's contract (`00_overview/contract/MASTER_CONTRACT.md`) means that any
 genuine bug here is a contract violation — we want to hear about it.

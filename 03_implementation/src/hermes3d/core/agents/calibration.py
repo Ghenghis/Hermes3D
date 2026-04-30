@@ -1,7 +1,7 @@
 """Calibration agent.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §23 (Calibration)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §23 (Calibration)
 
 Drives common Klipper calibration sequences via Moonraker:
 

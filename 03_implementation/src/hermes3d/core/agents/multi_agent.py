@@ -1,7 +1,7 @@
 """Multi-agent system — Critic / Optimizer / Executor pattern.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §33 (Multi-Agent)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §33 (Multi-Agent)
 
 Three composable agents that collaborate on a print decision:
 

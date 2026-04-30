@@ -1,7 +1,7 @@
 """Post-processing script generator.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §45 (Post-Processing Scripts)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §45 (Post-Processing Scripts)
 
 When the G-code analyzer or the failure predictor surfaces a known
 issue, the agent can generate a Python post-processing script that

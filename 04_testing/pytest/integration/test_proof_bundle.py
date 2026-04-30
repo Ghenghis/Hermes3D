@@ -2,7 +2,7 @@
 
 Each test:
   1. builds a bundle into a tmp_path
-  2. invokes ``03-PROOF-SYSTEM/conformance_runner.py --bundle <zip>``
+  2. invokes ``05_truth_proof/conformance_runner.py --bundle <zip>``
      as a subprocess
   3. asserts the appropriate exit code / error string
 
@@ -31,7 +31,7 @@ pytestmark = pytest.mark.skipif(
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 BUILD_SCRIPT = REPO_ROOT / "scripts" / "_build_bundle.py"
-RUNNER = REPO_ROOT / "03-PROOF-SYSTEM" / "conformance_runner.py"
+RUNNER = REPO_ROOT / "05_truth_proof" / "conformance_runner.py"
 
 
 def _load_builder():

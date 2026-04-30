@@ -131,9 +131,9 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 | `scripts/proof-collect.ps1` | runnable |
 | `run.bat` | runnable |
 | `.github/workflows/ci.yml` | runnable |
-| `05-INSTALLER/install.{ps1,sh}` | runnable |
-| `05-INSTALLER/verify_install.py` | runnable |
-| `05-INSTALLER/manifest.json` | runnable |
+| `06_release/installer/install.{ps1,sh}` | runnable |
+| `06_release/installer/verify_install.py` | runnable |
+| `06_release/installer/manifest.json` | runnable |
 
 ---
 

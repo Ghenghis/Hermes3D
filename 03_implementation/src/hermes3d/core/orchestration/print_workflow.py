@@ -1,7 +1,7 @@
 """End-to-end PrintWorkflow — every agent wired into one graph.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §30 (Orchestration Brain)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §30 (Orchestration Brain)
 
 Composes:
 

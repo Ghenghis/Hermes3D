@@ -1,7 +1,7 @@
 """Notification dispatch — Discord, Slack, generic webhook.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §13 (Notifications)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §13 (Notifications)
 
 Sends print-event notifications to one or more configured channels.
 Channels are loaded from environment variables so secrets never enter the

@@ -37,7 +37,7 @@ A change is **NOT done** unless all of these are true:
 2. **CI builds match local.** The GitHub Actions workflow runs the same
    commands as the local scripts and reaches the same outcome. CI is
    never "skipped" or "marked optional" without an entry in
-   `00-CONTRACT/HONESTY_LEDGER.md`.
+   `00_overview/contract/HONESTY_LEDGER.md`.
 3. **Smoke boot proves life.** The launcher (`hermes3d-api` for the REST
    server, `python -m hermes3d.app.launcher` for the Gradio UI) starts,
    responds to a healthcheck, and shuts down cleanly within 30 seconds on
@@ -112,7 +112,7 @@ A change is **NOT done** unless:
 5. **Proof envelope unbroken.** Any change that touches truth-gate
    results, dispatch decisions, slicer outputs, or test-case acceptance
    maintains the HMAC-SHA256 proof-envelope chain. Acceptance proofs are
-   verifiable by `python 03-PROOF-SYSTEM/conformance_runner.py
+   verifiable by `python 05_truth_proof/conformance_runner.py
    --verify`.
 
 ---
@@ -126,9 +126,9 @@ Updated **with the same PR**, never deferred:
   diagrams, no ASCII art)
 - `CHANGELOG.md` — versioned, every user-visible change explained
 - `SECURITY.md` — threat model, risky surfaces
-- `07-DOCS/AGENTIC_AUTOMATION.md` — when agents/tools change
-- `07-DOCS/PRINTER_FLEET_GUIDE.md` — when fleet/profiles change
-- `07-DOCS/AI_PROGRAMMER_GUIDE.md` — when contracts or APIs change
+- `01_requirements/AGENTIC_AUTOMATION.md` — when agents/tools change
+- `01_requirements/PRINTER_FLEET_GUIDE.md` — when fleet/profiles change
+- `01_requirements/AI_PROGRAMMER_GUIDE.md` — when contracts or APIs change
 
 Inline docstrings for every public function, class, and module — no
 "will be filled in later" placeholders.
@@ -147,7 +147,7 @@ A change earmarked for release is **NOT done** unless:
 2. The artifact extracts and runs on a clean Windows 11 VM with no
    network access (after dependencies are pre-installed) — i.e., no
    surprise downloads at first launch.
-3. The acceptance runner (`04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py
+3. The acceptance runner (`04_testing/acceptance/run_acceptance.py
    --strict`) succeeds against the artifact's own scaffolding without
    manual intervention.
 4. `CHANGELOG.md` has a dated entry for the version, listing every
@@ -181,7 +181,7 @@ The author of a change asserts, in the PR description:
 - [ ] Builds from a clean clone via the documented steps
 - [ ] All gate scripts (`format.ps1`, `lint.ps1`, `test.ps1`) pass
 - [ ] No new forbidden patterns introduced
-- [ ] CHANGELOG and relevant 07-DOCS entries updated
+- [ ] CHANGELOG and relevant 01_requirements entries updated
 - [ ] HONESTY_LEDGER reconciled
 - [ ] Smoke run from `run-dev.ps1` succeeds
 - [ ] Acceptance runner is still 48/48 (or has been updated honestly)

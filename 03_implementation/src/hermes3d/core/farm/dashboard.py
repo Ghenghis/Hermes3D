@@ -1,7 +1,7 @@
 """Print farm dashboard — fleet-wide live aggregation.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §16 (Print Farm Dashboard)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §16 (Print Farm Dashboard)
 
 Aggregates live state across all 12 printers in the fleet for display in
 the Gradio UI. This is a read-only data layer — it never mutates printer

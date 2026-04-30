@@ -3,7 +3,7 @@
     Hermes3D-OS Lite installer (Windows / PowerShell 7+).
 
 .DESCRIPTION
-    Reads 05-INSTALLER/manifest.json, installs every required component,
+    Reads 06_release/installer/manifest.json, installs every required component,
     asks the user about optional components, and runs verify_install.py.
 
 .PARAMETER Components
@@ -17,9 +17,9 @@
     Don't prompt for optional components — accept defaults.
 
 .EXAMPLE
-    pwsh 05-INSTALLER/install.ps1
-    pwsh 05-INSTALLER/install.ps1 -Components 'gradio_ui,rest_api,ollama_provider'
-    pwsh 05-INSTALLER/install.ps1 -Components 'all'
+    pwsh 06_release/installer/install.ps1
+    pwsh 06_release/installer/install.ps1 -Components 'gradio_ui,rest_api,ollama_provider'
+    pwsh 06_release/installer/install.ps1 -Components 'all'
 #>
 [CmdletBinding()]
 param(
@@ -31,8 +31,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $installerDir = $PSScriptRoot
-$repoRoot = Resolve-Path (Join-Path $installerDir '..')
-$scaffolding = Join-Path $repoRoot '02-SCAFFOLDING'
+$repoRoot = Resolve-Path (Join-Path $installerDir '..\..')
+$scaffolding = Join-Path $repoRoot '03_implementation'
 
 Write-Host '================================================================'
 Write-Host '  Hermes3D-OS Lite Installer (v5)' -ForegroundColor Cyan

@@ -1,7 +1,7 @@
 """Auto-orient agent.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §19 (Auto-Orient)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §19 (Auto-Orient)
 
 Picks the optimal "Z up" orientation for a mesh to minimize support
 material and maximize bed contact. Uses a heuristic scoring function

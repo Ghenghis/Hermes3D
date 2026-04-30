@@ -21,7 +21,7 @@ Get-ChildItem $hooksDir | ForEach-Object { Write-Host "  $($_.Name)" }
 Write-Host ""
 Write-Host "pre-push will:"
 Write-Host "  1. Refuse pushes to main/master"
-Write-Host "  2. Run 02-SCAFFOLDING/scripts/test.sh --fast (or test.ps1 -Fast) before push"
+Write-Host "  2. Run scripts/scaffolding/test.sh --fast (or test.ps1 -Fast) before push"
 Write-Host ""
 Write-Host "Note: On Windows, git uses the bash hook via sh.exe (Git-Bash). The .ps1 hook" -ForegroundColor Yellow
 Write-Host "is provided as a reference for users who prefer PowerShell-only workflows."  -ForegroundColor Yellow

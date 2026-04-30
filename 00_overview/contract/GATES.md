@@ -21,7 +21,7 @@ and short-circuits on the first failure to keep feedback tight.
 | Linter | ruff check | `ruff check src/ tests/` | unused imports, F-strings without interpolation, mutable defaults, etc. |
 | Type checker | mypy | `mypy --strict src/hermes3d` | structural type errors, missing return types, `Any` leaks |
 | Forbidden-pattern scan | `scripts/forbidden_pattern_scan` | regex over `src/` and `scripts/` | TODO/FIXME/STUB/PLACEHOLDER/`raise NotImplementedError` outside ABCs, empty `except:` |
-| Schema validators | jsonschema CLI | over every `.schema.json` in `01-ARCHITECTURE/contracts/` | malformed contract schemas |
+| Schema validators | jsonschema CLI | over every `.schema.json` in `02_architecture/contracts/` | malformed contract schemas |
 | YAML/TOML validators | `python -c "import tomllib; ..."` and `pyyaml` | over `pyproject.toml` and `.github/workflows/*.yml` | unparseable config |
 
 **Wall-clock target:** entire layer under 30 seconds on the test
@@ -44,7 +44,7 @@ handles a happy-path workflow before exotic integrations get tested.
 | CLI smoke | `hermes3d --help` and `hermes3d fleet --json` | exit code 0, valid JSON on stdout |
 | API smoke | start `hermes3d-api` in background, GET `/healthz`, GET `/v1/fleet` | both return 200; healthz body matches schema |
 | MCP smoke | spawn `hermes3d-mcp`, send `initialize` and `tools/list` over stdio | response includes ≥ 16 tools |
-| Acceptance runner | `python 04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py` | 48/48 variants × printers green, all proof envelopes verify |
+| Acceptance runner | `python 04_testing/acceptance/run_acceptance.py` | 48/48 variants × printers green, all proof envelopes verify |
 | Workflow graph | `python -m hermes3d.tools.workflow_smoke` | builds the 12-node print workflow, runs in DryRun mode, every node returns PASS or SKIP |
 
 **Wall-clock target:** entire layer under 3 minutes on the RTX 3090 Ti
@@ -97,7 +97,7 @@ ubuntu-latest, and headed locally on Windows 11 when invoked via
 | Build wheel | `python -m build --wheel` produces a `.whl` whose `RECORD` file matches the staged tree |
 | Build distribution zip | `scripts/release.ps1 -Stage build` produces a versioned zip + SHA256 |
 | Clean-room install | spin up a fresh Python venv, `pip install dist/*.whl`, run `hermes3d --help` and the smoke tests above |
-| Acceptance against installed package | run `04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py` against the installed module, not the source tree |
+| Acceptance against installed package | run `04_testing/acceptance/run_acceptance.py` against the installed module, not the source tree |
 | Proof envelope | `python -m hermes3d.tools.release_proof --verify dist/<artifact>.zip` confirms the build's HMAC chain |
 
 ---
@@ -109,8 +109,8 @@ documentation *claims* it does.
 
 | Gate | Mechanism | Authoritative file |
 |------|-----------|--------------------|
-| Honesty ledger reconciliation | `scripts/honesty_diff.py` compares the runnable-vs-spec annotations against actual test coverage | `00-CONTRACT/HONESTY_LEDGER.md` |
-| README claim audit | `scripts/readme_claim_audit.py` extracts every "X works" claim from the README and looks for a corresponding passing test | `README.md`, `07-DOCS/README.md` |
+| Honesty ledger reconciliation | `scripts/honesty_diff.py` compares the runnable-vs-spec annotations against actual test coverage | `00_overview/contract/HONESTY_LEDGER.md` |
+| README claim audit | `scripts/readme_claim_audit.py` extracts every "X works" claim from the README and looks for a corresponding passing test | `README.md`, `01_requirements/README.md` |
 | CHANGELOG completeness | every PR that touches a `runnable` module must add a CHANGELOG entry — enforced by a CI check | `CHANGELOG.md` |
 | Tier annotation freshness | every file in `src/hermes3d/` carries a `Status:` header (`runnable | scaffold | spec`); CI fails if a `spec` file gains code without being upgraded to `runnable` | every module top-of-file comment |
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-03-PROOF-SYSTEM/conformance_runner.py
+05_truth_proof/conformance_runner.py
 
 Walk every proof envelope under a root directory and assert four kinds
 of conformance:
@@ -15,10 +15,10 @@ of conformance:
 Exits 0 iff every gate passes for every envelope.
 
 Usage:
-    python 03-PROOF-SYSTEM/conformance_runner.py
-    python 03-PROOF-SYSTEM/conformance_runner.py --root var/acceptance-results
-    python 03-PROOF-SYSTEM/conformance_runner.py --json
-    python 03-PROOF-SYSTEM/conformance_runner.py --require-prod-key
+    python 05_truth_proof/conformance_runner.py
+    python 05_truth_proof/conformance_runner.py --root var/acceptance-results
+    python 05_truth_proof/conformance_runner.py --json
+    python 05_truth_proof/conformance_runner.py --require-prod-key
 """
 
 from __future__ import annotations

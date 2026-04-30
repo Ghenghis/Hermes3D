@@ -1,7 +1,7 @@
 """Backup / restore utility.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §29 (Backup & Restore)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §29 (Backup & Restore)
 
 Periodic snapshot of the user's persistent state:
   - queue.json

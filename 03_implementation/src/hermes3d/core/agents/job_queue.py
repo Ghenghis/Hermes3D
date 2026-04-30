@@ -1,7 +1,7 @@
 """Print job queue + manifest.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §11 (Print Job Lifecycle)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §11 (Print Job Lifecycle)
 
 A persistent JSON-backed queue of print jobs. Each job records:
   - id (UUID), state, timestamps

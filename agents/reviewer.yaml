@@ -9,7 +9,7 @@ inputs:
   - name: contract_path
     type: path
     required: true
-    description: Path to 00-CONTRACT/MASTER_CONTRACT.md.
+    description: Path to 00_overview/contract/MASTER_CONTRACT.md.
   - name: pr_metadata
     type: json
     required: false

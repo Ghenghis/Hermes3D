@@ -1,29 +1,33 @@
 {
   "manifest_version": "1.0.0",
   "kit": "Hermes3D-OS Lite v5 Contract Kit",
-  "generated_at": "2026-04-30T06:23:13Z",
+  "generated_at": "2026-04-30T08:18:48Z",
   "summary": {
-    "total_files": 155,
-    "total_bytes": 987317,
+    "total_files": 204,
+    "total_bytes": 1154624,
     "by_tier": {
-      "runnable": 155
+      "runnable": 160,
+      "spec": 44
     },
     "by_role": {
       "editor_config": 1,
+      "unknown": 36,
+      "ci_workflow": 2,
       "vcs_config": 1,
       "contract_doc": 7,
-      "ci_workflow": 1,
+      "doc": 5,
+      "architecture_doc": 4,
+      "diagram": 4,
       "klipper_config": 7,
       "config": 7,
-      "script": 20,
-      "module": 75,
-      "test": 14,
-      "proof": 2,
+      "module": 77,
       "acceptance_test": 4,
+      "test": 18,
+      "proof": 4,
       "installer": 4,
-      "doc": 9,
       "env_template": 1,
-      "deps": 2
+      "deps": 2,
+      "script": 20
     }
   },
   "files": [
@@ -35,1047 +39,1173 @@
       "role": "editor_config"
     },
     {
+      "path": ".githooks/pre-push",
+      "size_bytes": 1175,
+      "sha256": "086952ffd60688fce1696f3354de439f943e587ce2382ce10726eb01fabf4f79",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": ".githooks/pre-push.ps1",
+      "size_bytes": 1239,
+      "sha256": "0ad7fdd7243daba13e6dfba96f781a06c5c7623a1b9660511651659b40e9bad3",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": ".github/workflows/branch-guard.yml",
+      "size_bytes": 1762,
+      "sha256": "c82a47f4ec4c2cade29d61517a36a5e4a991e066f225a4941f9ad4716e2e5a0d",
+      "tier": "runnable",
+      "role": "ci_workflow"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "size_bytes": 4141,
+      "sha256": "302ef0de791764352a3a866dd4ad76bb0bcf9ccad948bc912d12c7010e3de9a5",
+      "tier": "runnable",
+      "role": "ci_workflow"
+    },
+    {
       "path": ".gitignore",
-      "size_bytes": 755,
-      "sha256": "44ee70346ac44feda761faabfd71b5e918803fd77d5a49714673b67e2f00e96f",
+      "size_bytes": 1044,
+      "sha256": "c8e0bceee4ed56f169987689a7e66f7904c79853e1c18939c2f3c1eb35937307",
       "tier": "runnable",
       "role": "vcs_config"
     },
     {
-      "path": "00-CONTRACT/DEFINITION_OF_DONE.md",
-      "size_bytes": 8155,
-      "sha256": "a0b5267c52fa2bdeb1adb5075092197125ea1d4beacea3b0e109615055dd3407",
+      "path": ".ruff_cache/.gitignore",
+      "size_bytes": 35,
+      "sha256": "9e3a60f1e6ec4ae60215c11d54b171392745ec25e9dded433d5bd921363af316",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": ".ruff_cache/0.14.14/15673740592542167964",
+      "size_bytes": 161,
+      "sha256": "fe28464543b06011455918095d7efba30f33cd7b5f314df2e28fadea175de19e",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": ".ruff_cache/0.14.14/17324917669666247744",
+      "size_bytes": 298,
+      "sha256": "397af75262256b3eaf4a36aaaf612ecf3e3bc8932f60af7b804817bfb0bb6f56",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": ".ruff_cache/CACHEDIR.TAG",
+      "size_bytes": 43,
+      "sha256": "5953156d7e0c564a427251316eaf26f8870e6483ae2197f916b630e4f93e31ae",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "00_overview/contract/DEFINITION_OF_DONE.md",
+      "size_bytes": 8189,
+      "sha256": "0fdc01e2629eb175d794dba0d647a5c1981c56ab5400ad1120da43fe4336950d",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "00-CONTRACT/FEATURES.md",
-      "size_bytes": 8120,
-      "sha256": "b58a06d0cf634e33603f26cdbf059d399f6c6da9b2550e5e7cc83b6d68d5c199",
+      "path": "00_overview/contract/FEATURES.md",
+      "size_bytes": 8122,
+      "sha256": "93605c57d5750e2f8a73c62c2c727cb4bc4d406fe42f99e101130b828cec734e",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "00-CONTRACT/GATES.md",
-      "size_bytes": 8605,
-      "sha256": "05c2f944a6b92b137450f99c9c5d7d9ce03bf16a82c2446272783c584f64a4e9",
+      "path": "00_overview/contract/GATES.md",
+      "size_bytes": 8610,
+      "sha256": "ef49d27f8cc38b9f3f587ce9a605ac0494ac6b93426529cb3561c4297ade7658",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "00-CONTRACT/HONESTY_LEDGER.md",
-      "size_bytes": 7338,
-      "sha256": "63e756230246a060de3811a4d3889d2ecdad331fd2c814cf7c2ce39c8fd6b0ca",
+      "path": "00_overview/contract/HONESTY_LEDGER.md",
+      "size_bytes": 7924,
+      "sha256": "eb65c80c80e2230f2a10beb3258a65b5ef8b495b23a3191c89fe09c7737206a3",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "00-CONTRACT/MASTER_CONTRACT.md",
-      "size_bytes": 12797,
-      "sha256": "2eb7f4b79f7b19fd77c7c830681629dab1c4a2f6f74d2e42e1383ac8fdcf0954",
+      "path": "00_overview/contract/MASTER_CONTRACT.md",
+      "size_bytes": 12808,
+      "sha256": "623735749728cdef017594b744dfe08d092d9c25a9aaae0db14ef40166ddc133",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "00-CONTRACT/ROADMAP.md",
+      "path": "00_overview/contract/ROADMAP.md",
       "size_bytes": 5997,
       "sha256": "e54ca3ef2deb001acfacf3a85c89ebe60852ffe133b24c76011b74e4dcfd9068",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "00-CONTRACT/TRUTH_AND_PROOF_SYSTEM.md",
-      "size_bytes": 6796,
-      "sha256": "5be427bd2ecac661a4b7760fd53ffb118a470b80dab4425484728811e042cb02",
+      "path": "00_overview/contract/TRUTH_AND_PROOF_SYSTEM.md",
+      "size_bytes": 6797,
+      "sha256": "db913635b6a403c5b242654a1300887f9329df3c553c1f85923203f46508f408",
       "tier": "runnable",
       "role": "contract_doc"
     },
     {
-      "path": "02-SCAFFOLDING/.github/workflows/ci.yml",
-      "size_bytes": 3986,
-      "sha256": "1f3b3dab1590169e266b213d0e33001c882b45a0d48abaefbc6fd3e91e067519",
+      "path": "01_requirements/AGENTIC_AUTOMATION.md",
+      "size_bytes": 8592,
+      "sha256": "dfab45d1c42897661fa41cd14ff3cc2d06b746ff66b21f93b94af39e86a6eb83",
       "tier": "runnable",
-      "role": "ci_workflow"
+      "role": "doc"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/creality_cr10s.printer.cfg",
+      "path": "01_requirements/AI_PROGRAMMER_GUIDE.md",
+      "size_bytes": 11049,
+      "sha256": "e33efc6b11a23b4b8dea260972c8ce85e28ae11603dc6308e2455ed51e4b3552",
+      "tier": "runnable",
+      "role": "doc"
+    },
+    {
+      "path": "01_requirements/BRAIN_LAYER_GUIDE.md",
+      "size_bytes": 9262,
+      "sha256": "6ab6f91d0d27b604030ce37144d5a6bc0754c5138a8eb6216de38861740a4f64",
+      "tier": "runnable",
+      "role": "doc"
+    },
+    {
+      "path": "01_requirements/PRINTER_FLEET_GUIDE.md",
+      "size_bytes": 6807,
+      "sha256": "c6401d651610cd7337acff34bd5a604ad90fc0a44410115a4efb54f0e7ab8b3e",
+      "tier": "runnable",
+      "role": "doc"
+    },
+    {
+      "path": "01_requirements/README.md",
+      "size_bytes": 5829,
+      "sha256": "a28ed3941bc0a2fc75139464a46400bea292ed5fabde617cac1153c6af5c288a",
+      "tier": "runnable",
+      "role": "doc"
+    },
+    {
+      "path": "02_architecture/ARCHITECTURE.md",
+      "size_bytes": 9859,
+      "sha256": "2ea84eec26dbfad604e41aa56860fcfd65b23160623dd41e32a329e5aac25102",
+      "tier": "spec",
+      "role": "architecture_doc"
+    },
+    {
+      "path": "02_architecture/CHANGELOG.md",
+      "size_bytes": 5368,
+      "sha256": "6ea39079e249052f89241d81245eca4f5786dc8c01b97ed6cfb91fb26a8c80df",
+      "tier": "spec",
+      "role": "architecture_doc"
+    },
+    {
+      "path": "02_architecture/SECURITY.md",
+      "size_bytes": 6834,
+      "sha256": "e795e716bd4488c82af9a05e80c077dd8fcea5c8eb852937b58756477f825386",
+      "tier": "spec",
+      "role": "architecture_doc"
+    },
+    {
+      "path": "02_architecture/TROUBLESHOOTING.md",
+      "size_bytes": 5835,
+      "sha256": "692deb72417c6008b06b8d1dc2da589722a59ddab84a06c6e228a396ae311bcd",
+      "tier": "spec",
+      "role": "architecture_doc"
+    },
+    {
+      "path": "02_architecture/diagrams/README.md",
+      "size_bytes": 1170,
+      "sha256": "26c5cff3c1f19f5e572ba02cc50dbc3562b45bd8ef5a237e8b929e24900f8e78",
+      "tier": "spec",
+      "role": "diagram"
+    },
+    {
+      "path": "02_architecture/diagrams/dispatcher-decision.mmd",
+      "size_bytes": 1036,
+      "sha256": "a235f64a872ef46a5d9c67730ca9444abdde7f7771a466df1f4eb4c8eb590eb0",
+      "tier": "spec",
+      "role": "diagram"
+    },
+    {
+      "path": "02_architecture/diagrams/system-context.mmd",
+      "size_bytes": 1333,
+      "sha256": "f228b282d1cbf2ca463c1ae43cc19ec4ae1effec259292b9d97024312951cc66",
+      "tier": "spec",
+      "role": "diagram"
+    },
+    {
+      "path": "02_architecture/diagrams/workflow-12node.mmd",
+      "size_bytes": 1258,
+      "sha256": "2a7ff5da329043440c9b76d4ba8702bfc7474d67437d37eef1efba102c72c9b6",
+      "tier": "spec",
+      "role": "diagram"
+    },
+    {
+      "path": "03_implementation/config/klipper/creality_cr10s.printer.cfg",
       "size_bytes": 1464,
       "sha256": "6af15306ed15abfc2a765e451f1f8ab866466fd87f60b4577eee2f49a12959e1",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/flsun_s1.printer.cfg",
+      "path": "03_implementation/config/klipper/flsun_s1.printer.cfg",
       "size_bytes": 2631,
-      "sha256": "3cd4879e4663f1c32d59c3998e10c43c7eee3c65f49f19a33dc58975d7a4bda0",
+      "sha256": "71dda227702717d8160505192306d5dea9f0935bddc05bf6aab0fe5d2ebef89d",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/flsun_t1.printer.cfg",
+      "path": "03_implementation/config/klipper/flsun_t1.printer.cfg",
       "size_bytes": 3855,
       "sha256": "173bb6bf3c7fa5346f9f4b86deb9fceb4f9c664dd08baa17f15867cb12a1c494",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/flsun_v400.printer.cfg",
+      "path": "03_implementation/config/klipper/flsun_v400.printer.cfg",
       "size_bytes": 1739,
       "sha256": "6dcc15f6c97b2a4f15567ab547717b75029c48b76f12138f1bc02e11ef8ac747",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/hermes3d_macros.cfg",
-      "size_bytes": 5667,
-      "sha256": "eae2602ab347969fee6c66fdf7f2299cbdaf10a6224d779cd4d8f8dca5dd0aad",
+      "path": "03_implementation/config/klipper/hermes3d_macros.cfg",
+      "size_bytes": 5676,
+      "sha256": "69e6b8fc65cd37e0457f1624b180a9d531d738c9d8e707c45bd79b14df32feb2",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/prusa_mk3s.printer.cfg",
+      "path": "03_implementation/config/klipper/prusa_mk3s.printer.cfg",
       "size_bytes": 2166,
       "sha256": "6ae819514460f7048cf2a8ee2e33673fe7c553bc7471695cbaa432019d037439",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/klipper/tronxy_d01_pro.printer.cfg",
+      "path": "03_implementation/config/klipper/tronxy_d01_pro.printer.cfg",
       "size_bytes": 1597,
       "sha256": "f95a7800805c37f326b7c8ac0132d33c97d9a6cda1b5a850cc15ca1cdf86541c",
       "tier": "runnable",
       "role": "klipper_config"
     },
     {
-      "path": "02-SCAFFOLDING/config/moonraker/moonraker.conf",
+      "path": "03_implementation/config/moonraker/moonraker.conf",
       "size_bytes": 2718,
       "sha256": "b2343d94aff0f637fd90812a2d18980a38f80cc30afabb192423d08526c28c5a",
       "tier": "runnable",
       "role": "config"
     },
     {
-      "path": "02-SCAFFOLDING/config/printers.toml",
+      "path": "03_implementation/config/printers.toml",
       "size_bytes": 2421,
       "sha256": "b8ce41bd61b50815deb4e651a89c4c3d8a9405e8098b909cb79d99f02c21141f",
       "tier": "runnable",
       "role": "config"
     },
     {
-      "path": "02-SCAFFOLDING/config/skill_packs/asa_general_tips.json",
+      "path": "03_implementation/config/skill_packs/asa_general_tips.json",
       "size_bytes": 3712,
       "sha256": "93d0178e65e4c35dfac34bfd81b78b76ed2e3dab352fb2b037957ea3f6459159",
       "tier": "runnable",
       "role": "config"
     },
     {
-      "path": "02-SCAFFOLDING/config/skill_packs/flsun_t1_essentials.json",
+      "path": "03_implementation/config/skill_packs/flsun_t1_essentials.json",
       "size_bytes": 5705,
       "sha256": "749bcbf9dac62708805d9e7633cedd18f21953e1d59853f67cbd7f077961cefb",
       "tier": "runnable",
       "role": "config"
     },
     {
-      "path": "02-SCAFFOLDING/config/skill_packs/tronxy_d01_quirks.json",
+      "path": "03_implementation/config/skill_packs/tronxy_d01_quirks.json",
       "size_bytes": 3240,
       "sha256": "f6a0a2877bb7a89bd490d6919daccab791d808d76aca46526fda71f7d5ba0367",
       "tier": "runnable",
       "role": "config"
     },
     {
-      "path": "02-SCAFFOLDING/config/slicer/hermes3d_fleet.ini",
+      "path": "03_implementation/config/slicer/hermes3d_fleet.ini",
       "size_bytes": 9157,
       "sha256": "fe5117eae98923b4faf32e8ca6c794c1ab4bcf0f548c5fb36ae8876d4ca9a37e",
       "tier": "runnable",
       "role": "config"
     },
     {
-      "path": "02-SCAFFOLDING/scripts/build.ps1",
-      "size_bytes": 1156,
-      "sha256": "505f12c2404b9b8e57d517b4d2c8cd954762c55ec34bb79383e4fa992a91e6bd",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/build.sh",
-      "size_bytes": 633,
-      "sha256": "738ea2ef5004c1a2e10f14dd7cc7a5e06f0bf3c3176bd6da951db760cbc8fc5b",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/doctor.ps1",
-      "size_bytes": 8139,
-      "sha256": "d2ca9d1d8707f60666036f1bd1c72d93d2f76a24cf2b5d1884dffbf9b55b3872",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/doctor.sh",
-      "size_bytes": 6417,
-      "sha256": "197c9b6a7e994d324b9c5a49ad2d88c5d151bc34246e863ef8200b5b864e3edc",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/forbidden_pattern_scan.py",
-      "size_bytes": 5755,
-      "sha256": "28845243b7ec53400bd8e6c752e412fdce57b4f4be67383d662adf8c0e5d7329",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/format.ps1",
-      "size_bytes": 567,
-      "sha256": "1bb5716727c039b7e85f09e598ec5557a06a7745006acf4574a3375c222d4fe8",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/format.sh",
-      "size_bytes": 365,
-      "sha256": "b97c6b99a5c25c365ee89ac1ee1a7ea33dc0cec4a59a8c61724fb81f748a98f8",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/honesty_diff.py",
-      "size_bytes": 5697,
-      "sha256": "110809a8100fdd6cd286de429cbaf909003ed1e0bf6730aa8338cbe2542eda83",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/lint.ps1",
-      "size_bytes": 1785,
-      "sha256": "34ff70111ede9b3025c9dce3a3185035d7609c153f5ea1af977a763cc5ec88e3",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/lint.sh",
-      "size_bytes": 1532,
-      "sha256": "96fccd8a54c62752ffa92dcfceaae622ee382b5f473ede246d405094fc7871d9",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/proof-collect.ps1",
-      "size_bytes": 2293,
-      "sha256": "f67ccb9e7a6a81fc8c07a11cb4f52fff0a470123758f5eb2af9f2cf80cef571b",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/proof-collect.sh",
-      "size_bytes": 2390,
-      "sha256": "31326c38b89027bf0e95c9848b8ad36c5d3341928922e59feff8cf2b48da776b",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/readme_claim_audit.py",
-      "size_bytes": 4795,
-      "sha256": "ba6c9fafbfdf93f10236e974d2b17ea76b7ecb6623b5ac7fa2338781ebfd8102",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/release.ps1",
-      "size_bytes": 3870,
-      "sha256": "711fbaed9968a69002de3387d18437249beaf5b25784e19d76f15c11d8ff5742",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/release.sh",
-      "size_bytes": 3373,
-      "sha256": "43e28511c0da3ef50d6c3101da53c8bb8cc1fb2f9ab8343e716b45497669f8a1",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/run-dev.ps1",
-      "size_bytes": 4723,
-      "sha256": "702d6c5ed4bbc468d74bda27a0c3ca4f6b7b768d53668c3143a90403ef24d0fd",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/run-dev.sh",
-      "size_bytes": 2655,
-      "sha256": "f18ef6419d9d8e7eb6e0904d4e77d6dcb97b44229886d77b7179841836f04549",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/test.ps1",
-      "size_bytes": 3776,
-      "sha256": "dc67004a4a00dd4ec0dbb6b89952081641760cc42d2bbd8bc15349e306dfad0e",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/scripts/test.sh",
-      "size_bytes": 3169,
-      "sha256": "1a12fd76a5372b6909348bab7b8522e827a31f6ad50df826ba028decd1e09b16",
-      "tier": "runnable",
-      "role": "script"
-    },
-    {
-      "path": "02-SCAFFOLDING/src/hermes3d/__init__.py",
-      "size_bytes": 910,
-      "sha256": "2f06972a5d58f7887a863f66c6c2d174f34d8ac6d92544ed58936a0cf966a0b6",
+      "path": "03_implementation/src/hermes3d/__init__.py",
+      "size_bytes": 919,
+      "sha256": "0098d0b4b0138744559a7243390ba5f7992d88cfd8364faed985c934e74b878c",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/api/__init__.py",
+      "path": "03_implementation/src/hermes3d/api/__init__.py",
       "size_bytes": 104,
       "sha256": "cb135c326bce29634d6406d24d686792561c1285e46ce34b76dd1bd16b2f6702",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/api/mcp_server.py",
-      "size_bytes": 25541,
-      "sha256": "aa3bf59e266f85322ee8879baa8053a913ed2debf7e302498f8798c16d2b4862",
+      "path": "03_implementation/src/hermes3d/api/mcp_server.py",
+      "size_bytes": 25550,
+      "sha256": "47b2f40d4f3d7b1dec7119ff3d4eca617f8ba2a16ad97487f4fb39a7d7ebe193",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/api/server.py",
-      "size_bytes": 16756,
-      "sha256": "d1a7cefd8d2d68683e29a7830981e042c1dfdc0d7d43af6f46d217043b58ebbb",
+      "path": "03_implementation/src/hermes3d/api/server.py",
+      "size_bytes": 16765,
+      "sha256": "6702cff84a23709785aed9848d0cf3d8ae28cd6c178e9e629a01d4ffcb403e86",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/app/__init__.py",
+      "path": "03_implementation/src/hermes3d/app/__init__.py",
       "size_bytes": 40,
       "sha256": "fb9d73cc2e819c2b90c76833f81d7f8e9743d3da3c4a6d41f71decfa1525e185",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/app/launcher.py",
-      "size_bytes": 8608,
-      "sha256": "47a85675ad8144fd73fd1ffeb4fadeef3b84580cb6626feed933d58466f68610",
+      "path": "03_implementation/src/hermes3d/app/launcher.py",
+      "size_bytes": 8624,
+      "sha256": "a703f32fa47e5bca81d99edc94cf0350fbb5c8d0fe54f2c8beb665f01be78a2a",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/cli/__init__.py",
+      "path": "03_implementation/src/hermes3d/cli/__init__.py",
       "size_bytes": 294,
       "sha256": "0e09bb91d09684a289f818ef55ca246fce7d346a501858f08ac31c17917b2127",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/cli/__main__.py",
-      "size_bytes": 19665,
-      "sha256": "30bd760733edbb85a0608bd6ce75d55cb95af81fae16a3f26f0e4f6d02fb04c9",
+      "path": "03_implementation/src/hermes3d/cli/__main__.py",
+      "size_bytes": 19674,
+      "sha256": "fad773b00ff0c0789d27358024a88a1451eab2c041f36505dd8d0d6db6e7e0d6",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/__init__.py",
       "size_bytes": 67,
       "sha256": "44afa41e34c053c7b9bb2ad622634118478990ac091bc005b51e1b526a42344f",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/agents/__init__.py",
       "size_bytes": 386,
       "sha256": "390c90f73955e46fb7e508127b34983feecdc608f2b21f3696ee1491ac7db9d2",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/auto_orient.py",
-      "size_bytes": 6615,
-      "sha256": "4c21d247f41b5d1e8967bb675d7dd45d7932cad230b896f15c504aa94c947e86",
+      "path": "03_implementation/src/hermes3d/core/agents/auto_orient.py",
+      "size_bytes": 6624,
+      "sha256": "4568f9352b628849c7e53d6af640f80d4408d78986f4b03516625365749b3dfa",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/auto_recovery.py",
-      "size_bytes": 6628,
-      "sha256": "852dbf934ea2989a42fbe7458f99898d91c28c69a1cf44794af374fb69333807",
+      "path": "03_implementation/src/hermes3d/core/agents/auto_recovery.py",
+      "size_bytes": 6637,
+      "sha256": "634acaa89c858c66a528ad639dcab30c837581313e6211e3dac03aec39c2899e",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/calibration.py",
-      "size_bytes": 4099,
-      "sha256": "f4e209bf33f41f7ab4184ef8e3e1d4d027206a34b1dc11c209fcfbbadaa6a787",
+      "path": "03_implementation/src/hermes3d/core/agents/calibration.py",
+      "size_bytes": 4108,
+      "sha256": "54a0e113dd5d80ace16329cbb7ae85abe9263d6b3e007e5e9a1d9ff9320ea299",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/dispatcher.py",
-      "size_bytes": 15034,
-      "sha256": "74be9760be6f3fda57a5567d85a4535098458a60129a315037a0a2dc4b5f5af7",
+      "path": "03_implementation/src/hermes3d/core/agents/dispatcher.py",
+      "size_bytes": 15043,
+      "sha256": "517ec2d764151e1b9ffbb17fc2186892e274d125c145a3d67e035192af04f3e2",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/equivalence.py",
-      "size_bytes": 3615,
-      "sha256": "a3cd2879dc2d298bab2fb66ee064126fcd30f029dd7eacc84bd30bce2046d6a6",
+      "path": "03_implementation/src/hermes3d/core/agents/equivalence.py",
+      "size_bytes": 3624,
+      "sha256": "ebc16060e658205c32da31a2f29013622c1aaaf5d54635377bf080abffd956f1",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/incident_detector.py",
+      "path": "03_implementation/src/hermes3d/core/agents/incident_detector.py",
       "size_bytes": 14783,
       "sha256": "6c166f5432a856bba1e73b9b3cb8ccb290729710047b657e41dbf50b46ac80f3",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/job_queue.py",
-      "size_bytes": 8877,
-      "sha256": "1e4e44b90d08e9c4a5a0f34b515f46111c010e24184d9ee7bb11e6a6a8185a80",
+      "path": "03_implementation/src/hermes3d/core/agents/job_queue.py",
+      "size_bytes": 8886,
+      "sha256": "d5d8cf7501037c6599c03db7d1c60af2b25746cca65cf011ecbc7e6d14ae2cf9",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/materials.py",
-      "size_bytes": 5205,
-      "sha256": "03ee3bf59ee692b1de2c71711f0444c36347b02ce07c13897a1c4dd048c0ece6",
+      "path": "03_implementation/src/hermes3d/core/agents/materials.py",
+      "size_bytes": 5214,
+      "sha256": "3b54de5845e6b6562ff89aafb4f06cf562ec986a64c9a1b80ede807e80c0970d",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/mesh_analyzer.py",
-      "size_bytes": 10346,
-      "sha256": "e7d9895650f726d3187fed6b1b14f0fc8713872655b9f25d9fb408ad3c125517",
+      "path": "03_implementation/src/hermes3d/core/agents/mesh_analyzer.py",
+      "size_bytes": 10355,
+      "sha256": "16b1d2f3bdc766b44af02e9b84a6b18e94499858fcb86003b19a8be84642b0d7",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/mesh_repair.py",
-      "size_bytes": 7738,
-      "sha256": "7d99d2d13d758d6c8dda9f98f99e7fc1b46c63f09cdd58ec6e5da7a97e86238a",
+      "path": "03_implementation/src/hermes3d/core/agents/mesh_repair.py",
+      "size_bytes": 7747,
+      "sha256": "3adc35f82bc7cda3bd3c08c6d4e6b85a28555f14c59d71acc44397a5ea6d9613",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/multi_agent.py",
-      "size_bytes": 11131,
-      "sha256": "1574e449c9290dbb6509bb597ccc936e631fe6bb03b2ddcc4b5d1ab05bccc31d",
+      "path": "03_implementation/src/hermes3d/core/agents/multi_agent.py",
+      "size_bytes": 11140,
+      "sha256": "b8592e197ea926cea5df148559ac342562a8afea35354cbbbbb141aae8224ff7",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/orchestrator.py",
-      "size_bytes": 7202,
-      "sha256": "27b7d9747e5871730d210d5e3e3ff160c89c52811fa17c0131da652543a0800f",
+      "path": "03_implementation/src/hermes3d/core/agents/orchestrator.py",
+      "size_bytes": 7218,
+      "sha256": "5a83f45fbf3a2c8ec2386dab82c8944cb17b09b73430b3162dc3ea58995f4f85",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/parallel_planner.py",
-      "size_bytes": 5104,
-      "sha256": "c54991b92fc6dd744774e930c33dc982480e0d3d8546b175aea96fc298c259c5",
+      "path": "03_implementation/src/hermes3d/core/agents/parallel_planner.py",
+      "size_bytes": 5113,
+      "sha256": "7844cbbf640c718674eac7b03a731b1d276597b9445238600020bce582e8b0ce",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/preflight.py",
-      "size_bytes": 8328,
-      "sha256": "da710d6fdad76ad97dcee05723a9b0e0e7038a34e1f679fa104b181b96c39d98",
+      "path": "03_implementation/src/hermes3d/core/agents/preflight.py",
+      "size_bytes": 8337,
+      "sha256": "1afedf2f20440cc14dc492aa175d68e0bbfc5ec6257c371866d5015fef733d14",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/quality_scorer.py",
+      "path": "03_implementation/src/hermes3d/core/agents/quality_scorer.py",
       "size_bytes": 7666,
       "sha256": "86f41a0f1322420045c0e5c80c44fa509a7302df50784645b09d8394b7fe0c16",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/scheduler.py",
-      "size_bytes": 7064,
-      "sha256": "f403eb56efc8110864d3fde9dd99bb09a3f93f9b5cf75bf3cd3a38ddd55e581b",
+      "path": "03_implementation/src/hermes3d/core/agents/scheduler.py",
+      "size_bytes": 7073,
+      "sha256": "f2a57ab0d75e4680431c19271d477f7bb42368f93c73bddd5b6bf973e8a91dfc",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/tool_registrations.py",
+      "path": "03_implementation/src/hermes3d/core/agents/tool_registrations.py",
       "size_bytes": 23629,
       "sha256": "a27f03be0a8e8162a066fcd7e0d122b61a5f9f1fe145c733b2bdc578a9a95fe0",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/agents/tool_registry.py",
+      "path": "03_implementation/src/hermes3d/core/agents/tool_registry.py",
       "size_bytes": 5051,
       "sha256": "adf9769170b8c6e3444b636b9ba0a565405c37ffdd2c34ccd60e4c9572bc340e",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/design/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/design/__init__.py",
       "size_bytes": 313,
       "sha256": "1d975a6dcb7841c00780820dc37988b762e01c3a6247ae701f59f687835f583c",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/design/desk_organizer.py",
-      "size_bytes": 14331,
-      "sha256": "aa08c961edb7008511b877aee9f30bc975e5047c49e61a7bccb8f69de17e2e50",
+      "path": "03_implementation/src/hermes3d/core/design/desk_organizer.py",
+      "size_bytes": 14325,
+      "sha256": "3e871370f48254c2655cce26fa9580b151cad1908ba1ae05f2e858722d669306",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/farm/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/farm/__init__.py",
       "size_bytes": 320,
       "sha256": "a684bd68024e4892789876d73f7b04bf3834884b626831e1edd3501be226575d",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/farm/backup.py",
-      "size_bytes": 5467,
-      "sha256": "2adf7a67f37d20f02b7540faf4a085b6a133da1c74dc12a2cafd84624935d983",
+      "path": "03_implementation/src/hermes3d/core/farm/backup.py",
+      "size_bytes": 5476,
+      "sha256": "d3b45f514094b2de12ed6c64a887f15bbecb0f917d5acfa256465b4d37661fda",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/farm/cost_estimator.py",
-      "size_bytes": 5870,
-      "sha256": "356851a42de4a125bbecabec022417fcc6c9c91d15af66c755550f2b5f796c2b",
+      "path": "03_implementation/src/hermes3d/core/farm/cost_estimator.py",
+      "size_bytes": 5879,
+      "sha256": "930a069e8a270bdd285c21636297df005a70dbc778a053c28e101932e4a5741a",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/farm/dashboard.py",
-      "size_bytes": 5269,
-      "sha256": "702cd4510a97c17e39a123f17786f8613706eb0b7169f22bcf303dd930ddc747",
+      "path": "03_implementation/src/hermes3d/core/farm/dashboard.py",
+      "size_bytes": 5278,
+      "sha256": "8a9d0d59d791a10333badc5ea3ff136561905c167efe2d16c1256d50aa4fc936",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/farm/print_history.py",
-      "size_bytes": 6844,
-      "sha256": "d9bcc236e6ac10a3f307557026452ff2c2aa490f981a28db9d6a12e0f2b9cc5d",
+      "path": "03_implementation/src/hermes3d/core/farm/print_history.py",
+      "size_bytes": 6853,
+      "sha256": "25af60803d4a38fbc12b7a70b8b42dd722565a72a6af181696bb0bdb9e690b70",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/farm/spool_tracker.py",
-      "size_bytes": 6447,
-      "sha256": "5673be75331d2451592d73e5066cec662550e0de9f55366796e380f367a93af3",
+      "path": "03_implementation/src/hermes3d/core/farm/spool_tracker.py",
+      "size_bytes": 6456,
+      "sha256": "7b0cc28c02e7a7b5a5b020651cba4bb506b7b10c0814cb881ad635c7f184380e",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/integrations/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/integrations/__init__.py",
       "size_bytes": 383,
       "sha256": "7d090591556d3c157e8adf65fc6679005f6f40db8d8d86deac33193c3717a74d",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/integrations/farm_discovery.py",
+      "path": "03_implementation/src/hermes3d/core/integrations/farm_discovery.py",
       "size_bytes": 5963,
       "sha256": "e8c8248699f7bcefd32a3955dadb8584594298dfe770705f5cb2a4afddcdcbaf",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/integrations/obico_client.py",
-      "size_bytes": 4950,
-      "sha256": "b70c67d8be077c27e7d358e3bfdbfb129ff8848d4068f1ee8570ebfa6ff79a82",
+      "path": "03_implementation/src/hermes3d/core/integrations/obico_client.py",
+      "size_bytes": 4959,
+      "sha256": "6624c0748aca217212dbff43aa9b37e10c4ab2906cdd016cd9588fd28eb903d7",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/integrations/octoprint_client.py",
-      "size_bytes": 5608,
-      "sha256": "991aa5b5e3fa3e4e3291dbe4001066fe5e0fc3a92b1259904e10c340f7f486b5",
+      "path": "03_implementation/src/hermes3d/core/integrations/octoprint_client.py",
+      "size_bytes": 5617,
+      "sha256": "3d2c520f86a0dde73145eb1aa5ecdfeae8bc4b804ddb62bf710ce378a2e7a45f",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/integrations/remote_control.py",
-      "size_bytes": 11209,
-      "sha256": "37753fd646d32e6525c6d33bd2f04fac0c40f19981d68f35dace5a6a9c3d644a",
+      "path": "03_implementation/src/hermes3d/core/integrations/remote_control.py",
+      "size_bytes": 17662,
+      "sha256": "dcb19ff4da80bf905ef35753f34ef52b6715156787060698d7c3c3f21ac82ccb",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/intelligence/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/intelligence/__init__.py",
       "size_bytes": 318,
       "sha256": "480adf13bf0031ef252001802492fea79eceb4ba885f91015c761d9d39fa9043",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/intelligence/failure_predictor.py",
-      "size_bytes": 5941,
-      "sha256": "a3f9cd95da4432d3d909a104ead186a7665d66cb0355baae5a3d943ebf05832b",
+      "path": "03_implementation/src/hermes3d/core/intelligence/failure_predictor.py",
+      "size_bytes": 5950,
+      "sha256": "3e9c661920e84a480f81ba5307adf454dc5ef688242f4c7ff27835a47da0506b",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/intelligence/self_improvement.py",
+      "path": "03_implementation/src/hermes3d/core/intelligence/self_improvement.py",
       "size_bytes": 9892,
       "sha256": "8aa70fca86d7964f99e980371517cc06a9991ee3549d01fd328893f08e922e5b",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/llm/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/llm/__init__.py",
       "size_bytes": 285,
       "sha256": "e2d1fa66c4f238307cd8e8acc6760f77493747d7474a3116ba05af5947965fbe",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/llm/ollama_client.py",
-      "size_bytes": 8377,
-      "sha256": "15a9e6e618cbd317a53213491697ed3519eb1d7a87a106a3c530d2bad5ad5cc7",
+      "path": "03_implementation/src/hermes3d/core/llm/ollama_client.py",
+      "size_bytes": 8386,
+      "sha256": "b642aead1657d555a14eccdb3ab5d3615e71a2a89957686b80c76b9cc67b2063",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/llm/providers.py",
+      "path": "03_implementation/src/hermes3d/core/llm/providers.py",
       "size_bytes": 9659,
       "sha256": "a3d18713b45d27d575743db7ef7ca1e1cdeb6fe7386cfbf1a9873353b779c4a0",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/memory/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/memory/__init__.py",
       "size_bytes": 258,
       "sha256": "98b8c41269e8c69c723d5ed9df00dc586d78907895c1b7a245cf8ab86830fe99",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/memory/skill_pack.py",
-      "size_bytes": 7738,
-      "sha256": "f2198f91885dd8e1552d6f1db464d50efc545d2cf13927a64cde437760740db4",
+      "path": "03_implementation/src/hermes3d/core/memory/skill_pack.py",
+      "size_bytes": 7747,
+      "sha256": "c5979a66a98fb13bf868592414ee689a322e1dd68ffc9eb3eb6688998e989bd3",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/memory/skill_store.py",
-      "size_bytes": 10270,
-      "sha256": "0f2e51caacd3ddffa5ce36850ebee61f80f2272089c69a393da367c528314588",
+      "path": "03_implementation/src/hermes3d/core/memory/skill_store.py",
+      "size_bytes": 10279,
+      "sha256": "deb581f9e98b92a6f1b0d73c5acf08a369acc6906b066971dc2618bc9925c64c",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/memory/vector_memory.py",
+      "path": "03_implementation/src/hermes3d/core/memory/vector_memory.py",
       "size_bytes": 8491,
       "sha256": "a7d7a2848034a043aa343556d9f2cbdddb116499e92ab8c8ee08828adfa935d1",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/modeling/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/modeling/__init__.py",
       "size_bytes": 427,
       "sha256": "6da4cd8e5456d2aceec0f46b0d59931378efa5a1c426e711d6a51fb77f820b81",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/modeling/blender_mcp_server.py",
-      "size_bytes": 7802,
-      "sha256": "fe85f0948cd02f4cf52d433e6d0d5d11a2c61c5dd027e64b9cf7cf8451fb8939",
+      "path": "03_implementation/src/hermes3d/core/modeling/blender_mcp_server.py",
+      "size_bytes": 7825,
+      "sha256": "f3d243bc2fac812e70890cbeada1f0357987ff754a3c13fd731174e988bf4449",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/notifications/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/notifications/__init__.py",
       "size_bytes": 508,
       "sha256": "cfe8cc71ab77be303bfb575581c93d9115e2ed1ff4eb0d2643bf512970048d33",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/notifications/notifier.py",
-      "size_bytes": 9656,
-      "sha256": "3594e7c96e27f35c4810fd28c14b96ed6655a5b74b0b09d029327b94673bd152",
+      "path": "03_implementation/src/hermes3d/core/notifications/notifier.py",
+      "size_bytes": 9665,
+      "sha256": "7fae63b692c1ed06a8d16c22350c51c51c9e405566ed6b10804fe78072fa6b41",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/orchestration/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/orchestration/__init__.py",
       "size_bytes": 454,
       "sha256": "02f8d0b32ebc5fed99aca3f8f1b8277fcd88deab2c242c8ff28e6a692f4250ed",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/orchestration/agent_graph.py",
-      "size_bytes": 10410,
-      "sha256": "773a5d90ce49af06113350f21ba6b266916c3a14bcf9fe011d361c329f759412",
+      "path": "03_implementation/src/hermes3d/core/orchestration/agent_graph.py",
+      "size_bytes": 10419,
+      "sha256": "578cbfec23173a237494e5ad290db36cafb6dc3a2a7606bf5e1ea8bafcae6e07",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/orchestration/langgraph_adapter.py",
+      "path": "03_implementation/src/hermes3d/core/orchestration/langgraph_adapter.py",
       "size_bytes": 4788,
       "sha256": "25f438be960fb4beb57207f676bf917648aad558e98ee973a257ebbb75092cc3",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/orchestration/print_workflow.py",
-      "size_bytes": 21698,
-      "sha256": "ce382291a9130e745086d61dfaa1242d37a3d62d91e52118bf692e4b3fcda6f0",
+      "path": "03_implementation/src/hermes3d/core/orchestration/print_workflow.py",
+      "size_bytes": 23778,
+      "sha256": "3beddbd9ec4ed53fc6b93eb3a7f9cb4ff0d52a8906520106377da8953addf6ae",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/printers/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/orchestration/repair_agent.py",
+      "size_bytes": 8959,
+      "sha256": "f04bc17811e183fd5f34b9ce066037f05132f4b024ea55a1188500415da16fde",
+      "tier": "runnable",
+      "role": "module"
+    },
+    {
+      "path": "03_implementation/src/hermes3d/core/orchestration/retry_controller.py",
+      "size_bytes": 4893,
+      "sha256": "0409e18715a4252c09726cfc3903b37c0a9790d825508a7084cb54788a54b4c0",
+      "tier": "runnable",
+      "role": "module"
+    },
+    {
+      "path": "03_implementation/src/hermes3d/core/printers/__init__.py",
       "size_bytes": 994,
       "sha256": "6cf7f61ae1f32b0715aaa111ede17c8d71c990c62232544992a3c36a6af23a23",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/printers/moonraker_client.py",
-      "size_bytes": 12646,
-      "sha256": "ca04a112411581aeee5cf66a6e408d4139757d8ebd8801498bf104ffb7d40c46",
+      "path": "03_implementation/src/hermes3d/core/printers/moonraker_client.py",
+      "size_bytes": 12655,
+      "sha256": "a5754a161e9dfca0301bad0b69f055e33bb528602505a4589f6d337d6641608f",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/printers/printer_profiles.py",
+      "path": "03_implementation/src/hermes3d/core/printers/printer_profiles.py",
       "size_bytes": 19257,
-      "sha256": "6a45e5aac4e38cb45b3d582807f896125fb06c52cd03bef108813f57f0dd56f0",
+      "sha256": "da009b6cb0977e74dffc24cbf690df9fc97f4dc67243d23f6fc149bb4ea786e2",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/proof/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/proof/__init__.py",
       "size_bytes": 881,
       "sha256": "67647e8d616726bd824945a00554e991ea94b306ca04468c0d47db237ba757bc",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/proof/proof_envelope.py",
+      "path": "03_implementation/src/hermes3d/core/proof/proof_envelope.py",
       "size_bytes": 12106,
       "sha256": "8fe6873b997fe6ceaa0a2c672bd06bca65c14bcdb81bd18b9477f3ab7063c63a",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/slicer/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/slicer/__init__.py",
       "size_bytes": 513,
       "sha256": "7ea9116ead51d161a65aa9613cfd2953b5e405c650f78cb9ccc42181c6a7e0e6",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/slicer/gcode_analyzer.py",
-      "size_bytes": 11016,
-      "sha256": "ae864e37465bcc59e25ab606739c53f396943f9a57a38921c6b2f51a45bf22e9",
+      "path": "03_implementation/src/hermes3d/core/slicer/gcode_analyzer.py",
+      "size_bytes": 11025,
+      "sha256": "3fa6252666bd0ce61652af359ca911360b65b1b33bef325a04ee5a5e3c30eae3",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/slicer/postproc_generator.py",
-      "size_bytes": 11426,
-      "sha256": "dca03a3c93f2d6258f5bdc02b9c4ef98353a4bfaa9d36ea4b6cfb2189d1e361c",
+      "path": "03_implementation/src/hermes3d/core/slicer/postproc_generator.py",
+      "size_bytes": 11435,
+      "sha256": "a865d1a18bea05f0962769ec7763274f4c7194802b5d519cf25b6369fb23bf02",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/slicer/profile_generator.py",
-      "size_bytes": 10062,
-      "sha256": "e2cc1bfa21be331cd282e5c75e952d398517144a1af32d07660fd88652423453",
+      "path": "03_implementation/src/hermes3d/core/slicer/profile_generator.py",
+      "size_bytes": 10071,
+      "sha256": "8c136e270ed06ef2e9e5fbb45a5b29581ebddefd8a1b0fb38ba47e6b7b2439ed",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/slicer/slicer_runner.py",
+      "path": "03_implementation/src/hermes3d/core/slicer/slicer_runner.py",
       "size_bytes": 10458,
       "sha256": "6833c87e8856a66bf762867319914c471ab852a984c367e164f5dfd71b11d42c",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/supervisor/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/supervisor/__init__.py",
       "size_bytes": 248,
       "sha256": "95150c0b6f79d17969254a6e444c0063efbc1c0061a00a5c3a854cfc7f38ae6e",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/supervisor/daemon.py",
-      "size_bytes": 14855,
-      "sha256": "25d5b2a2e41a8dee037ef6d3bfab5db1cad8517f05f48f358a55183998b69c67",
+      "path": "03_implementation/src/hermes3d/core/supervisor/daemon.py",
+      "size_bytes": 14864,
+      "sha256": "fd072dac6d357444ef9415790572affc9f292317bd7f5016fce68006241febc7",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/validation/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/validation/__init__.py",
       "size_bytes": 303,
       "sha256": "9afde8be57865c64a44010dc2ce007b90ec38e471be921a6f4237708ca58cefb",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/validation/truth_gate.py",
-      "size_bytes": 20643,
-      "sha256": "fd430cc42ba1b25ae3c08e22eaeda0aed88fbdf9f0343de2843373bba751d1c2",
+      "path": "03_implementation/src/hermes3d/core/validation/truth_gate.py",
+      "size_bytes": 20652,
+      "sha256": "a8c250620128660fab3a3c511c8d2349b0ecc5089be660cb08acceb259f229d7",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/visual/__init__.py",
+      "path": "03_implementation/src/hermes3d/core/visual/__init__.py",
       "size_bytes": 288,
       "sha256": "40dbace3ae49cbed7eaa2f65e3eb393a286dc9199adafe301efc098b7c3fc7d1",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/src/hermes3d/core/visual/render.py",
+      "path": "03_implementation/src/hermes3d/core/visual/render.py",
       "size_bytes": 6572,
       "sha256": "dc5f6f48c2281f3726b72f49916351905db127404d5972e7efe9b54a397a7ce0",
       "tier": "runnable",
       "role": "module"
     },
     {
-      "path": "02-SCAFFOLDING/tests/__init__.py",
-      "size_bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/conformance/__init__.py",
-      "size_bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/conformance/test_acceptance.py",
-      "size_bytes": 4621,
-      "sha256": "8cbacae6de16210709360cd035447844956b611aed8e758a95cc675348795228",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/conftest.py",
-      "size_bytes": 285,
-      "sha256": "d54d7d3ebbaecf76841da296a54d34affd593a4e0041d2ef58d0a4eb94523b59",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/integration/__init__.py",
-      "size_bytes": 0,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/integration/test_proof_pipeline.py",
-      "size_bytes": 5423,
-      "sha256": "572bb647710ce9d8ce737328252ca605819df986aaef0b5f300602ddb6aee5f6",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_agentic_modules.py",
-      "size_bytes": 23624,
-      "sha256": "1e7871ee71943ec979e986d2309c40478df3dfd84cdcf93204451cb34eab299c",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_brain_layer.py",
-      "size_bytes": 13337,
-      "sha256": "28dae0116c30e49e0d541252492de30085f977be8840919a029c180813550fc6",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_dispatcher.py",
-      "size_bytes": 7629,
-      "sha256": "29a4749722188c016fd30b169f12fe99b62419e802a94046a6095c03b5e54823",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_expansion_modules.py",
-      "size_bytes": 14618,
-      "sha256": "c7d4804bf2375de1abe8ab340e63c466132b7ee9d1b1a1a8472f9269b5d3a18d",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_organizer_and_truth_gate.py",
-      "size_bytes": 5118,
-      "sha256": "b20395b0e34738fcd34b6d594bd55953bd63337973822aadbca073cd927f61e3",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_printer_fleet.py",
-      "size_bytes": 6794,
-      "sha256": "ca3e30141a9792c913bdb508d5b56bac7da803215201d6f81c5b666cc6d61430",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_second_wave_modules.py",
-      "size_bytes": 25638,
-      "sha256": "489240a7060437b6e3675a9ec6c41c101d3b5e6e2221a250e627735c7df52435",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "02-SCAFFOLDING/tests/unit/test_tool_registrations.py",
-      "size_bytes": 17774,
-      "sha256": "39d1f2442eabfa7c34a12aee28701fd0b0f9b25081456c745efb2da7edec9a2d",
-      "tier": "runnable",
-      "role": "test"
-    },
-    {
-      "path": "03-PROOF-SYSTEM/PROOF_PROTOCOL.md",
-      "size_bytes": 9003,
-      "sha256": "842a72cd96391811a960485c1e829e944924fae0222529254ae1f4552118d902",
-      "tier": "runnable",
-      "role": "proof"
-    },
-    {
-      "path": "03-PROOF-SYSTEM/conformance_runner.py",
-      "size_bytes": 10276,
-      "sha256": "4ecc027f24869db5c0d3b722cdefa86ac23a5e6e96f1aa472642d53f81eb57b9",
-      "tier": "runnable",
-      "role": "proof"
-    },
-    {
-      "path": "04-TEST-CASE-DESK-ORGANIZER/ACCEPTANCE_CRITERIA.md",
-      "size_bytes": 6802,
-      "sha256": "2b268fd117f1b6ac9c997a933e2562df6e3e532077e04889dfedb3266dbf89eb",
+      "path": "04_testing/acceptance/ACCEPTANCE_CRITERIA.md",
+      "size_bytes": 6811,
+      "sha256": "fefb81b83eb4446a063cbbddae4ee1280adb237aa136db4f223263aa8b1e6515",
       "tier": "runnable",
       "role": "acceptance_test"
     },
     {
-      "path": "04-TEST-CASE-DESK-ORGANIZER/DESIGN_BRIEF.md",
+      "path": "04_testing/acceptance/DESIGN_BRIEF.md",
       "size_bytes": 4797,
       "sha256": "fe01fbed9181576355f49b1e602f60b26c850356d1e8fb6586bf484d106b11db",
       "tier": "runnable",
       "role": "acceptance_test"
     },
     {
-      "path": "04-TEST-CASE-DESK-ORGANIZER/README.md",
-      "size_bytes": 4914,
-      "sha256": "7e7d0f224d5bcf374c619f39b11e4a984140547bf70b87a6c9de9fcb4be6c47d",
+      "path": "04_testing/acceptance/README.md",
+      "size_bytes": 4899,
+      "sha256": "42e698eae3fedb5f255c32481c5b7ef46d71b35b647c0fe404e860d53a4f7049",
       "tier": "runnable",
       "role": "acceptance_test"
     },
     {
-      "path": "04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py",
-      "size_bytes": 7826,
-      "sha256": "f92b557b93b484d48d43c6b7ef206ee652745cdc730508d3122c08c6474b2731",
+      "path": "04_testing/acceptance/run_acceptance.py",
+      "size_bytes": 7884,
+      "sha256": "43bd0827a1f4ae42d8be7dc975c72c734ea1f1c4c4609c2e1ffd3b8fca3b19a8",
       "tier": "runnable",
       "role": "acceptance_test"
     },
     {
-      "path": "05-INSTALLER/install.ps1",
-      "size_bytes": 5282,
-      "sha256": "9614aa3197e035d15778133957389e20c16ec81f128eb37b8782ad6bc9cbf1b1",
+      "path": "04_testing/pytest/conformance/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/conformance/test_acceptance.py",
+      "size_bytes": 4621,
+      "sha256": "8cbacae6de16210709360cd035447844956b611aed8e758a95cc675348795228",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/conftest.py",
+      "size_bytes": 403,
+      "sha256": "6a3eb89dcdc3d196da773fd10803863157fec4fcafcc74393a20269591255006",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/integration/__init__.py",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/integration/test_proof_bundle.py",
+      "size_bytes": 4399,
+      "sha256": "ef5f7c82713b7dfa0c9d21772c522df32796696569b48e6aaa6ead8f8ad9b2b1",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/integration/test_proof_pipeline.py",
+      "size_bytes": 5423,
+      "sha256": "572bb647710ce9d8ce737328252ca605819df986aaef0b5f300602ddb6aee5f6",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/integration/test_workflow_retry.py",
+      "size_bytes": 2590,
+      "sha256": "4e3882b3f8b92e1cafcd3c4de1ab16efe5880e7e3943569208286c611ce0a317",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_agentic_modules.py",
+      "size_bytes": 23624,
+      "sha256": "1e7871ee71943ec979e986d2309c40478df3dfd84cdcf93204451cb34eab299c",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_brain_layer.py",
+      "size_bytes": 13337,
+      "sha256": "28dae0116c30e49e0d541252492de30085f977be8840919a029c180813550fc6",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_dispatcher.py",
+      "size_bytes": 7629,
+      "sha256": "29a4749722188c016fd30b169f12fe99b62419e802a94046a6095c03b5e54823",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_expansion_modules.py",
+      "size_bytes": 14618,
+      "sha256": "c7d4804bf2375de1abe8ab340e63c466132b7ee9d1b1a1a8472f9269b5d3a18d",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_organizer_and_truth_gate.py",
+      "size_bytes": 5118,
+      "sha256": "b20395b0e34738fcd34b6d594bd55953bd63337973822aadbca073cd927f61e3",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_printer_fleet.py",
+      "size_bytes": 6794,
+      "sha256": "ca3e30141a9792c913bdb508d5b56bac7da803215201d6f81c5b666cc6d61430",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_remote_control.py",
+      "size_bytes": 15922,
+      "sha256": "8a2c3aea3b1ede238f4ad07eb2547beab17902625f2fe98f4598043587071df7",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_repair_agent.py",
+      "size_bytes": 3111,
+      "sha256": "047178ff759651642c6099a674d6891e37d151fbdddff5f2b9bfd9ff6e5904a9",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_retry_controller.py",
+      "size_bytes": 2846,
+      "sha256": "078e89953d3c84d442f5cb99f6a3846917589d470fb4d4c5cd3a7ffc41a94768",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_second_wave_modules.py",
+      "size_bytes": 25638,
+      "sha256": "489240a7060437b6e3675a9ec6c41c101d3b5e6e2221a250e627735c7df52435",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "04_testing/pytest/unit/test_tool_registrations.py",
+      "size_bytes": 17774,
+      "sha256": "39d1f2442eabfa7c34a12aee28701fd0b0f9b25081456c745efb2da7edec9a2d",
+      "tier": "runnable",
+      "role": "test"
+    },
+    {
+      "path": "05_truth_proof/BUNDLE_FORMAT.md",
+      "size_bytes": 4356,
+      "sha256": "d4b86e21bed706f9a7b6c9fb42968b32339dac7222404747382e197327234ed4",
+      "tier": "runnable",
+      "role": "proof"
+    },
+    {
+      "path": "05_truth_proof/PROOF_PROTOCOL.md",
+      "size_bytes": 9011,
+      "sha256": "12bbf43ddf7a3e42782caac14baeaaaa7fdd22216535432ccb09c4ce84579cba",
+      "tier": "runnable",
+      "role": "proof"
+    },
+    {
+      "path": "05_truth_proof/bundles/.gitkeep",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tier": "runnable",
+      "role": "proof"
+    },
+    {
+      "path": "05_truth_proof/conformance_runner.py",
+      "size_bytes": 16077,
+      "sha256": "985266b9d22f7b179a8196d54ba638c88495ac4e40c60adae3c6daa91ff65e87",
+      "tier": "runnable",
+      "role": "proof"
+    },
+    {
+      "path": "06_release/BRANCH_STRATEGY.md",
+      "size_bytes": 2316,
+      "sha256": "ff1e800fd308c6158d4256a859a55e4b10da1716287cb5cca40ad4412416680e",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "06_release/QUICKSTART_NONCODER.md",
+      "size_bytes": 3422,
+      "sha256": "d56e1ede18576084bca18ebae84f36c0f302ac4332bced06acf5942f5913f4ab",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "06_release/ROLLBACK_RUNBOOK.md",
+      "size_bytes": 3496,
+      "sha256": "8c12b3b5910396825057003f468e092c4ec7f4b4ed4a60886229a60cefe9057c",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "06_release/installer/install.ps1",
+      "size_bytes": 5320,
+      "sha256": "fdc9cb9a3aa755fa45cc12183c280d05f8051a0d3cf55faa991957ac15ee7124",
       "tier": "runnable",
       "role": "installer"
     },
     {
-      "path": "05-INSTALLER/install.sh",
-      "size_bytes": 5282,
-      "sha256": "062663d95a0925bd2225cb6a81461e3966746a678f990a40da73f260fb1931cb",
+      "path": "06_release/installer/install.sh",
+      "size_bytes": 5296,
+      "sha256": "ac36e8119c371defcc45a8762d8628c85c8cfd0477f337d190ca75bdc26a04ab",
       "tier": "runnable",
       "role": "installer"
     },
     {
-      "path": "05-INSTALLER/manifest.json",
+      "path": "06_release/installer/manifest.json",
       "size_bytes": 2471,
       "sha256": "af325ab9d0d060671c807989412ba745817f2014f6721395f1fba243b939e4ec",
       "tier": "runnable",
       "role": "installer"
     },
     {
-      "path": "05-INSTALLER/verify_install.py",
-      "size_bytes": 6479,
-      "sha256": "1bcbab472cfa558dd4a596529fdad2eca1b1544419f33e026f3314b914e19e6b",
+      "path": "06_release/installer/verify_install.py",
+      "size_bytes": 6457,
+      "sha256": "746b72a6100efcd8efd2e3d87fa3864010e44e236186420ef987a7103d2c3e4f",
       "tier": "runnable",
       "role": "installer"
     },
     {
-      "path": "07-DOCS/AGENTIC_AUTOMATION.md",
-      "size_bytes": 8575,
-      "sha256": "8759fa9eef5e55891eb07c2d2e0d3b86c69ead2af969b3b10a6d8f867330ed70",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "HERMES3D_DELIVERY_README.md",
+      "size_bytes": 4428,
+      "sha256": "f4a7ccb62f6d49c149bc310e04b9206a8fbd64309cfae6710084696fc2c75625",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/AI_PROGRAMMER_GUIDE.md",
-      "size_bytes": 10939,
-      "sha256": "f82ab85cdf8f1aaeb363a46156a3b32ae7b13c74fe3e0a43962b482f991e9500",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "Hermes3D-OS.md",
+      "size_bytes": 16572,
+      "sha256": "1ac63868a446a442039ff0bc6923b27f06bee21127d3e4d8dee55bbb92aea28d",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/ARCHITECTURE.md",
-      "size_bytes": 9847,
-      "sha256": "a0056c77a152132ea2129f01ee602eaab01b25294cb2c2c2b3b379d6726cc8a3",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "README.md",
+      "size_bytes": 3645,
+      "sha256": "917c0c62d1e1b02a2a4138eb708c59caaf7f1c65173b266374d54472000c1f3d",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/BRAIN_LAYER_GUIDE.md",
-      "size_bytes": 9262,
-      "sha256": "18a072f6747161471534a9da2666fdd219b8589ba225655cc624ad87e080ca34",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "agents/README.md",
+      "size_bytes": 4454,
+      "sha256": "96e9fc8502f4d8a5e36ad5db4d969e36c15c8303eea4cc59854aaf3f5393cbf0",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/CHANGELOG.md",
-      "size_bytes": 5358,
-      "sha256": "f5c4a139976ee5f5e280c6184c6684f8faf4d1878dad7f4fc025b0be34f02b3f",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "agents/_schema.json",
+      "size_bytes": 3467,
+      "sha256": "aba2b7c92f11f0de0a64a766eba187ec4a9d51ca87d49d961115963eded7780e",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/PRINTER_FLEET_GUIDE.md",
-      "size_bytes": 6798,
-      "sha256": "d07e20b934d998f3312ff8fc6977b597ff6a182a3da05bbe92478ba9ce42cfef",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "agents/architect.yaml",
+      "size_bytes": 1708,
+      "sha256": "e5417228d9391b79783f17dc3a4f17740b2ac38e632568458b8390cf11e48217",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/README.md",
-      "size_bytes": 5705,
-      "sha256": "14bc5a099788c56117a58fff9c18d896803742e5ed1e599da5b88509b4388ac4",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "agents/auditor.yaml",
+      "size_bytes": 1317,
+      "sha256": "f2bd3419dde8417ad8823b0c0e63da3e01be7e37f44bf1c19df2e3bda9321998",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/SECURITY.md",
-      "size_bytes": 6837,
-      "sha256": "ea653dcdd9677d90dccd257898023bbb9531e0c6b97b74d2599d0828af52d7d8",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "agents/branchguard.yaml",
+      "size_bytes": 1356,
+      "sha256": "408572ff1dcbc30fe57ce462b9c1a9ac3eb1cb8e7adb2f5e724f9ee78dc69252",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
-      "path": "07-DOCS/TROUBLESHOOTING.md",
-      "size_bytes": 5811,
-      "sha256": "a45aca6bb0484264acf02eab17abff083bd89bef66f20b0a24fe78069a27b8b3",
-      "tier": "runnable",
-      "role": "doc"
+      "path": "agents/bundlesigner.yaml",
+      "size_bytes": 1505,
+      "sha256": "051dafa9e71f55167d30f212248eb4d96fb843def7e4bb337b403d5eac448437",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "agents/implementer.yaml",
+      "size_bytes": 1802,
+      "sha256": "553ad7aed863b49dce6bced98e5adf592f51a438e122ff2f05f2ca877447ef97",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "agents/preflight.yaml",
+      "size_bytes": 971,
+      "sha256": "7c5b6d2252964eaa8c9da976ecb1b69f357b3c726db42e37789d5b54c58d19be",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "agents/qa.yaml",
+      "size_bytes": 1553,
+      "sha256": "437d589caf1ef04f5bbfc2e744dc80b28d25e2566795b4fe57a0c3345161dd38",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "agents/releaser.yaml",
+      "size_bytes": 1614,
+      "sha256": "a7cf33d7bdf1842e0337529b6717d66d8ab6c4bf7b2e01d7b4bd03be358399b8",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "agents/repair.yaml",
+      "size_bytes": 1776,
+      "sha256": "670e9d38292218b65643a907f8af8ce1ab7620df290959f26d4f5b3e28cee5eb",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "agents/reviewer.yaml",
+      "size_bytes": 1883,
+      "sha256": "22d9e13e88c445dff3c1e287bfefb4c2f619a8d701ea52937c498f2de29bfc80",
+      "tier": "spec",
+      "role": "unknown"
     },
     {
       "path": "env/.env.example",
@@ -1086,8 +1216,8 @@
     },
     {
       "path": "pyproject.toml",
-      "size_bytes": 2176,
-      "sha256": "07a473d78f0cd335e3c6ce4800a798eb63a408c6913d66eec8ddff244a0fa212",
+      "size_bytes": 2289,
+      "sha256": "ecb8fc2200dfa8b1125a8c66300ce6205f3711f072a11674ff471c6ef745142d",
       "tier": "runnable",
       "role": "config"
     },
@@ -1100,17 +1230,234 @@
     },
     {
       "path": "requirements.txt",
-      "size_bytes": 224,
-      "sha256": "fe0fd62d0e4f6f00bf0c21095c86db92db5dc3b6e93d430bc535d490e74c4930",
+      "size_bytes": 255,
+      "sha256": "f5f599c7206289a13d2a9e99b6e00876bcb33fc43c683bbfa8f342edd04669ff",
       "tier": "runnable",
       "role": "deps"
     },
     {
       "path": "run.bat",
-      "size_bytes": 1092,
-      "sha256": "23688e294b17a721e815b5bdf8c6171265e11d3b7d53686f6d7e127f5053a9d3",
+      "size_bytes": 1089,
+      "sha256": "9e75143997a09381b022102a136f3c775185548bdb3687edfa3917bf1c003814",
       "tier": "runnable",
       "role": "script"
+    },
+    {
+      "path": "scripts/_build_bundle.py",
+      "size_bytes": 12421,
+      "sha256": "9c9e6019a5e9b48efb09ae2c6f22ed5766a52dfcfbe9304690216b4cebfd5e5c",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/build-bundle.ps1",
+      "size_bytes": 852,
+      "sha256": "8728c27d145bd696d650c99b5997988c67f947f797291cf0a96a70da74cead30",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/build-bundle.sh",
+      "size_bytes": 528,
+      "sha256": "5442e3a44aff0c46a878c2ff5a1c0a1386ae1c9e0ff0e19d49c2727f4acc9361",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/install-hooks.ps1",
+      "size_bytes": 1032,
+      "sha256": "d0c177a2ead42d08b7f3c507084423bad1b24b161bd06d26fc448bfff88cf399",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/install-hooks.sh",
+      "size_bytes": 1071,
+      "sha256": "1656bd9ef7b56e0678d4ddc98ac466d0194702b6e034a654cf3c590d7269e643",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/new-feature.ps1",
+      "size_bytes": 1677,
+      "sha256": "f8c1248db88440d216dfa61fb9f27d5b4da9d641b49cad48b666ab92300b6b80",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/new-feature.sh",
+      "size_bytes": 1678,
+      "sha256": "f1654b617c80026877917fa4ab4544db6be8af9e1f3f064988cd2147d628419a",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/preflight.ps1",
+      "size_bytes": 3020,
+      "sha256": "5a504d15e627dfaf40741bde426fd0292f614989772d2e2135d365b07201a098",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/preflight.sh",
+      "size_bytes": 3266,
+      "sha256": "7f8db3eca3232cb939ea81c8169497ae36a1bc11ac068b539bd40b9607d2d19b",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/scaffolding/build.ps1",
+      "size_bytes": 1158,
+      "sha256": "37861bff1577c76d8291231aad54e8226cf93e0d84f5ef9812dc2f5463151632",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/build.sh",
+      "size_bytes": 636,
+      "sha256": "05136744f0e739678054eeb68a2671dc330ede4aafadf3838aee69395c5a64d1",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/doctor.ps1",
+      "size_bytes": 8139,
+      "sha256": "d2ca9d1d8707f60666036f1bd1c72d93d2f76a24cf2b5d1884dffbf9b55b3872",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/doctor.sh",
+      "size_bytes": 6417,
+      "sha256": "197c9b6a7e994d324b9c5a49ad2d88c5d151bc34246e863ef8200b5b864e3edc",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/forbidden_pattern_scan.py",
+      "size_bytes": 5784,
+      "sha256": "b5acf6d8458476f1e8fc4accdf123f71d2430d6dba040cd812cbe2ec8bd09ed1",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/format.ps1",
+      "size_bytes": 599,
+      "sha256": "9129bbefef4f9c2b6cf0cc6d330900c39bd9c36dd584631d2a919a14c8a87dbd",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/format.sh",
+      "size_bytes": 398,
+      "sha256": "8a8015c421b5e326cd2b091d353569a5a7ea4b5b608d2b30aea0f473ca921336",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/honesty_diff.py",
+      "size_bytes": 5741,
+      "sha256": "9268bd7d5033f9bc9012d374689ac1373b563a35294fc1ebc8444228429288fe",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/lint.ps1",
+      "size_bytes": 1901,
+      "sha256": "59f2cee6ca88b1fb2f82ac2767a0d09bcee2f385b9bdcd3dabacd1fbda3fa186",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/lint.sh",
+      "size_bytes": 1649,
+      "sha256": "7bee923304a2de05de9dbfd7660c6fd4852f924ddcdfab5eab86d564500b0a09",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/proof-collect.ps1",
+      "size_bytes": 2313,
+      "sha256": "d62c9cf81061b2e57b5097b6058eb33692c9638f05cd3186d8f5ab73781a14c9",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/proof-collect.sh",
+      "size_bytes": 2411,
+      "sha256": "62ec64258b3e7bb1d75610b15ceb85122c9c0cf89adc981391a7f02c0841763e",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/readme_claim_audit.py",
+      "size_bytes": 4773,
+      "sha256": "a3f6c038dcfb0c159623cd097104d2e40bed47995e5be868ace5d55dfba5cd98",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/release.ps1",
+      "size_bytes": 3938,
+      "sha256": "247ca670983a09af9eb2afd461f5c52b0df94ef4745608c5a29eed7a8441cd39",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/release.sh",
+      "size_bytes": 3442,
+      "sha256": "9a8420eae21c422ce1a23fb10a9a3439bda3013902de0dc304b88c94e9702087",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/run-dev.ps1",
+      "size_bytes": 4743,
+      "sha256": "f753131fcc9335cb1de584769d23a5d7b5c41a978d905b154e6743376a0b99ae",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/run-dev.sh",
+      "size_bytes": 2676,
+      "sha256": "a19030f7b8d85d7820b78e2ef82219b8fba81724436dd48f7975b88d107f6355",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/test.ps1",
+      "size_bytes": 3910,
+      "sha256": "4a50b1d23603f40b7625f453f9e4549d1e19ac9a4a48b8b8351d0d2b21184b45",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/scaffolding/test.sh",
+      "size_bytes": 4094,
+      "sha256": "9f5b77259ac94360f2ab8f21f93e5881cf87ef2a83c03aa0b3ffa73d61465228",
+      "tier": "runnable",
+      "role": "script"
+    },
+    {
+      "path": "scripts/validate-agents.py",
+      "size_bytes": 3757,
+      "sha256": "13b2db27d2202c6da2a28162749ed761624e10c3fd4b0007363686bebe0ecbe6",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/wizard.ps1",
+      "size_bytes": 2722,
+      "sha256": "8dfff5b88658eea89b553d521045a495b9378b8c0ba88bd9cd4fcbe9d1b58bae",
+      "tier": "spec",
+      "role": "unknown"
+    },
+    {
+      "path": "scripts/wizard.sh",
+      "size_bytes": 3329,
+      "sha256": "4dede490bc5ed356d3e8ea65b7a7d25b0d96bedd761a450bbc3e8b46eabe794b",
+      "tier": "spec",
+      "role": "unknown"
     }
   ]
 }

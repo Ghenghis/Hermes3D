@@ -1,7 +1,7 @@
 """Pre-flight checker.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §24 (Pre-flight)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §24 (Pre-flight)
 
 Before sending a print to a printer, runs a battery of checks:
 

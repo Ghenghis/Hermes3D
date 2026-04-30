@@ -12,7 +12,7 @@ REM   run.bat api-only      (just the REST API)
 setlocal
 
 set REPO_ROOT=%~dp0
-set SCRIPT_DIR=%REPO_ROOT%02-SCAFFOLDING\scripts
+set SCRIPT_DIR=%REPO_ROOT%scripts\scaffolding
 
 where pwsh >nul 2>&1
 if %ERRORLEVEL%==0 (

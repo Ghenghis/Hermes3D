@@ -1,7 +1,7 @@
 """Fleet dispatcher — agentic printer selection.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §10 (Material-Aware Dispatch)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §10 (Material-Aware Dispatch)
 
 Given a print request (geometry + material + strategy + optional live load
 data), this module scores every printer in the fleet and selects the best

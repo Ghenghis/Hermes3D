@@ -1,7 +1,7 @@
 """Auto-recovery agent.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §28 (Auto-Recovery)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §28 (Auto-Recovery)
 
 When a printer reports `klippy_state: 'error'` or 'shutdown', this agent
 attempts a recovery sequence with exponential backoff:

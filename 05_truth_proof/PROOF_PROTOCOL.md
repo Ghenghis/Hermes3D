@@ -4,7 +4,7 @@
 > for verifying them.
 
 This document is the canonical reference. The implementation lives in
-`02-SCAFFOLDING/src/hermes3d/core/proof/proof_envelope.py`. Any
+`03_implementation/src/hermes3d/core/proof/proof_envelope.py`. Any
 disagreement between this doc and the code is a bug; the code wins
 in the short term but the doc must be brought into sync before the
 next release.
@@ -128,7 +128,7 @@ this artefact. Each check is:
 The overall status is included as a top-level field
 (`overall_status`) and equals `"pass"` iff every check is `pass` or
 `skip`. Eight gate names are reserved (see
-`00-CONTRACT/TRUTH_AND_PROOF_SYSTEM.md`):
+`00_overview/contract/TRUTH_AND_PROOF_SYSTEM.md`):
 
 `schema`, `watertight`, `geometry`, `bed_fit`, `material_capable`,
 `skill_safe`, `spool_sufficient`, `printer_health`.
@@ -210,7 +210,7 @@ Notes:
 
 ## 8. The conformance runner
 
-`03-PROOF-SYSTEM/conformance_runner.py` walks every proof envelope
+`05_truth_proof/conformance_runner.py` walks every proof envelope
 under a root and asserts:
 
 - **Schema** — every required field is present and well-typed.
@@ -223,9 +223,9 @@ under a root and asserts:
 Run it directly:
 
 ```bash
-python 03-PROOF-SYSTEM/conformance_runner.py --root var/acceptance-results
-python 03-PROOF-SYSTEM/conformance_runner.py --root var/acceptance-results --json
-python 03-PROOF-SYSTEM/conformance_runner.py --root var/acceptance-results --require-prod-key
+python 05_truth_proof/conformance_runner.py --root var/acceptance-results
+python 05_truth_proof/conformance_runner.py --root var/acceptance-results --json
+python 05_truth_proof/conformance_runner.py --root var/acceptance-results --require-prod-key
 ```
 
 CI runs the conformance runner against the acceptance run as part of

@@ -12,8 +12,8 @@ inputs:
     description: List of refs being pushed in this operation.
 action_sequence:
   - run: bash -c '[[ "$(git symbolic-ref --short HEAD)" != "main" && "$(git symbolic-ref --short HEAD)" != "master" ]]'
-  - run: bash 02-SCAFFOLDING/scripts/lint.sh
-  - run: pytest -x 02-SCAFFOLDING/tests/
+  - run: bash scripts/scaffolding/lint.sh
+  - run: pytest -x 04_testing/pytest/
 outputs:
   - artifact: push_decision
     description: 'allow | block, with a reason string.'
@@ -27,11 +27,11 @@ gates:
   - name: tests_green
     threshold: exit==0
     blocking: true
-    command: pytest -x 02-SCAFFOLDING/tests/
+    command: pytest -x 04_testing/pytest/
   - name: lint_clean
     threshold: exit==0
     blocking: true
-    command: bash 02-SCAFFOLDING/scripts/lint.sh
+    command: bash scripts/scaffolding/lint.sh
 retry_policy:
   max_retries: 0
   backoff_strategy: linear

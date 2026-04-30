@@ -19,7 +19,7 @@ release.
 - 8 truth gates: schema, geometry, bed, material, skill, spool,
   health, workflow — `core.validation.truth_gate`.
 - HMAC-SHA256 signed proof envelopes with batch verification —
-  `core.proof.proof_envelope`, `03-PROOF-SYSTEM/conformance_runner.py`.
+  `core.proof.proof_envelope`, `05_truth_proof/conformance_runner.py`.
 - 12-node print workflow with atomic JSON checkpointing —
   `core.orchestration.print_workflow`.
 - Skill memory store with 6 skill kinds, scope matching,
@@ -69,7 +69,7 @@ release.
 - Honesty-ledger drift detector — `scripts/honesty_diff.py`.
 - README claim audit — `scripts/readme_claim_audit.py`.
 - Installer with manifest-driven optional component selection —
-  `05-INSTALLER/install.{ps1,sh}`, `verify_install.py`.
+  `06_release/installer/install.{ps1,sh}`, `verify_install.py`.
 - Windows one-click launcher — `run.bat`.
 - GitHub Actions CI matrix (Linux + Windows × Python 3.11 + 3.12)
   with 6 jobs across 5 layers — `.github/workflows/ci.yml`.
@@ -80,11 +80,11 @@ release.
   `tests/integration/` — all green.
 - Acceptance runner: 4 desk-organiser variants × 12 printers, 48 cells
   produce signed proof envelopes — runs in <10 seconds —
-  `04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py`.
+  `04_testing/acceptance/run_acceptance.py`.
 
 ### Documentation
 
-- Master contract (`00-CONTRACT/MASTER_CONTRACT.md`) plus four
+- Master contract (`00_overview/contract/MASTER_CONTRACT.md`) plus four
   derived contract docs: `DEFINITION_OF_DONE`, `GATES`,
   `TRUTH_AND_PROOF_SYSTEM`, `ROADMAP`, `FEATURES`,
   `HONESTY_LEDGER`, `KIT_MANIFEST.json`.

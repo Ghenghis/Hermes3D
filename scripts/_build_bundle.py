@@ -42,7 +42,6 @@ DEFAULT_KEY = b"hermes3d-default-proof-key-not-secret"
 # Signing (reuse proof_envelope helpers when available; otherwise mirror them)
 # --------------------------------------------------------------------------- #
 def _load_proof_helpers():
-    sys.path.insert(0, str(REPO_ROOT / "02-SCAFFOLDING" / "src"))
     sys.path.insert(0, str(REPO_ROOT / "03_implementation" / "src"))
     try:
         from hermes3d.core.proof import proof_envelope as pe  # type: ignore
@@ -151,8 +150,8 @@ def run_pytest(work: Path) -> tuple[Path | None, str]:
 def run_forbidden_scan(work: Path) -> Path:
     """Locate forbidden_pattern_scan.py wherever the restructure has placed it."""
     candidates = [
+        REPO_ROOT / "scripts" / "scaffolding" / "forbidden_pattern_scan.py",
         REPO_ROOT / "scripts" / "forbidden_pattern_scan.py",
-        REPO_ROOT / "02-SCAFFOLDING" / "scripts" / "forbidden_pattern_scan.py",
     ]
     log_path = work / "logs" / "forbidden_scan.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
@@ -197,7 +196,7 @@ def build_evidence_ledger(envelopes: list[Path], work: Path) -> Path:
 
     # Source 1: HONESTY_LEDGER (table-style claims).
     for hl in [
-        REPO_ROOT / "00-CONTRACT" / "HONESTY_LEDGER.md",
+        REPO_ROOT / "00_overview/contract" / "HONESTY_LEDGER.md",
         REPO_ROOT / "00_overview" / "contract" / "HONESTY_LEDGER.md",
     ]:
         if not hl.is_file():
@@ -213,7 +212,7 @@ def build_evidence_ledger(envelopes: list[Path], work: Path) -> Path:
 
     # Source 2: KIT_MANIFEST entries.
     for km in [
-        REPO_ROOT / "00-CONTRACT" / "KIT_MANIFEST.json",
+        REPO_ROOT / "00_overview/contract" / "KIT_MANIFEST.json",
         REPO_ROOT / "00_overview" / "contract" / "KIT_MANIFEST.json",
     ]:
         if not km.is_file():

@@ -44,12 +44,12 @@ fi
 hr
 blue "Step 2/5  Installing Hermes3D (editable + UI extras)"
 hr
-if [[ ! -f "$ROOT/02-SCAFFOLDING/pyproject.toml" && ! -f "$ROOT/pyproject.toml" ]]; then
+if [[ ! -f "$ROOT/03_implementation/pyproject.toml" && ! -f "$ROOT/pyproject.toml" ]]; then
   red "pyproject.toml not found. Wrong working directory?"
   exit 1
 fi
 PYPROJECT_DIR="$ROOT"
-[[ -f "$ROOT/02-SCAFFOLDING/pyproject.toml" ]] && PYPROJECT_DIR="$ROOT/02-SCAFFOLDING"
+[[ -f "$ROOT/03_implementation/pyproject.toml" ]] && PYPROJECT_DIR="$ROOT/03_implementation"
 (cd "$PYPROJECT_DIR" && python -m pip install -e ".[all]" 2>&1 | tail -8) || {
   yel "[.all] extras not available — falling back to base install"
   (cd "$PYPROJECT_DIR" && python -m pip install -e . 2>&1 | tail -8)
@@ -67,8 +67,8 @@ fi
 hr
 blue "Step 4/5  Acceptance suite (48 cells)"
 hr
-if [[ -f "$ROOT/04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py" ]]; then
-  python "$ROOT/04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py" 2>&1 | tail -10 || {
+if [[ -f "$ROOT/04_testing/acceptance/run_acceptance.py" ]]; then
+  python "$ROOT/04_testing/acceptance/run_acceptance.py" 2>&1 | tail -10 || {
     red "Acceptance run failed. See output above."
     yel "You can still continue to step 5; some cells may rely on optional tools."
     ask "Continue to UI launch?" "y" || exit 1

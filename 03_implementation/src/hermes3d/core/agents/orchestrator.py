@@ -179,9 +179,9 @@ class LangGraphOrchestrator:
     def run(self, state: OrchestratorState) -> OrchestratorState:
         raise NotImplementedError(  # noqa: forbidden_pattern_scan
             "LangGraphOrchestrator is SPEC-only in this kit. Run "
-            "05-INSTALLER/install.ps1 to provision LangGraph and an LLM "
+            "06_release/installer/install.ps1 to provision LangGraph and an LLM "
             "endpoint, then implement the nodes per "
-            "07-DOCS/AI_PROGRAMMER_GUIDE.md §'Implementing the orchestrator'. "
+            "01_requirements/AI_PROGRAMMER_GUIDE.md §'Implementing the orchestrator'. "
             "DryRunOrchestrator is a drop-in for tests and the kit's "
             "validate-only mode."
         )

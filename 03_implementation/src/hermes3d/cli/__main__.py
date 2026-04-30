@@ -1,7 +1,7 @@
 """Hermes3D CLI entry point.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §17 (CLI Surface)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §17 (CLI Surface)
 
 Run with::
 

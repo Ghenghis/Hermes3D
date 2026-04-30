@@ -1,7 +1,7 @@
 """G-code analyzer.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §12 (G-code Pre-flight)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §12 (G-code Pre-flight)
 
 Parses sliced G-code (PrusaSlicer / OrcaSlicer / SuperSlicer / Cura output)
 and produces an analysis report:

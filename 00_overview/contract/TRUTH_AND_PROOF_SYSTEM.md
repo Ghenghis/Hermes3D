@@ -134,7 +134,7 @@ verifier is read-only — it never modifies the envelope.
 The acceptance runner also offers a batch verifier:
 
 ```bash
-python 03-PROOF-SYSTEM/conformance_runner.py --verify
+python 05_truth_proof/conformance_runner.py --verify
 ```
 
 which checks every envelope under `var/acceptance-results/` and exits
@@ -193,11 +193,11 @@ to tell the truth.
 
 ## 8. Related files
 
-- `00-CONTRACT/MASTER_CONTRACT.md` §28–§31 (truth gate + proof envelope
+- `00_overview/contract/MASTER_CONTRACT.md` §28–§31 (truth gate + proof envelope
   contract)
-- `02-SCAFFOLDING/src/hermes3d/core/validation/truth_gate.py`
-- `02-SCAFFOLDING/src/hermes3d/core/proof/proof_envelope.py`
-- `02-SCAFFOLDING/tests/unit/test_truth_gate.py`
-- `02-SCAFFOLDING/tests/unit/test_proof_envelope.py`
-- `04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py`
-- `03-PROOF-SYSTEM/PROOF_PROTOCOL.md`
+- `03_implementation/src/hermes3d/core/validation/truth_gate.py`
+- `03_implementation/src/hermes3d/core/proof/proof_envelope.py`
+- `04_testing/pytest/unit/test_truth_gate.py`
+- `04_testing/pytest/unit/test_proof_envelope.py`
+- `04_testing/acceptance/run_acceptance.py`
+- `05_truth_proof/PROOF_PROTOCOL.md`

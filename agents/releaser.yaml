@@ -15,8 +15,8 @@ inputs:
     required: true
     description: Reference to the gpg/cosign key id used to sign the bundle (the agent never sees the key material itself).
 action_sequence:
-  - run: bash 02-SCAFFOLDING/scripts/build.sh
-  - run: bash 02-SCAFFOLDING/scripts/release.sh "$VERSION"
+  - run: bash scripts/scaffolding/build.sh
+  - run: bash scripts/scaffolding/release.sh "$VERSION"
   - run: bash scripts/build-bundle.sh "$VERSION"
   - run: git tag -a "v$VERSION" -m "release v$VERSION" && git push origin "v$VERSION"
 outputs:

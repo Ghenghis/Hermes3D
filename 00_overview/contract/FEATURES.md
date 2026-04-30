@@ -44,8 +44,8 @@
 |---------|------|--------|
 | 8-gate truth check (schema/geometry/bed/material/skill/spool/health/workflow) | runnable | `core.validation.truth_gate` |
 | HMAC-SHA256 signed proof envelopes | runnable | `core.proof.proof_envelope` |
-| Acceptance-runner produces signed envelopes per printer/variant | runnable | `04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py` |
-| Batch envelope verifier | runnable | `03-PROOF-SYSTEM/conformance_runner.py` |
+| Acceptance-runner produces signed envelopes per printer/variant | runnable | `04_testing/acceptance/run_acceptance.py` |
+| Batch envelope verifier | runnable | `05_truth_proof/conformance_runner.py` |
 
 ## Slicer integration
 
@@ -162,4 +162,4 @@
 - Acceptance test variants × printers: 48 (4 × 12), all green with signed proofs
 - Tests: 264 passing in ~13 seconds
 
-The current honesty ledger is at `00-CONTRACT/HONESTY_LEDGER.md`.
+The current honesty ledger is at `00_overview/contract/HONESTY_LEDGER.md`.

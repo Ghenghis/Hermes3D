@@ -17,7 +17,7 @@ if ($branch -in @('main','master')) {
 }
 
 $repoRoot = (& git rev-parse --show-toplevel).Trim()
-$testScript = Join-Path $repoRoot '02-SCAFFOLDING/scripts/test.ps1'
+$testScript = Join-Path $repoRoot 'scripts/scaffolding/test.ps1'
 
 if (Test-Path $testScript) {
     Write-Host "pre-push: running fast test subset..." -ForegroundColor Green

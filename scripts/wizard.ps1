@@ -29,7 +29,7 @@ Banner 'Step 1/5  Preflight'
 if ($LASTEXITCODE -ne 0) { Write-Host "Preflight failed. Fix the missing tools, then re-run." -ForegroundColor Red; exit 1 }
 
 Banner 'Step 2/5  Installing Hermes3D'
-$Pyproj = if (Test-Path "$Root\02-SCAFFOLDING\pyproject.toml") { "$Root\02-SCAFFOLDING" } else { $Root }
+$Pyproj = if (Test-Path "$Root\03_implementation\pyproject.toml") { "$Root\03_implementation" } else { $Root }
 Push-Location $Pyproj
 try {
   python -m pip install -e ".[all]" 2>&1 | Select-Object -Last 8
@@ -47,7 +47,7 @@ if (Test-Path "$Root\scripts\install-hooks.ps1") {
 }
 
 Banner 'Step 4/5  Acceptance suite (48 cells)'
-$Acc = "$Root\04-TEST-CASE-DESK-ORGANIZER\run_acceptance.py"
+$Acc = "$Root\04_testing/acceptance\run_acceptance.py"
 if (Test-Path $Acc) {
   python $Acc 2>&1 | Select-Object -Last 10
   if ($LASTEXITCODE -ne 0) {

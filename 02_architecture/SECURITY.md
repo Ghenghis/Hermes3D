@@ -161,7 +161,7 @@ Every dispatch decision, slicer run, calibration intent, and remote
 control action produces a signed proof envelope. To inspect:
 
 ```bash
-python 02-SCAFFOLDING/scripts/proof-collect.sh
+python scripts/scaffolding/proof-collect.sh
 cat var/proof-report.json | jq '.summary'
 ```
 

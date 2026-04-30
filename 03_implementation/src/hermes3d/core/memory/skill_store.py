@@ -1,7 +1,7 @@
 """Skill memory — Hermes-style persistent learned skills.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §31 (Skill Memory)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §31 (Skill Memory)
 
 The agent learns user-specific facts and reuses them across sessions.
 Skills are typed, versioned, scope-tagged records — they are NOT raw

@@ -16,10 +16,10 @@ inputs:
     description: Files the implementer is permitted to edit.
 action_sequence:
   - run: git checkout -b "$BRANCH_NAME" || git checkout "$BRANCH_NAME"
-  - prompt: Write failing tests under 02-SCAFFOLDING/tests/ that encode the task spec acceptance criteria. Commit them on the feature branch.
-  - run: pytest -x 02-SCAFFOLDING/tests/ || true
-  - prompt: Implement the minimum production code under 02-SCAFFOLDING/src/ that makes the new tests pass. Do not edit files outside target_files.
-  - run: pytest 02-SCAFFOLDING/tests/
+  - prompt: Write failing tests under 04_testing/pytest/ that encode the task spec acceptance criteria. Commit them on the feature branch.
+  - run: pytest -x 04_testing/pytest/ || true
+  - prompt: Implement the minimum production code under 03_implementation/src/ that makes the new tests pass. Do not edit files outside target_files.
+  - run: pytest 04_testing/pytest/
   - run: git add -A && git diff --cached > var/implementer.patch
 outputs:
   - path: var/implementer.patch
@@ -30,11 +30,11 @@ gates:
   - name: tests_pass
     threshold: exit==0
     blocking: true
-    command: pytest 02-SCAFFOLDING/tests/
+    command: pytest 04_testing/pytest/
   - name: lint
     threshold: exit==0
     blocking: true
-    command: bash 02-SCAFFOLDING/scripts/lint.sh
+    command: bash scripts/scaffolding/lint.sh
   - name: not_on_main
     threshold: branch != main/master
     blocking: true

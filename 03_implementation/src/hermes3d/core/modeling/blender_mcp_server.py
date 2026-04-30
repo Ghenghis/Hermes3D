@@ -30,7 +30,7 @@ from typing import Any, Protocol
 SERVER_VERSION = "0.1.0-spec"
 
 # JSON-Schema-style descriptions of each tool's input. The conformance
-# runner in 03-PROOF-SYSTEM/conformance_runner.py uses this exact schema
+# runner in 05_truth_proof/conformance_runner.py uses this exact schema
 # definition to validate any third-party MCP implementation.
 TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     "import_and_repair": {
@@ -119,11 +119,11 @@ class _NotImpl:
     def __call__(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         raise NotImplementedError(  # noqa: forbidden_pattern_scan
             f"{self.tool}: Blender MCP server is SPEC-ONLY in this kit. "
-            "Run 05-INSTALLER/install.ps1 to download Blender 4.2 portable "
+            "Run 06_release/installer/install.ps1 to download Blender 4.2 portable "
             "and replace the body of "
             f"hermes3d.core.modeling.blender_mcp_server.{self.tool} with a "
             "real bpy/pymeshlab call. Contract docs: "
-            "07-DOCS/AI_PROGRAMMER_GUIDE.md §'Implementing the modeling MCP'."
+            "01_requirements/AI_PROGRAMMER_GUIDE.md §'Implementing the modeling MCP'."
         )
 
 
@@ -165,7 +165,7 @@ def build_app() -> Any:
         raise NotImplementedError(  # noqa: forbidden_pattern_scan
             "FastAPI is not installed. The kit's spec build does not list it "
             "as a hard dependency. Install with `pip install fastapi uvicorn` "
-            "or run 05-INSTALLER/install.ps1."
+            "or run 06_release/installer/install.ps1."
         ) from exc
 
     app = FastAPI(title="hermes3d-blender-mcp", version=SERVER_VERSION)

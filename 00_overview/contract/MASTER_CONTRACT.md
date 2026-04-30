@@ -70,7 +70,7 @@ The following are violations and must fail CI:
    *new* file (`*.repaired.stl`, `*.oriented.stl`); the original is
    never overwritten.
 
-Violations are tracked in `00-CONTRACT/HONESTY_LEDGER.md` until fixed.
+Violations are tracked in `00_overview/contract/HONESTY_LEDGER.md` until fixed.
 
 ---
 
@@ -78,14 +78,14 @@ Violations are tracked in `00-CONTRACT/HONESTY_LEDGER.md` until fixed.
 
 | §  | System            | Authoritative spec                              |
 |----|-------------------|-------------------------------------------------|
-| §2 | Truth Gate        | `01-ARCHITECTURE/contracts/truth_gate_report.schema.json` |
-| §3 | Proof Envelope    | `03-PROOF-SYSTEM/PROOF_PROTOCOL.md`             |
-| §4 | Printer profiles  | `01-ARCHITECTURE/contracts/printer_profile.schema.json`  |
-| §5 | Slicer adapters   | `02-SCAFFOLDING/src/hermes3d/core/slicer/`     |
-| §6 | Moonraker client  | `02-SCAFFOLDING/src/hermes3d/core/printers/moonraker_client.py` |
-| §7 | Renderer          | `02-SCAFFOLDING/src/hermes3d/core/visual/render.py` |
-| §8 | Acceptance runner | `04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py` |
-| §9 | Truth Gate checks | `01-ARCHITECTURE/contracts/truth_gate_report.schema.json` |
+| §2 | Truth Gate        | `02_architecture/contracts/truth_gate_report.schema.json` |
+| §3 | Proof Envelope    | `05_truth_proof/PROOF_PROTOCOL.md`             |
+| §4 | Printer profiles  | `02_architecture/contracts/printer_profile.schema.json`  |
+| §5 | Slicer adapters   | `03_implementation/src/hermes3d/core/slicer/`     |
+| §6 | Moonraker client  | `03_implementation/src/hermes3d/core/printers/moonraker_client.py` |
+| §7 | Renderer          | `03_implementation/src/hermes3d/core/visual/render.py` |
+| §8 | Acceptance runner | `04_testing/acceptance/run_acceptance.py` |
+| §9 | Truth Gate checks | `02_architecture/contracts/truth_gate_report.schema.json` |
 
 ---
 
@@ -282,8 +282,8 @@ probability + confidence label + citation list.
 
 A feature is DONE when:
 
-- [ ] Code lives under `02-SCAFFOLDING/src/hermes3d/`
-- [ ] Has a corresponding test under `02-SCAFFOLDING/tests/`
+- [ ] Code lives under `03_implementation/src/hermes3d/`
+- [ ] Has a corresponding test under `04_testing/pytest/`
 - [ ] All tests in the kit pass
 - [ ] No `TODO`/`STUB`/`NOT_IMPLEMENTED` in shipped code
 - [ ] Lint + typecheck clean (zero warnings)

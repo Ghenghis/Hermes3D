@@ -1,7 +1,7 @@
 """Retry budget controller — bounded self-correction for workflow nodes.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §30 (Orchestration Brain)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §30 (Orchestration Brain)
 
 Pure-stdlib retry decorator that gives each workflow node a finite "budget"
 of attempts before escalating to the Repair agent. Failures inside the

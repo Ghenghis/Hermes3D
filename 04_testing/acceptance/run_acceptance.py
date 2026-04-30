@@ -2,7 +2,7 @@
 
 This is the binding executable acceptance test for the contract kit. Run::
 
-    python 04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py
+    python 04_testing/acceptance/run_acceptance.py
 
 It:
   1. Builds all 4 acceptance variants of the parametric desk organizer
@@ -27,8 +27,8 @@ from pathlib import Path
 
 # Make the kit importable without installing the package
 HERE = Path(__file__).resolve().parent
-KIT_ROOT = HERE.parent
-SRC = KIT_ROOT / "02-SCAFFOLDING" / "src"
+KIT_ROOT = HERE.parent.parent  # 04_testing/acceptance/ -> 04_testing/ -> repo root
+SRC = KIT_ROOT / "03_implementation" / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 

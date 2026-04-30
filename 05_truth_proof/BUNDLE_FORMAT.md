@@ -69,7 +69,7 @@ SHA-256 over the on-disk bytes.
 ## Verification
 
 ```bash
-python 03-PROOF-SYSTEM/conformance_runner.py --bundle <bundle.zip>
+python 05_truth_proof/conformance_runner.py --bundle <bundle.zip>
 ```
 
 Exits **0** when **all** of the following hold:
@@ -115,7 +115,7 @@ the produced zip, then exits 0.
 ## References
 
 - RFC 2104 — HMAC: Keyed-Hashing for Message Authentication.
-- `02-SCAFFOLDING/src/hermes3d/core/proof/proof_envelope.py` —
+- `03_implementation/src/hermes3d/core/proof/proof_envelope.py` —
   per-dispatch envelope signing (same key, same canonicalisation).
-- `00-CONTRACT/HONESTY_LEDGER.md` — source for the `evidence_ledger.md`
+- `00_overview/contract/HONESTY_LEDGER.md` — source for the `evidence_ledger.md`
   claim rows.

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# 05-INSTALLER/install.sh — Hermes3D-OS Lite installer (Linux / WSL).
+# 06_release/installer/install.sh — Hermes3D-OS Lite installer (Linux / WSL).
 
 set -u
 
 INSTALLER_DIR="$(cd "$(dirname "$0")" && pwd)"
-REPO_ROOT="$(cd "$INSTALLER_DIR/.." && pwd)"
-SCAFFOLDING="$REPO_ROOT/02-SCAFFOLDING"
+REPO_ROOT="$(cd "$INSTALLER_DIR/../.." && pwd)"
+SCAFFOLDING="$REPO_ROOT/03_implementation"
 
 COMPONENTS=""
 NO_VERIFY=0

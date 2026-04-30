@@ -1,7 +1,7 @@
 """Moonraker HTTP client.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §9 (Printer Fleet Connectivity)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §9 (Printer Fleet Connectivity)
 
 A small, dependency-light wrapper around the public Moonraker REST API:
 

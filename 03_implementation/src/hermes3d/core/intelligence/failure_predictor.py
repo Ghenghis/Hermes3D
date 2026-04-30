@@ -1,7 +1,7 @@
 """Failure predictor.
 
 Status: runnable
-Contract: 00-CONTRACT/MASTER_CONTRACT.md §36 (Failure Prediction)
+Contract: 00_overview/contract/MASTER_CONTRACT.md §36 (Failure Prediction)
 
 Computes a failure-probability estimate for a proposed print before it
 starts. The prediction blends three signals:
