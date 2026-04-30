@@ -47,11 +47,14 @@ done
 
 START_NS="$(date +%s%N 2>/dev/null || echo 0)"
 
-# Build the inner command
-INNER=("bash" "$ROOT/scripts/wizard.sh")
+# Build the inner command as a single shell string (script -c takes one).
+# Using a string (not an array) avoids the bash-array-to-string quote-loss
+# bug that previously caused `bash -c bash <path>` to launch an interactive
+# shell under script(1)'s pty, hanging CI.
 if [ "$QUICK" -eq 1 ]; then
-  # Stub-mode wizard: just run preflight + install, skip acceptance + UI
-  INNER=("bash" "-c" "bash $ROOT/scripts/preflight.sh && echo '(quick mode: skipped acceptance + UI)'")
+  INNER_CMD="bash $ROOT/scripts/preflight.sh && echo '(quick mode: skipped acceptance + UI)'"
+else
+  INNER_CMD="bash $ROOT/scripts/wizard.sh"
 fi
 
 # Non-interactive: WIZARD_AUTO_YES bypasses every wizard prompt. This is more
@@ -61,13 +64,13 @@ if [ "$AUTO_YES" -eq 1 ]; then export WIZARD_AUTO_YES=1; fi
 
 # `script(1)` records a typescript including TTY control bytes; we strip them after.
 if command -v script >/dev/null 2>&1; then
-  script -q -e -c "${INNER[*]}" "$TRANSCRIPT.raw" </dev/null >/dev/null
+  script -q -e -c "$INNER_CMD" "$TRANSCRIPT.raw" </dev/null >/dev/null
   EXIT_CODE=$?
   # Strip ANSI codes for the canonical transcript
   sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$TRANSCRIPT.raw" > "$TRANSCRIPT" 2>/dev/null || cp "$TRANSCRIPT.raw" "$TRANSCRIPT"
 else
-  # Fallback: tee stdout+stderr, no TTY control. Loses some color but works.
-  "${INNER[@]}" </dev/null 2>&1 | tee "$TRANSCRIPT"
+  # Fallback: no TTY control bytes, but works when script(1) is unavailable.
+  bash -c "$INNER_CMD" </dev/null 2>&1 | tee "$TRANSCRIPT"
   EXIT_CODE=${PIPESTATUS[0]}
 fi
 
