@@ -81,6 +81,12 @@ class WorkflowState:
     history: list[NodeResult] = field(default_factory=list)
     aborted: bool = False
     abort_reason: str | None = None
+    terminal: bool = False
+
+    @property
+    def node_results(self) -> list[NodeResult]:
+        """Alias for ``history`` — surfaced for orchestrator API contracts."""
+        return self.history
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -96,6 +102,7 @@ class WorkflowState:
             ],
             "aborted": self.aborted,
             "abort_reason": self.abort_reason,
+            "terminal": self.terminal,
         }
 
     @classmethod
