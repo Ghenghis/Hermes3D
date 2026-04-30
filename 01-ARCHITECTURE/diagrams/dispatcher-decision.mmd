@@ -1,0 +1,28 @@
+%% Hermes3D-OS Lite -- dispatcher 8-strategy decision flow
+%% Render: npx -p @mermaid-js/mermaid-cli mmdc -i dispatcher-decision.mmd -o dispatcher-decision.svg
+flowchart TD
+    Start([Job arrives at dispatcher]) --> Filter[Apply hard filters:<br/>bed size, Z, material,<br/>temp range, kinematics]
+    Filter -->|0 candidates| Fail([Reject -- no compatible printer])
+    Filter -->|>=1 candidate| Score{Choose strategy}
+
+    Score --> S1[1. least_busy]
+    Score --> S2[2. fastest_printer]
+    Score --> S3[3. quietest]
+    Score --> S4[4. material_match]
+    Score --> S5[5. round_robin]
+    Score --> S6[6. weighted_score]
+    Score --> S7[7. best_quality]
+    Score --> S8[8. lowest_cost]
+
+    S1 --> Combine[Combine score with<br/>spool availability +<br/>preflight bias]
+    S2 --> Combine
+    S3 --> Combine
+    S4 --> Combine
+    S5 --> Combine
+    S6 --> Combine
+    S7 --> Combine
+    S8 --> Combine
+
+    Combine --> Tie{Tie-break:<br/>least_busy}
+    Tie --> Pick([Selected printer])
+    Pick --> Out([Hand off to scheduler])

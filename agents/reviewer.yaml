@@ -1,0 +1,40 @@
+role: reviewer
+description: Performs contract-aware code review on a PR diff. Emits a list of review comments and a single verdict (approve / revise / reject) using the same vocabulary as core.agents.multi_agent.CriticAgent.
+model: opus
+inputs:
+  - name: pr_diff
+    type: diff
+    required: true
+    description: Unified diff to review.
+  - name: contract_path
+    type: path
+    required: true
+    description: Path to 00-CONTRACT/MASTER_CONTRACT.md.
+  - name: pr_metadata
+    type: json
+    required: false
+    description: Branch name, target files, related ADR ids.
+action_sequence:
+  - prompt: Read the contract at {contract_path} and the diff. List every contract clause the diff touches.
+  - prompt: For each touched clause, decide whether the diff complies. Produce a JSON array of comments {file, line, severity, message, clause_ref}.
+  - prompt: Emit a single verdict (approve | revise | reject) plus a confidence in [0,1], matching the CritiqueReport shape.
+  - run: mkdir -p var/review && python -c "import json,sys,pathlib; p=pathlib.Path('var/review/comments.json'); p.parent.mkdir(parents=True,exist_ok=True)"
+outputs:
+  - path: var/review/comments.json
+    description: Array of review comments.
+  - path: var/review/verdict.json
+    description: '{verdict, confidence, reasons[]} matching CritiqueReport.to_dict().'
+gates:
+  - name: verdict_present
+    threshold: file exists and is valid json
+    blocking: true
+    command: python -c "import json; json.load(open('var/review/verdict.json'))"
+  - name: no_unresolved_blockers
+    threshold: zero severity==block comments remain
+    blocking: true
+    command: python -c "import json,sys; d=json.load(open('var/review/comments.json')); sys.exit(1 if any(c.get('severity')=='block' for c in d) else 0)"
+retry_policy:
+  max_retries: 2
+  backoff_strategy: linear
+  initial_delay_seconds: 5
+escalate_to: human

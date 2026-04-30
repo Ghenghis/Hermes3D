@@ -1,0 +1,40 @@
+role: qa
+description: Runs the full pytest suite and Playwright end-to-end tests, gating on 100% pass. Captures reports and screenshots into var/qa/.
+model: sonnet
+inputs:
+  - name: pr_diff
+    type: diff
+    required: true
+    description: Unified diff produced by the implementer role.
+  - name: branch_name
+    type: string
+    required: true
+    description: Branch under test.
+action_sequence:
+  - run: mkdir -p var/qa/screenshots
+  - run: pytest --junitxml=var/qa/pytest.xml --html=var/qa/pytest.html --self-contained-html 02-SCAFFOLDING/tests/
+  - run: pytest --junitxml=var/qa/playwright.xml -m playwright 02-SCAFFOLDING/tests/e2e/
+  - run: python -c "import xml.etree.ElementTree as ET, sys; t=ET.parse('var/qa/pytest.xml').getroot(); f=int(t.attrib.get('failures',0))+int(t.attrib.get('errors',0)); sys.exit(0 if f==0 else 1)"
+outputs:
+  - path: var/qa/pytest.xml
+    description: JUnit XML report for the unit and integration suite.
+  - path: var/qa/pytest.html
+    description: Self-contained HTML report.
+  - path: var/qa/playwright.xml
+    description: JUnit XML for the Playwright e2e run.
+  - path: var/qa/screenshots/
+    description: Playwright screenshots captured during e2e runs.
+gates:
+  - name: pytest_all_pass
+    threshold: 100% pass
+    blocking: true
+    command: pytest 02-SCAFFOLDING/tests/
+  - name: playwright_all_pass
+    threshold: 100% pass
+    blocking: true
+    command: pytest -m playwright 02-SCAFFOLDING/tests/e2e/
+retry_policy:
+  max_retries: 3
+  backoff_strategy: exponential
+  initial_delay_seconds: 10
+escalate_to: repair

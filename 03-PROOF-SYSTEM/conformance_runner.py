@@ -171,6 +171,127 @@ def collect_cross_refs(envelopes: list[tuple[Path, dict]]) -> list[dict[str, Any
     return issues
 
 
+BUNDLE_SCHEMA_VERSION = "bundle-1.0.0"
+
+
+def _bundle_canonical(doc: dict) -> bytes:
+    body = {k: v for k, v in doc.items() if k != "signature"}
+    return json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _bundle_file_sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def verify_bundle(zip_path: Path, key: bytes) -> tuple[int, dict]:
+    """Verify a proof bundle zip produced by scripts/build-bundle.
+
+    Checks:
+      1. zip integrity (CRCs)
+      2. manifest.json is parseable + has required schema fields
+      3. manifest.sig HMAC-SHA256 over canonical(manifest) matches under `key`
+      4. every file listed in manifest.files exists in the zip with matching sha256
+      5. evidence_ledger.md is present and references files that exist in the bundle
+    """
+    import zipfile as _zf
+
+    errors: list[str] = []
+    out: dict = {"path": str(zip_path), "errors": errors, "ok": False}
+
+    if not zip_path.is_file():
+        errors.append(f"bundle not found: {zip_path}")
+        return 2, out
+
+    try:
+        zf = _zf.ZipFile(zip_path, "r")
+    except _zf.BadZipFile as exc:
+        errors.append(f"bad zip: {exc}")
+        return 2, out
+
+    with zf:
+        bad = zf.testzip()
+        if bad is not None:
+            errors.append(f"corrupt entry in zip: {bad}")
+            return 2, out
+
+        names = set(zf.namelist())
+        if "manifest.json" not in names:
+            errors.append("manifest.json missing from bundle")
+            return 2, out
+        if "manifest.sig" not in names:
+            errors.append("manifest.sig missing from bundle")
+            return 2, out
+
+        try:
+            manifest = json.loads(zf.read("manifest.json").decode("utf-8"))
+        except Exception as exc:
+            errors.append(f"manifest.json not valid JSON: {exc}")
+            return 2, out
+
+        try:
+            sig = json.loads(zf.read("manifest.sig").decode("utf-8"))
+        except Exception as exc:
+            errors.append(f"manifest.sig not valid JSON: {exc}")
+            return 2, out
+
+        for f in ("schema_version", "git", "build", "env", "signer", "files"):
+            if f not in manifest:
+                errors.append(f"manifest missing field: {f}")
+        if manifest.get("schema_version") != BUNDLE_SCHEMA_VERSION:
+            errors.append(
+                f"unsupported bundle schema_version: {manifest.get('schema_version')!r} "
+                f"(expected {BUNDLE_SCHEMA_VERSION!r})"
+            )
+        if errors:
+            return 1, out
+
+        # 3. signature
+        if sig.get("algorithm") != "HMAC-SHA256":
+            errors.append(f"unsupported signature algorithm: {sig.get('algorithm')}")
+            return 1, out
+        expected = hmac.new(key, _bundle_canonical(manifest), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, sig.get("value", "")):
+            errors.append("signature mismatch (manifest tampered or wrong key)")
+            return 1, out
+
+        # 4. file presence + hash
+        for entry in manifest.get("files", []):
+            rel = entry.get("path", "")
+            want = entry.get("sha256", "")
+            if rel == "manifest.json" or rel == "manifest.sig":
+                # signing covers manifest itself; sig is by construction not signed.
+                continue
+            if rel not in names:
+                errors.append(f"missing-file: {rel}")
+                continue
+            got = _bundle_file_sha256_bytes(zf.read(rel))
+            if got != want:
+                errors.append(f"hash-mismatch: {rel} (recorded {want[:16]}, got {got[:16]})")
+
+        # 5. evidence ledger cross-refs
+        if "evidence_ledger.md" in names:
+            ledger_text = zf.read("evidence_ledger.md").decode("utf-8", "replace")
+            # rows reference files relative to bundle root in the third column.
+            for line in ledger_text.splitlines():
+                if not line.startswith("| proof_envelope "):
+                    continue
+                cols = [c.strip() for c in line.strip("|").split("|")]
+                if len(cols) >= 3 and cols[2]:
+                    ref = cols[2].replace("\\", "/")
+                    if ref and ref not in names and not ref.startswith(("kit_manifest", "honesty_ledger")):
+                        errors.append(f"evidence_ledger references missing file: {ref}")
+        else:
+            errors.append("evidence_ledger.md missing from bundle")
+
+    out["manifest"] = {
+        "git": manifest.get("git"),
+        "build": manifest.get("build"),
+        "files_count": len(manifest.get("files", [])),
+    }
+    out["ok"] = not errors
+    return (0 if not errors else 1), out
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -183,7 +304,33 @@ def main() -> int:
         "--require-prod-key", action="store_true",
         help="reject envelopes verifiable under the dev default key",
     )
+    parser.add_argument(
+        "--bundle", default=None,
+        help="verify a single proof-bundle zip produced by scripts/build-bundle",
+    )
     args = parser.parse_args()
+
+    # Bundle mode is mutually exclusive with the directory walk.
+    if args.bundle is not None:
+        if args.key is not None:
+            key = args.key.encode("utf-8")
+        else:
+            env_key = os.environ.get("HERMES3D_PROOF_KEY")
+            key = env_key.encode("utf-8") if env_key else DEFAULT_KEY
+        rc, result = verify_bundle(Path(args.bundle), key)
+        if args.json:
+            print(json.dumps(result, indent=2))
+        else:
+            print(f"[bundle] {result['path']}")
+            if result["ok"]:
+                print("[bundle] OK — signature + file hashes + cross-refs verified")
+                m = result.get("manifest", {})
+                print(f"[bundle] git={m.get('git')}  files={m.get('files_count')}")
+            else:
+                print(f"[bundle] FAIL — {len(result['errors'])} error(s):")
+                for e in result["errors"][:30]:
+                    print(f"  - {e}")
+        return rc
 
     root = Path(args.root)
 

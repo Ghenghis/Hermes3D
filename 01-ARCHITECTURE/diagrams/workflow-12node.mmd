@@ -1,0 +1,33 @@
+%% Hermes3D-OS Lite -- 12-node print workflow (sequence)
+%% Render: npx -p @mermaid-js/mermaid-cli mmdc -i workflow-12node.mmd -o workflow-12node.svg
+sequenceDiagram
+    autonumber
+    actor User
+    participant WF as PrintWorkflow
+    participant MR as mesh_repair
+    participant AO as auto_orient
+    participant MA as mesh_analyzer
+    participant TG as truth_gate
+    participant SR as slicer_runner
+    participant GA as gcode_analyzer
+    participant DS as dispatcher
+    participant PF as preflight
+    participant SP as scheduler
+    participant JQ as job_queue
+    participant MK as moonraker_client
+    participant PE as proof_envelope
+
+    User->>WF: submit STL + brief
+    WF->>MR: 1. repair_mesh(STL)
+    WF->>AO: 2. auto_orient(mesh)
+    WF->>MA: 3. analyze(mesh) -- overhang/support/bridge
+    WF->>TG: 4. validate(mesh) -- 8 truth checks
+    WF->>SR: 5. slice(mesh, profile)
+    WF->>GA: 6. analyze_gcode(time, filament, risk)
+    WF->>DS: 7. choose_printer(8 strategies)
+    WF->>PF: 8. preflight(printer, gcode) -- 6 go/no-go checks
+    WF->>SP: 9. schedule(eta, quiet hours, max duration)
+    WF->>JQ: 10. enqueue(job)
+    WF->>MK: 11. dispatch -- upload + start
+    WF->>PE: 12. sign proof envelope (HMAC)
+    PE-->>User: proof + job id

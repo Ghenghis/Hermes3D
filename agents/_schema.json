@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes3d.local/schemas/agent-manifest.json",
+  "title": "Hermes3D Agent Manifest",
+  "description": "Machine-readable role manifest. Any orchestrator (Claude Code multi-agent, n8n, GitHub Actions) can pick up the kit by loading these YAMLs and dispatching them.",
+  "type": "object",
+  "required": [
+    "role",
+    "description",
+    "model",
+    "inputs",
+    "action_sequence",
+    "outputs",
+    "gates",
+    "retry_policy",
+    "escalate_to"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "role": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Lowercase machine name; matches the YAML filename stem."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10
+    },
+    "model": {
+      "type": "string",
+      "enum": ["opus", "sonnet", "haiku"]
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type", "required", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "type": {"type": "string", "enum": ["string", "path", "json", "yaml", "diff", "ref", "list", "bool"]},
+          "required": {"type": "boolean"},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "action_sequence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "run": {"type": "string"},
+          "tool": {"type": "string"},
+          "args": {"type": "object"},
+          "prompt": {"type": "string"},
+          "description": {"type": "string"}
+        },
+        "oneOf": [
+          {"required": ["run"]},
+          {"required": ["tool"]},
+          {"required": ["prompt"]}
+        ]
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description"],
+        "properties": {
+          "path": {"type": "string"},
+          "artifact": {"type": "string"},
+          "description": {"type": "string"}
+        },
+        "oneOf": [
+          {"required": ["path"]},
+          {"required": ["artifact"]}
+        ]
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "threshold", "blocking", "command"],
+        "additionalProperties": false,
+        "properties": {
+          "name": {"type": "string"},
+          "threshold": {"type": "string", "description": "Human-readable pass criterion, e.g. '100% pass', 'exit==0', '0 violations'."},
+          "blocking": {"type": "boolean"},
+          "command": {"type": "string", "description": "Shell command runnable from repo root."}
+        }
+      }
+    },
+    "retry_policy": {
+      "type": "object",
+      "required": ["max_retries", "backoff_strategy", "initial_delay_seconds"],
+      "additionalProperties": false,
+      "properties": {
+        "max_retries": {"type": "integer", "minimum": 0, "maximum": 20},
+        "backoff_strategy": {"type": "string", "enum": ["linear", "exponential"]},
+        "initial_delay_seconds": {"type": "number", "minimum": 0}
+      }
+    },
+    "escalate_to": {
+      "type": "string",
+      "description": "Role name to hand off to when retries exhausted, or 'human' for manual."
+    }
+  }
+}

@@ -1,0 +1,43 @@
+role: repair
+description: Diagnoses failed runs by combining recent logs with the last known-good commit. Tries a skill_store hit first, then an LLM-generated patch, then escalates to a human.
+model: opus
+inputs:
+  - name: logs
+    type: path
+    required: true
+    description: Path to the failing run logs (typically var/qa/ or var/*.log).
+  - name: last_good_state
+    type: ref
+    required: true
+    description: Git ref of the most recent commit that passed all gates.
+  - name: failure_signature
+    type: string
+    required: false
+    description: Short signature (test id, error class) to use for skill lookup.
+action_sequence:
+  - prompt: Read {logs} and produce a one-paragraph diagnosis plus a candidate failure_signature.
+  - run: python -m hermes3d.core.memory.skill_lookup --kind FAILURE_PATTERN --signature "$FAILURE_SIGNATURE" --json > var/repair/skill_hits.json
+  - prompt: If skill_hits.json contains a matching repair skill, apply its body as a patch and stop. Otherwise produce an LLM patch using the diff between HEAD and {last_good_state} as context.
+  - run: git apply var/repair/patch.diff
+  - run: pytest 02-SCAFFOLDING/tests/
+outputs:
+  - path: var/repair/diagnosis.md
+    description: Human-readable failure diagnosis.
+  - path: var/repair/patch.diff
+    description: Candidate fix produced by the agent.
+  - path: var/repair/skill_hits.json
+    description: Matching skill_store entries, if any.
+gates:
+  - name: tests_pass_after_patch
+    threshold: exit==0
+    blocking: true
+    command: pytest 02-SCAFFOLDING/tests/
+  - name: patch_applies_cleanly
+    threshold: exit==0
+    blocking: true
+    command: git apply --check var/repair/patch.diff
+retry_policy:
+  max_retries: 2
+  backoff_strategy: linear
+  initial_delay_seconds: 15
+escalate_to: human

@@ -37,6 +37,7 @@ Usage::
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import logging
 import time
@@ -51,6 +52,53 @@ from .agent_graph import (
     WorkflowGraph,
     WorkflowState,
 )
+from .repair_agent import RepairAgent
+from .retry_controller import RepairEscalation, RetryBudget, with_retry
+
+
+_DEFAULT_BUDGET = RetryBudget(max_retries=3)
+
+
+def _retry_node(fn):
+    """Wrap a node fn with a RetryBudget; on RepairEscalation, invoke the
+    RepairAgent and surface its result as a FAIL NodeResult.
+    """
+    wrapped = with_retry(_DEFAULT_BUDGET)(fn)
+
+    @functools.wraps(fn)
+    def runner(state: "WorkflowState") -> NodeResult:
+        try:
+            return wrapped(state)
+        except RepairEscalation as esc:
+            try:
+                repair = RepairAgent().repair(esc)
+            except Exception as repair_exc:  # noqa: BLE001
+                log.exception("RepairAgent failed: %s", repair_exc)
+                return NodeResult(
+                    node_name=getattr(fn, "__name__", "unknown")
+                        .removeprefix("_node_"),
+                    outcome=NodeOutcome.FAIL,
+                    started_unix=_now(), ended_unix=_now(),
+                    error=f"escalation + repair failure: {esc.cause!r}",
+                )
+            outcome = (NodeOutcome.PASS if repair.outcome == "fixed"
+                       else NodeOutcome.FAIL)
+            return NodeResult(
+                node_name=getattr(fn, "__name__", "unknown")
+                    .removeprefix("_node_"),
+                outcome=outcome,
+                started_unix=_now(), ended_unix=_now(),
+                error=None if outcome == NodeOutcome.PASS else repr(esc.cause),
+                state_patch={
+                    "repair_outcome": repair.outcome,
+                    "repair_strategy": repair.strategy_used,
+                    "repair_notes": repair.notes,
+                    "repair_suggested_action": repair.suggested_action,
+                },
+                notes=[f"repair: {repair.outcome} via {repair.strategy_used}"],
+            )
+
+    return runner
 
 
 log = logging.getLogger(__name__)
@@ -520,69 +568,69 @@ def build_print_workflow(*, checkpoint_dir: str | Path | None = None,
                           ) -> WorkflowGraph:
     g = WorkflowGraph("PrintWorkflow", checkpoint_dir=checkpoint_dir)
     g.add_node(GraphNode(
-        name="enqueue", fn=_node_enqueue,
+        name="enqueue", fn=_retry_node(_node_enqueue),
         expected_inputs=("mesh_path",),
         description="Persist a Job in the queue",
     ))
     g.add_node(GraphNode(
-        name="truth_gate", fn=_node_truth_gate,
+        name="truth_gate", fn=_retry_node(_node_truth_gate),
         expected_inputs=("mesh_path",),
         description="Run printability validation",
     ))
     g.add_node(GraphNode(
-        name="repair_if_needed", fn=_node_repair,
+        name="repair_if_needed", fn=_retry_node(_node_repair),
         expected_inputs=("mesh_path",),
         description="Auto-repair non-watertight or flipped meshes",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="auto_orient", fn=_node_auto_orient,
+        name="auto_orient", fn=_retry_node(_node_auto_orient),
         expected_inputs=("mesh_path",),
         description="Find optimal print orientation",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="dispatch", fn=_node_dispatch,
+        name="dispatch", fn=_retry_node(_node_dispatch),
         expected_inputs=("mesh_path",),
         description="Pick the best printer in the fleet",
     ))
     g.add_node(GraphNode(
-        name="preflight", fn=_node_preflight,
+        name="preflight", fn=_retry_node(_node_preflight),
         expected_inputs=("selected_printer_id",),
         description="Run preflight safety checklist",
     ))
     g.add_node(GraphNode(
-        name="slice", fn=_node_slice,
+        name="slice", fn=_retry_node(_node_slice),
         expected_inputs=("mesh_path", "selected_printer_id"),
         description="Slice mesh to G-code",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="analyze_gcode", fn=_node_analyze_gcode,
+        name="analyze_gcode", fn=_retry_node(_node_analyze_gcode),
         expected_inputs=("sliced_gcode_path",),
         description="Parse G-code metadata + raise risk flags",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="cost_estimate", fn=_node_cost_estimate,
+        name="cost_estimate", fn=_retry_node(_node_cost_estimate),
         expected_inputs=("selected_printer_id",),
         description="Estimate filament + electricity cost",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="upload", fn=_node_upload,
+        name="upload", fn=_retry_node(_node_upload),
         expected_inputs=("sliced_gcode_path", "selected_printer_id"),
         description="Upload G-code to Moonraker",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="start_print", fn=_node_start_print,
+        name="start_print", fn=_retry_node(_node_start_print),
         expected_inputs=("selected_printer_id",),
         description="Tell Klipper to start the print",
         optional=True,
     ))
     g.add_node(GraphNode(
-        name="notify_started", fn=_node_notify_started,
+        name="notify_started", fn=_retry_node(_node_notify_started),
         expected_inputs=("selected_printer_id",),
         description="Send Discord/Slack notification",
         optional=True,

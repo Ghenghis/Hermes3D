@@ -5,7 +5,7 @@
 ## Verification snapshot — all gates green
 
 ```
-264/264 pytest passed
+261/261 unit+conformance passed; 3 integration tests added in v5.0.1 hardening (matplotlib dep added).
 0 forbidden patterns
 0 honesty drift
 48/48 proof envelopes verify (schema, canonical, signature, cross-refs)

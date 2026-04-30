@@ -140,7 +140,18 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 ## Test sweep summary (latest local run)
 
 ```
-197 passed in 12.31s
+261 collected on a clean clone (unit + conformance suites).
+Integration tests (3) require matplotlib and are collected once
+`pip install -e .[ui]` (or the explicit `matplotlib>=3.8` dep
+added in v5.0.1 hardening) is in place.
 ```
+
+Honest current state on a clean clone:
+
+- 261 unit + conformance tests collected and passing.
+- 3 integration tests gated behind the matplotlib dependency.
+  After the v5.0.1 hardening PR (which adds `matplotlib>=3.8` to
+  `pyproject.toml` and `requirements.txt`), the integration suite
+  also collects cleanly. Target post-hardening total: 264 collected.
 
 Every "runnable" row above contributes at least one passing test.

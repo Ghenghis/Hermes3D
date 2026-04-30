@@ -1,0 +1,28 @@
+role: preflight
+description: Verifies the developer or CI environment has every required tool before any other role runs. Wraps scripts/preflight.sh.
+model: haiku
+inputs:
+  - name: profile
+    type: string
+    required: false
+    description: Named profile (dev, ci, release). Selects which tool subset to require. Defaults to dev.
+action_sequence:
+  - run: mkdir -p var/preflight
+  - run: bash scripts/preflight.sh --profile "${PROFILE:-dev}" --report var/preflight/report.json
+outputs:
+  - path: var/preflight/report.json
+    description: Per-tool detected version and pass/fail status.
+gates:
+  - name: required_tools_present
+    threshold: all required tools present
+    blocking: true
+    command: bash scripts/preflight.sh --profile "${PROFILE:-dev}"
+  - name: doctor_ok
+    threshold: exit==0
+    blocking: true
+    command: bash 02-SCAFFOLDING/scripts/doctor.sh
+retry_policy:
+  max_retries: 0
+  backoff_strategy: linear
+  initial_delay_seconds: 0
+escalate_to: human

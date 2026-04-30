@@ -1,0 +1,35 @@
+role: auditor
+description: Runs the contract-honesty audits. Both the forbidden pattern scan and the honesty diff must report zero violations or the agent blocks the pipeline.
+model: haiku
+inputs:
+  - name: target_paths
+    type: list
+    required: false
+    description: Paths to audit. Defaults to the whole repo.
+  - name: baseline_ref
+    type: ref
+    required: false
+    description: Git ref to diff against for the honesty check. Defaults to origin/main.
+action_sequence:
+  - run: mkdir -p var/audit
+  - run: python 02-SCAFFOLDING/scripts/forbidden_pattern_scan.py --json > var/audit/forbidden.json
+  - run: python 02-SCAFFOLDING/scripts/honesty_diff.py --baseline "${BASELINE_REF:-origin/main}" --json > var/audit/honesty.json
+outputs:
+  - path: var/audit/forbidden.json
+    description: forbidden_pattern_scan report.
+  - path: var/audit/honesty.json
+    description: honesty_diff report.
+gates:
+  - name: forbidden_pattern_scan
+    threshold: 0 violations
+    blocking: true
+    command: python 02-SCAFFOLDING/scripts/forbidden_pattern_scan.py
+  - name: honesty_diff
+    threshold: 0 violations
+    blocking: true
+    command: python 02-SCAFFOLDING/scripts/honesty_diff.py --baseline "${BASELINE_REF:-origin/main}"
+retry_policy:
+  max_retries: 1
+  backoff_strategy: linear
+  initial_delay_seconds: 2
+escalate_to: human

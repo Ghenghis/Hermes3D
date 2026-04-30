@@ -1,0 +1,56 @@
+name: branch-guard
+
+# Enforces gitflow rules for PRs targeting main:
+#   - Reject same-branch PRs (main -> main)
+#   - Only release/* and hotfix/* branches may merge to main
+#   - No STUB/TODO/FIXME leaks via forbidden_pattern_scan.py
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  refuse_same_branch_pr:
+    name: Reject main -> main PRs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check head != base
+        run: |
+          set -e
+          head="${{ github.event.pull_request.head.ref }}"
+          base="${{ github.event.pull_request.base.ref }}"
+          echo "head=$head base=$base"
+          if [ "$head" = "$base" ] || [ "$head" = "main" ]; then
+            echo "::error::Refusing PR from '$head' into '$base'. main->main PRs are forbidden."
+            exit 1
+          fi
+
+  enforce_release_or_hotfix:
+    name: Only release/* or hotfix/* may target main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect head ref
+        run: |
+          set -e
+          head="${{ github.event.pull_request.head.ref }}"
+          echo "Head branch: $head"
+          case "$head" in
+            release/*|hotfix/*)
+              echo "OK: $head is allowed to target main."
+              ;;
+            *)
+              echo "::error::Branch '$head' may not merge to main. Use release/v<x.y.z> or hotfix/<id>. See 06_release/BRANCH_STRATEGY.md."
+              exit 1
+              ;;
+          esac
+
+  forbidden_pattern_scan:
+    name: Forbidden pattern scan (no STUB/TODO leaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run forbidden pattern scan
+        run: python 02-SCAFFOLDING/scripts/forbidden_pattern_scan.py
