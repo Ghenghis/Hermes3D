@@ -54,26 +54,20 @@ if [ "$QUICK" -eq 1 ]; then
   INNER=("bash" "-c" "bash $ROOT/scripts/preflight.sh && echo '(quick mode: skipped acceptance + UI)'")
 fi
 
-# Choose recorder
-if [ "$AUTO_YES" -eq 1 ]; then INPUT_PIPE='yes y'; else INPUT_PIPE='cat'; fi
+# Non-interactive: WIZARD_AUTO_YES bypasses every wizard prompt. This is more
+# robust than piping `yes` into stdin because `script(1)` creates a pty and
+# `read` may read from /dev/tty bypassing the pipe.
+if [ "$AUTO_YES" -eq 1 ]; then export WIZARD_AUTO_YES=1; fi
 
 # `script(1)` records a typescript including TTY control bytes; we strip them after.
 if command -v script >/dev/null 2>&1; then
-  if [ "$AUTO_YES" -eq 1 ]; then
-    yes y | script -q -e -c "${INNER[*]}" "$TRANSCRIPT.raw" >/dev/null
-  else
-    script -q -e -c "${INNER[*]}" "$TRANSCRIPT.raw" >/dev/null
-  fi
+  script -q -e -c "${INNER[*]}" "$TRANSCRIPT.raw" </dev/null >/dev/null
+  EXIT_CODE=$?
   # Strip ANSI codes for the canonical transcript
   sed -E 's/\x1B\[[0-9;]*[A-Za-z]//g' "$TRANSCRIPT.raw" > "$TRANSCRIPT" 2>/dev/null || cp "$TRANSCRIPT.raw" "$TRANSCRIPT"
-  EXIT_CODE=$?
 else
   # Fallback: tee stdout+stderr, no TTY control. Loses some color but works.
-  if [ "$AUTO_YES" -eq 1 ]; then
-    yes y | "${INNER[@]}" 2>&1 | tee "$TRANSCRIPT"
-  else
-    "${INNER[@]}" 2>&1 | tee "$TRANSCRIPT"
-  fi
+  "${INNER[@]}" </dev/null 2>&1 | tee "$TRANSCRIPT"
   EXIT_CODE=${PIPESTATUS[0]}
 fi
 

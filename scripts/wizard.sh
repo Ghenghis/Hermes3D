@@ -13,6 +13,12 @@ hr(){    printf '%s\n' "--------------------------------------------------------
 
 ask(){ # ask "prompt" default
   local prompt="$1"; local default="${2:-y}"
+  # Non-interactive override: WIZARD_AUTO_YES=1 makes every prompt accept the default.
+  if [[ "${WIZARD_AUTO_YES:-0}" == "1" ]]; then
+    echo "$prompt [$default] (auto:y)"
+    [[ "$default" =~ ^[Yy] ]]
+    return $?
+  fi
   read -r -p "$prompt [$default] " ans
   ans="${ans:-$default}"
   [[ "$ans" =~ ^[Yy] ]]
