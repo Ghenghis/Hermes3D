@@ -17,13 +17,11 @@ from __future__ import annotations
 import json
 import logging
 import os
-import socket
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +74,7 @@ class OctoPrintClient:
             except Exception:
                 detail = ""
             raise RuntimeError(f"OctoPrint HTTP {exc.code} on {path}: {detail[:200]}")
-        except (URLError, socket.timeout) as exc:
+        except (TimeoutError, URLError) as exc:
             raise RuntimeError(f"OctoPrint network error: {exc}")
 
     # ---- High-level API -------------------------------------------------
@@ -85,7 +83,7 @@ class OctoPrintClient:
         try:
             self._request("GET", "/api/version")
             return True
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def version(self) -> dict[str, Any]:
@@ -105,7 +103,7 @@ class OctoPrintClient:
                 "is_error": bool(flags.get("error")),
                 "raw": data,
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {"reachable": False, "error": str(exc)}
 
     def upload_gcode(self, gcode_path: str | Path, *, location: str = "local") -> str:

@@ -63,7 +63,7 @@ class RemoteControlConfig:
     rate_limit_seconds: float = 2.0
 
     @classmethod
-    def from_env(cls) -> "RemoteControlConfig":
+    def from_env(cls) -> RemoteControlConfig:
         token = os.getenv("HERMES3D_TELEGRAM_BOT_TOKEN")
         allowlist_raw = os.getenv("HERMES3D_TELEGRAM_ALLOWLIST", "")
         allowlist = tuple(x.strip() for x in allowlist_raw.split(",") if x.strip())
@@ -284,7 +284,7 @@ class CommandRouter:
 def _http_get_json(url: str, *, timeout: float = 10.0) -> dict[str, Any]:
     """GET ``url`` and decode JSON. Raises urllib.error on failure."""
     req = urllib.request.Request(url, method="GET")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - trusted https
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = resp.read()
     return json.loads(body.decode("utf-8"))
 
@@ -300,7 +300,7 @@ def _http_post_json(
         method="POST",
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 - trusted https
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = resp.read()
     if not body:
         return None

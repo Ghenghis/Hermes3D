@@ -20,8 +20,9 @@ from __future__ import annotations
 import functools
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Literal
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any, Literal
 
 log = logging.getLogger(__name__)
 
@@ -98,12 +99,12 @@ def with_retry(
                 except RepairEscalation:
                     # Already escalated downstream — propagate untouched.
                     raise
-                except BaseException as exc:  # noqa: BLE001
+                except BaseException as exc:
                     last_exc = exc
                     if on_failure is not None:
                         try:
                             on_failure(exc, attempt)
-                        except Exception:  # noqa: BLE001
+                        except Exception:
                             log.exception("on_failure callback raised")
                     log.warning(
                         "with_retry: %s attempt %d/%d failed: %r",

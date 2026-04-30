@@ -23,7 +23,6 @@ so transient blips don't trigger false alarms.
 
 from __future__ import annotations
 
-import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
@@ -347,11 +346,6 @@ class IncidentDetector:
 
 
 __all__ = [
-    "IncidentDetector",
-    "IncidentEvent",
-    "IncidentSeverity",
-    "IncidentType",
-    "PrinterPing",
     "FAN_FAILURE_DRIFT_OFFSET_C",
     "FAN_FAILURE_WINDOW_PINGS",
     "NETWORK_LOSS_PINGS",
@@ -359,4 +353,9 @@ __all__ = [
     "RUNAWAY_BED_OFFSET_C",
     "RUNAWAY_HOTEND_OFFSET_C",
     "STALL_PROGRESS_SECONDS",
+    "IncidentDetector",
+    "IncidentEvent",
+    "IncidentSeverity",
+    "IncidentType",
+    "PrinterPing",
 ]

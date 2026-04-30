@@ -89,7 +89,7 @@ class RepairAgent:
             return None
         try:
             from hermes3d.core.memory.skill_store import SkillKind
-        except Exception:  # noqa: BLE001
+        except Exception:
             return None
         ctx = esc.context or {}
         # Optional scope hints — pull from context if available.
@@ -100,7 +100,7 @@ class RepairAgent:
                 material=ctx.get("material"),
                 quality_level=ctx.get("quality_level"),
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.warning("SkillStore lookup failed: %s", exc)
             return None
         if not matches:
@@ -149,14 +149,13 @@ class RepairAgent:
         if client is None:
             try:
                 from hermes3d.core.llm.providers import (
-                    ProviderUnavailable,
                     select_provider,
                 )
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return None
             try:
                 client = select_provider()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 return None
             if not getattr(client, "available", lambda: False)():
                 return None
@@ -171,7 +170,7 @@ class RepairAgent:
                 f"Attempts: {esc.attempts}\n"
             )
             result = client.generate(prompt)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.info("LLM repair suggestion unavailable: %s", exc)
             return None
         # Try to extract JSON, but tolerate plain text.
@@ -180,7 +179,7 @@ class RepairAgent:
             from hermes3d.core.llm.providers import extract_json
 
             suggestion = extract_json(getattr(result, "text", "")) or suggestion
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass
         return RepairResult(
             outcome="fixed",
@@ -197,7 +196,7 @@ class RepairAgent:
                 from hermes3d.core.notifications.notifier import Notifier
 
                 notifier = Notifier()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 notifier = None
         if notifier is not None:
             try:
@@ -220,7 +219,7 @@ class RepairAgent:
                 )
                 results = notifier.notify(evt)
                 sent_count = sum(1 for r in results if getattr(r, "sent", False))
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("Notifier escalation failed: %s", exc)
         notes = (pre_note + " | " if pre_note else "") + (
             f"notified {sent_count} channel(s)" if notifier is not None else "no notifier available"

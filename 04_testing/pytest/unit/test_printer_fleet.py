@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-import math
-
 import pytest
-
 from hermes3d.core.printers import (
     FLEET,
     BedShape,
-    FirmwareSupport,
     Kinematics,
-    PrinterProfile,
     fits_bed,
     get_profile,
     list_ids,
@@ -21,7 +16,6 @@ from hermes3d.core.printers.moonraker_client import (
     MoonrakerError,
     probe_fleet,
 )
-
 
 # ----------------------------------------------------------------------------
 # Fleet structure

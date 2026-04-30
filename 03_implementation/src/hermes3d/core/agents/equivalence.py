@@ -19,10 +19,9 @@ The user can extend the catalog by editing config/equivalence_groups.toml.
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass, field
-from typing import Any, Iterable
-
-from hermes3d.core.printers import FLEET, PrinterProfile
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)

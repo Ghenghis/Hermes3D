@@ -27,11 +27,9 @@ from typing import Any
 
 from hermes3d.core.farm.print_history import (
     PrintHistory,
-    PrinterAggregate,
     aggregate_metrics,
 )
 from hermes3d.core.memory import SkillKind, SkillStore
-
 
 # Number of prints below which a printer's success rate is too noisy
 # to weigh on its own.
@@ -181,7 +179,7 @@ def predict_failure(
 
 __all__ = [
     "DEFAULT_BASELINE_FAILURE_RATE",
-    "FailureForecast",
     "MIN_EVIDENCE_PRINTS",
+    "FailureForecast",
     "predict_failure",
 ]

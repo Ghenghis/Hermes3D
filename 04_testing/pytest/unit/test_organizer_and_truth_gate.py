@@ -2,19 +2,16 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
 import trimesh
-
-from hermes3d.core.design import OrganizerSpec, build_organizer, export_organizer
+from hermes3d.core.design import OrganizerSpec, build_organizer
 from hermes3d.core.validation import (
     CheckStatus,
     TruthGateConfig,
     run_truth_gate,
 )
-
 
 # ---------------------------------------------------------------------------
 # OrganizerSpec.validated()

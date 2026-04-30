@@ -33,7 +33,6 @@ from __future__ import annotations
 
 import dataclasses
 import enum
-import hashlib
 import json
 import os
 import threading
@@ -41,8 +40,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -104,7 +102,7 @@ class SkillScope:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "SkillScope":
+    def from_dict(cls, d: dict[str, Any]) -> SkillScope:
         return cls(**d)
 
 
@@ -130,7 +128,7 @@ class Skill:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Skill":
+    def from_dict(cls, d: dict[str, Any]) -> Skill:
         d = dict(d)
         d["skill_kind"] = SkillKind(d["skill_kind"])
         d["scope"] = SkillScope.from_dict(d["scope"])

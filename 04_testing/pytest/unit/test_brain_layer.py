@@ -8,14 +8,13 @@ from pathlib import Path
 import pytest
 import trimesh
 
-
 # =============================================================================
 # Orchestration graph
 # =============================================================================
 
 
 def test_workflow_state_serialization_roundtrip():
-    from hermes3d.core.orchestration import WorkflowState, NodeOutcome, NodeResult
+    from hermes3d.core.orchestration import NodeOutcome, NodeResult, WorkflowState
 
     s = WorkflowState(workflow_id="wf-test", created_unix=1000.0, data={"a": 1})
     s.history.append(
@@ -126,7 +125,7 @@ def test_print_workflow_checkpoint_resume(tmp_path: Path):
 
 
 def test_skill_store_add_lookup_persist(tmp_path: Path):
-    from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
+    from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
 
     store = SkillStore(tmp_path / "sk.json")
     s = store.add(
@@ -148,7 +147,7 @@ def test_skill_store_add_lookup_persist(tmp_path: Path):
 
 
 def test_skill_store_specificity_ordering(tmp_path: Path):
-    from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
+    from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
 
     store = SkillStore(tmp_path / "sk.json")
     # Generic skill (matches anything)
@@ -176,7 +175,7 @@ def test_skill_store_specificity_ordering(tmp_path: Path):
 
 
 def test_skill_store_reinforce_caps_at_one(tmp_path: Path):
-    from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
+    from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
 
     store = SkillStore(tmp_path / "sk.json")
     s = store.add(
@@ -259,7 +258,6 @@ def test_multi_agent_clean_approval():
 def test_multi_agent_history_drives_revision(tmp_path: Path):
     from hermes3d.core.agents.dispatcher import (
         DispatchRequest,
-        DispatchStrategy,
     )
     from hermes3d.core.agents.multi_agent import run_multi_agent
     from hermes3d.core.farm.print_history import PrintHistory
@@ -294,10 +292,9 @@ def test_multi_agent_history_drives_revision(tmp_path: Path):
 def test_multi_agent_skill_attaches_param_overrides(tmp_path: Path):
     from hermes3d.core.agents.dispatcher import (
         DispatchRequest,
-        DispatchStrategy,
     )
     from hermes3d.core.agents.multi_agent import run_multi_agent
-    from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
+    from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
 
     sk = SkillStore(tmp_path / "sk.json")
     sk.add(
@@ -357,7 +354,7 @@ def test_failure_predict_high_confidence_with_history(tmp_path: Path):
 
 def test_failure_predict_skill_dominates(tmp_path: Path):
     from hermes3d.core.intelligence import predict_failure
-    from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
+    from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
 
     sk = SkillStore(tmp_path / "sk.json")
     sk.add(
@@ -391,8 +388,6 @@ def test_octoprint_client_unreachable_returns_falsy_state():
 def test_obico_client_status_action_thresholds():
     from hermes3d.core.integrations import (
         ObicoClient,
-        ObicoAction,
-        DEFAULT_FAILURE_THRESHOLD,
     )
 
     # Build by hand with threshold knobs
@@ -407,7 +402,7 @@ def test_obico_client_status_action_thresholds():
 
 
 def test_obico_status_to_dict_serializes_action():
-    from hermes3d.core.integrations import ObicoStatus, ObicoAction
+    from hermes3d.core.integrations import ObicoAction, ObicoStatus
 
     s = ObicoStatus(
         printer_id="x",

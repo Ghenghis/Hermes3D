@@ -32,10 +32,9 @@ import json
 import logging
 import os
 import sys
-import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
-
+from typing import Any
 
 log = logging.getLogger("hermes3d.mcp")
 
@@ -78,8 +77,8 @@ def _tool_dispatch(arguments: dict[str, Any]) -> dict[str, Any]:
 
 
 def _tool_fleet_status(arguments: dict[str, Any]) -> dict[str, Any]:
-    from hermes3d.core.farm.dashboard import collect_fleet_status
     from hermes3d.core.agents.job_queue import JobQueue
+    from hermes3d.core.farm.dashboard import collect_fleet_status
     from hermes3d.core.farm.spool_tracker import SpoolTracker
 
     qpath = arguments.get("queue_path", os.environ.get("HERMES3D_QUEUE", ""))
@@ -677,7 +676,7 @@ def serve_stdio() -> int:
                 _err(req_id, -32601, f"method not found: {method}")
         except KeyError as exc:
             _err(req_id, -32602, str(exc))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _err(req_id, -32603, f"internal error: {exc}")
     return 0
 

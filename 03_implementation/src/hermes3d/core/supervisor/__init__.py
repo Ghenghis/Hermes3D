@@ -1,8 +1,8 @@
 """Hermes3D supervisor — long-running reactive monitor."""
 
 from .daemon import (
-    PrintSupervisor,
     PrinterState,
+    PrintSupervisor,
     SupervisorEvent,
     SupervisorPolicy,
 )

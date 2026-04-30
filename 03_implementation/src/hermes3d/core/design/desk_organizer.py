@@ -28,13 +28,12 @@ a clear error explaining why the parameters are infeasible.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import trimesh
-
 
 # Engine selection — manifold3d is required for clean boolean ops.
 trimesh.util.attach_to_log()
@@ -80,7 +79,7 @@ class OrganizerSpec:
     # Fillet on top edges (very small for printability)
     chamfer_mm: float = 0.6
 
-    def validated(self) -> "OrganizerSpec":
+    def validated(self) -> OrganizerSpec:
         """Return self if valid, else raise ValueError."""
         errors: list[str] = []
         if self.wall_mm < 1.2:
@@ -391,7 +390,7 @@ def acceptance_variants() -> list[tuple[str, OrganizerSpec]]:
 
 __all__ = [
     "OrganizerSpec",
+    "acceptance_variants",
     "build_organizer",
     "export_organizer",
-    "acceptance_variants",
 ]

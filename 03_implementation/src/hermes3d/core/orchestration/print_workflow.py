@@ -42,9 +42,7 @@ import functools
 import hashlib
 import logging
 import time
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from .agent_graph import (
     GraphNode,
@@ -56,7 +54,6 @@ from .agent_graph import (
 from .repair_agent import RepairAgent
 from .retry_controller import RepairEscalation, RetryBudget, with_retry
 
-
 _DEFAULT_BUDGET = RetryBudget(max_retries=3)
 
 
@@ -67,13 +64,13 @@ def _retry_node(fn):
     wrapped = with_retry(_DEFAULT_BUDGET)(fn)
 
     @functools.wraps(fn)
-    def runner(state: "WorkflowState") -> NodeResult:
+    def runner(state: WorkflowState) -> NodeResult:
         try:
             return wrapped(state)
         except RepairEscalation as esc:
             try:
                 repair = RepairAgent().repair(esc)
-            except Exception as repair_exc:  # noqa: BLE001
+            except Exception as repair_exc:
                 log.exception("RepairAgent failed: %s", repair_exc)
                 return NodeResult(
                     node_name=getattr(fn, "__name__", "unknown").removeprefix("_node_"),
@@ -156,9 +153,9 @@ def _node_enqueue(state: WorkflowState) -> NodeResult:
 
 def _node_truth_gate(state: WorkflowState) -> NodeResult:
     from hermes3d.core.validation.truth_gate import (
+        CheckStatus,
         TruthGateConfig,
         run_truth_gate,
-        CheckStatus,
     )
 
     started = _now()
@@ -213,6 +210,7 @@ def _node_repair(state: WorkflowState) -> NodeResult:
         )
 
     import trimesh
+
     from hermes3d.core.agents.mesh_repair import RepairConfig, repair_mesh
     from hermes3d.core.validation.truth_gate import (
         TruthGateConfig,
@@ -279,6 +277,7 @@ def _node_auto_orient(state: WorkflowState) -> NodeResult:
             notes=["auto-orient disabled by caller"],
         )
     import trimesh
+
     from hermes3d.core.agents.auto_orient import auto_orient
 
     started = _now()
@@ -317,6 +316,7 @@ def _node_auto_orient(state: WorkflowState) -> NodeResult:
 
 def _node_dispatch(state: WorkflowState) -> NodeResult:
     import trimesh
+
     from hermes3d.core.agents.dispatcher import (
         DispatchRequest,
         DispatchStrategy,
@@ -416,9 +416,9 @@ def _node_preflight(state: WorkflowState) -> NodeResult:
 
 def _node_slice(state: WorkflowState) -> NodeResult:
     from hermes3d.core.slicer.slicer_runner import (
-        slice_mesh,
         SlicerError,
         SlicerNotFound,
+        slice_mesh,
     )
 
     started = _now()
@@ -544,7 +544,7 @@ def _node_upload(state: WorkflowState) -> NodeResult:
     )
     try:
         item_path = client.upload_gcode(state.data["sliced_gcode_path"])
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return NodeResult(
             node_name="upload",
             outcome=NodeOutcome.RETRY,
@@ -581,7 +581,7 @@ def _node_start_print(state: WorkflowState) -> NodeResult:
     item = state.data.get("moonraker_item_path") or state.data["sliced_gcode_path"]
     try:
         client.start_print(item)
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return NodeResult(
             node_name="start_print",
             outcome=NodeOutcome.FAIL,

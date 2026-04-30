@@ -60,7 +60,7 @@ class ProviderConfig:
     temperature: float = 0.2
 
     @classmethod
-    def from_env(cls) -> "ProviderConfig":
+    def from_env(cls) -> ProviderConfig:
         provider = LLMProvider(os.getenv("HERMES3D_LLM_PROVIDER", "ollama").lower())
         defaults = {
             LLMProvider.OLLAMA: ("http://127.0.0.1:11434", "qwen2.5-coder:7b"),

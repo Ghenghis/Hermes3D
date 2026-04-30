@@ -23,7 +23,6 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Tuple
 
 
 class Kinematics(str, Enum):
@@ -113,7 +112,7 @@ class PrinterProfile:
 #   - Klipper Community (Guilouz/Klipper-Flsun-Speeder-Pad, danorder/V400)
 # =============================================================================
 
-FLEET: Tuple[PrinterProfile, ...] = (
+FLEET: tuple[PrinterProfile, ...] = (
     # -------------------------------------------------------------- FLSUN ----
     PrinterProfile(
         profile_id="flsun_qqs_pro",
@@ -460,7 +459,7 @@ def fits_bed(
     profile: PrinterProfile,
     mesh_extents_mm: tuple[float, float, float],
     mesh_xy_radius_mm: float | None = None,
-) -> Tuple[bool, str]:
+) -> tuple[bool, str]:
     """Check whether a mesh fits the printer's build envelope.
 
     Args:

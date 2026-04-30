@@ -40,7 +40,6 @@ from typing import Any
 import numpy as np
 import trimesh
 
-
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -246,7 +245,7 @@ def analyze_mesh(
         bbox_mm=extents,
         volume_mm3=float(m.volume) if m.is_volume else 0.0,
         surface_area_mm2=total_area,
-        triangle_count=int(len(m.faces)),
+        triangle_count=len(m.faces),
         is_watertight=bool(m.is_watertight),
         is_volume=bool(m.is_volume),
         overhang_area_mm2=overhang_area,
@@ -271,8 +270,8 @@ def analyze_mesh_file(path: str) -> MeshAnalysis:
 __all__ = [
     "BRIDGE_MAX_SPAN_DEFAULT_MM",
     "DEFAULT_OVERHANG_THRESHOLD_DEG",
-    "MeshAnalysis",
     "THIN_WALL_DEFAULT_MIN_MM",
+    "MeshAnalysis",
     "analyze_mesh",
     "analyze_mesh_file",
 ]

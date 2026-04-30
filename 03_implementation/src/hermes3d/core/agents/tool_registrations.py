@@ -76,11 +76,11 @@ def _tool_fleet_status(include_offline: bool = True, timeout_s: float = 2.5) -> 
     queue: JobQueue | None
     try:
         queue = JobQueue(_queue_path())
-    except Exception:  # noqa: BLE001 - missing/corrupt queue files are non-fatal here
+    except Exception:
         queue = None
     try:
         spool_tracker = SpoolTracker(_spools_path())
-    except Exception:  # noqa: BLE001
+    except Exception:
         spool_tracker = None
 
     entries = collect_fleet_status(
@@ -364,7 +364,7 @@ def _tool_failure_forecast(
         history_path = os.environ.get("HERMES3D_PRINT_HISTORY", "./var/print_history.json")
         if Path(history_path).exists():
             history = PrintHistory(history_path)
-    except Exception:  # noqa: BLE001 - history is optional
+    except Exception:
         history = None
 
     skills: SkillStore | None
@@ -374,7 +374,7 @@ def _tool_failure_forecast(
             skills = SkillStore(skills_path)
         else:
             skills = None
-    except Exception:  # noqa: BLE001
+    except Exception:
         skills = None
 
     pred = predict_failure(
@@ -669,7 +669,7 @@ def is_builtin(name: str) -> bool:
 
 
 __all__ = [
-    "register_builtin_tools",
     "builtin_names",
     "is_builtin",
+    "register_builtin_tools",
 ]

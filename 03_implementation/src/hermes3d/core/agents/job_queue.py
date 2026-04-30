@@ -32,8 +32,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
-
+from typing import Any
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -77,15 +76,15 @@ class Job:
     history: list[dict[str, Any]] = field(default_factory=list)
 
     # Filled in as the job advances
-    target_printer_id: Optional[str] = None
-    dispatcher_decision: Optional[dict[str, Any]] = None
-    truth_gate_report: Optional[dict[str, Any]] = None
-    sliced_gcode_path: Optional[str] = None
-    sliced_gcode_sha256: Optional[str] = None
-    slicer_metadata: Optional[dict[str, Any]] = None
-    moonraker_item_path: Optional[str] = None
-    proof_envelope_path: Optional[str] = None
-    error: Optional[str] = None
+    target_printer_id: str | None = None
+    dispatcher_decision: dict[str, Any] | None = None
+    truth_gate_report: dict[str, Any] | None = None
+    sliced_gcode_path: str | None = None
+    sliced_gcode_sha256: str | None = None
+    slicer_metadata: dict[str, Any] | None = None
+    moonraker_item_path: str | None = None
+    proof_envelope_path: str | None = None
+    error: str | None = None
     notes: str = ""
 
     # User-supplied metadata
@@ -99,7 +98,7 @@ class Job:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Job":
+    def from_dict(cls, d: dict[str, Any]) -> Job:
         d = dict(d)
         d["state"] = JobState(d["state"])
         return cls(**d)
@@ -273,8 +272,8 @@ class JobQueue:
 
 
 __all__ = [
+    "SCHEMA_VERSION",
     "Job",
     "JobQueue",
     "JobState",
-    "SCHEMA_VERSION",
 ]

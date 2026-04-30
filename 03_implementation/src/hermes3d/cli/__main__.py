@@ -46,7 +46,6 @@ import os
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any
 
 
 def _printers_table_compact() -> str:
@@ -90,8 +89,8 @@ def cmd_fleet_probe(args: argparse.Namespace) -> int:
 
 
 def cmd_fleet_status(args: argparse.Namespace) -> int:
-    from hermes3d.core.farm import collect_fleet_status, render_dashboard_table
     from hermes3d.core.agents.job_queue import JobQueue
+    from hermes3d.core.farm import collect_fleet_status, render_dashboard_table
     from hermes3d.core.farm.spool_tracker import SpoolTracker
 
     queue = JobQueue(args.queue) if args.queue and Path(args.queue).exists() else None
@@ -112,9 +111,9 @@ def cmd_fleet_list(args: argparse.Namespace) -> int:
 
 def cmd_validate(args: argparse.Namespace) -> int:
     from hermes3d.core.validation.truth_gate import (
+        CheckStatus,
         TruthGateConfig,
         run_truth_gate,
-        CheckStatus,
     )
 
     cfg = TruthGateConfig(printer_profile_id=args.printer)
@@ -132,12 +131,12 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_fleet(args: argparse.Namespace) -> int:
+    from hermes3d.core.printers import list_ids
     from hermes3d.core.validation.truth_gate import (
+        CheckStatus,
         TruthGateConfig,
         run_truth_gate,
-        CheckStatus,
     )
-    from hermes3d.core.printers import list_ids
 
     fail = 0
     for pid in list_ids():
@@ -162,7 +161,6 @@ def cmd_validate_fleet(args: argparse.Namespace) -> int:
 def cmd_generate_organizer(args: argparse.Namespace) -> int:
     from hermes3d.core.design.desk_organizer import (
         OrganizerSpec,
-        build_organizer,
         export_organizer,
     )
 
@@ -186,6 +184,7 @@ def cmd_generate_organizer(args: argparse.Namespace) -> int:
 
 def cmd_dispatch(args: argparse.Namespace) -> int:
     import trimesh
+
     from hermes3d.core.agents.dispatcher import (
         DispatchRequest,
         DispatchStrategy,
@@ -229,7 +228,7 @@ def cmd_dispatch(args: argparse.Namespace) -> int:
 
 
 def cmd_slice(args: argparse.Namespace) -> int:
-    from hermes3d.core.slicer.slicer_runner import slice_mesh, SlicerError
+    from hermes3d.core.slicer.slicer_runner import SlicerError, slice_mesh
 
     out_dir = (
         Path(args.out_dir) if args.out_dir else Path(tempfile.mkdtemp(prefix="hermes3d_slice_"))
@@ -379,8 +378,8 @@ def cmd_spool_consume(args: argparse.Namespace) -> int:
 
 def cmd_proof_verify(args: argparse.Namespace) -> int:
     from hermes3d.core.proof.proof_envelope import (
-        verify_proof,
         ProofVerificationError,
+        verify_proof,
     )
 
     try:
@@ -388,7 +387,7 @@ def cmd_proof_verify(args: argparse.Namespace) -> int:
     except ProofVerificationError as exc:
         print(f"VERIFICATION FAILED: {exc}", file=sys.stderr)
         return 1
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"Error reading proof: {exc}", file=sys.stderr)
         return 1
     print("Proof verified ✓")

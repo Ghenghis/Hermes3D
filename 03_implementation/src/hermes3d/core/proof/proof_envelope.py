@@ -68,7 +68,7 @@ class VisualEvidence:
         return {"path": self.path, "sha256": self.sha256, "view_name": self.view_name}
 
     @classmethod
-    def from_dict(cls, d: dict[str, str]) -> "VisualEvidence":
+    def from_dict(cls, d: dict[str, str]) -> VisualEvidence:
         return cls(path=d["path"], sha256=d["sha256"], view_name=d["view_name"])
 
 
@@ -99,7 +99,7 @@ class ProofEnvelope:
         return d
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "ProofEnvelope":
+    def from_dict(cls, d: dict[str, Any]) -> ProofEnvelope:
         return cls(
             schema_version=d["schema_version"],
             timestamp_unix=float(d["timestamp_unix"]),
@@ -152,8 +152,8 @@ def _mesh_metadata(mesh_path: Path) -> dict[str, Any]:
     return {
         "path": str(mesh_path.resolve()),
         "sha256": _file_sha256(mesh_path),
-        "vertex_count": int(len(mesh.vertices)),
-        "face_count": int(len(mesh.faces)),
+        "vertex_count": len(mesh.vertices),
+        "face_count": len(mesh.faces),
         "bbox_mm": [list(map(float, mesh.bounds[0])), list(map(float, mesh.bounds[1]))],
         "extents_mm": list(map(float, mesh.extents)),
         "volume_mm3": float(mesh.volume),
@@ -286,7 +286,7 @@ def verify_proof(proof_path: str | Path, *, check_files: bool = True) -> ProofEn
     Raises ProofVerificationError on any mismatch.
     """
     p = Path(proof_path)
-    with open(p, "r", encoding="utf-8") as fp:
+    with open(p, encoding="utf-8") as fp:
         data = json.load(fp)
 
     envelope = ProofEnvelope.from_dict(data)

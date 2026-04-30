@@ -18,11 +18,9 @@ honestly reflecting reality.
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
-
 from hermes3d.core.design.desk_organizer import (
     OrganizerSpec,
     acceptance_variants,
@@ -34,7 +32,6 @@ from hermes3d.core.validation.truth_gate import (
     TruthGateConfig,
     run_truth_gate,
 )
-
 
 # Cache built meshes — building each variant is a few seconds of CSG.
 _MESH_CACHE: dict[str, Path] = {}

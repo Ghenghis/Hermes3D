@@ -47,9 +47,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from fastapi import FastAPI, Header, HTTPException, UploadFile, File, Body
+    from fastapi import Body, FastAPI, Header, HTTPException
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import PlainTextResponse, JSONResponse
+    from fastapi.responses import JSONResponse, PlainTextResponse
     from pydantic import BaseModel, Field
 
     _FASTAPI_AVAILABLE = True
@@ -129,7 +129,7 @@ def create_app(
         "http://localhost:3000",
         "http://127.0.0.1",
     ),
-) -> "FastAPI":
+) -> FastAPI:
     if not _FASTAPI_AVAILABLE:
         raise RuntimeError("FastAPI is not installed. Install with: pip install fastapi uvicorn")
 
@@ -150,17 +150,19 @@ def create_app(
         log.warning("HERMES3D_API_TOKEN unset — API is OPEN (no auth)")
 
     # Lazy imports — avoid cost at module import time
-    from hermes3d.core.printers import FLEET, get_profile
-    from hermes3d.core.printers.moonraker_client import probe_fleet, MoonrakerClient
     from hermes3d.core.agents.dispatcher import (
-        dispatch as run_dispatch,
         DispatchRequest,
         DispatchStrategy,
     )
+    from hermes3d.core.agents.dispatcher import (
+        dispatch as run_dispatch,
+    )
     from hermes3d.core.agents.job_queue import JobQueue, JobState
-    from hermes3d.core.farm.spool_tracker import SpoolTracker
     from hermes3d.core.farm.print_history import PrintHistory, aggregate_metrics
-    from hermes3d.core.proof.proof_envelope import verify_proof, ProofVerificationError
+    from hermes3d.core.farm.spool_tracker import SpoolTracker
+    from hermes3d.core.printers import FLEET, get_profile
+    from hermes3d.core.printers.moonraker_client import MoonrakerClient, probe_fleet
+    from hermes3d.core.proof.proof_envelope import ProofVerificationError, verify_proof
 
     queue = JobQueue(queue_path)
     spools = SpoolTracker(spools_path)
@@ -227,7 +229,7 @@ def create_app(
         client = MoonrakerClient(p.moonraker_url_default, timeout_s=2.5)
         try:
             return client.printer_state()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {"reachable": False, "error": str(exc)}
 
     @app.post("/fleet/probe")
@@ -430,7 +432,7 @@ def create_app(
 if _FASTAPI_AVAILABLE:
     try:
         app = create_app()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         log.error("Failed to create default API app: %s", exc)
         app = None  # type: ignore[assignment]
 else:

@@ -18,12 +18,12 @@ Returns a list of FleetEntry rows ready for table rendering.
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
+from hermes3d.core.agents.job_queue import Job, JobQueue, JobState
 from hermes3d.core.printers import FLEET, PrinterProfile
 from hermes3d.core.printers.moonraker_client import probe_fleet
-from hermes3d.core.agents.job_queue import Job, JobQueue, JobState
 
 
 @dataclass

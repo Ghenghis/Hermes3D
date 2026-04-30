@@ -22,14 +22,13 @@ from __future__ import annotations
 
 import dataclasses
 import json
-import os
 import threading
 import time
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -70,7 +69,7 @@ class PrintRecord:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "PrintRecord":
+    def from_dict(cls, d: dict[str, Any]) -> PrintRecord:
         return cls(**d)
 
 
@@ -225,11 +224,11 @@ def aggregate_metrics(
 
 
 __all__ = [
+    "SCHEMA_VERSION",
     "FleetMetrics",
     "MaterialAggregate",
     "PrintHistory",
     "PrintRecord",
     "PrinterAggregate",
-    "SCHEMA_VERSION",
     "aggregate_metrics",
 ]

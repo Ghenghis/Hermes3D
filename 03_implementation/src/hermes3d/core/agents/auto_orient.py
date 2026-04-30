@@ -34,7 +34,6 @@ from typing import Any
 import numpy as np
 import trimesh
 
-
 # Triangle is "overhanging" if its normal makes more than ~50° with +Z.
 # At 50°, dot(normal, +Z) = cos(50°) ≈ 0.643. Anything with normal.z
 # below this, when pointing roughly downward, requires support.
@@ -88,14 +87,14 @@ class OrientDecision:
 
 def _make_axis_candidates() -> list[OrientCandidate]:
     """Six basis orientations: identity + rotations putting each face down."""
-    I = np.eye(4)
+    identity = np.eye(4)
     rx90 = trimesh.transformations.rotation_matrix(math.pi / 2, (1, 0, 0))
     rx_90 = trimesh.transformations.rotation_matrix(-math.pi / 2, (1, 0, 0))
     ry90 = trimesh.transformations.rotation_matrix(math.pi / 2, (0, 1, 0))
     ry_90 = trimesh.transformations.rotation_matrix(-math.pi / 2, (0, 1, 0))
     rx180 = trimesh.transformations.rotation_matrix(math.pi, (1, 0, 0))
     return [
-        OrientCandidate("identity", _to_tuple(I)),
+        OrientCandidate("identity", _to_tuple(identity)),
         OrientCandidate("rotX+90", _to_tuple(rx90)),
         OrientCandidate("rotX-90", _to_tuple(rx_90)),
         OrientCandidate("rotY+90", _to_tuple(ry90)),

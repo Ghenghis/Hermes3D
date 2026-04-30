@@ -16,23 +16,23 @@ Public API:
 from __future__ import annotations
 
 from .printer_profiles import (
+    FLEET,
     BedShape,
     FirmwareSupport,
     Kinematics,
     PrinterProfile,
-    FLEET,
+    fits_bed,
     get_profile,
     list_ids,
-    fits_bed,
 )
 
 __all__ = [
+    "FLEET",
     "BedShape",
     "FirmwareSupport",
     "Kinematics",
     "PrinterProfile",
-    "FLEET",
+    "fits_bed",
     "get_profile",
     "list_ids",
-    "fits_bed",
 ]

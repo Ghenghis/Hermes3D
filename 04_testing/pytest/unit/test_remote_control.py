@@ -9,7 +9,6 @@ import time
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from hermes3d.core.agents.tool_registry import ToolRegistry, ToolSpec
 from hermes3d.core.integrations.remote_control import (
     COMMAND_TABLE,
@@ -20,7 +19,6 @@ from hermes3d.core.integrations.remote_control import (
     RemoteControlConfig,
     TelegramTransport,
 )
-
 
 # --- Test fixtures -----------------------------------------------------------
 
@@ -401,10 +399,10 @@ class TestRemoteControlBridge:
 
 def test_telegram_send_with_real_module_patched() -> None:
     """Confirm stdlib urllib.request is the only network surface (no httpx)."""
-    import hermes3d.core.integrations.remote_control as rc
-
     # urllib.request is imported by the module; httpx must NOT be.
     import sys
+
+    import hermes3d.core.integrations.remote_control as rc
 
     assert "hermes3d.core.integrations.remote_control" in sys.modules
     src = rc.__file__

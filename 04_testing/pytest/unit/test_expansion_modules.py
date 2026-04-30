@@ -9,7 +9,6 @@ import numpy as np
 import pytest
 import trimesh
 
-
 # =============================================================================
 # Mesh analyzer
 # =============================================================================
@@ -29,8 +28,8 @@ def test_mesh_analyzer_simple_cube_no_overhangs():
 
 
 def test_mesh_analyzer_tip_down_cone_flags_low_bed():
-    from hermes3d.core.agents.mesh_analyzer import analyze_mesh
     import trimesh.transformations as tt
+    from hermes3d.core.agents.mesh_analyzer import analyze_mesh
 
     cone = trimesh.creation.cone(radius=20, height=40)
     cone.apply_transform(tt.rotation_matrix(np.pi, (1, 0, 0)))
@@ -80,7 +79,6 @@ def test_mesh_analyzer_volume_metric():
 
 
 def test_parallel_planner_assigns_distinct_printers():
-    from hermes3d.core.agents.dispatcher import DispatchStrategy
     from hermes3d.core.agents.parallel_planner import (
         PartRequest,
         plan_parallel_print,
@@ -151,7 +149,7 @@ def test_generate_profile_quality_levels_differ():
 
 
 def test_generate_profile_skill_overrides_applied(tmp_path: Path):
-    from hermes3d.core.memory import SkillStore, SkillKind, SkillScope
+    from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
     from hermes3d.core.slicer.profile_generator import generate_profile
 
     sk = SkillStore(tmp_path / "sk.json")
@@ -245,8 +243,8 @@ def test_skill_pack_merge_skips_duplicates(tmp_path: Path):
         ImportMode,
         export_pack,
         import_pack,
-        write_pack,
         read_pack,
+        write_pack,
     )
 
     src = SkillStore(tmp_path / "src.json")
@@ -275,11 +273,12 @@ def test_skill_pack_merge_skips_duplicates(tmp_path: Path):
 
 def test_skill_pack_corrupt_hash_rejected(tmp_path: Path):
     import json
+
     from hermes3d.core.memory import SkillKind, SkillScope, SkillStore
     from hermes3d.core.memory.skill_pack import (
         export_pack,
-        write_pack,
         read_pack,
+        write_pack,
     )
 
     src = SkillStore(tmp_path / "src.json")
@@ -337,8 +336,8 @@ def test_supervisor_event_listeners_fire(tmp_path: Path):
     from hermes3d.core.memory import SkillStore
     from hermes3d.core.notifications import Notifier
     from hermes3d.core.supervisor import (
-        PrintSupervisor,
         PrinterState,
+        PrintSupervisor,
         SupervisorEvent,
     )
 

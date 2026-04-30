@@ -25,7 +25,6 @@ import dataclasses
 import enum
 import hashlib
 import json
-import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -33,7 +32,6 @@ from typing import Any
 
 import numpy as np
 import trimesh
-
 
 CURRENT_SCHEMA_VERSION = "1.0.0"
 
@@ -182,7 +180,7 @@ def _check_watertight(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResul
         name="watertight",
         status=CheckStatus.PASS if measured else CheckStatus.FAIL,
         threshold={"required": True},
-        measured={"watertight": measured, "open_edges": int(len(mesh.facets_boundary or []))},
+        measured={"watertight": measured, "open_edges": len(mesh.facets_boundary or [])},
         message="Mesh is watertight."
         if measured
         else "Mesh is NOT watertight; open edges detected.",
@@ -293,7 +291,7 @@ def _check_printer_fit(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResu
 
     # Local import to keep the truth_gate -> printers dependency optional
     # for tests that only validate generic geometry.
-    from hermes3d.core.printers import get_profile, fits_bed
+    from hermes3d.core.printers import fits_bed, get_profile
 
     profile = get_profile(cfg.printer_profile_id)
     extents = tuple(float(e) for e in mesh.extents)
@@ -448,7 +446,7 @@ def _check_thickness(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> CheckResult
         )
     try:
         min_t, hits = _estimate_min_wall_thickness(mesh, cfg.thickness_sample_count)
-    except Exception as exc:  # noqa: BLE001 — we want to record the failure
+    except Exception as exc:
         return CheckResult(
             name="wall_thickness",
             status=CheckStatus.ERROR,
@@ -491,7 +489,7 @@ def _check_self_intersection(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> Che
     # construction. We surface the count even when zero so the proof has
     # the actual measurement.
     broken = trimesh.repair.broken_faces(mesh, color=None)
-    broken_count = int(len(broken)) if broken is not None else 0
+    broken_count = len(broken) if broken is not None else 0
     ratio = broken_count / max(len(mesh.faces), 1)
     ok = ratio <= cfg.max_self_intersection_ratio
     return CheckResult(
@@ -500,7 +498,7 @@ def _check_self_intersection(mesh: trimesh.Trimesh, cfg: TruthGateConfig) -> Che
         threshold={"max_ratio": cfg.max_self_intersection_ratio},
         measured={
             "broken_face_count": broken_count,
-            "total_faces": int(len(mesh.faces)),
+            "total_faces": len(mesh.faces),
             "ratio": ratio,
         },
         message=f"Broken faces {broken_count}/{len(mesh.faces)}"
@@ -548,7 +546,7 @@ def run_truth_gate(
     for check_fn in CHECKS:
         try:
             results.append(check_fn(mesh, cfg))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             results.append(
                 CheckResult(
                     name=check_fn.__name__.lstrip("_check_"),

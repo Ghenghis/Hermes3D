@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import pytest
-
 from hermes3d.core.agents.dispatcher import (
     DispatchRequest,
-    DispatchScore,
     DispatchStrategy,
     dispatch,
 )
-from hermes3d.core.agents.materials import MATERIALS, get_material, list_materials
-
+from hermes3d.core.agents.materials import get_material, list_materials
 
 # -- materials ----------------------------------------------------------------
 

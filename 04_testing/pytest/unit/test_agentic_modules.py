@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 import datetime as dt
-import json
-import os
-import tempfile
-import time
 from pathlib import Path
 
 import numpy as np
 import pytest
 import trimesh
-
 
 # =============================================================================
 # Mesh repair
@@ -221,7 +216,7 @@ def test_equivalence_expand_pool_request():
 
 
 def test_scheduler_short_print_at_3pm_allowed():
-    from hermes3d.core.agents.scheduler import schedule_window, SchedulerPolicy
+    from hermes3d.core.agents.scheduler import SchedulerPolicy, schedule_window
 
     now = dt.datetime(2026, 4, 29, 15, 0)
     d = schedule_window(duration_minutes=120, policy=SchedulerPolicy(), now=now)
@@ -230,7 +225,7 @@ def test_scheduler_short_print_at_3pm_allowed():
 
 
 def test_scheduler_quiet_hours_blocks_start():
-    from hermes3d.core.agents.scheduler import schedule_window, SchedulerPolicy
+    from hermes3d.core.agents.scheduler import SchedulerPolicy, schedule_window
 
     now = dt.datetime(2026, 4, 29, 23, 30)
     d = schedule_window(duration_minutes=240, policy=SchedulerPolicy(), now=now)
@@ -240,7 +235,7 @@ def test_scheduler_quiet_hours_blocks_start():
 
 
 def test_scheduler_duration_cap():
-    from hermes3d.core.agents.scheduler import schedule_window, SchedulerPolicy
+    from hermes3d.core.agents.scheduler import SchedulerPolicy, schedule_window
 
     now = dt.datetime(2026, 4, 29, 9, 0)
     p = SchedulerPolicy(max_print_duration_minutes=120)
@@ -394,7 +389,7 @@ def test_gcode_analyzer_missing_file_raises():
 
 def test_notifier_no_channels_returns_empty():
     """With no env vars set, the Notifier reports no channels."""
-    from hermes3d.core.notifications import Notifier, NotificationEvent
+    from hermes3d.core.notifications import NotificationEvent, Notifier
 
     n = Notifier(discord_url=None, slack_url=None, generic_url=None)
     assert n.configured_channels == ()
@@ -404,10 +399,10 @@ def test_notifier_no_channels_returns_empty():
 def test_notifier_payload_shapes():
     """Verify the payload shapes are correct (offline)."""
     from hermes3d.core.notifications.notifier import (
-        discord_payload,
-        slack_payload,
         NotificationEvent,
         NotificationLevel,
+        discord_payload,
+        slack_payload,
     )
 
     e = NotificationEvent(
@@ -432,7 +427,7 @@ def test_notifier_payload_shapes():
 
 def test_preflight_passes_clean_scenario():
     from hermes3d.core.agents.preflight import run_preflight
-    from hermes3d.core.agents.scheduler import schedule_window, SchedulerPolicy
+    from hermes3d.core.agents.scheduler import SchedulerPolicy, schedule_window
     from hermes3d.core.farm.cost_estimator import estimate_cost
     from hermes3d.core.farm.spool_tracker import Spool
 

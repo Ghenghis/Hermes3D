@@ -21,7 +21,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 SCHEMA_VERSION = "1.0.0"
 
 
@@ -51,7 +50,7 @@ class Spool:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "Spool":
+    def from_dict(cls, d: dict[str, Any]) -> Spool:
         return cls(**d)
 
 
@@ -178,4 +177,4 @@ class SpoolTracker:
         return [s for s in out if s.remaining_grams > 0]
 
 
-__all__ = ["Spool", "SpoolTracker", "SCHEMA_VERSION"]
+__all__ = ["SCHEMA_VERSION", "Spool", "SpoolTracker"]
