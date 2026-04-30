@@ -26,11 +26,11 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 PYTHONPATH_BACKUP="${PYTHONPATH:-}"
-export PYTHONPATH="$REPO_ROOT/src:$PYTHONPATH_BACKUP"
+export PYTHONPATH="$REPO_ROOT/03_implementation/src:$PYTHONPATH_BACKUP"
 export HERMES3D_PROOF_KEY="${HERMES3D_PROOF_KEY:-hermes3d-default-proof-key-not-secret}"
 
 # Resolve python: prefer python3 (Linux/macOS), fall back to python (Windows/Git-Bash).
@@ -45,7 +45,7 @@ fi
 
 if [[ "$ACCEPTANCE_ONLY" -eq 1 ]]; then
     echo "[1/1] Acceptance runner ..."
-    $PY ../04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py
+    $PY 04_testing/acceptance/run_acceptance.py
     exit $?
 fi
 
@@ -54,8 +54,8 @@ echo "[1/4] Layer A: static gates ..."
 if [[ "$FAST" -eq 1 ]]; then
     echo "  [fast] skipping ruff format + check + mypy"
 elif command -v ruff >/dev/null 2>&1; then
-    ruff format --check src tests || { echo "[FAIL] ruff format"; exit 1; }
-    ruff check src tests || { echo "[FAIL] ruff check"; exit 1; }
+    ruff format --check 03_implementation/src 04_testing/pytest || { echo "[FAIL] ruff format"; exit 1; }
+    ruff check 03_implementation/src 04_testing/pytest || { echo "[FAIL] ruff check"; exit 1; }
     echo "  [PASS] ruff format + check"
 else
     echo "  [WARN] ruff not installed; skipping format + lint (pip install ruff)"
@@ -64,7 +64,7 @@ fi
 # Forbidden-pattern scan: TODO/FIXME/STUB outside tests/fixtures
 echo "  [SCAN] forbidden patterns ..."
 hits=$(grep -rE '\b(TODO|FIXME|STUB|PLACEHOLDER|NOT_IMPLEMENTED)\b' \
-       src/hermes3d 2>/dev/null \
+       03_implementation/src/hermes3d 2>/dev/null \
        --include='*.py' --exclude-dir=__pycache__ \
        || true)
 if [[ -n "$hits" ]]; then
@@ -72,21 +72,21 @@ if [[ -n "$hits" ]]; then
     echo "$hits"
     exit 1
 fi
-echo "  [PASS] no forbidden patterns in src/hermes3d"
+echo "  [PASS] no forbidden patterns in 03_implementation/src/hermes3d"
 
 # Layer B: unit + smoke tests
 echo "[2/4] Layer B: unit + smoke tests ..."
 if [[ "$INTEGRATION" -eq 1 ]]; then
-    pytest_args=("tests/")
+    pytest_args=("04_testing/pytest/")
 elif [[ "$FAST" -eq 1 ]]; then
     # --fast: only the new hardening tests known to be green; used by pre-push hook.
     pytest_args=(
-        "tests/unit/test_retry_controller.py"
-        "tests/unit/test_repair_agent.py"
-        "tests/unit/test_remote_control.py"
+        "04_testing/pytest/unit/test_retry_controller.py"
+        "04_testing/pytest/unit/test_repair_agent.py"
+        "04_testing/pytest/unit/test_remote_control.py"
     )
 else
-    pytest_args=("tests/unit" "tests/conformance")
+    pytest_args=("04_testing/pytest/unit" "04_testing/pytest/conformance")
 fi
 $PY -m pytest "${pytest_args[@]}" "${EXTRA_ARGS[@]}" --tb=no -q || exit $?
 
@@ -98,7 +98,7 @@ fi
 
 # Layer B continued: acceptance runner
 echo "[3/4] Layer B: acceptance runner ..."
-$PY ../04-TEST-CASE-DESK-ORGANIZER/run_acceptance.py || exit $?
+$PY 04_testing/acceptance/run_acceptance.py || exit $?
 
 if [[ "$E2E" -eq 1 ]]; then
     echo "[4/4] Layer D: E2E launcher smoke ..."

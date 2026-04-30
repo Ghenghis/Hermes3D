@@ -5,7 +5,7 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '....')
 Push-Location $repoRoot
 try {
     $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }

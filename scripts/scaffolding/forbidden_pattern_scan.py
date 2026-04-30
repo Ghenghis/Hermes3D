@@ -24,8 +24,8 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-SRC = REPO_ROOT / "src" / "hermes3d"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+SRC = REPO_ROOT / "03_implementation" / "src" / "hermes3d"
 
 PATTERNS = re.compile(
     r"\b(TODO|FIXME|STUB|PLACEHOLDER|NOT_IMPLEMENTED)\b", re.IGNORECASE

@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Read version from pyproject.toml if not supplied
@@ -42,7 +42,7 @@ echo "[release] packaging $ARTIFACT ..."
 STAGE=$(mktemp -d)
 trap 'rm -rf "$STAGE"' EXIT
 
-cp -r src tests config scripts pyproject.toml requirements.txt requirements-dev.txt env "$STAGE/"
+cp -r 03_implementation/src 04_testing/pytest 03_implementation/config scripts pyproject.toml requirements.txt requirements-dev.txt env "$STAGE/"
 [[ -f .gitignore ]] && cp .gitignore "$STAGE/"
 [[ -f .editorconfig ]] && cp .editorconfig "$STAGE/"
 
@@ -68,7 +68,7 @@ HOST_FP="$(hostname 2>/dev/null || echo 'unknown')"
 
 PROOF_KEY="${HERMES3D_PROOF_KEY:-hermes3d-default-proof-key-not-secret}"
 
-PYTHONPATH="$REPO_ROOT/src" python3 - <<PY
+PYTHONPATH="$REPO_ROOT/03_implementation/src" python3 - <<PY
 import hashlib, hmac, json, sys
 
 doc = {

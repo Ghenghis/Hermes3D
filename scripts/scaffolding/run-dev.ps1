@@ -46,10 +46,10 @@ if ($NoSupervisor) { $supervisor = $false }
 if ($NoUi) { $ui = $false }
 if ($NoApi) { $api = $false }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '....')
 Push-Location $repoRoot
 
-$env:PYTHONPATH = (Join-Path $repoRoot 'src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
+$env:PYTHONPATH = (Join-Path $repoRoot '03_implementation/src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
 if (-not $env:HERMES3D_PROOF_KEY) {
     $env:HERMES3D_PROOF_KEY = 'hermes3d-default-proof-key-not-secret'
 }

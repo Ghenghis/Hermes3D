@@ -14,7 +14,7 @@ param(
     [string]$Version
 )
 $ErrorActionPreference = 'Stop'
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '....')
 Push-Location $repoRoot
 try {
     $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }
@@ -33,7 +33,7 @@ try {
     # Stage the files
     $stage = New-Item -ItemType Directory -Path (Join-Path ([System.IO.Path]::GetTempPath()) ("h3d-stage-" + [guid]::NewGuid())) -Force
     try {
-        foreach ($d in @('src', 'tests', 'config', 'scripts', 'env')) {
+        foreach ($d in @('03_implementation/src', '04_testing/pytest', '03_implementation/config', 'scripts', 'env')) {
             if (Test-Path $d) { Copy-Item -Recurse -Path $d -Destination (Join-Path $stage $d) }
         }
         foreach ($f in @('pyproject.toml', 'requirements.txt', 'requirements-dev.txt', '.gitignore', '.editorconfig')) {
@@ -63,7 +63,7 @@ try {
     $hostFp = $env:COMPUTERNAME
 
     $proofKey = if ($env:HERMES3D_PROOF_KEY) { $env:HERMES3D_PROOF_KEY } else { 'hermes3d-default-proof-key-not-secret' }
-    $env:PYTHONPATH = (Join-Path $repoRoot 'src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
+    $env:PYTHONPATH = (Join-Path $repoRoot '03_implementation/src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
 
     $script = @"
 import hashlib, hmac, json

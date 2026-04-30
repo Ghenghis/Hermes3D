@@ -4,13 +4,13 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 OUT="var/proof-report.json"
 mkdir -p var
 
-PYTHONPATH="$REPO_ROOT/src" python3 - <<'PY'
+PYTHONPATH="$REPO_ROOT/03_implementation/src" python3 - <<'PY'
 import json, os, sys
 from pathlib import Path
 

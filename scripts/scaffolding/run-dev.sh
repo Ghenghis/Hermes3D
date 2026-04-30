@@ -30,10 +30,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-export PYTHONPATH="$REPO_ROOT/src:${PYTHONPATH:-}"
+export PYTHONPATH="$REPO_ROOT/03_implementation/src:${PYTHONPATH:-}"
 export HERMES3D_PROOF_KEY="${HERMES3D_PROOF_KEY:-hermes3d-default-proof-key-not-secret}"
 
 mkdir -p "$REPO_ROOT/var" "$REPO_ROOT/logs"

@@ -5,7 +5,7 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '....')
 Push-Location $repoRoot
 try {
     if (-not (Get-Command ruff -ErrorAction SilentlyContinue)) {
@@ -13,7 +13,7 @@ try {
         exit 1
     }
     Write-Host '[format] running ruff format ...'
-    & ruff format src tests
+    & ruff format 03_implementation/src 04_testing/pytest
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     Write-Host '[format] done.'
 } finally {

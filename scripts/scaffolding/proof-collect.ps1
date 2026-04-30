@@ -6,11 +6,11 @@
 [CmdletBinding()]
 param()
 $ErrorActionPreference = 'Stop'
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '....')
 Push-Location $repoRoot
 try {
     $py = if (Get-Command python -ErrorAction SilentlyContinue) { 'python' } else { 'py' }
-    $env:PYTHONPATH = (Join-Path $repoRoot 'src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
+    $env:PYTHONPATH = (Join-Path $repoRoot '03_implementation/src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
     if (-not (Test-Path 'var')) { New-Item -ItemType Directory -Path 'var' -Force | Out-Null }
     & $py (Join-Path $PSScriptRoot 'proof-collect.sh') 2>&1 | Out-Null
     # Fallback: run a Python one-liner directly (Bash script may not work on plain Windows)

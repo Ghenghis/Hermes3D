@@ -23,14 +23,14 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-LEDGER = REPO_ROOT / "00-CONTRACT" / "HONESTY_LEDGER.md"
-MANIFEST = REPO_ROOT / "00-CONTRACT" / "KIT_MANIFEST.json"
+LEDGER = REPO_ROOT / "00_overview" / "contract" / "HONESTY_LEDGER.md"
+MANIFEST = REPO_ROOT / "00_overview" / "contract" / "KIT_MANIFEST.json"
 
 
 def load_manifest() -> dict:
     if not MANIFEST.exists():
         print(f"[FAIL] manifest not found at {MANIFEST}")
-        print("       run: python 00-CONTRACT/_generate_manifest.py")
+        print("       run: python 00_overview/contract/_generate_manifest.py")
         sys.exit(2)
     return json.loads(MANIFEST.read_text(encoding="utf-8"))
 
@@ -39,7 +39,7 @@ def load_ledger() -> dict[str, str]:
     """Parse the HONESTY_LEDGER.md and extract path -> tier mappings.
 
     The ledger names files in code spans, e.g. ``core.farm.print_history``
-    or ``02-SCAFFOLDING/src/hermes3d/core/farm/backup.py``. We harvest
+    or ``03_implementation/src/hermes3d/core/farm/backup.py``. We harvest
     every distinct path-like token and try to bucket it by the nearest
     section heading (## Runnable / ## Scaffold / ## Spec).
     """
@@ -81,10 +81,10 @@ def normalise_module(tok: str) -> str:
     tok = tok.strip()
     # core/foo/bar.py form
     if tok.startswith(("core/", "api/", "app/", "cli/")) and tok.endswith(".py"):
-        return f"02-SCAFFOLDING/src/hermes3d/{tok}"
+        return f"03_implementation/src/hermes3d/{tok}"
     # core.foo.bar form (dotted module)
     if tok.startswith(("core.", "api.", "app.", "cli.")):
-        return f"02-SCAFFOLDING/src/hermes3d/{tok.replace('.', '/')}.py"
+        return f"03_implementation/src/hermes3d/{tok.replace('.', '/')}.py"
     if tok.endswith(".py"):
         return tok
     return tok

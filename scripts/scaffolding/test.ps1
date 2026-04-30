@@ -29,10 +29,10 @@ $ErrorActionPreference = 'Stop'
 
 if ($E2E) { $Integration = $true }
 
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '....')
 Push-Location $repoRoot
 try {
-    $env:PYTHONPATH = (Join-Path $repoRoot 'src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
+    $env:PYTHONPATH = (Join-Path $repoRoot '03_implementation/src') + [System.IO.Path]::PathSeparator + $env:PYTHONPATH
     if (-not $env:HERMES3D_PROOF_KEY) {
         $env:HERMES3D_PROOF_KEY = 'hermes3d-default-proof-key-not-secret'
     }
@@ -51,16 +51,16 @@ try {
 
     if ($AcceptanceOnly) {
         Write-Host '[1/1] Acceptance runner ...'
-        & $py '..\04-TEST-CASE-DESK-ORGANIZER\run_acceptance.py'
+        & $py '04_testing/acceptance/run_acceptance.py'
         exit $LASTEXITCODE
     }
 
     # Layer A — ruff (best-effort)
     Write-Host '[1/4] Layer A: static gates ...'
     if (Get-Command ruff -ErrorAction SilentlyContinue) {
-        & ruff format --check src tests
+        & ruff format --check 03_implementation/src 04_testing/pytest
         if ($LASTEXITCODE -ne 0) { Write-Host '[FAIL] ruff format' -ForegroundColor Red; exit 1 }
-        & ruff check src tests
+        & ruff check 03_implementation/src 04_testing/pytest
         if ($LASTEXITCODE -ne 0) { Write-Host '[FAIL] ruff check' -ForegroundColor Red; exit 1 }
         Write-Host '  [PASS] ruff format + check' -ForegroundColor Green
     } else {
@@ -70,24 +70,24 @@ try {
     # Forbidden-pattern scan
     Write-Host '  [SCAN] forbidden patterns ...'
     $patterns = 'TODO|FIXME|STUB|PLACEHOLDER|NOT_IMPLEMENTED'
-    $hits = Get-ChildItem -Recurse -Path 'src/hermes3d' -Filter *.py |
+    $hits = Get-ChildItem -Recurse -Path '03_implementation/src/hermes3d' -Filter *.py |
             Select-String -Pattern $patterns
     if ($hits) {
         Write-Host '[FAIL] Forbidden patterns found in runtime code:' -ForegroundColor Red
         $hits | ForEach-Object { Write-Host ('  {0}:{1}: {2}' -f $_.Path, $_.LineNumber, $_.Line) }
         exit 1
     }
-    Write-Host '  [PASS] no forbidden patterns in src/hermes3d' -ForegroundColor Green
+    Write-Host '  [PASS] no forbidden patterns in 03_implementation/src/hermes3d' -ForegroundColor Green
 
     # Layer B
     Write-Host '[2/4] Layer B: unit + smoke tests ...'
-    $pytestArgs = if ($Integration) { @('tests/') } else { @('tests/unit', 'tests/conformance') }
+    $pytestArgs = if ($Integration) { @('04_testing/pytest/') } else { @('04_testing/pytest/unit', '04_testing/pytest/conformance') }
     if ($ExtraArgs) { $pytestArgs += $ExtraArgs }
     & $py '-m' 'pytest' @pytestArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     Write-Host '[3/4] Layer B: acceptance runner ...'
-    & $py '..\04-TEST-CASE-DESK-ORGANIZER\run_acceptance.py'
+    & $py '04_testing/acceptance/run_acceptance.py'
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     if ($E2E) {

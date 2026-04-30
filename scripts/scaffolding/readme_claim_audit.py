@@ -23,16 +23,15 @@ import re
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 # Files to scan for claims
 CLAIM_SOURCES = [
-    REPO_ROOT / ".." / "00-CONTRACT" / "FEATURES.md",
+    REPO_ROOT / "00_overview" / "contract" / "FEATURES.md",
 ]
 README_PATHS = [
     REPO_ROOT / "README.md",
-    REPO_ROOT.parent / "07-DOCS" / "README.md",
-    REPO_ROOT.parent / "README.md",
+    REPO_ROOT / "01_requirements" / "README.md",
 ]
 for p in README_PATHS:
     if p.exists():
