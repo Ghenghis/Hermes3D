@@ -57,6 +57,9 @@ vendor/PrusaSlicer/
 ## Skill packs the user might import (project-specific)
 03_implementation/config/skill_packs/local_*.json
 
+## Per-deployment fleet config (real printer IPs / API keys live here, never in git)
+03_implementation/config/printers.user.toml
+
 ## Node / Playwright (added in kit-hardening)
 node_modules/
 04_testing/playwright/test-results/
