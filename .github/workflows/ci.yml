@@ -50,6 +50,10 @@ jobs:
         python-version: ["3.11", "3.12"]
     env:
       HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
+      # Force UTF-8 stdout so unicode box-drawing chars in the acceptance
+      # runner ('━' etc.) don't crash on Windows cp1252.
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
