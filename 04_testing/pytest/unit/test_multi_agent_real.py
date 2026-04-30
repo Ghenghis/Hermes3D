@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from types import SimpleNamespace
 
 
 @dataclass
@@ -18,6 +17,9 @@ class _MockProvider:
     def __init__(self, replies: list[str]):
         self._replies = list(replies)
         self.calls: list[tuple[str, str]] = []
+        # Mimic .config attribute used by MultiAgentLoop
+        from types import SimpleNamespace
+
         from hermes3d.core.llm.providers import LLMProvider
 
         self.config = SimpleNamespace(provider=LLMProvider.OLLAMA, model="mock")
@@ -50,10 +52,22 @@ def test_three_rounds_with_mock_provider():
     assert provider.calls, "provider should have been invoked"
 
 
-def test_provider_failure_returns_partial():
+def test_no_provider_returns_no_llm():
     from hermes3d.core.agents.multi_agent import MultiAgentLoop
 
+    class _NoProvider:
+        def available(self) -> bool:
+            return False
+
+        def generate(self, *a, **kw):  # pragma: no cover - never called
+            raise RuntimeError("should not be called")
+
+    # Inject a provider that reports unavailable. The loop must still
+    # return gracefully — explicit providers skip the auto-detection
+    # availability check, so simulate a real failure via generate().
     class _FailingProvider:
+        from types import SimpleNamespace
+
         config = SimpleNamespace(provider=None, model="x")
 
         def available(self):
@@ -64,6 +78,7 @@ def test_provider_failure_returns_partial():
 
     loop = MultiAgentLoop(provider=_FailingProvider())
     res = loop.run({"goal": "diagnose"})
+    # First round fails -> partial outcome with error captured.
     assert res.outcome == "partial"
     assert res.rounds[0].error and "ConnectionError" in res.rounds[0].error
 

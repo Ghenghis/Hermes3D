@@ -5,8 +5,6 @@ Skipped automatically when Ollama is not reachable on 127.0.0.1:11434.
 
 from __future__ import annotations
 
-import os
-
 import pytest
 
 
@@ -25,11 +23,14 @@ def _ollama_reachable() -> bool:
 def test_multi_agent_loop_against_local_ollama():
     import httpx
 
+    # Discover an available model so we don't pin to a specific tag.
     with httpx.Client(timeout=5.0) as c:
         models = [
             m["name"] for m in c.get("http://127.0.0.1:11434/api/tags").json().get("models", [])
         ]
     assert models, "Ollama is up but has no models pulled"
+
+    import os
 
     os.environ["HERMES3D_LLM_PROVIDER"] = "ollama"
     os.environ["HERMES3D_LLM_MODEL"] = models[0]
@@ -45,4 +46,5 @@ def test_multi_agent_loop_against_local_ollama():
         assert res.final_draft and res.final_draft.strip()
     for r in res.rounds:
         assert r.prompt
+        # response empty only if errored
         assert r.response or r.error

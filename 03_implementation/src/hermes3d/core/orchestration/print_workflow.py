@@ -762,6 +762,8 @@ def run_with_langgraph(
     Both paths return a populated :class:`WorkflowState` with
     ``terminal=True``.
     """
+    # Imported here to avoid a circular import at module load time
+    # (orchestrator -> print_workflow).
     from hermes3d.core.agents.orchestrator import LangGraphOrchestrator
 
     orch = LangGraphOrchestrator()

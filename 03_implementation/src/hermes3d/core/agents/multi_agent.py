@@ -398,6 +398,9 @@ class MultiAgentLoop:
         self.max_rounds = max_rounds
         self.escalate_on_disagreement = escalate_on_disagreement
 
+    # ------------------------------------------------------------------
+    # Provider resolution
+    # ------------------------------------------------------------------
     def _resolve_provider(self) -> Any | None:
         if self._explicit_provider is not None:
             return self._explicit_provider
@@ -421,6 +424,9 @@ class MultiAgentLoop:
             return None
         return client
 
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
     def run(
         self,
         task: dict[str, Any],
@@ -450,7 +456,7 @@ class MultiAgentLoop:
             ctx_block = "\n\nContext:\n" + "\n".join(f"- {k}: {v}" for k, v in context.items())
         task_block = "\n".join(f"- {k}: {v}" for k, v in task.items())
 
-        # Round 1: Executor
+        # ---- Round 1: Executor draft -----------------------------------
         exec_prompt = f"Task:\n{task_block}{ctx_block}\n\nProduce a draft response."
         exec_record = self._call(provider, "executor", _EXECUTOR_SYSTEM, exec_prompt)
         rounds.append(exec_record)
@@ -463,7 +469,7 @@ class MultiAgentLoop:
                 model=model,
             )
 
-        # Round 2: Critic
+        # ---- Round 2: Critic review ------------------------------------
         critic_prompt = (
             f"Task:\n{task_block}{ctx_block}\n\n"
             f"Executor draft:\n{exec_record.response}\n\n"
@@ -481,7 +487,7 @@ class MultiAgentLoop:
                 model=model,
             )
 
-        # Round 3: Optimizer
+        # ---- Round 3: Optimizer revision -------------------------------
         opt_prompt = (
             f"Task:\n{task_block}{ctx_block}\n\n"
             f"Draft:\n{exec_record.response}\n\n"
@@ -508,6 +514,9 @@ class MultiAgentLoop:
             model=model,
         )
 
+    # ------------------------------------------------------------------
+    # Single LLM call wrapper
+    # ------------------------------------------------------------------
     @staticmethod
     def _call(provider: Any, role: str, system: str, prompt: str) -> LLMRoundRecord:
         import time as _time
@@ -525,14 +534,13 @@ class MultiAgentLoop:
             )
         elapsed = getattr(res, "elapsed_seconds", _time.monotonic() - start)
         text = getattr(res, "text", str(res))
+        # Token count is provider-specific; pull from raw payload when present.
         raw = getattr(res, "raw", {}) or {}
-        token_count = None
-        if isinstance(raw, dict):
-            token_count = raw.get("eval_count")
-            if token_count is None:
-                usage = raw.get("usage") or {}
-                if isinstance(usage, dict):
-                    token_count = usage.get("total_tokens")
+        token_count = (
+            raw.get("eval_count") or raw.get("usage", {}).get("total_tokens")
+            if isinstance(raw, dict)
+            else None
+        )
         return LLMRoundRecord(
             role=role,
             prompt=prompt,

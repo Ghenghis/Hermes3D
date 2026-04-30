@@ -45,12 +45,14 @@ def test_orchestrator_with_langgraph_completes(tmp_path: Path):
     final = orch.run(state, checkpoint_dir=tmp_path / "cp")
     assert final.terminal is True
     assert isinstance(final.aborted, bool)
+    # node_results is the alias for history
     assert final.node_results is final.history
-    assert len(final.history) >= 4
+    assert len(final.history) >= 4  # at least enqueue, truth_gate, dispatch, preflight
 
 
 def test_orchestrator_fallback_without_langgraph(tmp_path: Path, monkeypatch):
     """Force the import path to fail and assert fallback completes + warns."""
+    # Block langgraph imports for the duration of this test.
     monkeypatch.setitem(sys.modules, "langgraph", None)
 
     from hermes3d.core.agents.orchestrator import (
@@ -68,6 +70,7 @@ def test_orchestrator_fallback_without_langgraph(tmp_path: Path, monkeypatch):
         "expected LangGraphUnavailableWarning"
     )
     assert not final.aborted
+    # The fallback ran the real WorkflowGraph nodes
     pass_nodes = {h.node_name for h in final.history if h.outcome.value == "pass"}
     assert "enqueue" in pass_nodes
     assert "dispatch" in pass_nodes
@@ -83,12 +86,15 @@ def test_orchestrator_checkpoint_resume(tmp_path: Path):
     final = orch.run(state, checkpoint_dir=tmp_path / "cp")
     assert final.terminal is True
 
+    # Reload via the same workflow graph and verify history is preserved.
     graph = build_print_workflow(checkpoint_dir=tmp_path / "cp")
     cp = graph.load_checkpoint(state.workflow_id)
     assert cp is not None
     assert cp.workflow_id == state.workflow_id
     assert len(cp.history) == len(final.history)
 
+    # Re-run on the loaded checkpoint — already-passed nodes are skipped,
+    # state still terminates.
     final2 = orch.run(cp, checkpoint_dir=tmp_path / "cp")
     assert final2.terminal is True
 

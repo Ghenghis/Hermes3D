@@ -218,6 +218,7 @@ class LangGraphOrchestrator:
         max_steps: int = 50,
         checkpoint_dir: Path | str | None = None,
     ) -> _WorkflowState:
+        # Late imports keep this module importable offline.
         from hermes3d.core.orchestration.print_workflow import (
             build_print_workflow,
         )
@@ -262,6 +263,7 @@ class LangGraphOrchestrator:
         max_steps: int,
         checkpoint_dir: Path | str | None,
     ) -> _WorkflowState:
+        # Imports guarded — only reached when langgraph is installed.
         from langgraph.graph import END, StateGraph  # type: ignore[import-not-found]
 
         from hermes3d.core.orchestration.agent_graph import NodeOutcome
