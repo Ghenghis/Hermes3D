@@ -749,4 +749,23 @@ def build_print_workflow(
     return g
 
 
-__all__ = ["build_print_workflow"]
+def run_with_langgraph(
+    state: WorkflowState,
+    *,
+    checkpoint_dir: str | Path | None = None,
+    max_steps: int = 50,
+) -> WorkflowState:
+    """Run the print workflow via :class:`LangGraphOrchestrator`.
+
+    Uses the optional ``langgraph`` runtime when installed; otherwise
+    transparently falls back to the hand-rolled :class:`WorkflowGraph`.
+    Both paths return a populated :class:`WorkflowState` with
+    ``terminal=True``.
+    """
+    from hermes3d.core.agents.orchestrator import LangGraphOrchestrator
+
+    orch = LangGraphOrchestrator()
+    return orch.run(state, max_steps=max_steps, checkpoint_dir=checkpoint_dir)
+
+
+__all__ = ["build_print_workflow", "run_with_langgraph"]
