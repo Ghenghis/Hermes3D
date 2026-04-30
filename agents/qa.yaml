@@ -13,7 +13,7 @@ inputs:
 action_sequence:
   - run: mkdir -p var/qa/screenshots
   - run: pytest --junitxml=var/qa/pytest.xml --html=var/qa/pytest.html --self-contained-html 04_testing/pytest/
-  - run: pytest --junitxml=var/qa/playwright.xml -m playwright 04_testing/pytest/e2e/
+  - run: bash scripts/run-e2e.sh
   - run: python -c "import xml.etree.ElementTree as ET, sys; t=ET.parse('var/qa/pytest.xml').getroot(); f=int(t.attrib.get('failures',0))+int(t.attrib.get('errors',0)); sys.exit(0 if f==0 else 1)"
 outputs:
   - path: var/qa/pytest.xml
@@ -32,7 +32,7 @@ gates:
   - name: playwright_all_pass
     threshold: 100% pass
     blocking: true
-    command: pytest -m playwright 04_testing/pytest/e2e/
+    command: bash scripts/run-e2e.sh
 retry_policy:
   max_retries: 3
   backoff_strategy: exponential

@@ -1,0 +1,16 @@
+{
+  "name": "hermes3d-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hermes3D-OS Playwright E2E suite (UI Truth Gates).",
+  "scripts": {
+    "test": "playwright test",
+    "test:update": "playwright test --update-snapshots",
+    "report": "playwright show-report playwright-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "typescript": "^5.9.3"
+  }
+}

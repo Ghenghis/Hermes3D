@@ -101,13 +101,8 @@ echo "[3/4] Layer B: acceptance runner ..."
 $PY 04_testing/acceptance/run_acceptance.py || exit $?
 
 if [[ "$E2E" -eq 1 ]]; then
-    echo "[4/4] Layer D: E2E launcher smoke ..."
-    if command -v gradio >/dev/null 2>&1 || $PY -c 'import gradio' 2>/dev/null; then
-        # Smoke-import the launcher; full E2E requires a browser
-        $PY -c 'import hermes3d.app.launcher as m; print("launcher importable:", hasattr(m, "build_app") or hasattr(m, "main"))'
-    else
-        echo "  [WARN] gradio not installed; skipping launcher smoke"
-    fi
+    echo "[4/4] Layer D: Playwright E2E (UI Truth Gates) ..."
+    bash "$REPO_ROOT/scripts/run-e2e.sh" || exit $?
 else
     echo "[4/4] Layer D: skipped (use --e2e to enable)"
 fi
