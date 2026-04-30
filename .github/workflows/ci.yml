@@ -147,7 +147,7 @@ jobs:
     name: Layer E — release dry-run
     needs: layer_b_smoke_and_acceptance
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
