@@ -316,10 +316,252 @@ def run_multi_agent(
     )
 
 
+# =============================================================================
+# Real LLM-driven multi-agent loop (Executor / Critic / Optimizer)
+# =============================================================================
+#
+# The classes below sit alongside the deterministic dispatch loop above. They
+# drive a real LLM provider through three rounds (draft -> critique ->
+# optimize) and return a structured, JSON-serialisable result. When no LLM
+# backend is reachable they degrade gracefully — every call site can run
+# offline.
+
+
+@dataclass
+class LLMRoundRecord:
+    """One round of the multi-agent loop, captured for the proof bundle."""
+
+    role: str  # "executor" | "critic" | "optimizer"
+    prompt: str
+    response: str
+    latency_seconds: float
+    token_count: int | None = None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return dataclasses.asdict(self)
+
+
+@dataclass
+class MultiAgentLoopResult:
+    """Outcome of a real-LLM multi-agent loop. JSON-serialisable."""
+
+    outcome: str  # "ok" | "no-llm" | "partial"
+    rounds: list[LLMRoundRecord] = field(default_factory=list)
+    final_draft: str | None = None
+    message: str | None = None
+    provider: str | None = None
+    model: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "outcome": self.outcome,
+            "rounds": [r.to_dict() for r in self.rounds],
+            "final_draft": self.final_draft,
+            "message": self.message,
+            "provider": self.provider,
+            "model": self.model,
+        }
+
+
+_EXECUTOR_SYSTEM = (
+    "You are the Executor agent for a 3D-printing fleet. Produce a concise, "
+    "actionable draft response to the user task. Be specific and grounded."
+)
+_CRITIC_SYSTEM = (
+    "You are the Critic agent. Review the Executor's draft for correctness, "
+    "safety, and completeness. Output a short bulleted list of findings."
+)
+_OPTIMIZER_SYSTEM = (
+    "You are the Optimizer agent. Apply the Critic's findings to the "
+    "Executor's draft and produce an improved final response."
+)
+
+
+class MultiAgentLoop:
+    """Executor -> Critic -> Optimizer loop against a real LLM provider.
+
+    Provider auto-detection: when ``provider`` is ``None`` we call
+    :func:`hermes3d.core.llm.providers.select_provider` and check
+    availability. When no provider is reachable, :meth:`run` returns a
+    :class:`MultiAgentLoopResult` with ``outcome="no-llm"`` — never raises.
+    """
+
+    def __init__(
+        self,
+        provider: Any | None = None,
+        *,
+        max_rounds: int = 3,
+        escalate_on_disagreement: bool = True,
+    ) -> None:
+        self._explicit_provider = provider
+        self.max_rounds = max_rounds
+        self.escalate_on_disagreement = escalate_on_disagreement
+
+    # ------------------------------------------------------------------
+    # Provider resolution
+    # ------------------------------------------------------------------
+    def _resolve_provider(self) -> Any | None:
+        if self._explicit_provider is not None:
+            return self._explicit_provider
+        try:
+            from hermes3d.core.llm.providers import (
+                ProviderUnavailable,
+                select_provider,
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            log.info("LLM providers unavailable: %s", exc)
+            return None
+        try:
+            client = select_provider()
+        except ProviderUnavailable as exc:
+            log.info("No LLM provider configured: %s", exc)
+            return None
+        try:
+            if not client.available():
+                return None
+        except Exception:
+            return None
+        return client
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def run(
+        self,
+        task: dict[str, Any],
+        *,
+        context: dict[str, Any] | None = None,
+    ) -> MultiAgentLoopResult:
+        provider = self._resolve_provider()
+        if provider is None:
+            return MultiAgentLoopResult(
+                outcome="no-llm",
+                message=(
+                    "No LLM backend reachable. Configure HERMES3D_LLM_PROVIDER "
+                    "or pass a provider explicitly. Returning no-llm result so "
+                    "callers can degrade gracefully."
+                ),
+            )
+
+        provider_name = getattr(
+            getattr(provider, "config", None), "provider", None
+        )
+        provider_value = (
+            provider_name.value if hasattr(provider_name, "value") else str(provider_name)
+        )
+        model = getattr(getattr(provider, "config", None), "model", None)
+
+        rounds: list[LLMRoundRecord] = []
+        ctx_block = ""
+        if context:
+            ctx_block = "\n\nContext:\n" + "\n".join(
+                f"- {k}: {v}" for k, v in context.items()
+            )
+        task_block = "\n".join(f"- {k}: {v}" for k, v in task.items())
+
+        # ---- Round 1: Executor draft -----------------------------------
+        exec_prompt = f"Task:\n{task_block}{ctx_block}\n\nProduce a draft response."
+        exec_record = self._call(provider, "executor", _EXECUTOR_SYSTEM, exec_prompt)
+        rounds.append(exec_record)
+        if exec_record.error:
+            return MultiAgentLoopResult(
+                outcome="partial",
+                rounds=rounds,
+                message=f"executor failed: {exec_record.error}",
+                provider=provider_value,
+                model=model,
+            )
+
+        # ---- Round 2: Critic review ------------------------------------
+        critic_prompt = (
+            f"Task:\n{task_block}{ctx_block}\n\n"
+            f"Executor draft:\n{exec_record.response}\n\n"
+            "List concrete findings."
+        )
+        critic_record = self._call(provider, "critic", _CRITIC_SYSTEM, critic_prompt)
+        rounds.append(critic_record)
+        if critic_record.error:
+            return MultiAgentLoopResult(
+                outcome="partial",
+                rounds=rounds,
+                final_draft=exec_record.response,
+                message=f"critic failed: {critic_record.error}",
+                provider=provider_value,
+                model=model,
+            )
+
+        # ---- Round 3: Optimizer revision -------------------------------
+        opt_prompt = (
+            f"Task:\n{task_block}{ctx_block}\n\n"
+            f"Draft:\n{exec_record.response}\n\n"
+            f"Critic findings:\n{critic_record.response}\n\n"
+            "Produce the improved final response."
+        )
+        opt_record = self._call(provider, "optimizer", _OPTIMIZER_SYSTEM, opt_prompt)
+        rounds.append(opt_record)
+        if opt_record.error:
+            return MultiAgentLoopResult(
+                outcome="partial",
+                rounds=rounds,
+                final_draft=exec_record.response,
+                message=f"optimizer failed: {opt_record.error}",
+                provider=provider_value,
+                model=model,
+            )
+
+        return MultiAgentLoopResult(
+            outcome="ok",
+            rounds=rounds,
+            final_draft=opt_record.response,
+            provider=provider_value,
+            model=model,
+        )
+
+    # ------------------------------------------------------------------
+    # Single LLM call wrapper
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _call(provider: Any, role: str, system: str, prompt: str) -> LLMRoundRecord:
+        import time as _time
+
+        start = _time.monotonic()
+        try:
+            res = provider.generate(prompt, system=system)
+        except Exception as exc:
+            return LLMRoundRecord(
+                role=role,
+                prompt=prompt,
+                response="",
+                latency_seconds=_time.monotonic() - start,
+                error=f"{type(exc).__name__}: {exc}",
+            )
+        elapsed = getattr(res, "elapsed_seconds", _time.monotonic() - start)
+        text = getattr(res, "text", str(res))
+        # Token count is provider-specific; pull from raw payload when present.
+        raw = getattr(res, "raw", {}) or {}
+        token_count = (
+            raw.get("eval_count")
+            or raw.get("usage", {}).get("total_tokens")
+            if isinstance(raw, dict)
+            else None
+        )
+        return LLMRoundRecord(
+            role=role,
+            prompt=prompt,
+            response=text,
+            latency_seconds=float(elapsed),
+            token_count=token_count,
+        )
+
+
 __all__ = [
     "CriticAgent",
     "CritiqueReport",
     "ExecutorAgent",
+    "LLMRoundRecord",
+    "MultiAgentLoop",
+    "MultiAgentLoopResult",
     "MultiAgentResult",
     "OptimizerAgent",
     "Verdict",

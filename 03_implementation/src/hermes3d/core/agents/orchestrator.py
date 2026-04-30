@@ -1,21 +1,20 @@
-"""Agentic orchestrator — SPECIFICATION ONLY (status: spec).
+"""Agentic orchestrator — runnable.
 
-This file pins the public contract for the multi-agent pipeline. The full
-implementation requires a live LLM provider (LangGraph + LangChain + an API
-key) and is delegated to the installer per the contract.
+This module pins the public contract for the multi-agent pipeline and ships
+two interchangeable runtimes:
 
-What IS real here:
-    - The state schema (``OrchestratorState``) — fully usable.
-    - Stage names (``Stage``) — fully usable.
-    - The transition table (``TRANSITIONS``) — fully usable; the
-      conformance runner verifies any implementation respects it.
-    - A working ``DryRunOrchestrator`` that walks the state machine WITHOUT
-      calling any LLM, so the rest of the pipeline (UI, conformance,
-      proof) can be tested end-to-end without an API key.
+- :class:`DryRunOrchestrator` — a deterministic state-machine walker used
+  by tests, the conformance runner, and the kit's "Validate-Only" mode. No
+  LLM, no I/O, no network.
+- :class:`LangGraphOrchestrator` — runtime over the 12-node
+  ``print_workflow`` graph. When the optional ``langgraph`` package is
+  installed it builds a real ``StateGraph`` with conditional edges and
+  checkpointing; otherwise it transparently falls back to the hand-rolled
+  :class:`hermes3d.core.orchestration.agent_graph.WorkflowGraph` and emits a
+  structured warning.
 
-What is SPEC-only:
-    - ``LangGraphOrchestrator`` raises NotImplementedError until the user
-      runs the installer to provision LangGraph + an LLM endpoint.
+Both runtimes are importable offline. ``langgraph`` is an OPTIONAL extra
+(see ``pyproject.toml`` ``[project.optional-dependencies].langgraph``).
 """
 
 from __future__ import annotations
@@ -24,11 +23,22 @@ import enum
 import logging
 import time
 import uuid
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from hermes3d.core.orchestration.agent_graph import (
+        WorkflowState as _WorkflowState,
+    )
 
 LOG = logging.getLogger(__name__)
+
+
+class LangGraphUnavailableWarning(UserWarning):
+    """Emitted when the optional ``langgraph`` package is not installed."""
 
 
 class Stage(str, enum.Enum):
@@ -176,24 +186,182 @@ class DryRunOrchestrator:
         return Stage.DONE
 
 
-class LangGraphOrchestrator:
-    """SPEC-only. Real implementation requires LangGraph + an LLM."""
+def _langgraph_available() -> bool:
+    """Return True if the optional ``langgraph`` package can be imported."""
+    try:
+        import langgraph  # noqa: F401
+    except Exception:
+        return False
+    return True
 
-    def run(self, state: OrchestratorState) -> OrchestratorState:
-        raise NotImplementedError(  # noqa: forbidden_pattern_scan
-            "LangGraphOrchestrator is SPEC-only in this kit. Run "
-            "06_release/installer/install.ps1 to provision LangGraph and an LLM "
-            "endpoint, then implement the nodes per "
-            "01_requirements/AI_PROGRAMMER_GUIDE.md §'Implementing the orchestrator'. "
-            "DryRunOrchestrator is a drop-in for tests and the kit's "
-            "validate-only mode."
+
+class LangGraphOrchestrator:
+    """Runtime over the 12-node ``print_workflow`` graph.
+
+    When the optional ``langgraph`` extra is installed, builds a real
+    ``StateGraph`` with conditional edges and a checkpointer. Otherwise
+    falls back to the hand-rolled :class:`WorkflowGraph` (same node set,
+    same state shape) and emits a :class:`LangGraphUnavailableWarning`.
+
+    Both code paths return a :class:`WorkflowState` populated with
+    ``terminal=True``, an ``aborted`` flag, and ``node_results`` (alias of
+    ``history``).
+    """
+
+    def __init__(self, *, force_fallback: bool = False) -> None:
+        self.force_fallback = force_fallback
+
+    def run(
+        self,
+        state: _WorkflowState,
+        *,
+        max_steps: int = 50,
+        checkpoint_dir: Path | str | None = None,
+    ) -> _WorkflowState:
+        # Late imports keep this module importable offline.
+        from hermes3d.core.orchestration.print_workflow import (
+            build_print_workflow,
         )
+
+        if not self.force_fallback and _langgraph_available():
+            try:
+                return self._run_langgraph(
+                    state, max_steps=max_steps, checkpoint_dir=checkpoint_dir
+                )
+            except Exception as exc:
+                LOG.exception("LangGraph runtime failed: %s — falling back", exc)
+                warnings.warn(
+                    f"LangGraph runtime raised {type(exc).__name__}; falling "
+                    "back to WorkflowGraph for this run.",
+                    LangGraphUnavailableWarning,
+                    stacklevel=2,
+                )
+        elif not self.force_fallback:
+            warnings.warn(
+                "LangGraph runtime unavailable: optional 'langgraph' package not "
+                "installed. Falling back to hand-rolled WorkflowGraph (same node "
+                "set, same result shape). Install 'hermes3d-os-lite[langgraph]' "
+                "to enable the real StateGraph runtime.",
+                LangGraphUnavailableWarning,
+                stacklevel=2,
+            )
+        else:
+            LOG.info("LangGraphOrchestrator: forced fallback to WorkflowGraph")
+
+        graph = build_print_workflow(checkpoint_dir=checkpoint_dir)
+        result = graph.run(state)
+        result.terminal = True
+        return result
+
+    # ------------------------------------------------------------------
+    # Real LangGraph path
+    # ------------------------------------------------------------------
+    def _run_langgraph(
+        self,
+        state: _WorkflowState,
+        *,
+        max_steps: int,
+        checkpoint_dir: Path | str | None,
+    ) -> _WorkflowState:
+        # Imports guarded — only reached when langgraph is installed.
+        from langgraph.graph import END, StateGraph  # type: ignore[import-not-found]
+
+        from hermes3d.core.orchestration.agent_graph import NodeOutcome
+        from hermes3d.core.orchestration.print_workflow import (
+            build_print_workflow,
+        )
+
+        builder = build_print_workflow(checkpoint_dir=checkpoint_dir)
+        node_names = list(builder.node_names)
+
+        sg: Any = StateGraph(dict)
+
+        def _make_runner(node_name: str) -> Callable[[dict], dict]:
+            node = builder._by_name[node_name]  # noqa: SLF001 - intentional bridge
+
+            def runner(d: dict) -> dict:
+                ws_cls = type(state)
+                ws = (
+                    ws_cls.from_dict(d)
+                    if isinstance(d, dict) and "workflow_id" in d
+                    else state
+                )
+                ok, why = node.can_run(ws)
+                if not ok:
+                    if not node.optional:
+                        ws.aborted = True
+                        ws.abort_reason = f"required node {node.name} skipped: {why}"
+                    return ws.to_dict()
+                try:
+                    result = node.fn(ws)
+                except Exception as exc:
+                    ws.aborted = True
+                    ws.abort_reason = f"node {node.name} raised: {exc!r}"
+                    return ws.to_dict()
+                if result.state_patch:
+                    ws.data.update(result.state_patch)
+                ws.history.append(result)
+                if result.outcome is NodeOutcome.FAIL:
+                    ws.aborted = True
+                    ws.abort_reason = f"node {node.name} failed: {result.error}"
+                return ws.to_dict()
+
+            runner.__name__ = f"node_{node_name}"
+            return runner
+
+        for name in node_names:
+            sg.add_node(name, _make_runner(name))
+
+        sg.set_entry_point(node_names[0])
+
+        def _route(after: str) -> Callable[[dict], str]:
+            def cond(d: dict) -> str:
+                if d.get("aborted"):
+                    return END
+                return after
+
+            return cond
+
+        for src, dst in zip(node_names, node_names[1:]):
+            sg.add_conditional_edges(src, _route(dst), {dst: dst, END: END})
+        sg.add_edge(node_names[-1], END)
+
+        compiled: Any
+        try:
+            from langgraph.checkpoint.memory import MemorySaver  # type: ignore
+
+            compiled = sg.compile(checkpointer=MemorySaver())
+        except Exception:
+            compiled = sg.compile()
+
+        config = {
+            "configurable": {"thread_id": state.workflow_id},
+            "recursion_limit": max_steps,
+        }
+        final_dict = compiled.invoke(state.to_dict(), config=config)
+
+        ws_cls = type(state)
+        final_state = (
+            ws_cls.from_dict(final_dict) if isinstance(final_dict, dict) else state
+        )
+        if checkpoint_dir is not None:
+            cp_path = Path(checkpoint_dir) / f"{final_state.workflow_id}.json"
+            cp_path.parent.mkdir(parents=True, exist_ok=True)
+            import json as _json
+
+            cp_path.write_text(
+                _json.dumps(final_state.to_dict(), indent=2, sort_keys=True),
+                encoding="utf-8",
+            )
+        final_state.terminal = True
+        return final_state
 
 
 __all__ = [
     "TRANSITIONS",
     "DryRunOrchestrator",
     "LangGraphOrchestrator",
+    "LangGraphUnavailableWarning",
     "OrchestratorState",
     "Stage",
 ]

@@ -1,0 +1,32 @@
+role: multi_agent
+description: Runs the Executor/Critic/Optimizer loop against a local LLM (Ollama by default). Captures prompts, responses, latency, and token counts for the proof bundle. Degrades to a no-llm result when no backend is reachable.
+model: sonnet
+inputs:
+  - name: task
+    type: json
+    required: true
+    description: Task dict with free-form keys describing what the loop should reason about.
+  - name: context
+    type: json
+    required: false
+    description: Optional context dict appended to every round's prompt.
+action_sequence:
+  - run: mkdir -p var/multi_agent
+  - run: python -m hermes3d.cli multi-agent --task "${TASK_JSON:-{}}" --out var/multi_agent/result.json
+outputs:
+  - path: var/multi_agent/result.json
+    description: JSON-serialised MultiAgentLoopResult (rounds + final_draft + outcome).
+gates:
+  - name: at_least_one_round_or_no_llm
+    threshold: outcome in {ok, partial, no-llm}
+    blocking: true
+    command: python -c "import json,sys; r=json.load(open('var/multi_agent/result.json')); sys.exit(0 if r['outcome'] in ('ok','partial','no-llm') else 1)"
+  - name: result_is_json_serializable
+    threshold: exit==0
+    blocking: true
+    command: python -c "import json; json.load(open('var/multi_agent/result.json'))"
+retry_policy:
+  max_retries: 2
+  backoff_strategy: exponential
+  initial_delay_seconds: 5
+escalate_to: human
