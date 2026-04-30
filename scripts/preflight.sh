@@ -53,6 +53,15 @@ check mypy           mypy           no
 check npx            npx            no
 check blender        blender        no
 check ollama         ollama         no
+# LM Studio: HTTP probe (no `lms` CLI required)
+LMSTUDIO_URL="${LMSTUDIO_BASE_URL:-http://localhost:1234/v1}"
+if command -v curl >/dev/null 2>&1 && curl -fsS --max-time 2 "${LMSTUDIO_URL%/v1}/v1/models" >/dev/null 2>&1; then
+  CAP[lmstudio]="present|reachable at $LMSTUDIO_URL"
+  green "  [OK] lmstudio → reachable at $LMSTUDIO_URL"
+else
+  CAP[lmstudio]="missing"
+  yel   "  [opt] lmstudio (not reachable at $LMSTUDIO_URL; start: lms server start)"
+fi
 check prusa-slicer   prusa-slicer   no
 check orca-slicer    orca-slicer    no
 check gh             gh             no
