@@ -54,16 +54,16 @@ Homepage = "https://github.com/ShadowByte/hermes3d-os-lite"
 Issues = "https://github.com/ShadowByte/hermes3d-os-lite/issues"
 
 [tool.setuptools.packages.find]
-where = ["02-SCAFFOLDING/src"]
+where = ["03_implementation/src"]
 include = ["hermes3d*"]
 
 [tool.setuptools.package-dir]
-"" = "02-SCAFFOLDING/src"
+"" = "03_implementation/src"
 
 [tool.pytest.ini_options]
-testpaths = ["02-SCAFFOLDING/tests"]
+testpaths = ["04_testing/pytest"]
 addopts = "-q --strict-markers"
-pythonpath = ["02-SCAFFOLDING/src"]
+pythonpath = ["03_implementation/src"]
 filterwarnings = [
   "ignore::DeprecationWarning",
 ]
@@ -82,4 +82,4 @@ python_version = "3.11"
 strict = false
 warn_return_any = true
 warn_unused_configs = true
-files = ["02-SCAFFOLDING/src/hermes3d"]
+files = ["03_implementation/src/hermes3d"]
