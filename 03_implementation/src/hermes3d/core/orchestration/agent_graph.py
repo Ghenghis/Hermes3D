@@ -85,7 +85,7 @@ class WorkflowState:
 
     @property
     def node_results(self) -> list[NodeResult]:
-        """Alias for ``history`` — surfaced for the orchestrator API contract."""
+        """Alias for ``history`` — surfaced for orchestrator API contracts."""
         return self.history
 
     def to_dict(self) -> dict[str, Any]:

@@ -108,7 +108,11 @@ jobs:
           python-version: "3.11"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # Node 24 (current LTS) — Playwright @1.50 is supported on 18/20/22/24.
+          # Bumping from 20 to keep CI aligned with contributor toolchains
+          # (local dev typically Node 22+/24+) and avoid version-skew in
+          # esbuild/jiti/etc. that the older toolchain pulls in.
+          node-version: "24"
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
