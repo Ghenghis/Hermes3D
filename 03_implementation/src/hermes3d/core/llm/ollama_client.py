@@ -26,16 +26,14 @@ scoring functions.
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import logging
 import os
-import socket
-from dataclasses import dataclass, field
-from typing import Any, Iterable
+from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-
 
 log = logging.getLogger(__name__)
 
@@ -88,7 +86,7 @@ class OllamaClient:
         try:
             with urlrequest.urlopen(req, timeout=self.timeout_s) as resp:
                 raw = resp.read().decode("utf-8")
-        except (HTTPError, URLError, socket.timeout) as exc:
+        except (TimeoutError, HTTPError, URLError) as exc:
             raise OllamaUnavailable(f"Ollama request to {url} failed: {exc}")
         try:
             return json.loads(raw)
@@ -100,7 +98,7 @@ class OllamaClient:
         try:
             with urlrequest.urlopen(url, timeout=self.timeout_s) as resp:
                 return json.loads(resp.read().decode("utf-8"))
-        except (HTTPError, URLError, socket.timeout) as exc:
+        except (TimeoutError, HTTPError, URLError) as exc:
             raise OllamaUnavailable(f"Ollama GET {url} failed: {exc}")
         except json.JSONDecodeError as exc:
             raise OllamaUnavailable(f"Ollama returned non-JSON: {exc}")

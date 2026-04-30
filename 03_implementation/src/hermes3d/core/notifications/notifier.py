@@ -18,18 +18,15 @@ outage prevented a "print started" message from sending.
 
 from __future__ import annotations
 
-import dataclasses
 import enum
 import json
 import logging
 import os
-import socket
 import time
 from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-
 
 log = logging.getLogger(__name__)
 
@@ -83,9 +80,9 @@ def _post_json(
             return False, f"HTTP {resp.status}"
     except HTTPError as exc:
         return False, f"HTTP {exc.code}: {exc.reason}"
-    except (URLError, socket.timeout) as exc:
+    except (TimeoutError, URLError) as exc:
         return False, f"net: {exc}"
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         return False, f"unexpected: {exc}"
 
 

@@ -5,8 +5,8 @@ installer per the contract). Use ``find_slicer()`` to detect availability.
 """
 
 from hermes3d.core.slicer.slicer_runner import (
-    SliceResult,
     SlicerError,
+    SliceResult,
     SlicerNotFound,
     find_slicer,
     parse_gcode_metadata,

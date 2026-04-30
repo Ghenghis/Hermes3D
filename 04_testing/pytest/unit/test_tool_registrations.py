@@ -10,7 +10,6 @@ relevant.
 
 from __future__ import annotations
 
-import json
 import os
 import struct
 from pathlib import Path
@@ -108,11 +107,11 @@ def test_register_builtin_tools_registers_eleven(fresh_registry):
 
 
 def test_help_returns_full_manifest(fresh_registry):
+    from hermes3d.core.agents import tool_registry as tr_module
     from hermes3d.core.agents.tool_registrations import (
         _tool_help,
         register_builtin_tools,
     )
-    from hermes3d.core.agents import tool_registry as tr_module
 
     # _tool_help() reads from the module-level singleton, so register there.
     # Snapshot existing tools so we don't pollute other tests.

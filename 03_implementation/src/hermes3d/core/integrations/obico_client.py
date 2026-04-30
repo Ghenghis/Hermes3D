@@ -26,12 +26,10 @@ import enum
 import json
 import logging
 import os
-import socket
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-
 
 log = logging.getLogger(__name__)
 
@@ -99,14 +97,14 @@ class ObicoClient:
                 return json.loads(raw.decode("utf-8"))
         except HTTPError as exc:
             raise RuntimeError(f"Obico HTTP {exc.code} on {path}")
-        except (URLError, socket.timeout) as exc:
+        except (TimeoutError, URLError) as exc:
             raise RuntimeError(f"Obico network error: {exc}")
 
     def reachable(self) -> bool:
         try:
             self._request("GET", "/api/v1/printers/")
             return True
-        except Exception:  # noqa: BLE001
+        except Exception:
             return False
 
     def list_printers(self) -> list[dict[str, Any]]:

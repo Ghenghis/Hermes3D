@@ -23,13 +23,13 @@ standalone process via `python -m hermes3d.core.supervisor.daemon`.
 
 from __future__ import annotations
 
-import dataclasses
 import enum
 import logging
 import threading
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from typing import Any
 
 from hermes3d.core.farm.print_history import PrintHistory
 from hermes3d.core.farm.spool_tracker import SpoolTracker
@@ -48,7 +48,6 @@ from hermes3d.core.notifications import (
 )
 from hermes3d.core.printers import FLEET, get_profile
 from hermes3d.core.printers.moonraker_client import MoonrakerClient
-
 
 log = logging.getLogger(__name__)
 
@@ -148,7 +147,7 @@ class PrintSupervisor:
         for cb in self._listeners:
             try:
                 cb(event, ps, detail)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("supervisor listener failed: %s", exc)
 
     # ---- start/stop -----------------------------------------------------
@@ -181,7 +180,7 @@ class PrintSupervisor:
         while not self._stop_event.is_set():
             try:
                 self.poll_once()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.exception("supervisor poll iteration failed: %s", exc)
             # Sleep with early-exit if stopped
             self._stop_event.wait(self.policy.poll_interval_s)
@@ -191,7 +190,7 @@ class PrintSupervisor:
         for pid, state in self.states.items():
             try:
                 self._poll_printer(pid, state)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.warning("error polling %s: %s", pid, exc)
 
     # ---- per-printer poll ----------------------------------------------
@@ -310,7 +309,7 @@ class PrintSupervisor:
         )
         try:
             status = client.status(pid)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             log.debug("obico status failed for %s: %s", pid, exc)
             return
         if status.recommended_action == ObicoAction.PAUSE:
@@ -330,7 +329,7 @@ class PrintSupervisor:
                         ps,
                         {"failure_probability": status.failure_probability},
                     )
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     log.warning("auto-pause via Moonraker failed: %s", exc)
         elif status.recommended_action == ObicoAction.HEADS_UP:
             self._emit(

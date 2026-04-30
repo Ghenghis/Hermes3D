@@ -24,15 +24,17 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
 from hermes3d.core.agents.dispatcher import (
     DispatchRequest,
     DispatchStrategy,
+)
+from hermes3d.core.agents.dispatcher import (
     dispatch as run_dispatch,
 )
-
 
 log = logging.getLogger(__name__)
 

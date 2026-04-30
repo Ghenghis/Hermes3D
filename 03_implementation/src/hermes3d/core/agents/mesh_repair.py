@@ -90,7 +90,7 @@ class RepairReport:
 
 
 def _safe_count(mesh: trimesh.Trimesh) -> tuple[int, int]:
-    return int(len(mesh.faces)), int(len(mesh.vertices))
+    return len(mesh.faces), len(mesh.vertices)
 
 
 def repair_mesh(
@@ -131,7 +131,7 @@ def repair_mesh(
         try:
             m.merge_vertices()
             _record("remove_duplicate_vertices", True, f"epsilon={cfg.duplicate_epsilon}", bf, bv)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("remove_duplicate_vertices", False, f"error: {exc}", bf, bv)
 
     # ---- 2. Remove degenerate faces ----
@@ -144,7 +144,7 @@ def repair_mesh(
             _record(
                 "remove_degenerate_faces", True, f"removed {removed} zero-area triangles", bf, bv
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("remove_degenerate_faces", False, f"error: {exc}", bf, bv)
 
     # ---- 3. Fill small holes ----
@@ -159,7 +159,7 @@ def repair_mesh(
                 bf,
                 bv,
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("fill_holes", False, f"error: {exc}", bf, bv)
 
     # ---- 4. Fix normals (orient outward) ----
@@ -174,7 +174,7 @@ def repair_mesh(
                 m.fix_normals()
                 detail = "applied trimesh.fix_normals (consistent winding)"
             _record("fix_normals", True, detail, bf, bv)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("fix_normals", False, f"error: {exc}", bf, bv)
 
     # ---- 5. Remove unreferenced vertices ----
@@ -185,7 +185,7 @@ def repair_mesh(
             _record(
                 "remove_unreferenced", True, "stripped vertices not referenced by any face", bf, bv
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("remove_unreferenced", False, f"error: {exc}", bf, bv)
 
     # ---- 6. Merge near-duplicate vertices (heal seams) ----
@@ -196,7 +196,7 @@ def repair_mesh(
             digits = max(1, int(round(-np.log10(cfg.duplicate_epsilon))))
             m.merge_vertices(digits_vertex=digits)
             _record("merge_close_vertices", True, f"digits_vertex={digits}", bf, bv)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("merge_close_vertices", False, f"error: {exc}", bf, bv)
 
     # ---- 7. trimesh's built-in process pass ----
@@ -205,7 +205,7 @@ def repair_mesh(
         try:
             m.process(validate=True)
             _record("run_trimesh_process", True, "process(validate=True)", bf, bv)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             _record("run_trimesh_process", False, f"error: {exc}", bf, bv)
 
     final_f, final_v = _safe_count(m)

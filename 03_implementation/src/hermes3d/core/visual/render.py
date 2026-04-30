@@ -22,10 +22,10 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")  # headless — must be set BEFORE pyplot import
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import trimesh  # noqa: E402
-from matplotlib.collections import PolyCollection  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import trimesh
+from matplotlib.collections import PolyCollection
 
 LOG = logging.getLogger(__name__)
 

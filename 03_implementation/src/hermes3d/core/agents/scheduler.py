@@ -15,15 +15,11 @@ consume its decision and either start the print or queue it for later.
 
 from __future__ import annotations
 
-import dataclasses
 import datetime as _dt
-import socket
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-
 
 # =============================================================================
 # Scheduler
@@ -168,7 +164,7 @@ def fetch_camera_snapshot(
         with urlrequest.urlopen(req, timeout=timeout_s) as resp:
             content_type = resp.headers.get("Content-Type", "image/jpeg")
             image = resp.read()
-    except (HTTPError, URLError, socket.timeout) as exc:
+    except (TimeoutError, HTTPError, URLError) as exc:
         raise RuntimeError(f"Camera fetch failed for {printer_id}: {exc}") from exc
 
     saved_path: str | None = None

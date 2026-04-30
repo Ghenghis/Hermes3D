@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import textwrap
 
-from hermes3d.core.orchestration.agent_graph import GraphNode, WorkflowGraph
+from hermes3d.core.orchestration.agent_graph import WorkflowGraph
 
 
 def to_langgraph_source(graph: WorkflowGraph, *, function_name: str = "build_pipeline") -> str:

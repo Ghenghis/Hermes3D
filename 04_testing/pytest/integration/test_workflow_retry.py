@@ -8,7 +8,6 @@ complete and the slice node should record success.
 from __future__ import annotations
 
 import importlib
-from pathlib import Path
 
 import pytest
 
@@ -17,7 +16,7 @@ def _has_matplotlib() -> bool:
     try:
         importlib.import_module("matplotlib")
         return True
-    except Exception:  # noqa: BLE001
+    except Exception:
         return False
 
 
@@ -26,9 +25,8 @@ def _has_matplotlib() -> bool:
 )
 def test_workflow_retries_transient_slice_failure(monkeypatch, tmp_path):
     from hermes3d.core.design.desk_organizer import OrganizerSpec, build_organizer
-    from hermes3d.core.orchestration.agent_graph import new_state
     from hermes3d.core.orchestration import print_workflow
-    from hermes3d.core.orchestration.agent_graph import NodeOutcome, NodeResult
+    from hermes3d.core.orchestration.agent_graph import NodeOutcome, NodeResult, new_state
 
     # Make backoff instantaneous.
     monkeypatch.setattr(
@@ -41,7 +39,6 @@ def test_workflow_retries_transient_slice_failure(monkeypatch, tmp_path):
     mesh.export(stl)
 
     calls = {"n": 0}
-    real_slice = print_workflow._node_slice
 
     def flaky_slice(state):
         calls["n"] += 1

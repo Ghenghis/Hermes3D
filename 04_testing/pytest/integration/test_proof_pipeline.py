@@ -16,11 +16,9 @@ strongest single check in the suite — it touches every runnable subsystem.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 import pytest
-
 from hermes3d.core.design.desk_organizer import OrganizerSpec, build_organizer
 from hermes3d.core.proof.proof_envelope import (
     ProofVerificationError,

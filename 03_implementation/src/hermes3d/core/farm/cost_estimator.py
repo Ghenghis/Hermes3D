@@ -31,8 +31,7 @@ import dataclasses
 from dataclasses import dataclass, field
 from typing import Any
 
-from hermes3d.core.printers import FLEET, get_profile, PrinterProfile
-
+from hermes3d.core.printers import get_profile
 
 # Default electricity price (USD/kWh)
 DEFAULT_PRICE_PER_KWH_USD = 0.16
@@ -120,7 +119,7 @@ def estimate_cost(
     Polymaker PolyTerra PLA, or their Arizona-rate-locked solar setup
     runs them at $0.10/kWh).
     """
-    profile = get_profile(printer_id)
+    get_profile(printer_id)  # validates printer_id; raises KeyError if unknown
     notes: list[str] = []
 
     mat_key = material.upper()
@@ -185,9 +184,9 @@ def estimate_from_gcode_analysis(
 
 
 __all__ = [
-    "CostEstimate",
     "DEFAULT_FILAMENT_PRICES_USD_PER_KG",
     "DEFAULT_PRICE_PER_KWH_USD",
+    "CostEstimate",
     "estimate_cost",
     "estimate_from_gcode_analysis",
     "get_typical_wattage",

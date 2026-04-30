@@ -21,7 +21,7 @@ The output is intentionally explainable: every dimension carries a list of
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -213,7 +213,7 @@ def score_print(inp: ScoringInput) -> QualityReport:
         confidence=round(confidence, 4),
         outcome=inp.outcome,
         dimensions=dims,
-        generated_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        generated_at=datetime.now(UTC).isoformat(timespec="seconds"),
     )
 
 

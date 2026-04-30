@@ -99,7 +99,7 @@ def check_printer_state(live_state: dict[str, Any]) -> CheckResult:
         return CheckResult(
             name="printer_state",
             outcome=PreflightOutcome.PASS,
-            message=f"Klippy ready",
+            message="Klippy ready",
         )
     if ks in ("printing", "paused"):
         return CheckResult(

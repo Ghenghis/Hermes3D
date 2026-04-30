@@ -25,15 +25,13 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
+from hermes3d.core.agents.materials import MaterialProfile, get_material
 from hermes3d.core.printers import (
     FLEET,
     Kinematics,
     PrinterProfile,
     fits_bed,
-    get_profile,
 )
-from hermes3d.core.agents.materials import MaterialProfile, get_material
-
 
 # =============================================================================
 

@@ -35,10 +35,10 @@ import logging
 import time
 import traceback
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable
-
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class WorkflowState:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "WorkflowState":
+    def from_dict(cls, d: dict[str, Any]) -> WorkflowState:
         s = cls(
             workflow_id=d["workflow_id"],
             created_unix=d["created_unix"],
@@ -166,7 +166,7 @@ class WorkflowGraph:
         self._by_name: dict[str, GraphNode] = {}
         self.checkpoint_dir = Path(checkpoint_dir) if checkpoint_dir else None
 
-    def add_node(self, node: GraphNode) -> "WorkflowGraph":
+    def add_node(self, node: GraphNode) -> WorkflowGraph:
         if node.name in self._by_name:
             raise ValueError(f"duplicate node: {node.name}")
         self._nodes.append(node)
@@ -259,7 +259,7 @@ class WorkflowGraph:
                 started = time.time()
                 try:
                     result = node.fn(state)
-                except Exception as exc:  # noqa: BLE001
+                except Exception as exc:
                     result = NodeResult(
                         node_name=node.name,
                         outcome=NodeOutcome.FAIL,

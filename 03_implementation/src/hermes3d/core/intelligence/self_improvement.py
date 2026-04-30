@@ -18,8 +18,8 @@ inside the supervisor daemon every time a print finishes.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from hermes3d.core.agents.quality_scorer import PrintOutcome, QualityReport
 from hermes3d.core.memory.skill_store import (
@@ -28,7 +28,6 @@ from hermes3d.core.memory.skill_store import (
     SkillScope,
     SkillStore,
 )
-
 
 # Score thresholds — anything above SUCCESS_FLOOR reinforces, below
 # FAILURE_CEIL weakens. The band between is treated as ambiguous.
@@ -262,13 +261,13 @@ def run_once(
 
 __all__ = [
     "FAILURE_CEIL",
-    "LoopReport",
-    "LoopUpdate",
     "NEW_SKILL_MIN_DOMINANCE",
     "NEW_SKILL_MIN_EVIDENCE",
-    "PrintObservation",
     "RETIREMENT_FLOOR",
     "SUCCESS_FLOOR",
+    "LoopReport",
+    "LoopUpdate",
+    "PrintObservation",
     "propose_new_skills",
     "reinforce_or_weaken",
     "run_once",

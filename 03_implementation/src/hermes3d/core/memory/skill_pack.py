@@ -27,18 +27,16 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
 
 from hermes3d.core.memory import (
+    SCHEMA_VERSION,
     Skill,
     SkillKind,
-    SkillScope,
     SkillStore,
-    SCHEMA_VERSION,
 )
-
 
 log = logging.getLogger(__name__)
 
@@ -190,7 +188,6 @@ def import_pack(
     mode: ImportMode = ImportMode.MERGE,
 ) -> SkillPackImportReport:
     """Apply (or audit) a skill pack against a local store."""
-    import uuid
 
     report = SkillPackImportReport(audit_only=(mode is ImportMode.AUDIT))
     existing_by_name = {s.name: s for s in store.list()}
@@ -217,14 +214,14 @@ def import_pack(
                     notes=sk.notes,
                 )
                 report.added_skill_ids.append(added.skill_id)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 report.errors.append(f"{sk.name}: {exc}")
     return report
 
 
 __all__ = [
-    "ImportMode",
     "PACK_SCHEMA_VERSION",
+    "ImportMode",
     "SkillPack",
     "SkillPackImportReport",
     "SkillPackManifest",

@@ -104,7 +104,7 @@ def run_calibration(
         resp = client._request("POST", "/printer/gcode/script", params={"script": macro})
         result.moonraker_response = resp if isinstance(resp, dict) else {}
         result.succeeded = True
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         result.error = str(exc)
         result.succeeded = False
     return result

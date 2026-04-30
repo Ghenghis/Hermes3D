@@ -29,18 +29,16 @@ combination Dave runs on the fleet.
 
 from __future__ import annotations
 
-import dataclasses
 import json
 import os
-import socket
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
-
 
 # Default request timeout in seconds. Long uploads override per-call.
 DEFAULT_TIMEOUT_S = 15.0
@@ -163,7 +161,7 @@ class MoonrakerClient:
             payload: Any = None
             try:
                 payload = json.loads(exc.read().decode("utf-8"))
-            except Exception:  # noqa: BLE001
+            except Exception:
                 payload = None
             err_msg = (
                 payload.get("error", {}).get("message") if isinstance(payload, dict) else None
@@ -174,7 +172,7 @@ class MoonrakerClient:
                 url=url,
                 body=payload,
             ) from exc
-        except (URLError, socket.timeout) as exc:
+        except (TimeoutError, URLError) as exc:
             raise MoonrakerError(
                 f"Network error on {url}: {exc}",
                 url=url,
@@ -331,7 +329,7 @@ def probe_fleet(timeout_s: float = 5.0) -> list[dict[str, Any]]:
             entry["moonraker_version"] = info.moonraker_version
         except MoonrakerError as exc:
             entry["error"] = str(exc)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             entry["error"] = f"{type(exc).__name__}: {exc}"
         out.append(entry)
     return out

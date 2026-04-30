@@ -31,7 +31,6 @@ from typing import Any
 from hermes3d.core.printers import get_profile
 from hermes3d.core.printers.moonraker_client import MoonrakerClient
 
-
 log = logging.getLogger(__name__)
 
 
@@ -86,7 +85,7 @@ def auto_recover(
     # Initial state probe
     try:
         state = client.printer_state()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         result.attempts.append(
             RecoveryAttempt(
                 step="initial_probe",
@@ -133,7 +132,7 @@ def auto_recover(
                 detail="POST /printer/restart issued",
             )
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         result.attempts.append(
             RecoveryAttempt(
                 step="soft_restart",
@@ -174,7 +173,7 @@ def auto_recover(
                 detail="POST /printer/firmware_restart issued",
             )
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         result.attempts.append(
             RecoveryAttempt(
                 step="firmware_restart",

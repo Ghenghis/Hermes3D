@@ -28,10 +28,10 @@ import hashlib
 import json
 import tarfile
 import time
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
-
+from typing import Any
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -154,8 +154,8 @@ def restore_backup(
 
 
 __all__ = [
-    "BackupManifest",
     "SCHEMA_VERSION",
+    "BackupManifest",
     "create_backup",
     "restore_backup",
 ]

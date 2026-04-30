@@ -24,8 +24,9 @@ import enum
 import logging
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable
+from typing import Any
 
 LOG = logging.getLogger(__name__)
 
@@ -190,9 +191,9 @@ class LangGraphOrchestrator:
 
 
 __all__ = [
+    "TRANSITIONS",
     "DryRunOrchestrator",
     "LangGraphOrchestrator",
     "OrchestratorState",
     "Stage",
-    "TRANSITIONS",
 ]

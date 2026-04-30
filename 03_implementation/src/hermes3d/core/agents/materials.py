@@ -10,8 +10,7 @@ out printers that can't handle a given material before scoring the rest.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Tuple
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -42,7 +41,7 @@ class MaterialProfile:
 # (Prusa, Bambu, Polymaker, eSun) and the Klipper community wiki.
 # -----------------------------------------------------------------------------
 
-MATERIALS: Tuple[MaterialProfile, ...] = (
+MATERIALS: tuple[MaterialProfile, ...] = (
     MaterialProfile(
         material="PLA",
         hotend_min_c=190,

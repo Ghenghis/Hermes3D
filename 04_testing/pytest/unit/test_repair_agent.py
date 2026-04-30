@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from hermes3d.core.memory.skill_store import (
     SkillKind,
     SkillScope,

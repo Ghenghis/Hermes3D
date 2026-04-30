@@ -29,7 +29,6 @@ from typing import Any
 
 from hermes3d.core.memory.skill_store import Skill, SkillStore
 
-
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_]+")
 
 
@@ -130,7 +129,7 @@ class FAISSBackend:
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2") -> None:
         try:
-            import faiss  # type: ignore  # noqa: F401
+            import faiss  # type: ignore
             from sentence_transformers import SentenceTransformer  # type: ignore
         except ImportError as exc:  # pragma: no cover - exercised when deps missing
             raise RuntimeError(
