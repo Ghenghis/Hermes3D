@@ -1,0 +1,42 @@
+# printers.user.toml — per-deployment fleet override.
+#
+# Copy this file to `printers.user.toml` (already in .gitignore) and edit
+# with YOUR printer IPs / API keys. Only declare fields that differ from
+# the shipped defaults in printers.toml — values you don't override fall
+# through to the FLEET defaults in core/printers/printer_profiles.py.
+#
+# `status` may be "active" | "maintenance" | "offline" — the dispatcher
+# excludes anything not "active" from candidate selection (no need to
+# delete a printer to take it out of rotation).
+
+schema_version = "1.0.0"
+
+# --- Worked example: a small FLSUN-only fleet on a 192.168.0.x LAN -------
+
+[printers.flsun_t1_a]
+moonraker_url = "http://192.168.0.10"
+status        = "active"
+
+[printers.flsun_t1_b]
+moonraker_url = "http://192.168.0.11"
+status        = "active"
+
+[printers.flsun_s1]
+moonraker_url = "http://192.168.0.12"
+# Hotend disassembled for cleaning — exclude from dispatcher until back in service.
+status        = "maintenance"
+maintenance_note = "hotend disassembled — re-enable after reassembly + first-layer test"
+
+[printers.flsun_v400]
+moonraker_url = "http://192.168.0.34"
+status        = "active"
+
+# --- Optional: scan ranges for farm_discovery's IP-sweep fallback ---------
+# If mDNS is blocked on your network (common on managed VLANs), the
+# farm_discovery agent will probe these subnets for Moonraker (TCP/7125)
+# in addition to the named printers above.
+
+[discovery]
+scan_subnets = ["192.168.0.0/24"]
+scan_ports   = [7125, 80]   # 7125 = Moonraker default, 80 = some custom installs
+timeout_ms   = 800
