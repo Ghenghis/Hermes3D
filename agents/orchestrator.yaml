@@ -1,0 +1,32 @@
+role: orchestrator
+description: Drives a workflow state through the 12-node print_workflow graph using LangGraphOrchestrator. Uses a real LangGraph StateGraph when the optional dependency is installed, otherwise transparently falls back to the hand-rolled WorkflowGraph.
+model: sonnet
+inputs:
+  - name: state_path
+    type: path
+    required: true
+    description: Path to a JSON file holding the WorkflowState seed (mesh_path + flags).
+  - name: checkpoint_dir
+    type: path
+    required: false
+    description: Directory where per-node checkpoints are persisted for resume.
+action_sequence:
+  - run: mkdir -p var/orchestrator
+  - run: python -m hermes3d.cli orchestrate --state "${STATE_PATH}" --checkpoint-dir "${CHECKPOINT_DIR:-var/orchestrator/cp}" --out var/orchestrator/result.json
+outputs:
+  - path: var/orchestrator/result.json
+    description: Serialised final WorkflowState including history (node_results), aborted flag, and terminal=true.
+gates:
+  - name: terminal_within_max_steps
+    threshold: terminal==true
+    blocking: true
+    command: python -c "import json,sys; r=json.load(open('var/orchestrator/result.json')); sys.exit(0 if r.get('terminal') else 1)"
+  - name: no_unhandled_exceptions
+    threshold: every node_result has an outcome
+    blocking: true
+    command: python -c "import json,sys; r=json.load(open('var/orchestrator/result.json')); sys.exit(0 if all('outcome' in h for h in r.get('history', [])) else 1)"
+retry_policy:
+  max_retries: 1
+  backoff_strategy: linear
+  initial_delay_seconds: 2
+escalate_to: repair

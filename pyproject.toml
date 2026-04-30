@@ -47,7 +47,8 @@ dev = [
   "ruff==0.14.14",
   "mypy>=1.10",
 ]
-all = ["hermes3d-os-lite[ui,dev]"]
+langgraph = ["langgraph>=0.2"]
+all = ["hermes3d-os-lite[ui,dev,langgraph]"]
 
 [project.scripts]
 hermes3d = "hermes3d.cli.__main__:main"
