@@ -147,7 +147,9 @@ def build_app():  # type: ignore[no-untyped-def]
 
         with gr.Tab("✅ Truth Gate Validator", elem_id="tab-truth-gate"):
             stl_in = gr.File(
-                label="Upload STL", file_types=[".stl"], type="filepath",
+                label="Upload STL",
+                file_types=[".stl"],
+                type="filepath",
                 elem_id="tg-stl-input",
             )
             run_btn = gr.Button("Run Truth Gate", variant="primary", elem_id="tg-run")
@@ -224,6 +226,7 @@ def main() -> None:
     # gradio 6.x dropped show_api from Blocks.launch; filter to whatever the
     # installed version actually accepts so the launcher survives minor API drift.
     import inspect
+
     launch_params = inspect.signature(app.launch).parameters
     launch_kwargs = {"server_name": host, "server_port": port}
     if "show_api" in launch_params:
