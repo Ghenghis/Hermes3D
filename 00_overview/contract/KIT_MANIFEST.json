@@ -1,12 +1,12 @@
 {
   "manifest_version": "1.0.0",
   "kit": "Hermes3D-OS Lite v5 Contract Kit",
-  "generated_at": "2026-04-30T08:18:48Z",
+  "generated_at": "2026-04-30T08:20:53Z",
   "summary": {
-    "total_files": 204,
-    "total_bytes": 1154624,
+    "total_files": 206,
+    "total_bytes": 1165612,
     "by_tier": {
-      "runnable": 160,
+      "runnable": 162,
       "spec": 44
     },
     "by_role": {
@@ -23,7 +23,7 @@
       "module": 77,
       "acceptance_test": 4,
       "test": 18,
-      "proof": 4,
+      "proof": 6,
       "installer": 4,
       "env_template": 1,
       "deps": 2,
@@ -68,8 +68,8 @@
     },
     {
       "path": ".gitignore",
-      "size_bytes": 1044,
-      "sha256": "c8e0bceee4ed56f169987689a7e66f7904c79853e1c18939c2f3c1eb35937307",
+      "size_bytes": 1062,
+      "sha256": "c25a33799a2baf9f486a2adb9d9e3044217af7b1f0ea2d480b43fc3c8c70b84c",
       "tier": "runnable",
       "role": "vcs_config"
     },
@@ -1047,6 +1047,20 @@
       "role": "proof"
     },
     {
+      "path": "05_truth_proof/bundles/29dc1b2a7cef-20260430T082040Z.zip",
+      "size_bytes": 5479,
+      "sha256": "7701e1557894c33d61451112e62915b0aa1c5520cd20270d93b06d7c9e0cdb0b",
+      "tier": "runnable",
+      "role": "proof"
+    },
+    {
+      "path": "05_truth_proof/bundles/55fc9e373237-20260430T081858Z.zip",
+      "size_bytes": 5480,
+      "sha256": "9e81312b86c9b93bbe2e1380a09d38e24cf2c78f534d221d897a381452aafa93",
+      "tier": "runnable",
+      "role": "proof"
+    },
+    {
       "path": "05_truth_proof/conformance_runner.py",
       "size_bytes": 16077,
       "sha256": "985266b9d22f7b179a8196d54ba638c88495ac4e40c60adae3c6daa91ff65e87",
@@ -1118,8 +1132,8 @@
     },
     {
       "path": "README.md",
-      "size_bytes": 3645,
-      "sha256": "917c0c62d1e1b02a2a4138eb708c59caaf7f1c65173b266374d54472000c1f3d",
+      "size_bytes": 3656,
+      "sha256": "7b52e3199f61796c80f7203c278d1f8099c5ed104705841e6ed8b2c131a9bbf4",
       "tier": "spec",
       "role": "unknown"
     },
