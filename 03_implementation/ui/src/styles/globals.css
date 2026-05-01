@@ -1,36 +1,16 @@
-/* Bootstrap CSS (Task 1). Tailwind directives + tokens land in Task 2. */
-:root {
-  color-scheme: dark;
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-body {
-  margin: 0;
-  background-color: #0a0e1a;
-  color: #e6edf7;
-  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-.min-h-screen {
-  min-height: 100vh;
-}
-
-.flex {
-  display: flex;
-}
-
-.items-center {
-  align-items: center;
-}
-
-.justify-center {
-  justify-content: center;
-}
-
-.text-2xl {
-  font-size: 1.5rem;
-  line-height: 2rem;
-}
-
-.font-semibold {
-  font-weight: 600;
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background-color: theme(colors.bg);
+    color: theme(colors.fg);
+    font-family: theme(fontFamily.sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
 }
