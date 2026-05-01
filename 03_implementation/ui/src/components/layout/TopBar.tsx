@@ -30,13 +30,13 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
         <span className="text-muted text-xs">·</span>
         <span className="text-muted text-xs truncate">{activeLabel}</span>
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         <EditionBadge edition={sys.edition} />
-        <StatusPill icon={<CircleDot size={14} />} label="System" value={sys.system_status} tone="green" />
-        <StatusPill icon={<Cpu size={14} />} label="GPU" value={`${sys.gpu_detected_pct}%`} tone="cyan" />
-        <StatusPill icon={<ShieldCheck size={14} />} label="Security" value={sys.security_status} tone="green" />
+        <StatusPill icon={<CircleDot size={13} />} label="System" value={sys.system_status} tone="green" />
+        <StatusPill icon={<Cpu size={13} />} label="GPU" value={`${sys.gpu_detected_pct}%`} tone="cyan" />
+        <StatusPill icon={<ShieldCheck size={13} />} label="Security" value={sys.security_status} tone="green" />
         <ProofChip status="verified" />
-        <span className="h-5 w-px bg-border mx-1" aria-hidden />
+        <span className="h-6 w-px bg-border mx-1.5" aria-hidden />
         <TimePill time={time} />
         <BellButton unread={unread} />
         <GearButton />

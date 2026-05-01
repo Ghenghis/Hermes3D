@@ -21,6 +21,8 @@ export type PanelProps = {
   children: ReactNode;
   /** Tailwind className(s) appended to the outer container. */
   className?: string;
+  /** Tighter header (h-8) + content padding (p-2.5) — used by the dense Dashboard. */
+  dense?: boolean;
 };
 
 export function Panel({
@@ -30,9 +32,13 @@ export function Panel({
   headerExtra,
   children,
   className,
+  dense = false,
 }: PanelProps) {
   const dock = useStore((s) => s.panelDock[id] ?? "docked");
   const isFullscreen = dock === "external"; // CSS-only fullscreen in Phase 2
+
+  const headerCls = dense ? "h-8 px-3" : "h-10 px-4";
+  const bodyCls = dense ? "flex-1 p-2.5 overflow-auto" : "flex-1 p-4 overflow-auto";
 
   return (
     <section
@@ -43,12 +49,14 @@ export function Panel({
       ].join(" ")}
       aria-label={title}
     >
-      <header className="h-10 px-4 flex items-center justify-between border-b border-border shrink-0">
+      <header className={`${headerCls} flex items-center justify-between border-b border-border shrink-0`}>
         <div className="flex items-center gap-2 min-w-0">
-          <span className="text-fg text-sm font-semibold truncate">{title}</span>
+          <span className="text-fg text-[11px] font-semibold uppercase tracking-wide truncate">
+            {title}
+          </span>
           {status && <StatusBadge tone={status.tone} label={status.label} />}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           {headerExtra}
           <DockModeToggle panelId={id} />
           <button
@@ -56,18 +64,18 @@ export function Panel({
             aria-label="Collapse panel"
             className="text-muted hover:text-fg p-1"
           >
-            <ChevronDown size={14} />
+            <ChevronDown size={13} />
           </button>
           <button
             type="button"
             aria-label="More actions"
             className="text-muted hover:text-fg p-1"
           >
-            <MoreHorizontal size={14} />
+            <MoreHorizontal size={13} />
           </button>
         </div>
       </header>
-      <div className="flex-1 p-4 overflow-auto">{children}</div>
+      <div className={bodyCls}>{children}</div>
     </section>
   );
 }

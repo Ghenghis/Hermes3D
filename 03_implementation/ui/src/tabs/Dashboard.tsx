@@ -120,9 +120,9 @@ export function Dashboard() {
   const activeWorkflow = MOCK_WORKFLOWS.find((w) => w.status === "active") ?? MOCK_WORKFLOWS[0];
 
   return (
-    <div className="grid grid-cols-12 gap-3 auto-rows-min" data-testid="dashboard-root">
+    <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="dashboard-root">
       {/* ── Row 1 ─ 5 KPI cards ──────────────────────────────────────────── */}
-      <div className="col-span-12 grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <div className="col-span-12 grid grid-cols-2 sm:grid-cols-5 gap-2.5">
         <KpiCard
           label="Total Printers"
           value={totalPrinters}
@@ -177,7 +177,8 @@ export function Dashboard() {
               View All <ExternalLink size={11} />
             </button>
           }
-          className="h-[360px]"
+          dense
+          className="h-[300px]"
         >
           <FleetTable />
         </Panel>
@@ -190,7 +191,8 @@ export function Dashboard() {
           headerExtra={
             <span className="text-muted text-xs truncate max-w-[180px]">{activeWorkflow.name}</span>
           }
-          className="h-[360px]"
+          dense
+          className="h-[300px]"
         >
           <PipelinePanel />
         </Panel>
@@ -205,7 +207,8 @@ export function Dashboard() {
             tone: "green",
             label: `${MOCK_AGENTS.filter((a) => a.status === "active").length}/${MOCK_AGENTS.length}`,
           }}
-          className="h-[280px]"
+          dense
+          className="h-[230px]"
         >
           <ActiveAgentsList />
         </Panel>
@@ -215,7 +218,8 @@ export function Dashboard() {
           id="dashboard.agents.activity"
           title="AGENT ACTIVITY (LIVE)"
           status={{ tone: "cyan", label: "streaming" }}
-          className="h-[280px]"
+          dense
+          className="h-[230px]"
         >
           <AgentActivityLog />
         </Panel>
@@ -225,7 +229,8 @@ export function Dashboard() {
           id="dashboard.resources"
           title="SYSTEM RESOURCES"
           status={{ tone: "green", label: sys.system_status }}
-          className="h-[280px]"
+          dense
+          className="h-[230px]"
         >
           <ResourcePanel />
         </Panel>
@@ -235,7 +240,8 @@ export function Dashboard() {
           id="dashboard.jobs"
           title="RECENT JOBS"
           status={{ tone: "muted", label: `${MOCK_JOBS.length} total` }}
-          className="h-[280px]"
+          dense
+          className="h-[230px]"
         >
           <RecentJobs />
         </Panel>
@@ -248,7 +254,8 @@ export function Dashboard() {
           title="PROOF & VERIFICATION"
           status={{ tone: "green", label: "LATEST" }}
           headerExtra={<ProofChip status={LATEST_BUNDLE.verdict === "verified" ? "verified" : "pending"} />}
-          className="h-[260px]"
+          dense
+          className="h-[220px]"
         >
           <ProofPanel />
         </Panel>
@@ -259,7 +266,8 @@ export function Dashboard() {
           title="SYSTEM LOGS"
           status={{ tone: "cyan", label: "LATEST" }}
           headerExtra={<span className="text-muted text-xs">{MOCK_LOGS.length} recent</span>}
-          className="h-[260px]"
+          dense
+          className="h-[220px]"
         >
           <LogsPanel />
         </Panel>
@@ -269,7 +277,8 @@ export function Dashboard() {
           id="dashboard.preview"
           title="QUICK PREVIEW"
           status={{ tone: "muted", label: "STL · 3MF" }}
-          className="h-[260px]"
+          dense
+          className="h-[220px]"
         >
           <QuickPreview />
         </Panel>
@@ -282,7 +291,8 @@ export function Dashboard() {
             tone: MOCK_NOTIFICATIONS.some((n) => !n.read) ? "amber" : "muted",
             label: `${MOCK_NOTIFICATIONS.filter((n) => !n.read).length} unread`,
           }}
-          className="h-[260px]"
+          dense
+          className="h-[220px]"
         >
           <NotificationsPanel />
         </Panel>
@@ -295,7 +305,8 @@ export function Dashboard() {
           title="DIMENSIONAL TRUTH ENGINE"
           status={{ tone: "amber", label: "phase 6 pending" }}
           headerExtra={<span className="text-muted text-xs">UI-standards reservation · live in Phase 6</span>}
-          className="h-[110px]"
+          dense
+          className="h-[85px]"
         >
           <DimensionalStrip />
         </Panel>
@@ -471,28 +482,55 @@ function TimelineRow({
 /** Stylized dark wireframe placeholder — Phase 6 wires real STL/3MF preview. */
 function PreviewBox({ label }: { label: string }) {
   return (
-    <div className="h-full w-full bg-gradient-to-br from-surface2 to-surface border border-border rounded-lg p-2 flex flex-col items-center justify-between overflow-hidden">
-      <div className="text-muted text-[10px] uppercase tracking-wide">{label}</div>
+    <div className="h-full w-full bg-gradient-to-br from-surface2 to-bg border border-accent-cyan/20 rounded-lg p-2 flex flex-col items-center justify-between overflow-hidden relative">
+      <div className="absolute inset-0 pointer-events-none" aria-hidden>
+        {/* Subtle grid backdrop */}
+        <svg viewBox="0 0 100 100" className="w-full h-full opacity-10" preserveAspectRatio="none">
+          <defs>
+            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#22d3ee" strokeWidth="0.3" />
+            </pattern>
+          </defs>
+          <rect width="100" height="100" fill="url(#grid)" />
+        </svg>
+        {/* Corner brackets */}
+        <CornerBracket pos="tl" />
+        <CornerBracket pos="tr" />
+        <CornerBracket pos="bl" />
+        <CornerBracket pos="br" />
+      </div>
+      <div className="text-accent-cyan/80 text-[9px] uppercase tracking-wider z-10">{label}</div>
       <svg
         viewBox="0 0 100 100"
-        className="w-full h-full max-h-[140px] text-accent-cyan/60"
+        className="w-full h-full max-h-[120px] text-accent-cyan z-10 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]"
         fill="none"
         stroke="currentColor"
-        strokeWidth="0.5"
+        strokeWidth="0.6"
         strokeLinejoin="round"
       >
-        {/* Wireframe cube */}
-        <polygon points="25,30 75,30 75,80 25,80" />
-        <polygon points="25,30 50,15 100,15 75,30" />
-        <polygon points="75,30 100,15 100,65 75,80" />
-        <line x1="25" y1="30" x2="50" y2="15" />
-        <line x1="50" y1="15" x2="50" y2="65" stroke="currentColor" strokeOpacity="0.3" />
-        <line x1="50" y1="65" x2="25" y2="80" stroke="currentColor" strokeOpacity="0.3" />
-        <line x1="50" y1="65" x2="100" y2="65" stroke="currentColor" strokeOpacity="0.3" />
+        {/* Wireframe cube — front + top + side faces */}
+        <polygon points="25,35 75,35 75,82 25,82" stroke="currentColor" />
+        <polygon points="25,35 45,18 95,18 75,35" stroke="currentColor" />
+        <polygon points="75,35 95,18 95,65 75,82" stroke="currentColor" />
+        {/* Hidden edges */}
+        <line x1="25" y1="35" x2="45" y2="18" />
+        <line x1="45" y1="18" x2="45" y2="65" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="1,1" />
+        <line x1="45" y1="65" x2="25" y2="82" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="1,1" />
+        <line x1="45" y1="65" x2="95" y2="65" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="1,1" />
       </svg>
-      <div className="text-muted text-[10px]">frame-bracket-v3</div>
+      <div className="text-fg/90 text-[10px] font-mono z-10">frame-bracket-v3</div>
     </div>
   );
+}
+
+function CornerBracket({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
+  const positions = {
+    tl: "top-1 left-1 border-l border-t",
+    tr: "top-1 right-1 border-r border-t",
+    bl: "bottom-1 left-1 border-l border-b",
+    br: "bottom-1 right-1 border-r border-b",
+  } as const;
+  return <div className={`absolute h-2 w-2 border-accent-cyan/70 ${positions[pos]}`} />;
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
@@ -713,34 +751,48 @@ function LogsPanel() {
  * ────────────────────────────────────────────────────────────────────────── */
 function QuickPreview() {
   return (
-    <div className="h-full flex flex-col gap-2">
-      <div className="flex-1 bg-gradient-to-br from-surface2 to-surface border border-border/60 rounded-lg flex items-center justify-center overflow-hidden">
+    <div className="h-full flex flex-col gap-1.5">
+      <div className="flex-1 bg-gradient-to-br from-surface2 to-bg border border-accent-cyan/20 rounded-lg flex items-center justify-center overflow-hidden relative">
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <svg viewBox="0 0 100 100" className="w-full h-full opacity-10" preserveAspectRatio="none">
+            <defs>
+              <pattern id="grid-preview" width="8" height="8" patternUnits="userSpaceOnUse">
+                <path d="M 8 0 L 0 0 0 8" fill="none" stroke="#22d3ee" strokeWidth="0.3" />
+              </pattern>
+            </defs>
+            <rect width="100" height="100" fill="url(#grid-preview)" />
+          </svg>
+          <CornerBracket pos="tl" />
+          <CornerBracket pos="tr" />
+          <CornerBracket pos="bl" />
+          <CornerBracket pos="br" />
+        </div>
         <svg
           viewBox="0 0 100 100"
-          className="w-full h-full max-h-[160px] text-accent-cyan/70"
+          className="w-full h-full max-h-[140px] text-accent-cyan z-10 drop-shadow-[0_0_5px_rgba(34,211,238,0.45)]"
           fill="none"
           stroke="currentColor"
-          strokeWidth="0.5"
+          strokeWidth="0.6"
           strokeLinejoin="round"
         >
-          {/* Wireframe icosahedron-ish shape */}
-          <polygon points="50,10 80,30 80,70 50,90 20,70 20,30" stroke="currentColor" />
-          <line x1="50" y1="10" x2="50" y2="90" stroke="currentColor" strokeOpacity="0.4" />
-          <line x1="20" y1="30" x2="80" y2="70" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="80" y1="30" x2="20" y2="70" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="10" x2="20" y2="70" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="10" x2="80" y2="70" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="90" x2="20" y2="30" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="90" x2="80" y2="30" stroke="currentColor" strokeOpacity="0.3" />
-          <circle cx="50" cy="50" r="2" fill="currentColor" />
+          {/* Wireframe hexagonal prism */}
+          <polygon points="50,12 78,28 78,72 50,88 22,72 22,28" stroke="currentColor" />
+          <line x1="50" y1="12" x2="50" y2="88" stroke="currentColor" strokeOpacity="0.5" />
+          <line x1="22" y1="28" x2="78" y2="72" stroke="currentColor" strokeOpacity="0.35" />
+          <line x1="78" y1="28" x2="22" y2="72" stroke="currentColor" strokeOpacity="0.35" />
+          <line x1="50" y1="12" x2="22" y2="72" stroke="currentColor" strokeOpacity="0.3" />
+          <line x1="50" y1="12" x2="78" y2="72" stroke="currentColor" strokeOpacity="0.3" />
+          <line x1="50" y1="88" x2="22" y2="28" stroke="currentColor" strokeOpacity="0.3" />
+          <line x1="50" y1="88" x2="78" y2="28" stroke="currentColor" strokeOpacity="0.3" />
+          <circle cx="50" cy="50" r="1.5" fill="currentColor" />
         </svg>
       </div>
-      <div className="flex items-center justify-between text-[11px]">
-        <div className="flex flex-col leading-tight">
-          <span className="text-fg font-medium">frame-bracket-v3.3mf</span>
+      <div className="flex items-center justify-between text-[11px] px-0.5">
+        <div className="flex flex-col leading-tight min-w-0">
+          <span className="text-fg font-medium truncate">frame-bracket-v3.3mf</span>
           <span className="text-muted font-mono text-[10px]">42.1 × 28.4 × 12.0 mm</span>
         </div>
-        <Box size={14} className="text-muted" />
+        <Box size={13} className="text-accent-cyan/70 shrink-0" />
       </div>
     </div>
   );
