@@ -59,8 +59,11 @@ git diff --stat develop...feat/phase-0-foundation-baseline -- \
   hermes3d_gui_contract_kit_v4.1/
 # Expect: empty (no diff)
 
-# 3. Confirm rc1 tag and release branch are immutable
-[ "$(git rev-parse v5.3.0-rc1)" = "6dd9e01f4e090663c7fdd87bb968f37b512de7ca" ] && echo "rc1 tag OK"
+# 3. Confirm rc1 tag and release branch are immutable.
+# Note: v5.3.0-rc1 is an annotated tag, so `git rev-parse v5.3.0-rc1`
+# returns the tag-object SHA, not the commit. Use ^{commit} to resolve
+# to the actual commit it points at.
+[ "$(git rev-parse v5.3.0-rc1^{commit})" = "6dd9e01f4e090663c7fdd87bb968f37b512de7ca" ] && echo "rc1 tag OK"
 [ "$(git rev-parse release/v5.3.0-rc1)" = "6dd9e01f4e090663c7fdd87bb968f37b512de7ca" ] && echo "rc1 branch OK"
 
 # 4. Run the kit's own gates from this branch (must pass)
