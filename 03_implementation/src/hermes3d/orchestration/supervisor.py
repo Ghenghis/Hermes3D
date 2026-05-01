@@ -84,19 +84,6 @@ class OfflineSupervisor:
             self._tokens[token.token_id] = token
         return token
 
-    def validate_token(
-        self,
-        token: CapabilityToken | None,
-        *,
-        tool: str,
-        now_utc: datetime | None = None,
-    ) -> Result[CapabilityToken]:
-        if token is None:
-            return Err("no_token", "dispatch requires a capability token")
-
-        with self._registry_lock:
-            return self._validate_token_unlocked(token, tool=tool, now_utc=now_utc)
-
     def _validate_token_unlocked(
         self,
         token: CapabilityToken | None,
@@ -291,10 +278,6 @@ class OfflineSupervisor:
 
     def registered_tools(self) -> frozenset[str]:
         return self._registered_tools
-
-    def _consume(self, token: CapabilityToken) -> None:
-        with self._registry_lock:
-            self._consumed_tokens.add(token.token_id)
 
     def _refuse(
         self,
