@@ -1,19 +1,22 @@
 import { Maximize2, Minimize2, PictureInPicture2 } from "lucide-react";
 import { type DockMode, useStore } from "../../app/store";
 
-const MODES: { mode: DockMode; Icon: typeof Maximize2; label: string }[] = [
-  { mode: "docked", Icon: Minimize2, label: "Docked" },
-  { mode: "undocked", Icon: PictureInPicture2, label: "Undocked" },
-  { mode: "external", Icon: Maximize2, label: "Fullscreen" },
+const MODES: { mode: DockMode; Icon: typeof Maximize2; label: string; hint: string }[] = [
+  { mode: "docked",     Icon: Minimize2,         label: "Docked",     hint: "Inline panel (default)" },
+  { mode: "undocked",   Icon: PictureInPicture2, label: "Undocked",   hint: "Floating CSS overlay (mock)" },
+  { mode: "fullscreen", Icon: Maximize2,         label: "Fullscreen", hint: "Expanded CSS overlay" },
 ];
 
 /**
- * 3-mode dock toggle per ADR-008 §3 (docked / undocked / external) +
- * `TAB_SPECS.md` "Every panel has: ... undock, fullscreen."
+ * 3-mode dock toggle per ADR-008 §3 + `TAB_SPECS.md` "Every panel has:
+ * ... undock, fullscreen."
  *
- * Phase 2 ships CSS-only fullscreen and writes the chosen mode to the
- * zustand store. Phase 3+ may wire native detached windows for "undocked";
- * the contract surface (this 3-button toggle) stays stable.
+ * Phase 2 is store-only — every transition writes to the zustand
+ * `panelDock` map and renders via CSS. No BrowserWindow/WebView/process
+ * is created; the actual native-window wiring is deferred to Phase 3+.
+ *
+ * Click already-active mode → returns to "docked" (so the toggle is
+ * always escapable without a separate close button).
  */
 export function DockModeToggle({ panelId }: { panelId: string }) {
   const dock = useStore((s) => s.panelDock[panelId] ?? "docked");
@@ -24,7 +27,7 @@ export function DockModeToggle({ panelId }: { panelId: string }) {
       role="group"
       aria-label="Dock mode"
     >
-      {MODES.map(({ mode, Icon, label }) => {
+      {MODES.map(({ mode, Icon, label, hint }) => {
         const active = dock === mode;
         return (
           <button
@@ -32,7 +35,10 @@ export function DockModeToggle({ panelId }: { panelId: string }) {
             type="button"
             aria-label={label}
             aria-pressed={active}
-            onClick={() => setPanelDock(panelId, mode)}
+            title={`${label} — ${hint}`}
+            data-dock-mode={mode}
+            data-active={active}
+            onClick={() => setPanelDock(panelId, active ? "docked" : mode)}
             className={[
               "p-1 rounded-sm transition-colors",
               active
