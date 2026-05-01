@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
-from .capability_matrix import is_known_type
+from .capability_matrix import is_known_type, required_capabilities_for_type
 from .errors import ErrorCode, ValidationError
 from .loader import LoaderError, load_registry
 from .types import ToolEntry
@@ -117,12 +117,58 @@ def _check_url(entry: ToolEntry) -> list[ValidationError]:
     return []
 
 
+def _check_per_type_capabilities(entry: ToolEntry) -> list[ValidationError]:
+    """Enforce required capability tokens per `type`.
+
+    A `dock_*` token in `_REQUIRED` is satisfied by any capability starting
+    with `dock_` (so `dock_if_supported` and `dock_if_allowed` both work).
+    `launch_external` is satisfied by either itself or `fullscreen_external`
+    (the web-UI equivalent). Other required tokens must match exactly.
+    """
+    required = required_capabilities_for_type(entry.type)
+    if not required:
+        return []
+    caps = set(entry.adapter.capabilities)
+    out: list[ValidationError] = []
+    for req in required:
+        if req.startswith("dock_"):
+            if not any(c.startswith("dock_") for c in caps):
+                out.append(
+                    ValidationError(
+                        entry.key,
+                        ErrorCode.MISSING_DOCK_CAPABILITY,
+                        f"type '{entry.type}' requires a dock capability "
+                        f"(e.g. {req}); none declared",
+                    )
+                )
+        elif req == "launch_external":
+            if "launch_external" not in caps and "fullscreen_external" not in caps:
+                out.append(
+                    ValidationError(
+                        entry.key,
+                        ErrorCode.MISSING_EXTERNAL_LAUNCH_CAPABILITY,
+                        f"type '{entry.type}' requires 'launch_external' or "
+                        f"'fullscreen_external'; none declared",
+                    )
+                )
+        elif req not in caps:
+            out.append(
+                ValidationError(
+                    entry.key,
+                    ErrorCode.MISSING_REQUIRED_FIELD,
+                    f"type '{entry.type}' requires capability '{req}'",
+                )
+            )
+    return out
+
+
 def _check_entry(entry: ToolEntry) -> list[ValidationError]:
-    """Aggregate all per-entry checks. Tasks 7-8 extend this list."""
+    """Aggregate all per-entry checks. Task 8 extends this list."""
     errs: list[ValidationError] = []
     errs.extend(_check_license(entry))
     errs.extend(_check_capabilities(entry))
     errs.extend(_check_url(entry))
+    errs.extend(_check_per_type_capabilities(entry))
     return errs
 
 

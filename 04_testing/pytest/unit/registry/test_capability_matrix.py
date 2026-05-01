@@ -46,3 +46,26 @@ def test_known_types_includes_all_locked_categories():
         "printer_api_and_web_ui",
     }
     assert expected.issubset(KNOWN_TYPES)
+
+
+# Task 7 — per-type capability matrix enforcement in the validator
+def test_slicer_missing_dock_token_flagged(fixture_path):
+    from hermes3d.registry.errors import ErrorCode
+    from hermes3d.registry.loader import load_registry
+    from hermes3d.registry.validator import validate
+
+    result = validate(load_registry(fixture_path("slicer_missing_dock_token.yaml")))
+    assert not result.ok
+    pairs = {(e.tool_id, e.code) for e in result.errors}
+    assert ("bad_slicer", ErrorCode.MISSING_DOCK_CAPABILITY) in pairs
+
+
+def test_web_ui_missing_fullscreen_flagged(fixture_path):
+    from hermes3d.registry.errors import ErrorCode
+    from hermes3d.registry.loader import load_registry
+    from hermes3d.registry.validator import validate
+
+    result = validate(load_registry(fixture_path("web_ui_missing_fullscreen.yaml")))
+    assert not result.ok
+    codes = {e.code for e in result.errors}
+    assert ErrorCode.MISSING_REQUIRED_FIELD in codes  # missing fullscreen_external token
