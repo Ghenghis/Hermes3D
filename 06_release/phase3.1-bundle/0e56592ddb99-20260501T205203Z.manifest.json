@@ -1,0 +1,48 @@
+{
+  "created_utc": "2026-05-01T20:52:03.731571+00:00",
+  "env": {
+    "machine": "AMD64",
+    "os": "Windows-11-10.0.26100-SP0",
+    "python": "3.14.3",
+    "python_impl": "CPython"
+  },
+  "files": [
+    {
+      "path": "docs/ADR-009-orchestration-skeleton.md",
+      "sha256": "03a5431aa03c2fa73d53a3b5a3b2310a1eec2aba2518483948a0fb41d3115043",
+      "size": 10962
+    },
+    {
+      "path": "docs/PHASE3_PLAN.md",
+      "sha256": "1697a583bdfaf02d87344463e19d55df7f14f8c63949e50e12f39c620864b6bc",
+      "size": 11280
+    },
+    {
+      "path": "evidence/fixture_replay_log.json",
+      "sha256": "8355b4c237c203f08cda3b089df3c5666dd857ee1e22283a041744a61febc02c",
+      "size": 4716
+    },
+    {
+      "path": "evidence/ledger_snapshot.sqlite3",
+      "sha256": "ca59545bdd4605bfd3fcbc569e9e40fcac5277d45a26988e0066b633d3e36148",
+      "size": 8192
+    },
+    {
+      "path": "evidence/playwright_report.json",
+      "sha256": "d29d0d4a7d55e4b8a28903224b11e7044943d1bcce45f99c3ba223ebe98d8416",
+      "size": 13934
+    },
+    {
+      "path": "evidence/ui_build_output_hash.json",
+      "sha256": "7d2a7712536180cd13a0dd79b18dcd6d0e8364f676c24ddc4f4f62c774a7d349",
+      "size": 589
+    }
+  ],
+  "git": {
+    "branch": "feat/phase-3-1-fleet-readonly",
+    "dirty": "not-computed",
+    "sha": "0e56592ddb9948c6a7ad9cac88f74d264f52e8c7"
+  },
+  "run_id": "0e56592ddb99-20260501T205203Z",
+  "schema_version": "phase3.1-bundle-1.0.0"
+}

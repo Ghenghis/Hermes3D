@@ -9,8 +9,8 @@
  *   Row 4   Proof & Verification | System Logs | Quick Preview | Notifications
  *   Row 5   Dimensional Truth Engine (compact strip)
  *
- * No real APIs, no adapter calls, no subprocesses — every value flows from
- * `src/data/mock/*`. Phase 3 swaps the mock layer behind `AdapterAPI`.
+ * Default mode renders deterministic mock data; Phase 3.1 live mode reads
+ * local bridge snapshots through `AdapterAPI`.
  */
 import {
   Activity,
@@ -36,6 +36,7 @@ import { Sparkline } from "../components/charts/Sparkline";
 import { StatusBadge, type StatusTone } from "../components/badges/StatusBadge";
 import { ProofChip } from "../components/badges/ProofChip";
 import { useStore } from "../app/store";
+import { adapters } from "../api/adapters";
 import { MOCK_PRINTERS } from "../data/mock/printers";
 import { MOCK_AGENTS } from "../data/mock/agents";
 import { MOCK_WORKFLOWS } from "../data/mock/workflows";
@@ -45,12 +46,13 @@ import { MOCK_SYSTEM_SNAPSHOT } from "../data/mock/system";
 import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
 import { MOCK_LOGS } from "../data/mock/logs";
 import { MOCK_NOTIFICATIONS } from "../data/mock/notifications";
-import type { PrinterStatus } from "../types/printer";
+import type { Printer, PrinterDataSource, PrinterStatus } from "../types/printer";
 import type { Job } from "../types/job";
 import type { Agent } from "../types/agent";
 import type { LogLevel } from "../types/log";
 import type { NotificationSeverity } from "../types/notification";
 import { tokens } from "../styles/tokens";
+import { useEffect, useState } from "react";
 
 const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   online: "green",
@@ -110,11 +112,23 @@ const PIPELINE_STAGES: { id: string; label: string; Icon: typeof Sparkles; statu
 
 export function Dashboard() {
   const setActiveTabId = useStore((s) => s.setActiveTabId);
+  const [printers, setPrinters] = useState<Printer[]>(MOCK_PRINTERS);
+  useEffect(() => {
+    let mounted = true;
+    void adapters.getPrinters().then((nextPrinters) => {
+      if (mounted) {
+        setPrinters(nextPrinters);
+      }
+    }).catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  const totalPrinters = MOCK_PRINTERS.length;
-  const onlinePrinters = MOCK_PRINTERS.filter((p) => p.status !== "offline").length;
+  const totalPrinters = printers.length;
+  const onlinePrinters = printers.filter((p) => p.status !== "offline").length;
   const offlinePrinters = totalPrinters - onlinePrinters;
-  const activePrints = MOCK_PRINTERS.filter((p) => p.status === "printing").length;
+  const activePrints = printers.filter((p) => p.status === "printing").length;
   const queuedJobs = MOCK_JOBS.filter((j) => j.status === "queued").length;
   const sys = MOCK_SYSTEM_SNAPSHOT;
   const activeWorkflow = MOCK_WORKFLOWS.find((w) => w.status === "active") ?? MOCK_WORKFLOWS[0];
@@ -180,7 +194,7 @@ export function Dashboard() {
           dense
           className="h-[300px]"
         >
-          <FleetTable />
+          <FleetTable printers={printers} />
         </Panel>
       </div>
       <div className="col-span-12 lg:col-span-5">
@@ -243,7 +257,7 @@ export function Dashboard() {
           dense
           className="h-[230px]"
         >
-          <RecentJobs />
+          <RecentJobs printers={printers} />
         </Panel>
       </div>
 
@@ -318,7 +332,7 @@ export function Dashboard() {
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Printer Fleet — numbered, IP, progress bars                         *
  * ────────────────────────────────────────────────────────────────────────── */
-function FleetTable() {
+function FleetTable({ printers }: { printers: Printer[] }) {
   return (
     <div className="w-full overflow-auto h-full">
       <table className="w-full text-xs">
@@ -333,13 +347,20 @@ function FleetTable() {
           </tr>
         </thead>
         <tbody>
-          {MOCK_PRINTERS.map((p, i) => (
-            <tr key={p.id} className="border-b border-border/30 hover:bg-surface2/50 transition-colors">
+          {printers.map((p, i) => (
+            <tr
+              key={p.id}
+              className="border-b border-border/30 hover:bg-surface2/50 transition-colors"
+              data-source={p.data_source}
+            >
               <td className="py-1.5 px-2 text-right text-muted font-mono tabular-nums">{i + 1}</td>
               <td className="py-1.5 px-2">
                 <div className="flex flex-col leading-tight">
                   <span className="text-fg font-medium">{p.name}</span>
-                  <span className="text-muted text-[10px]">{p.model}</span>
+                  <span className="text-muted text-[10px] flex items-center gap-1">
+                    {p.model}
+                    <DataSourceChip source={p.data_source} />
+                  </span>
                 </div>
               </td>
               <td className="py-1.5 px-2 text-muted font-mono text-[11px]">{p.ip ?? "—"}</td>
@@ -359,6 +380,23 @@ function FleetTable() {
         </tbody>
       </table>
     </div>
+  );
+}
+
+function DataSourceChip({ source }: { source: PrinterDataSource }) {
+  const tone = {
+    mock: "border-border text-muted",
+    live: "border-accent-green/50 text-accent-green",
+    error: "border-accent-red/50 text-accent-red",
+  }[source];
+  return (
+    <span
+      data-source={source}
+      className={`px-1 py-px rounded border text-[8px] uppercase leading-none ${tone}`}
+      title={`data source: ${source}`}
+    >
+      {source}
+    </span>
   );
 }
 
@@ -622,9 +660,9 @@ function ResourcePanel() {
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Recent Jobs — name + printer + progress + done/check                *
  * ────────────────────────────────────────────────────────────────────────── */
-function RecentJobs() {
+function RecentJobs({ printers }: { printers: Printer[] }) {
   const jobs = MOCK_JOBS.slice(0, 7);
-  const printerNameById = new Map(MOCK_PRINTERS.map((p) => [p.id, p.name]));
+  const printerNameById = new Map(printers.map((p) => [p.id, p.name]));
   return (
     <ul className="flex flex-col gap-1.5 h-full overflow-auto">
       {jobs.map((j) => {

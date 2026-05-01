@@ -1,14 +1,13 @@
 /**
- * Mock adapter interface for Phase 2.
+ * Adapter interface for Phase 2 mock mode and Phase 3.1 local live reads.
  *
- * Every method returns mock data via Promise.resolve() — no real network
- * calls, no subprocess, no adapter invocation. Phase 3 swaps the
- * implementation here to call the real Python `hermes3d.adapters` Protocol
- * (over a thin HTTP/IPC bridge or wasm shim — TBD in Phase 3 ADR-009).
+ * Default mode returns deterministic mock data. Live mode only reads the
+ * local bridge `GET /api/printers`; all other methods remain mock-backed.
  *
  * The interface shape stays stable across the Phase-2 → Phase-3 swap so
  * tab components don't change.
  */
+import { getLivePrinters } from "./adapters.live";
 import { MOCK_AGENTS } from "../data/mock/agents";
 import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
 import { MOCK_JOBS } from "../data/mock/jobs";
@@ -41,11 +40,13 @@ export interface AdapterAPI {
   getNotifications(): Promise<Notification[]>;
 }
 
-/**
- * Mock implementation. Phase 3 replaces this with a real client of the
- * Python `hermes3d.adapters` shell, but the AdapterAPI contract remains.
- */
-export const adapters: AdapterAPI = {
+type HermesImportMeta = ImportMeta & {
+  env: {
+    VITE_HERMES3D_ADAPTER?: string;
+  };
+};
+
+const mockAdapters: AdapterAPI = {
   getPrinters: async () => MOCK_PRINTERS,
   getAgents: async () => MOCK_AGENTS,
   getActiveWorkflows: async () => MOCK_WORKFLOWS,
@@ -57,3 +58,21 @@ export const adapters: AdapterAPI = {
   getLogs: async () => MOCK_LOGS,
   getNotifications: async () => MOCK_NOTIFICATIONS,
 };
+
+const liveAdapters: AdapterAPI = {
+  ...mockAdapters,
+  getPrinters: getLivePrinters,
+};
+
+function adapterMode(): "mock" | "live" {
+  const env = (import.meta as HermesImportMeta).env;
+  if (env.VITE_HERMES3D_ADAPTER === "live") {
+    return "live";
+  }
+  if (typeof window !== "undefined") {
+    return new URLSearchParams(window.location.search).get("adapter") === "live" ? "live" : "mock";
+  }
+  return "mock";
+}
+
+export const adapters: AdapterAPI = adapterMode() === "live" ? liveAdapters : mockAdapters;
