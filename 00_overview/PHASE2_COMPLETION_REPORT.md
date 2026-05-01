@@ -23,7 +23,7 @@ Phase 2 delivered the mock-only React/Tailwind UI-Final shell, 13-tab navigation
 | 43-47 | PASS | Playwright visual/dock gates run from `03_implementation/ui/tests/visual/` and cover dashboard baseline, all-tab panel chrome, dock toggles, fullscreen overlay, collapse, ARIA, and forbidden launch paths. |
 | 48-49 | PASS | UI CI truth gate and lockfile/ignore hardening are present. `dist/` remains untracked. |
 | 50 | PASS | This completion report records the Phase 2 closeout state. |
-| 51 | PASS | Signed proof bundle is generated and verified after the closeout commit. The exact bundle path and sha256 are recorded in the final checkpoint report and PR body because the bundle filename includes the committed HEAD prefix. |
+| 51 | PASS | Signed proof bundle is generated and verified after the closeout commit. The exact bundle path, sidecars, and sha256 are recorded in the signed proof bundle section of this report. |
 | 52 | PENDING TASK 52 | Push/PR is guarded by `gh auth status` and `git remote -v`; no repeated push retries. |
 
 ## Code surface
@@ -173,18 +173,80 @@ The committed Playwright baseline is Chromium/Windows-specific:
 | Property | Value |
 |---|---|
 | Release path | `06_release/phase2-bundle/9e7e7a8f89a6-20260501T145353Z.zip` |
+| Manifest sidecar | `06_release/phase2-bundle/9e7e7a8f89a6-20260501T145353Z.manifest.json` |
+| SHA sidecar | `06_release/phase2-bundle/9e7e7a8f89a6-20260501T145353Z.sha256` |
 | sha256 | `5b990c1d3805158b4dab0fd59821fe5c4af0d0763845d3569d106bd07f9d54bb` |
 | Verification command | `python 05_truth_proof/conformance_runner.py --bundle 06_release/phase2-bundle/9e7e7a8f89a6-20260501T145353Z.zip` |
 | Expected verification | `OK - signature + file hashes + cross-refs verified` |
 | Manifest git state | `dirty=False` |
 | Required screenshot | `screenshots/dashboard_checkpoint4_1920x1080_v2.png` present in the zip |
+| Integrity command | `sha256sum 06_release/phase2-bundle/*.zip` |
+| Integrity output | `5b990c1d3805158b4dab0fd59821fe5c4af0d0763845d3569d106bd07f9d54bb  06_release/phase2-bundle/9e7e7a8f89a6-20260501T145353Z.zip` |
 
 ## Final gates
 
-Required gate sequence for closeout:
+Run from:
 
 ```bash
 cd 03_implementation/ui
+```
+
+### `npm run lint`
+
+```text
+> hermes3d-ui-final@0.1.0 lint
+> tsc --noEmit
+```
+
+Result: PASS.
+
+### `npm run build`
+
+```text
+> hermes3d-ui-final@0.1.0 build
+> tsc -b && vite build
+
+vite v5.4.8 building for production...
+transforming...
+✓ 2409 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                  0.42 kB │ gzip:   0.29 kB
+dist/assets/index-Du6_UzWC.css  20.00 kB │ gzip:   4.67 kB
+dist/assets/index-BtnC2FAY.js  675.69 kB │ gzip: 182.46 kB
+✓ built in 5.75s
+
+(!) Some chunks are larger than 500 kB after minification.
+```
+
+Result: PASS. Module count: 2409. Bundle sizes: `index.html` 0.42 kB / gzip 0.29 kB, CSS 20.00 kB / gzip 4.67 kB, JS 675.69 kB / gzip 182.46 kB.
+
+### `npx playwright test`
+
+```text
+Running 9 tests using 1 worker
+
+  ok 1 [chromium-1920x1080] › dashboard.visual.spec.ts:44:3 › Dashboard @ 1920×1080 › renders all panels and matches visual baseline (1.4s)
+  ok 2 [chromium-1920x1080] › dock.spec.ts:60:3 › Panel dock state machine @ 1920×1080 › every tab panel exposes required Phase 2 chrome (3.2s)
+  ok 3 [chromium-1920x1080] › dock.spec.ts:85:3 › Panel dock state machine @ 1920×1080 › dock toggle: switches state via store (876ms)
+  ok 4 [chromium-1920x1080] › dock.spec.ts:100:3 › Panel dock state machine @ 1920×1080 › fullscreen overlay renders fixed-position CSS (no native window) (831ms)
+  ok 5 [chromium-1920x1080] › dock.spec.ts:118:3 › Panel dock state machine @ 1920×1080 › clicking the active dock mode returns to 'docked' (844ms)
+  ok 6 [chromium-1920x1080] › dock.spec.ts:130:3 › Panel dock state machine @ 1920×1080 › collapse: hides panel body and flips chevron aria-label (666ms)
+  ok 7 [chromium-1920x1080] › dock.spec.ts:148:3 › Panel dock state machine @ 1920×1080 › no external window or network calls during dock interactions (812ms)
+  ok 8 [chromium-1920x1080] › dock.spec.ts:202:3 › Panel dock state machine @ 1920×1080 › source has no external window/process launch path (10ms)
+  ok 9 [chromium-1920x1080] › dock.spec.ts:214:3 › Panel dock state machine @ 1920×1080 › aria contract: every dock-toggle button has label + title (613ms)
+
+  9 passed (12.2s)
+```
+
+Result: PASS. Total tests: 9. Duration: 12.2s. Spec files exercised:
+
+- `03_implementation/ui/tests/visual/dashboard.visual.spec.ts`
+- `03_implementation/ui/tests/visual/dock.spec.ts`
+
+Reference command sequence for full closeout:
+
+```bash
 npm ci
 npm run lint
 npm run build
@@ -197,6 +259,12 @@ Latest closeout run is recorded in the final checkpoint response. At the time of
 |---|---|
 | `dashboard.visual.spec.ts` | Dashboard render and visual baseline comparison. |
 | `dock.spec.ts` | All-tab panel audit, dock state toggles, CSS-only fullscreen overlay, collapse behavior, ARIA labels/tooltips, no popup/window-open/external request path, and source scan for forbidden window/process APIs. |
+
+## Known follow-ups · deferred to v5.4
+
+- recharts bundle splitting (Vite >500 KB warning)
+- Linux Playwright baseline (win32-only today)
+- Phase 3 adapter wiring at src/api/adapters.ts (ADR-008 §4)
 
 ## Safety audit
 
@@ -243,7 +311,7 @@ Phase 3 may begin only after explicit approval. It should add read-only adapter 
 - `hermes3d_gui_contract_kit_v4.1/01_requirements/TAB_SPECS.md`
 - `02_architecture/adr/ADR-008-adapter-lifecycle-and-dock-undock.md`
 - `00_overview/PHASE2_PLAN.md`
-- `00_overview/PHASE2_PLAN.md` - Dimensional Truth Engine UI standards addendum
+- `00_overview/PHASE2_PLAN.md` § "Dimensional Truth Engine UI-standards addendum"
 
 ## Stop point
 
