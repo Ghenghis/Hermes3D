@@ -9,6 +9,7 @@ export type PrinterStatus =
   | "error";
 
 export type PrinterAdapter = "moonraker" | "octoprint" | "printrun" | "manual";
+export type PrinterDataSource = "mock" | "live" | "error";
 
 export interface Printer {
   id: string;
@@ -17,6 +18,7 @@ export interface Printer {
   ip: string | null;
   status: PrinterStatus;
   adapter: PrinterAdapter;
+  data_source: PrinterDataSource;
   /** Hot-end temperature in °C, or null if offline. */
   temp_hot: number | null;
   /** Bed temperature in °C, or null if offline. */

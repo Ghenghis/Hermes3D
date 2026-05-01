@@ -11,6 +11,7 @@ from hermes3d.adapters import moonraker_readonly
 from hermes3d.adapters.moonraker_readonly import MoonrakerReadonlyAdapter
 from hermes3d.agents.printer_executor import POLL_TOOL, PrinterExecutor
 from hermes3d.orchestration import Err, OfflineSupervisor, Ok, PollRequest, PrinterMirror
+from hermes3d.orchestration.bridge import BridgeState, create_bridge_app
 
 FIXTURE_ROOT = Path(__file__).resolve().parents[2] / "fixtures"
 if str(FIXTURE_ROOT) not in sys.path:
@@ -118,3 +119,63 @@ def test_fixture_oversized_response_returns_safe_error():
 
     assert isinstance(result.result, Err)
     assert result.result.code == "response_too_large"
+
+
+def test_bridge_returns_fixture_snapshot_with_four_live_and_eight_mock_entries():
+    client = TestClient(create_bridge_app(), client=("127.0.0.1", 50000))
+
+    response = client.get("/api/printers", headers={"Origin": "http://localhost:5173"})
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+    printers = response.json()
+    assert len(printers) == 12
+    assert sum(1 for printer in printers if printer["data_source"] == "live") == 4
+    assert sum(1 for printer in printers if printer["data_source"] == "mock") == 8
+
+
+def test_bridge_returns_orchestrator_last_poll_snapshot():
+    state = BridgeState()
+    state.update_last_poll_snapshot(
+        [
+            {
+                "id": "fixture-only",
+                "name": "Fixture Only",
+                "model": "Generic",
+                "ip": "127.0.0.1",
+                "status": "online",
+                "adapter": "moonraker",
+                "data_source": "live",
+                "temp_hot": 21,
+                "temp_bed": 20,
+                "progress": None,
+                "current_job": None,
+                "maintenance_flag": False,
+                "camera_url": None,
+            }
+        ]
+    )
+    client = TestClient(create_bridge_app(state), client=("127.0.0.1", 50000))
+
+    response = client.get("/api/printers")
+
+    assert response.status_code == 200
+    assert response.json()[0]["id"] == "fixture-only"
+
+
+def test_bridge_refuses_non_localhost_clients_and_has_no_write_route():
+    remote_client = TestClient(create_bridge_app(), client=("203.0.113.10", 50000))
+    local_client = TestClient(create_bridge_app(), client=("127.0.0.1", 50000))
+
+    assert remote_client.get("/api/printers").status_code == 403
+    assert local_client.post("/api/printers").status_code == 405
+    assert local_client.get("/openapi.json").status_code == 404
+
+
+def test_bridge_omits_cors_header_for_non_localhost_origins():
+    client = TestClient(create_bridge_app(), client=("127.0.0.1", 50000))
+
+    response = client.get("/api/printers", headers={"Origin": "http://example.com"})
+
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers

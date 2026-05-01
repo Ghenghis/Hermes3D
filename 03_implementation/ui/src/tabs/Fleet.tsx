@@ -8,9 +8,11 @@
 import { Panel } from "../components/layout/Panel";
 import { StatusBadge, type StatusTone } from "../components/badges/StatusBadge";
 import { LockedAction } from "../components/badges/LockedAction";
+import { adapters } from "../api/adapters";
 import { MOCK_PRINTERS } from "../data/mock/printers";
-import type { Printer, PrinterStatus, PrinterAdapter } from "../types/printer";
+import type { Printer, PrinterStatus, PrinterAdapter, PrinterDataSource } from "../types/printer";
 import { Camera, ExternalLink } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   online: "green",
@@ -29,14 +31,31 @@ const ADAPTER_TONE: Record<PrinterAdapter, StatusTone> = {
 };
 
 export function FleetTab() {
-  const adapterCounts = MOCK_PRINTERS.reduce(
-    (acc, p) => {
-      acc[p.adapter] = (acc[p.adapter] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<PrinterAdapter, number>,
+  const [printers, setPrinters] = useState<Printer[]>(MOCK_PRINTERS);
+  useEffect(() => {
+    let mounted = true;
+    void adapters.getPrinters().then((nextPrinters) => {
+      if (mounted) {
+        setPrinters(nextPrinters);
+      }
+    }).catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const adapterCounts = useMemo(
+    () =>
+      printers.reduce(
+        (acc, p) => {
+          acc[p.adapter] = (acc[p.adapter] ?? 0) + 1;
+          return acc;
+        },
+        {} as Record<PrinterAdapter, number>,
+      ),
+    [printers],
   );
-  const maintenanceCount = MOCK_PRINTERS.filter((p) => p.maintenance_flag).length;
+  const maintenanceCount = printers.filter((p) => p.maintenance_flag).length;
 
   return (
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="fleet-root">
@@ -45,7 +64,7 @@ export function FleetTab() {
           id="fleet.table"
           title="PRINTER FLEET (12 UNITS)"
           dense
-          status={{ tone: "green", label: `${MOCK_PRINTERS.length} units` }}
+          status={{ tone: "green", label: `${printers.length} units` }}
           className="h-[600px]"
         >
           <div className="w-full overflow-auto h-full">
@@ -63,7 +82,7 @@ export function FleetTab() {
                 </tr>
               </thead>
               <tbody>
-                {MOCK_PRINTERS.map((p, i) => (
+                {printers.map((p, i) => (
                   <PrinterRow key={p.id} printer={p} index={i + 1} />
                 ))}
               </tbody>
@@ -102,7 +121,7 @@ export function FleetTab() {
             <div className="text-muted text-xs text-center py-6">No maintenance flags. ✓</div>
           ) : (
             <ul className="flex flex-col gap-1.5 h-full overflow-auto text-xs">
-              {MOCK_PRINTERS.filter((p) => p.maintenance_flag).map((p) => (
+              {printers.filter((p) => p.maintenance_flag).map((p) => (
                 <li
                   key={p.id}
                   className="flex flex-col gap-0.5 px-2 py-1.5 rounded bg-accent-amber/10 border border-accent-amber/30"
@@ -148,12 +167,15 @@ export function FleetTab() {
 function PrinterRow({ printer: p, index }: { printer: Printer; index: number }) {
   const tempLabel = p.temp_hot != null && p.temp_bed != null ? `${p.temp_hot}/${p.temp_bed}°` : "—";
   return (
-    <tr className="border-b border-border/30 hover:bg-surface2/50 transition-colors">
+    <tr className="border-b border-border/30 hover:bg-surface2/50 transition-colors" data-source={p.data_source}>
       <td className="py-1.5 px-2 text-right text-muted font-mono">{index}</td>
       <td className="py-1.5 px-2">
         <div className="flex flex-col leading-tight">
           <span className="text-fg font-medium">{p.name}</span>
-          <span className="text-muted text-[10px]">{p.model}</span>
+          <span className="text-muted text-[10px] flex items-center gap-1">
+            {p.model}
+            <DataSourceChip source={p.data_source} />
+          </span>
         </div>
       </td>
       <td className="py-1.5 px-2 text-muted font-mono text-[11px]">{p.ip ?? "USB"}</td>
@@ -195,5 +217,22 @@ function PrinterRow({ printer: p, index }: { printer: Printer; index: number }) 
         </div>
       </td>
     </tr>
+  );
+}
+
+function DataSourceChip({ source }: { source: PrinterDataSource }) {
+  const tone = {
+    mock: "border-border text-muted",
+    live: "border-accent-green/50 text-accent-green",
+    error: "border-accent-red/50 text-accent-red",
+  }[source];
+  return (
+    <span
+      data-source={source}
+      className={`px-1 py-px rounded border text-[8px] uppercase leading-none ${tone}`}
+      title={`data source: ${source}`}
+    >
+      {source}
+    </span>
   );
 }
