@@ -18,7 +18,7 @@ For each registry item:
 git clone https://github.com/blender/blender source-lab/blender
 git clone https://github.com/Flsun3d/FlsunSlicer source-lab/flsun_slicer
 git clone https://github.com/prusa3d/PrusaSlicer source-lab/prusa_slicer
-git clone https://github.com/OrcaSlicer/OrcaSlicer source-lab/orca_slicer
+git clone https://github.com/SoftFever/OrcaSlicer source-lab/orca_slicer
 git clone https://github.com/kliment/Printrun source-lab/printrun
 git clone https://github.com/Arksine/moonraker source-lab/moonraker
 git clone https://github.com/fluidd-core/fluidd source-lab/fluidd

@@ -44,6 +44,14 @@ Thumbs.db
 .env.*.local
 !env/.env.example
 
+## Sensitive material — defensive (no current matches; keep this way)
+## Phase 0 Security + Tunnel audit finding LOW-6.
+*.pem
+*.key
+id_rsa*
+*.p12
+*.pfx
+
 ## Slicer caches
 *.gcode
 *.3mf
