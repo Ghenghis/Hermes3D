@@ -1,0 +1,2 @@
+Name
+Intel(R) UHD Graphics 630

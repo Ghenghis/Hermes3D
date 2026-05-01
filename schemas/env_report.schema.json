@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://schemas/env_report.schema.json",
+  "title": "Hermes3D environment detection report",
+  "description": "Output of `python -m hermes3d.env.detect` — consumed by registry, router, UI.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "timestamp_utc",
+    "platform",
+    "python_version",
+    "edition",
+    "vendor",
+    "detection_source",
+    "cuda_available",
+    "shells"
+  ],
+  "properties": {
+    "timestamp_utc": {"type": "string"},
+    "platform": {"type": "string", "enum": ["windows", "linux", "macos", "other"]},
+    "python_version": {"type": "string", "minLength": 3},
+    "edition": {"type": "string", "enum": ["desktop_gpu_worker", "ubuntu_vps_control_server", "blocked_no_gpu"]},
+    "vendor": {"type": "string", "enum": ["NVIDIA", "AMD", "Intel", "none", "unknown"]},
+    "detection_source": {"type": "string", "enum": ["nvidia-smi", "torch.cuda", "wmi", "unavailable"]},
+    "cuda_available": {"type": "boolean"},
+    "gpu_name": {"type": ["string", "null"]},
+    "vram_total_mib": {"type": ["integer", "null"], "minimum": 0},
+    "vram_free_mib": {"type": ["integer", "null"], "minimum": 0},
+    "driver_version": {"type": ["string", "null"]},
+    "node_version": {"type": ["string", "null"]},
+    "shells": {"type": "array", "items": {"type": "string"}}
+  }
+}
