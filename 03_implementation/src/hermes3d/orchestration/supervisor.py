@@ -14,7 +14,7 @@ from typing import Callable, Mapping
 from .ledger import LedgerEvent, OrchestrationLedger
 from .types import CapabilityToken, Err, Ok, PollRequest, PollResult, PrinterMirror, Result
 
-OfflinePollHandler = Callable[[PollRequest], PrinterMirror]
+OfflinePollHandler = Callable[[PollRequest], PrinterMirror | Result[PrinterMirror]]
 
 
 class OfflineSupervisor:
@@ -113,7 +113,11 @@ class OfflineSupervisor:
                     "no offline handler registered for dispatch",
                 )
             else:
-                result = Ok(handler(request), "offline dispatch completed")
+                handled = handler(request)
+                if isinstance(handled, (Ok, Err)):
+                    result = handled
+                else:
+                    result = Ok(handled, "offline dispatch completed")
 
         poll_result = PollResult(
             run_id=request.run_id,
