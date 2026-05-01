@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -27,6 +28,11 @@ from .types import ToolEntry
 _INVALID_LICENSE_VALUES = frozenset(
     {"", "unknown", "tbd", "todo", "n/a", "none"},
 )
+
+# Generous URL shape: scheme + host + any RFC 3986 reserved/unreserved chars.
+# Closes Phase 0 finding LOW-7 (typo'd repo: "https//github.com/x/y" silently
+# passed). Empty strings also flagged via reference_url() returning falsy.
+_URL_SHAPE = re.compile(r"^https?://[A-Za-z0-9._~:/?#\[\]@!$&'()*+,;=%-]+$")
 
 
 @dataclass(frozen=True)
@@ -85,11 +91,38 @@ def _check_capabilities(entry: ToolEntry) -> list[ValidationError]:
     return out
 
 
+def _check_url(entry: ToolEntry) -> list[ValidationError]:
+    """Distinguish 'no URL field declared' (MISSING) from 'declared but malformed'
+    (INVALID_URL_SHAPE). Empty-string `repo: ""` is a declaration with bad data,
+    not a missing declaration."""
+    declared = (entry.repo, entry.source, entry.homepage)
+    any_declared = any(v is not None for v in declared)
+    if not any_declared:
+        return [
+            ValidationError(
+                entry.key,
+                ErrorCode.MISSING_REQUIRED_FIELD,
+                "must include a repo, source, or homepage URL",
+            )
+        ]
+    url = entry.reference_url()
+    if not isinstance(url, str) or not url.strip() or not _URL_SHAPE.match(url):
+        return [
+            ValidationError(
+                entry.key,
+                ErrorCode.INVALID_URL_SHAPE,
+                f"reference URL '{url}' is not a well-formed http(s) URL",
+            )
+        ]
+    return []
+
+
 def _check_entry(entry: ToolEntry) -> list[ValidationError]:
-    """Aggregate all per-entry checks. Tasks 6-8 extend this list."""
+    """Aggregate all per-entry checks. Tasks 7-8 extend this list."""
     errs: list[ValidationError] = []
     errs.extend(_check_license(entry))
     errs.extend(_check_capabilities(entry))
+    errs.extend(_check_url(entry))
     return errs
 
 
