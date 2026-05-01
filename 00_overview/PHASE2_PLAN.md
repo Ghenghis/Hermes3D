@@ -44,6 +44,94 @@
 
 ---
 
+## Dimensional Truth Engine — UI standards (additive Phase 2 scope per user clarification)
+
+**Hermes3D's end-to-end vision** (the "Dimensional Truth Engine"):
+
+```
+Prompt → Vision → 3D → Dimensional Accuracy → Mesh Repair →
+Printability → Slice → Select Printer → Print → Monitor → Recover → Proof
+```
+
+Precision + accuracy are first-class risks. Phase 2 must **reserve UI space** for the dimensional pipeline so Phase 4-6 can populate it without renegotiating the visual contract. Phase 2 ships placeholders + mock data shapes only — no real measurement logic, no CAD libraries, no slicer queries.
+
+### What Phase 2 reserves
+
+| Surface | Where | Mock-data shape |
+|---|---|---|
+| Dimensional accuracy status | Workflows tab (extended pipeline panel, gated behind a "Pipeline Detail" toggle so the Dashboard's faithful PNG layout is unchanged) | `DimensionalAccuracyReport` |
+| Visual fidelity score | 3D Generation tab + Proof & Reports tab | `VisualFidelityScore` (0-100, with method tag) |
+| Requested measurement changes | 3D Generation tab + Workflows pipeline | `MeasurementChangeRequest[]` |
+| Before/after dimensions | Proof & Reports tab | `BeforeAfterDimensions` |
+| Scale / unit confirmation | Slicing tab + Print Queue tab | `ScaleConfirmation` (mm/inch + factor) |
+| Model measurement report | Proof & Reports tab | `ModelMeasurementReport` |
+
+### Mock-data shapes (placed in `src/types/dimensional.ts` + populated in `src/data/mock/dimensional.ts`)
+
+```typescript
+export type Unit = "mm" | "in";
+
+export interface ScaleConfirmation {
+  unit: Unit;
+  scale_factor: number;        // user-confirmed multiplier
+  confirmed_by: string | null; // mock: "operator" | null
+  confirmed_at_utc: string | null;
+}
+
+export interface MeasurementChangeRequest {
+  axis: "x" | "y" | "z" | "diameter" | "length";
+  from_mm: number;
+  to_mm: number;
+  reason: string;              // mock: free text
+  status: "requested" | "applied" | "rejected";
+}
+
+export interface BeforeAfterDimensions {
+  before_mm: { x: number; y: number; z: number };
+  after_mm:  { x: number; y: number; z: number };
+  delta_mm:  { x: number; y: number; z: number };
+}
+
+export interface VisualFidelityScore {
+  score: number;               // 0-100
+  method: "ssim" | "human_eyeball" | "phase4_pending";
+  notes: string;
+}
+
+export interface DimensionalAccuracyReport {
+  job_id: string;
+  scale: ScaleConfirmation;
+  changes: MeasurementChangeRequest[];
+  before_after: BeforeAfterDimensions | null;  // null until print + scan complete (Phase 6)
+  fidelity: VisualFidelityScore | null;
+  printability: "pass" | "fail" | "pending";
+  mesh_repair: { applied: boolean; notes: string };
+  proof_bundle_ref: string | null;
+}
+```
+
+### Phase 2 placeholder UI behavior
+
+- Every placeholder surface renders the data shape in a **disabled / "Phase 6 will populate"** style — typically a chip with `pending` status and the explanation text "Phase 6 implements the live measurement pipeline."
+- The placeholders MUST NOT contradict the Dashboard PNG. If a placeholder doesn't fit the PNG layout, it lives in a non-Dashboard tab.
+- Mock data uses representative values (e.g. ScaleConfirmation `{unit: "mm", scale_factor: 1.0, confirmed_by: null}`) so Playwright snapshots are stable.
+- No real CAD/measurement libraries imported. No `trimesh`, no `numpy-stl`, no slicer Python calls. The Phase 1 boundary "no real tool integration" remains in force.
+
+### Tasks affected (additive — folded into existing task numbers)
+
+- **Task 13b** (mock data extension): add `src/data/mock/dimensional.ts` + `src/types/dimensional.ts`
+- **Task 24b** (dashboard): no new panels — the existing Workflow Pipeline panel already covers this for the Dashboard's PNG-faithful view
+- **Task 28b** (Workflows tab): "Pipeline Detail" toggle reveals the 12-stage Dimensional Truth pipeline beneath the standard 7-stage view
+- **Task 29b** (3D Generation tab): VisualFidelityScore + MeasurementChangeRequest placeholder cards
+- **Task 31b** (Slicing tab): ScaleConfirmation widget (read-only mock; Phase 6 wires the operator-confirmation flow)
+- **Task 33b** (Print Queue tab): per-job ScaleConfirmation chip
+- **Task 36b** (Proof & Reports tab): full DimensionalAccuracyReport panel (mock-data placeholder, "Phase 6 populates")
+- **Task 47b** (Playwright spec): assert these placeholders render `pending`/`null` states cleanly without console errors
+
+These additive sub-tasks add ~15-20 minutes total (placeholder rendering of typed mock data is small work).
+
+---
+
 ## File Structure
 
 ```
