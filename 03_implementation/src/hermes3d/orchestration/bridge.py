@@ -124,7 +124,16 @@ def fixture_printer_snapshot() -> list[dict[str, object]]:
     ]
     simulated: list[dict[str, object]] = []
     statuses = ["online", "printing", "online", "offline", "online", "printing", "online", "online"]
-    adapters = ["moonraker", "moonraker", "octoprint", "moonraker", "printrun", "moonraker", "octoprint", "manual"]
+    adapters = [
+        "moonraker",
+        "moonraker",
+        "octoprint",
+        "moonraker",
+        "printrun",
+        "moonraker",
+        "octoprint",
+        "manual",
+    ]
     jobs = [None, "demo-cube.gcode", None, None, None, "spindle-housing.gcode", None, None]
     progress = [None, 18, None, None, None, 92, None, None]
     for index, suffix in enumerate(("20", "21", "22", "23", "24", "25", "26", "27")):
@@ -132,7 +141,11 @@ def fixture_printer_snapshot() -> list[dict[str, object]]:
             {
                 "id": f"sim-{suffix}",
                 "name": f"Sim Printer {index + 1}",
-                "model": "FLSUN T1" if index % 3 == 0 else "FLSUN V400" if index % 3 == 1 else "Generic",
+                "model": "FLSUN T1"
+                if index % 3 == 0
+                else "FLSUN V400"
+                if index % 3 == 1
+                else "Generic",
                 "ip": f"192.168.0.{suffix}",
                 "status": statuses[index],
                 "adapter": adapters[index],

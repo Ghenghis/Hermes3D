@@ -129,11 +129,15 @@ def _normalize_base_url(base_url: str) -> str:
     if parsed.scheme not in {"http", "https"} or host is None or parsed.netloc == "":
         raise MoonrakerReadonlyError("invalid_base_url", "Moonraker base URL must be HTTP(S)")
     if parsed.username or parsed.password:
-        raise MoonrakerReadonlyError("invalid_base_url", "Moonraker base URL cannot include userinfo")
+        raise MoonrakerReadonlyError(
+            "invalid_base_url", "Moonraker base URL cannot include userinfo"
+        )
     if parsed.path not in {"", "/"}:
         raise MoonrakerReadonlyError("invalid_base_url", "Moonraker base URL cannot include a path")
     if not _host_allowed(host):
-        raise MoonrakerReadonlyError("host_not_allowed", f"Moonraker host is not allowlisted: {host}")
+        raise MoonrakerReadonlyError(
+            "host_not_allowed", f"Moonraker host is not allowlisted: {host}"
+        )
     return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
 
 
@@ -169,7 +173,9 @@ def _to_printer_mirror(
     )
     return PrinterMirror(
         printer_id=printer_id,
-        name=_string_value(printer_info.get("hostname"), server_info.get("hostname"), default=printer_id),
+        name=_string_value(
+            printer_info.get("hostname"), server_info.get("hostname"), default=printer_id
+        ),
         status=printer_state,
         state=printer_state,
         progress=_float_value(virtual_sdcard.get("progress")),
