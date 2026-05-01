@@ -26,9 +26,11 @@ from .errors import ErrorCode, ValidationError
 from .loader import LoaderError, load_registry
 from .types import ToolEntry
 
-_INVALID_LICENSE_VALUES = frozenset(
-    {"", "unknown", "tbd", "todo", "n/a", "none"},
-)
+# `_INVALID_LICENSE_VALUES`: rejection set of common non-SPDX strings users
+# type when they have not filled in a real license id. Trailing pragma silences
+# the forbidden-pattern scan (the literal lower-case rejection-set member is
+# intentional data, not a code marker).
+_INVALID_LICENSE_VALUES = frozenset({"", "unknown", "tbd", "todo", "n/a", "none"})  # noqa: forbidden_pattern_scan
 
 # Generous URL shape: scheme + host + any RFC 3986 reserved/unreserved chars.
 # Closes Phase 0 finding LOW-7 (typo'd repo: "https//github.com/x/y" silently

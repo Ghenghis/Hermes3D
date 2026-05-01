@@ -23,7 +23,7 @@ from .types import (
 
 
 class NotImplementedYet(NotImplementedError):
-    """Phase-1 skeleton method placeholder.
+    """Raised by Phase 1 skeleton methods that are not yet implemented.
 
     Phase 3 implements read-only methods (validate/healthcheck/status/open_*).
     Phase 6 implements write methods (dry_run/execute) behind the
