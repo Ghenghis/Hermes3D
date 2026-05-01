@@ -1,7 +1,50 @@
-"""Phase 1 Task 1 — typed dataclasses for registry entries."""
+"""Phase 1 Task 1 — typed dataclasses for registry entries.
+
+Phase 1 Task 2 — error model also tested here (small, related).
+"""
 from __future__ import annotations
 
+from hermes3d.registry.errors import ErrorCode, ValidationError
 from hermes3d.registry.types import AdapterSpec, ToolEntry, VersionPolicy
+
+
+def test_error_code_enum_complete():
+    expected = {
+        "MISSING_REQUIRED_FIELD",
+        "INVALID_TYPE",
+        "INVALID_URL_SHAPE",
+        "MISSING_LICENSE",
+        "INVALID_LICENSE",
+        "MISSING_DOCK_CAPABILITY",
+        "MISSING_EXTERNAL_LAUNCH_CAPABILITY",
+        "EMPTY_CAPABILITIES",
+        "UNKNOWN_TYPE",
+        "EMPTY_TESTED_VERSIONS",
+        "INVALID_VERSION_POLICY",
+    }
+    actual = {e.value for e in ErrorCode}
+    assert expected.issubset(actual)
+
+
+def test_validation_error_serializes_with_severity():
+    err = ValidationError(
+        tool_id="example",
+        code=ErrorCode.MISSING_LICENSE,
+        message="missing 'license'",
+        severity="error",
+    )
+    d = err.to_dict()
+    assert d == {
+        "tool_id": "example",
+        "code": "MISSING_LICENSE",
+        "message": "missing 'license'",
+        "severity": "error",
+    }
+
+
+def test_validation_error_default_severity_is_error():
+    err = ValidationError(tool_id="x", code=ErrorCode.UNKNOWN_TYPE, message="msg")
+    assert err.severity == "error"
 
 
 def test_tool_entry_minimal_construction():
