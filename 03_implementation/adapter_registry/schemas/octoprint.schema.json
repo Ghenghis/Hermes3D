@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/octoprint.schema.json",
+  "title": "OctoPrint adapter config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["base_url", "api_key"],
+  "properties": {
+    "base_url": {"type": "string", "pattern": "^https?://", "description": "Full base URL of the OctoPrint instance."},
+    "api_key": {"type": "string", "minLength": 8, "description": "OctoPrint REST API key. Stored in printers.user.toml (gitignored)."},
+    "verify_tls": {"type": "boolean", "default": true},
+    "timeout_ms": {"type": "integer", "minimum": 100, "default": 5000}
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/printrun.schema.json",
+  "title": "Printrun (USB) adapter config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["serial_port"],
+  "properties": {
+    "serial_port": {"type": "string", "minLength": 1, "description": "Serial device path, e.g. /dev/ttyUSB0 or COM3."},
+    "baud": {"type": "integer", "enum": [9600, 19200, 38400, 57600, 115200, 230400, 250000, 500000, 1000000], "default": 250000},
+    "auto_detect_baud": {"type": "boolean", "default": false},
+    "gcode_denylist_ref": {"type": ["string", "null"], "default": null, "description": "Reference to a denylist file for blocked manual G-code (e.g. M999, M81)."}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/cura.schema.json",
+  "title": "Ultimaker Cura adapter config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exe_path"],
+  "properties": {
+    "exe_path": {"type": "string", "minLength": 1, "description": "Absolute path to the Cura GUI binary."},
+    "cura_engine_path": {"type": ["string", "null"], "default": null, "description": "Path to CuraEngine binary for headless slicing."},
+    "profile_dir": {"type": ["string", "null"], "default": null}
+  }
+}

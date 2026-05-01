@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/orca_slicer.schema.json",
+  "title": "OrcaSlicer adapter config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exe_path"],
+  "properties": {
+    "exe_path": {"type": "string", "minLength": 1},
+    "profile_dir": {"type": ["string", "null"], "default": null},
+    "cli_supported": {"type": "boolean", "default": true}
+  }
+}
