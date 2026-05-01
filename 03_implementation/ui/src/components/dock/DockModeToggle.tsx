@@ -12,20 +12,19 @@ const MODES: { mode: DockMode; Icon: typeof Maximize2; label: string; hint: stri
  * ... undock, fullscreen."
  *
  * Phase 2 is store-only — every transition writes to the zustand
- * `panelDock` map and renders via CSS. No BrowserWindow/WebView/process
- * is created; the actual native-window wiring is deferred to Phase 3+.
+ * `panelDock` map and renders via CSS.
  *
  * Click already-active mode → returns to "docked" (so the toggle is
  * always escapable without a separate close button).
  */
-export function DockModeToggle({ panelId }: { panelId: string }) {
+export function DockModeToggle({ panelId, panelTitle }: { panelId: string; panelTitle: string }) {
   const dock = useStore((s) => s.panelDock[panelId] ?? "docked");
-  const setPanelDock = useStore((s) => s.setPanelDock);
+  const togglePanelDock = useStore((s) => s.togglePanelDock);
   return (
     <div
       className="inline-flex items-center gap-0.5 border border-border rounded-md p-0.5"
       role="group"
-      aria-label="Dock mode"
+      aria-label={`Dock mode controls for ${panelTitle}`}
     >
       {MODES.map(({ mode, Icon, label, hint }) => {
         const active = dock === mode;
@@ -33,12 +32,12 @@ export function DockModeToggle({ panelId }: { panelId: string }) {
           <button
             key={mode}
             type="button"
-            aria-label={label}
+            aria-label={`Set ${panelTitle} panel to ${label.toLowerCase()}`}
             aria-pressed={active}
-            title={`${label} — ${hint}`}
+            title={`${label}: ${hint}`}
             data-dock-mode={mode}
             data-active={active}
-            onClick={() => setPanelDock(panelId, active ? "docked" : mode)}
+            onClick={() => togglePanelDock(panelId, mode)}
             className={[
               "p-1 rounded-sm transition-colors",
               active

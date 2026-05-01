@@ -2,7 +2,7 @@
  * Docked Apps tab — Phase 2 mock-only per TAB_SPECS.md §10.
  *
  * Hosts external GUIs (Fluidd / Mainsail / OctoPrint / slicer / Blender) as
- * dock placeholders. Phase 2 ships visual-only placeholders — no iframes are
+ * dock placeholders. Phase 2 ships visual-only placeholders — no embeds are
  * mounted, no external launches happen, no CSP fallback decisions are made
  * until the dock state machine lands (Tasks 39-42).
  */
@@ -44,8 +44,7 @@ export function DockedAppsTab() {
                 <div className="text-[10px] uppercase tracking-wide">dock placeholder</div>
                 <div className="text-[10px] font-mono">{app.host}</div>
                 <div className="text-[9px] text-center max-w-[200px] mt-1">
-                  iframe / WebView mount lands with the dock state machine
-                  (Tasks 39-42).
+                  embedded tool surfaces remain locked in this mock UI phase.
                 </div>
               </div>
               <div className="flex items-center justify-between">

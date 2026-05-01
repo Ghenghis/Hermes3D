@@ -17,6 +17,8 @@ export function StatusBadge({ tone, label }: { tone: StatusTone; label: string }
   const t = TONE[tone];
   return (
     <span
+      aria-label={`Status: ${label}`}
+      data-status-badge
       className={[
         "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-chip text-xs font-medium",
         t.bg,

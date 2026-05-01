@@ -79,8 +79,8 @@ const KEYS_BY_SECTION: Record<SectionKey, { k: string; v: string; tone: StatusTo
   dock_undock: [
     { k: "Default mode", v: "docked", tone: "cyan" },
     { k: "Allow undocked", v: "yes", tone: "green" },
-    { k: "Allow external", v: "yes (Phase 4 wires native windows)", tone: "amber" },
-    { k: "iframe CSP fallback", v: "external launch", tone: "muted" },
+    { k: "Allow fullscreen", v: "CSS-only overlay", tone: "cyan" },
+    { k: "External launch", v: "locked in Phase 2", tone: "amber" },
   ],
   ota: [
     { k: "Channel", v: "stable", tone: "cyan" },
