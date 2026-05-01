@@ -1,0 +1,53 @@
+{
+  "created_utc": "2026-05-01T23:53:43.004815+00:00",
+  "env": {
+    "machine": "AMD64",
+    "os": "Windows-11-10.0.26100-SP0",
+    "python": "3.14.3",
+    "python_impl": "CPython"
+  },
+  "files": [
+    {
+      "path": "docs/ADR-010-planner-and-dag.md",
+      "sha256": "c91ffefc92149634941d44f5b12e3ff9c92650b7f70385032c2da4b62f604dd7",
+      "size": 6798
+    },
+    {
+      "path": "docs/PHASE3_2_PLAN.md",
+      "sha256": "9cc335edf09e352decebe4fba908d7724fcf35faa33ec8899bc77bab6496864f",
+      "size": 14573
+    },
+    {
+      "path": "evidence/dag_fixture_replay.json",
+      "sha256": "16252e5cb1ce449b50d75b0b6316c227b49b3d2c1b8a3e25fe7b4a08a030a601",
+      "size": 1957
+    },
+    {
+      "path": "evidence/ledger_snapshot.sqlite3",
+      "sha256": "6be9fcd0549486b35080deb083dfd1267b68eecf651bf29f5157caa3a49433ba",
+      "size": 8192
+    },
+    {
+      "path": "evidence/plan_preview_replay.json",
+      "sha256": "c460ce9abd42c228f772cac529215f0f2ecf7f266e02abf0fd6d24b659bc31e0",
+      "size": 894
+    },
+    {
+      "path": "evidence/playwright_report.json",
+      "sha256": "a356bf6201759342f8b876f5ae34b200ca1fbfacbdeae2b41471d2cfb585c82b",
+      "size": 14675
+    },
+    {
+      "path": "evidence/ui_build_output_hash.json",
+      "sha256": "53d4835c5f34a997fae594e28d26d3f0ad7af5791fee5c21e4b017e48ad74cad",
+      "size": 589
+    }
+  ],
+  "git": {
+    "branch": "feat/phase-3-2-planner-readonly",
+    "dirty": "not-computed",
+    "sha": "8ccf241bd6f1193e5e17db2e235a8770c9a5b452"
+  },
+  "run_id": "8ccf241bd6f1-20260501T235342Z",
+  "schema_version": "phase3.2-bundle-1.0.0"
+}
