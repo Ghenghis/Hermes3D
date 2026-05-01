@@ -162,13 +162,33 @@ def _check_per_type_capabilities(entry: ToolEntry) -> list[ValidationError]:
     return out
 
 
+def _check_tested_versions(entry: ToolEntry) -> list[ValidationError]:
+    """tested_versions must record at least one verified version.
+
+    Closes Phase 0 finding LOW-5: every entry was `manual_select: true` with no
+    record of which versions had actually been tried. Even when install is
+    user-selected, recording verified versions makes the registry reproducible.
+    """
+    if not entry.tested_versions:
+        return [
+            ValidationError(
+                entry.key,
+                ErrorCode.EMPTY_TESTED_VERSIONS,
+                "tested_versions must be a non-empty list "
+                "(record at least one version that was verified)",
+            )
+        ]
+    return []
+
+
 def _check_entry(entry: ToolEntry) -> list[ValidationError]:
-    """Aggregate all per-entry checks. Task 8 extends this list."""
+    """Aggregate all per-entry checks (final form for Phase 1)."""
     errs: list[ValidationError] = []
     errs.extend(_check_license(entry))
     errs.extend(_check_capabilities(entry))
     errs.extend(_check_url(entry))
     errs.extend(_check_per_type_capabilities(entry))
+    errs.extend(_check_tested_versions(entry))
     return errs
 
 
