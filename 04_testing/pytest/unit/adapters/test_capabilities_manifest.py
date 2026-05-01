@@ -6,6 +6,8 @@ import pytest
 from hermes3d.adapters._capabilities import (
     AdapterManifest,
     AdapterRegistrationError,
+    capability_phase,
+    is_dangerous_capability,
     is_write_capability,
     register_adapter,
 )
@@ -57,3 +59,18 @@ def test_write_manifest_registers_when_current_phase_is_4():
 
     assert register_adapter(manifest, current_phase=4) is manifest
     assert is_write_capability("gcode_send") is True
+
+
+def test_phase_3_planner_and_gen3d_capabilities_are_read_only():
+    manifest = AdapterManifest(
+        adapter_id="phase3-planner",
+        display_name="Phase 3 Planner",
+        phase=3,
+        capabilities=frozenset({"planner.plan", "gen3d.generate"}),
+    )
+
+    assert register_adapter(manifest, current_phase=3) is manifest
+    assert capability_phase("planner.plan") == 3
+    assert capability_phase("gen3d.generate") == 3
+    assert is_dangerous_capability("planner.plan") is False
+    assert is_dangerous_capability("gen3d.generate") is False
