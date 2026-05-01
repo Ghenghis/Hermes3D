@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/moonraker.schema.json",
+  "title": "Moonraker adapter config",
+  "description": "Per-printer Moonraker connection settings (referenced from printers.user.toml).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["host", "port"],
+  "properties": {
+    "host": {"type": "string", "minLength": 1, "description": "Hostname or IP of the Klipper/Moonraker host."},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535, "default": 7125},
+    "api_key": {"type": ["string", "null"], "default": null, "description": "Optional one-shot or persistent API key for protected setups."},
+    "wss_path": {"type": "string", "default": "/websocket"},
+    "tls_verify": {"type": "boolean", "default": true},
+    "timeout_ms": {"type": "integer", "minimum": 100, "default": 5000}
+  }
+}

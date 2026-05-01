@@ -1,0 +1,25 @@
+tools:
+  bad_one:
+    name: Bad
+    type: external_app
+    repo: ""
+    required: false
+    os_support: [windows]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary}
+    verify: {commands: ["x --version"], expected: "v"}
+    adapter: {mode: external_process, capabilities: [launch_external, dock_if_supported]}
+    license: MIT
+    tested_versions: ["1.0.0"]
+  bad_two:
+    name: Bad2
+    type: external_app
+    repo: "https//github.com/x/y"
+    required: false
+    os_support: [windows]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary}
+    verify: {commands: ["x --version"], expected: "v"}
+    adapter: {mode: external_process, capabilities: [launch_external, dock_if_supported]}
+    license: MIT
+    tested_versions: ["1.0.0"]

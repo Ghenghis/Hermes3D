@@ -1,0 +1,13 @@
+tools:
+  bad_ui:
+    name: BadUi
+    type: external_web_ui
+    repo: https://github.com/x/y
+    required: false
+    os_support: [network_service]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: existing_service_or_remote_endpoint}
+    verify: {commands: ["curl -I http://x/"], expected: "HTTP 200"}
+    adapter: {mode: web_embed_or_external, capabilities: [dock_if_allowed]}
+    license: MIT
+    tested_versions: ["1.0.0"]

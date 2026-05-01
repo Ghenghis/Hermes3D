@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/prusa_slicer.schema.json",
+  "title": "PrusaSlicer adapter config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exe_path"],
+  "properties": {
+    "exe_path": {"type": "string", "minLength": 1, "description": "Absolute path to prusa-slicer (or prusa-slicer-console.exe on Windows)."},
+    "profile_dir": {"type": ["string", "null"], "default": null, "description": "Directory holding printer/material/print profiles."},
+    "cli_supported": {"type": "boolean", "default": true}
+  }
+}

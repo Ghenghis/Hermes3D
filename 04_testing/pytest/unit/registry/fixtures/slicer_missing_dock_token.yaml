@@ -1,0 +1,13 @@
+tools:
+  bad_slicer:
+    name: BadSlicer
+    type: slicer
+    repo: https://github.com/x/y
+    required: true
+    os_support: [windows]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary}
+    verify: {commands: ["bad-slicer --version"], expected: "version"}
+    adapter: {mode: cli_external_process, capabilities: [launch_external, slice_to_staging]}
+    license: GPL-3.0-or-later
+    tested_versions: ["1.0.0"]

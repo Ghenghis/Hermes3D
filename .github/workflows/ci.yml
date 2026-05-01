@@ -34,6 +34,15 @@ jobs:
         run: ruff check 03_implementation/src 04_testing/pytest
       - name: forbidden-pattern scan
         run: python scripts/scaffolding/forbidden_pattern_scan.py
+      - name: registry validator (hermes3d.registry.validator)
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+          PYTHONPATH: 03_implementation/src
+        run: |
+          pip install pyyaml
+          python -m hermes3d.registry.validator \
+            hermes3d_gui_contract_kit_v4.1/config/external_repos_registry.yaml
       - name: mypy --strict (advisory)
         run: |
           pip install -r requirements.txt

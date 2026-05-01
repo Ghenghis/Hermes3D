@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/flsun_slicer.schema.json",
+  "title": "FLSUN Slicer adapter config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["extracted_dir"],
+  "properties": {
+    "archive_path": {"type": ["string", "null"], "default": null, "description": "Path to user-provided FlsunSlicer-X.Y.Z.zip; null if already extracted."},
+    "extracted_dir": {"type": "string", "minLength": 1, "description": "Directory where the FLSUN Slicer was extracted."},
+    "cli_supported": {"type": "boolean", "default": false}
+  }
+}

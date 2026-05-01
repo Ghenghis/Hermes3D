@@ -1,0 +1,13 @@
+tools:
+  example:
+    name: Example
+    type: external_app
+    repo: https://github.com/example/example
+    required: true
+    os_support: [windows]
+    version_policy: {channel: stable, manual_select: true}
+    install: {method: binary_or_existing_install}
+    verify: {commands: ["example --version"], expected: "version output"}
+    adapter: {mode: external_process, capabilities: [launch_external, dock_if_supported]}
+    license: MIT
+    tested_versions: ["1.0.0", "1.1.0"]
