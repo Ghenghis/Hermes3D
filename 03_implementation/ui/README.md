@@ -40,6 +40,20 @@ Per [`feedback_no_ui_design.md`](https://github.com/Ghenghis/Hermes3D/blob/devel
 - **No printer command writes.** Phase 6 implements those behind the dry-run-token + Confirmation gate.
 - **Gradio launcher untouched.** This UI is additive; the legacy Gradio app at `03_implementation/src/hermes3d/app/launcher.py` stays as stabilization scaffolding.
 
+### Phase 2 safety boundary — no external app launches
+
+The Dashboard, all panels, and the Playwright visual gate are forbidden from launching external applications during Phase 2:
+
+- **No** `child_process` / `spawn` / `exec` / `execSync` / `execFile` from any UI module.
+- **No** Electron-style `shell.openPath` / `shell.openExternal` (this is a pure web app — no Electron in Phase 2).
+- **No** `<a href="file://…">`, `download` attributes, or `target="_blank"` to OS-handled file extensions.
+- **No** `Start-Process` / `os.startfile` / `cmd /c start` from any test or build script.
+- Slicer UIs (FLSUN Slicer, PrusaSlicer, OrcaSlicer, Cura), printer hosts (Moonraker, OctoPrint, Printrun, Klipper), and Blender are referenced **as strings only** — adapter unions, mock-data filenames, agent provider tags, log messages. They render as plain text in the DOM; the OS never sees them as a launch instruction.
+
+The actual launch code lives in `03_implementation/src/hermes3d/adapters/*` (Phase 1 skeletons) and is gated by Phase 6's dry-run-token + Confirmation flow. Phase 2 does not touch that path.
+
+If OrcaSlicer (or any slicer / printer host) opens during Phase 2 work, it is **not** caused by this UI or the visual test — investigate manual user action, OS file association, or the slicer's own auto-updater.
+
 ## Stack
 
 | Tool | Version | Purpose |

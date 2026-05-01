@@ -17,6 +17,12 @@ const __dirname = path.dirname(__filename);
  *     - On first run (no baseline) Playwright creates the snapshot under
  *       `tests/visual/__screenshots__/` and the test fails by design — commit
  *       the snapshot, then subsequent runs enforce the diff.
+ *
+ * Phase 2 safety boundary (see ../../../README.md §"Phase 2 safety boundary"):
+ *   This test is forbidden from launching external applications. It must NOT
+ *   call `page.click()` on download/file links, navigate to `file://` URLs,
+ *   trigger filechooser dialogs, or call any process-spawn API. Pure
+ *   navigation + screenshot only.
  */
 
 const ARTIFACT_DIR = path.resolve(__dirname, "../../artifacts");
