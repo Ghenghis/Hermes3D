@@ -190,6 +190,22 @@ def gather_envelopes(dest: Path) -> list[Path]:
     return copied
 
 
+def gather_release_screenshots(dest: Path) -> list[Path]:
+    """Copy Phase release screenshots that are part of the proof contract."""
+    dest.mkdir(parents=True, exist_ok=True)
+    required = [
+        REPO_ROOT / "06_release" / "dashboard_checkpoint4_1920x1080_v2.png",
+    ]
+    copied: list[Path] = []
+    for src in required:
+        if not src.is_file():
+            raise FileNotFoundError(f"required proof screenshot missing: {src}")
+        target = dest / src.name
+        shutil.copy2(src, target)
+        copied.append(target)
+    return copied
+
+
 def build_evidence_ledger(envelopes: list[Path], work: Path) -> Path:
     ledger_md = work / "evidence_ledger.md"
     rows: list[tuple[str, str, str]] = []
@@ -271,7 +287,9 @@ def build(output_dir: Path, key_env_var: str) -> dict[str, Any]:
     run_forbidden_scan(work)
     # d. existing HMAC envelopes
     envelopes = gather_envelopes(work / "proof" / "envelopes")
-    # e. evidence ledger
+    # e. Phase release screenshots
+    gather_release_screenshots(work / "screenshots")
+    # f. evidence ledger
     build_evidence_ledger(envelopes, work)
 
     # Build manifest with sha256 of every staged file.

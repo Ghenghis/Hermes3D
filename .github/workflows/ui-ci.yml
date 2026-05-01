@@ -1,0 +1,104 @@
+name: ui-ci
+
+# Layer D2 — Phase 2 React UI truth gate.
+#
+# Scope:
+#   This workflow gates the Phase 2 mock-only React UI under
+#   `03_implementation/ui/`. The pre-existing `layer_d_ui_e2e` job in
+#   `ci.yml` covers the legacy Gradio launcher; that gate stays as-is.
+#   Layer D2 is additive — it does not replace any existing gate and does
+#   not touch the rc1 Python codebase.
+#
+# What it proves:
+#   - Lockfile is honored:           `npm ci` (no drift between dev + CI)
+#   - TypeScript compiles strict:    `npm run lint` (`tsc --noEmit`)
+#   - Production bundle builds:      `npm run build` (vite + tsc -b)
+#   - Phase 2 dock state machine
+#     and safety boundary hold:      `npx playwright test`
+#       · 6 dock-state behavior tests (see tests/visual/dock.spec.ts)
+#       · 1 source-pattern audit (no BrowserWindow / spawn / shell.* / etc.)
+#       · 1 dashboard visual diff (win32-baseline only; CI exports artifact)
+#
+# Platform scoping:
+#   The dashboard visual baseline is committed for chromium-win32 only.
+#   On Linux runners, `dashboard.visual.spec.ts` exports the artifact and
+#   then calls `test.skip(process.platform !== "win32")` so the strict diff
+#   does not fire — sub-pixel font + AA rendering diverges across platforms.
+#   Linux baseline can be added later by committing the corresponding
+#   `…-linux.png` snapshot under `tests/visual/.../-snapshots/`.
+
+on:
+  push:
+    branches: [main, develop, "release/**", "hotfix/**", "feat/phase-2-ui-final"]
+    paths:
+      - "03_implementation/ui/**"
+      - ".github/workflows/ui-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "03_implementation/ui/**"
+      - ".github/workflows/ui-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  layer_d2_ui_final:
+    name: Layer D2 — UI-Final (React @ 1920×1080)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: 03_implementation/ui
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node 24
+        # Node 24 keeps us aligned with `layer_d_ui_e2e` and contributor
+        # toolchains. Phase 2 deps (Vite 5.4, React 18.3, TS 5.6, Playwright
+        # 1.48, recharts 2.13, zustand 5.0) all support Node 18+/20+/22+/24.
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: "npm"
+          cache-dependency-path: 03_implementation/ui/package-lock.json
+
+      - name: Install dependencies (npm ci, deterministic from lockfile)
+        run: npm ci
+
+      - name: Lint (tsc --noEmit, strict mode)
+        run: npm run lint
+
+      - name: Build (tsc -b && vite build)
+        run: npm run build
+
+      - name: Install Playwright Chromium browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright suite (dock + dashboard)
+        # `npx playwright test` runs both dashboard.visual.spec.ts (visual
+        # diff is platform-skipped on Linux but artifact still exports) and
+        # dock.spec.ts (8 cross-platform behavior + audit tests).
+        run: npx playwright test
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-ci-playwright-report
+          path: |
+            03_implementation/ui/playwright-report/
+            03_implementation/ui/test-results/
+            03_implementation/ui/artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload current-render artifact (always)
+        # The artifact PNG is exported every run regardless of pass/fail so
+        # reviewers can eyeball UI deltas on Linux even when the strict win32
+        # diff is skipped.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-ci-dashboard-artifact-${{ github.run_id }}
+          path: 03_implementation/ui/artifacts/dashboard-current-1920x1080.png
+          if-no-files-found: warn
+          retention-days: 14

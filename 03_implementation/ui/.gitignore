@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+*.log
+
+# tsc -b incremental build artifacts
+*.tsbuildinfo
+
+# tsc emit of vite.config.ts (we run vite via the .ts source, no need to commit the .js)
+vite.config.js
+vite.config.d.ts
+
+# Playwright runtime outputs (baselines under tests/visual/*-snapshots/ ARE committed)
+artifacts/
+test-results/
+playwright-report/
