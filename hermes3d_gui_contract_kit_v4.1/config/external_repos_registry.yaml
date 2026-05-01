@@ -1,4 +1,7 @@
 # Hermes3D v4.1 External Repository / Tool Registry
+# Phase 1 update: licenses + tested_versions + dock-capability tokens added per
+# 01_requirements/EXTERNAL_TOOL_REGISTRY_AUDIT.md and validated by
+# `python -m hermes3d.registry.validator <path>`.
 tools:
   blender:
     name: Blender
@@ -11,6 +14,8 @@ tools:
     install: {method: binary_or_existing_install, windows_hint: "Detect blender.exe", linux_hint: "Detect blender in PATH"}
     verify: {commands: ["blender --version"], expected: "version output contains Blender"}
     adapter: {mode: external_process, capabilities: [detect, launch_external, dock_if_supported, screenshot_source]}
+    license: GPL-3.0-or-later
+    tested_versions: ["4.2.0"]
   blender_mcp_ahujasid:
     name: Blender MCP ahujasid
     type: mcp_provider
@@ -21,6 +26,8 @@ tools:
     install: {method: uvx, command: "uvx blender-mcp"}
     verify: {commands: ["uvx blender-mcp --help", "claude mcp list"], expected: "MCP provider can be listed and connected"}
     adapter: {mode: mcp, capabilities: [get_scene_info, get_viewport_screenshot, execute_blender_code, export_3mf]}
+    license: MIT
+    tested_versions: ["0.1.0"]
   blender_mcp_vxai:
     name: Blender MCP VxAI
     type: mcp_provider
@@ -31,6 +38,8 @@ tools:
     install: {method: repo_or_package, command: "manual provider install after validation"}
     verify: {commands: ["claude mcp list"], expected: "Provider appears and required capabilities pass"}
     adapter: {mode: mcp, capabilities: [get_scene_info, get_viewport_screenshot, execute_blender_code]}
+    license: MIT
+    tested_versions: ["0.1.0"]
   prusa_slicer:
     name: PrusaSlicer
     type: slicer
@@ -40,7 +49,9 @@ tools:
     version_policy: {channel: stable, manual_select: true}
     install: {method: binary_or_existing_install, windows_hint: "Detect prusa-slicer.exe"}
     verify: {commands: ["prusa-slicer --version"], expected: "version output"}
-    adapter: {mode: cli_external_process, capabilities: [detect, version, slice_to_staging, launch_external]}
+    adapter: {mode: cli_external_process, capabilities: [detect, version, slice_to_staging, launch_external, dock_if_allowed]}
+    license: AGPL-3.0-or-later
+    tested_versions: ["2.7.0", "2.8.1"]
   orca_slicer:
     name: OrcaSlicer
     type: slicer
@@ -50,7 +61,9 @@ tools:
     version_policy: {channel: stable, manual_select: true}
     install: {method: binary_or_existing_install}
     verify: {commands: ["orca-slicer --version || OrcaSlicer --version"], expected: "version output or graceful unsupported"}
-    adapter: {mode: cli_external_process, capabilities: [detect, version, slice_to_staging, launch_external]}
+    adapter: {mode: cli_external_process, capabilities: [detect, version, slice_to_staging, launch_external, dock_if_allowed]}
+    license: AGPL-3.0-or-later
+    tested_versions: ["2.2.0"]
   flsun_slicer:
     name: FLSUN Slicer
     type: slicer
@@ -61,7 +74,9 @@ tools:
     version_policy: {channel: user_provided_or_stable, manual_select: true}
     install: {method: portable_or_installer, windows_hint: "Use user-provided FlsunSlicer-2.0.6.zip or detected install"}
     verify: {commands: ["detect executable path and record file version"], expected: "FLSUN Slicer executable detected"}
-    adapter: {mode: external_process, capabilities: [detect, version, launch_external, slice_to_staging_if_cli_available]}
+    adapter: {mode: external_process, capabilities: [detect, version, launch_external, slice_to_staging_if_cli_available, dock_if_allowed]}
+    license: proprietary
+    tested_versions: ["2.0.6"]
   cura:
     name: Ultimaker Cura
     type: slicer
@@ -71,7 +86,9 @@ tools:
     version_policy: {channel: stable, manual_select: true}
     install: {method: binary_or_existing_install}
     verify: {commands: ["cura --version || Ultimaker-Cura --version"], expected: "version output or graceful unsupported"}
-    adapter: {mode: external_process, capabilities: [detect, version, launch_external]}
+    adapter: {mode: external_process, capabilities: [detect, version, launch_external, dock_if_allowed]}
+    license: LGPL-3.0-or-later
+    tested_versions: ["5.8.0"]
   printrun:
     name: Printrun / Pronterface / Pronsole
     type: printer_control_usb
@@ -82,7 +99,9 @@ tools:
     version_policy: {channel: stable, manual_select: true}
     install: {method: bundled_or_python, windows_hint: "Use user-provided printrun-2.2.0_windows_x64_py3.10.zip or source zip"}
     verify: {commands: ["pronsole --help", "python -m printrun.pronsole --help"], expected: "help output or detected bundled app"}
-    adapter: {mode: cli_or_gui_external_process, capabilities: [detect, list_serial_ports, read_only_connect, send_gcode_with_approval, launch_external]}
+    adapter: {mode: cli_or_gui_external_process, capabilities: [detect, list_serial_ports, read_only_connect, send_gcode_with_approval, launch_external, dock_if_allowed]}
+    license: GPL-3.0-or-later
+    tested_versions: ["2.2.0"]
   moonraker:
     name: Moonraker
     type: printer_api
@@ -93,6 +112,8 @@ tools:
     install: {method: existing_service_or_remote_endpoint}
     verify: {commands: ["curl http://<printer-ip>:7125/server/info"], expected: "JSON server info"}
     adapter: {mode: http_api, capabilities: [status, temps, job_status, file_list, controlled_write_after_gate]}
+    license: GPL-3.0-or-later
+    tested_versions: ["0.9.0"]
   fluidd:
     name: Fluidd
     type: external_web_ui
@@ -103,6 +124,8 @@ tools:
     install: {method: existing_service_or_remote_endpoint}
     verify: {commands: ["curl -I http://<fluidd-host>/"], expected: "HTTP 200/30x or graceful unavailable"}
     adapter: {mode: web_embed_or_external, capabilities: [dock_if_allowed, undock, fullscreen_external, status_link]}
+    license: GPL-3.0-or-later
+    tested_versions: ["1.30.0"]
   mainsail:
     name: Mainsail
     type: external_web_ui
@@ -113,6 +136,8 @@ tools:
     install: {method: existing_service_or_remote_endpoint}
     verify: {commands: ["curl -I http://<mainsail-host>/"], expected: "HTTP 200/30x or graceful unavailable"}
     adapter: {mode: web_embed_or_external, capabilities: [dock_if_allowed, undock, fullscreen_external, status_link]}
+    license: GPL-3.0-or-later
+    tested_versions: ["2.13.0"]
   octoprint:
     name: OctoPrint
     type: printer_api_and_web_ui
@@ -122,4 +147,6 @@ tools:
     version_policy: {channel: existing_service_or_stable, manual_select: true}
     install: {method: existing_service_or_python}
     verify: {commands: ["curl http://<octoprint-host>/api/version"], expected: "JSON version output when API reachable"}
-    adapter: {mode: http_api_and_web_embed, capabilities: [status, temps, job_status, file_list, dock_if_allowed, controlled_write_after_gate]}
+    adapter: {mode: http_api_and_web_embed, capabilities: [status, temps, job_status, file_list, dock_if_allowed, fullscreen_external, controlled_write_after_gate]}
+    license: AGPL-3.0-or-later
+    tested_versions: ["1.10.0"]
