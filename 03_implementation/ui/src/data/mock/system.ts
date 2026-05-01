@@ -13,4 +13,6 @@ export const MOCK_SYSTEM_SNAPSHOT: SystemSnapshot = {
   cpu_pct: 23,
   ram_pct: 41,
   gpu_util_pct: 56,
+  disk_pct: 38,
+  network_kbps: [820, 910, 1240, 1180, 1410, 1330, 1520, 1480, 1610, 1550, 1490, 1620],
 };

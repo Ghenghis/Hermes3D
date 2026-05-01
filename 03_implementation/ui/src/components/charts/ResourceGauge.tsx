@@ -34,7 +34,12 @@ export function ResourceGauge({
             endAngle={-270}
           >
             <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-            <RadialBar dataKey="value" background={{ fill: "#1f2a44" }} cornerRadius={3} />
+            <RadialBar
+              dataKey="value"
+              background={{ fill: "#1f2a44" }}
+              cornerRadius={3}
+              isAnimationActive={false}
+            />
           </RadialBarChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center text-fg font-semibold text-lg">

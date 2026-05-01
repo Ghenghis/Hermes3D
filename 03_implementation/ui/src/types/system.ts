@@ -21,4 +21,8 @@ export interface SystemSnapshot {
   cpu_pct: number;
   ram_pct: number;
   gpu_util_pct: number;
+  /** Primary disk usage percent (0-100). Phase-2 mock; Phase 4 wires real telemetry. */
+  disk_pct: number;
+  /** Recent network throughput sparkline samples (kbps), oldest → newest. */
+  network_kbps: number[];
 }

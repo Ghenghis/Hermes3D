@@ -12,6 +12,8 @@
 import { MOCK_AGENTS } from "../data/mock/agents";
 import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
 import { MOCK_JOBS } from "../data/mock/jobs";
+import { MOCK_LOGS } from "../data/mock/logs";
+import { MOCK_NOTIFICATIONS } from "../data/mock/notifications";
 import { MOCK_PRINTERS } from "../data/mock/printers";
 import { MOCK_PROOF_BUNDLES, LATEST_BUNDLE } from "../data/mock/proof";
 import { MOCK_SYSTEM_SNAPSHOT } from "../data/mock/system";
@@ -19,6 +21,8 @@ import { MOCK_WORKFLOWS } from "../data/mock/workflows";
 import type { Agent } from "../types/agent";
 import type { DimensionalAccuracyReport } from "../types/dimensional";
 import type { Job } from "../types/job";
+import type { LogEntry } from "../types/log";
+import type { Notification } from "../types/notification";
 import type { Printer } from "../types/printer";
 import type { ProofBundle } from "../types/proof";
 import type { SystemSnapshot } from "../types/system";
@@ -33,6 +37,8 @@ export interface AdapterAPI {
   getLatestProofBundle(): Promise<ProofBundle>;
   getSystemSnapshot(): Promise<SystemSnapshot>;
   getDimensionalReports(): Promise<DimensionalAccuracyReport[]>;
+  getLogs(): Promise<LogEntry[]>;
+  getNotifications(): Promise<Notification[]>;
 }
 
 /**
@@ -48,4 +54,6 @@ export const adapters: AdapterAPI = {
   getLatestProofBundle: async () => LATEST_BUNDLE,
   getSystemSnapshot: async () => MOCK_SYSTEM_SNAPSHOT,
   getDimensionalReports: async () => MOCK_DIMENSIONAL_REPORTS,
+  getLogs: async () => MOCK_LOGS,
+  getNotifications: async () => MOCK_NOTIFICATIONS,
 };
