@@ -1,8 +1,8 @@
 """Phase 1 Task 4 — YAML loader returns typed ToolEntry list."""
+
 from __future__ import annotations
 
 import pytest
-
 from hermes3d.registry.loader import LoaderError, load_registry
 
 

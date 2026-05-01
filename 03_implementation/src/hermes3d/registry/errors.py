@@ -4,6 +4,7 @@ Errors are emitted as `ValidationError` records with an `ErrorCode` enum so
 downstream tooling (CI gates, dashboards, dry-run editors) can match on stable
 codes rather than parsing free-form strings.
 """
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass

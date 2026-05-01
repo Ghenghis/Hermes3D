@@ -1,4 +1,5 @@
 """Phase 1 Task 8 — tested_versions required field rule."""
+
 from __future__ import annotations
 
 from hermes3d.registry.errors import ErrorCode

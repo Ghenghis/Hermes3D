@@ -4,6 +4,7 @@ Backs hermes3d.registry.loader and hermes3d.registry.validator. All entries are
 immutable (frozen=True) so they can be safely shared across the validator,
 adapter loader, and any future async pipeline without copy semantics.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

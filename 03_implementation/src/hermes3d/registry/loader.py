@@ -4,6 +4,7 @@ The kit's `validate_registry.py` baseline operates on raw dicts. This loader
 emits `ToolEntry` dataclasses so downstream consumers (validator, adapter
 loader, future router) all see the same typed surface.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -70,9 +71,7 @@ def load_registry(path: Path) -> list[ToolEntry]:
     if not path.exists():
         raise LoaderError(f"registry not found: {path}")
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    tools = (
-        data.get("tools") if isinstance(data, dict) and "tools" in data else data
-    )
+    tools = data.get("tools") if isinstance(data, dict) and "tools" in data else data
     if not isinstance(tools, dict) or not tools:
         raise LoaderError("registry must contain non-empty 'tools' object")
     return [_coerce_entry(str(k), v) for k, v in tools.items() if isinstance(v, dict)]

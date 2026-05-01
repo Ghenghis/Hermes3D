@@ -10,6 +10,7 @@ Tasks 6-8 add URL shape, per-type capability matrix, and tested_versions
 rules incrementally — Task 5 ships only license + structural checks + the
 CLI shell so all later tasks can extend `_check_entry()` without re-plumbing.
 """
+
 from __future__ import annotations
 
 import argparse

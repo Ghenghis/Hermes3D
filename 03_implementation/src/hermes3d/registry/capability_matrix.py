@@ -12,15 +12,16 @@ Any token starting with "dock_" satisfies the "must dock" requirement (e.g.
 dock_if_supported, dock_if_allowed); the validator accepts any of these for
 flexibility while keeping the user's contract intact.
 """
+
 from __future__ import annotations
 
 _REQUIRED: dict[str, frozenset[str]] = {
-    "external_app":           frozenset({"launch_external", "dock_if_supported"}),
-    "mcp_provider":           frozenset(),  # provider, no UI surface
-    "slicer":                 frozenset({"launch_external", "dock_if_allowed"}),
-    "printer_control_usb":    frozenset({"launch_external", "dock_if_allowed"}),
-    "printer_api":            frozenset(),  # headless API, no UI
-    "external_web_ui":        frozenset({"dock_if_allowed", "fullscreen_external"}),
+    "external_app": frozenset({"launch_external", "dock_if_supported"}),
+    "mcp_provider": frozenset(),  # provider, no UI surface
+    "slicer": frozenset({"launch_external", "dock_if_allowed"}),
+    "printer_control_usb": frozenset({"launch_external", "dock_if_allowed"}),
+    "printer_api": frozenset(),  # headless API, no UI
+    "external_web_ui": frozenset({"dock_if_allowed", "fullscreen_external"}),
     "printer_api_and_web_ui": frozenset({"dock_if_allowed"}),
 }
 

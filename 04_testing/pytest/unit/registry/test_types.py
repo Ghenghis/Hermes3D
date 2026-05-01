@@ -2,6 +2,7 @@
 
 Phase 1 Task 2 — error model also tested here (small, related).
 """
+
 from __future__ import annotations
 
 from hermes3d.registry.errors import ErrorCode, ValidationError

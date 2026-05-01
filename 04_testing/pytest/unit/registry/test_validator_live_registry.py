@@ -4,21 +4,18 @@ Skips gracefully if the kit is not present (e.g. running the test suite from a
 sparse checkout); fails loudly if the kit is present and the registry has
 drifted from the validator's expectations.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
 
 import pytest
-
 from hermes3d.registry.loader import load_registry
 from hermes3d.registry.validator import validate
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 LIVE_REGISTRY = (
-    REPO_ROOT
-    / "hermes3d_gui_contract_kit_v4.1"
-    / "config"
-    / "external_repos_registry.yaml"
+    REPO_ROOT / "hermes3d_gui_contract_kit_v4.1" / "config" / "external_repos_registry.yaml"
 )
 
 
@@ -27,8 +24,7 @@ def test_live_registry_passes_hardened_validator():
     entries = load_registry(LIVE_REGISTRY)
     result = validate(entries)
     assert result.ok, "live registry FAILED hardened validation:\n" + "\n".join(
-        f"- {e.tool_id} [{e.severity}] {e.code.value}: {e.message}"
-        for e in result.errors
+        f"- {e.tool_id} [{e.severity}] {e.code.value}: {e.message}" for e in result.errors
     )
 
 

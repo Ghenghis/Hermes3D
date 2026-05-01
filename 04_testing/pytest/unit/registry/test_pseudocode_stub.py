@@ -4,6 +4,7 @@ Closes Phase 0 audit finding #1 (HIGH): the pseudocode used to describe a
 schema that never matched the real registry. Running it now raises
 SystemExit(2) with a redirect message.
 """
+
 from __future__ import annotations
 
 import subprocess
@@ -36,4 +37,4 @@ def test_pseudocode_no_longer_imports_obsolete_schema():
     assert "REQUIRED_FIELDS" not in text, "obsolete pseudocode must be removed"
     # Mentioning the old names in the deprecation message is fine; what we
     # forbid is the obsolete *code* that referenced them.
-    assert "data.get(\"repositories\"" not in text
+    assert 'data.get("repositories"' not in text

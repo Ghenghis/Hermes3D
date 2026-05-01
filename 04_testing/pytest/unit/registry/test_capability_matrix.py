@@ -1,4 +1,5 @@
 """Phase 1 Task 3 — per-type required capability matrix."""
+
 from __future__ import annotations
 
 from hermes3d.registry.capability_matrix import (

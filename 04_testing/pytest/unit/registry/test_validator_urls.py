@@ -1,4 +1,5 @@
 """Phase 1 Task 6 — URL shape validation."""
+
 from __future__ import annotations
 
 from hermes3d.registry.errors import ErrorCode
