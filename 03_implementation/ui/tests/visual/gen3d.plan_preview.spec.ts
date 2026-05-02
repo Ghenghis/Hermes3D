@@ -40,7 +40,7 @@ test("live mode previews a planner DAG without execution affordances", async ({ 
     popupCount += 1;
   });
 
-  await page.route("http://127.0.0.1:8765/api/plan/preview", async (route) => {
+  await page.route(/http:\/\/127\.0\.0\.1:\d+\/api\/plan\/preview/, async (route) => {
     planPreviewCalls += 1;
     expect(route.request().method()).toBe("POST");
     expect(route.request().postDataJSON()).toEqual({ prompt: "calibration cube" });

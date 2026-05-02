@@ -69,8 +69,7 @@ def test_cycle_detection_returns_cycle_detected():
 def test_depth_cap_allows_twelve_and_rejects_thirteen():
     twelve_nodes = tuple(_node(f"n-{index}") for index in range(12))
     twelve_edges = tuple(
-        TaskEdge(from_node=f"n-{index}", to_node=f"n-{index + 1}")
-        for index in range(11)
+        TaskEdge(from_node=f"n-{index}", to_node=f"n-{index + 1}") for index in range(11)
     )
     valid = TaskDAG(
         dag_id="dag-valid",
@@ -81,8 +80,7 @@ def test_depth_cap_allows_twelve_and_rejects_thirteen():
 
     thirteen_nodes = tuple(_node(f"n-{index}") for index in range(13))
     thirteen_edges = tuple(
-        TaskEdge(from_node=f"n-{index}", to_node=f"n-{index + 1}")
-        for index in range(12)
+        TaskEdge(from_node=f"n-{index}", to_node=f"n-{index + 1}") for index in range(12)
     )
     invalid = TaskDAG(
         dag_id="dag-invalid",

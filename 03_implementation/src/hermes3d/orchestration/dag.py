@@ -86,9 +86,7 @@ def topological_walk(dag: TaskDAG) -> Result[tuple[TaskNode, ...]]:
 
     for edge in dag.edges:
         missing = [
-            node_id
-            for node_id in (edge.from_node, edge.to_node)
-            if node_id not in nodes_by_id
+            node_id for node_id in (edge.from_node, edge.to_node) if node_id not in nodes_by_id
         ]
         if missing:
             return Err(
@@ -117,9 +115,7 @@ def topological_walk(dag: TaskDAG) -> Result[tuple[TaskNode, ...]]:
             f"node fanout exceeds cap: {', '.join(sorted(fanout_errors))}",
         )
 
-    ready = deque(
-        node.node_id for node in dag.nodes if not incoming[node.node_id]
-    )
+    ready = deque(node.node_id for node in dag.nodes if not incoming[node.node_id])
     ordered_ids: list[str] = []
     depth_by_id: dict[str, int] = {node_id: 1 for node_id in ready}
     incoming_remaining = {node_id: set(parents) for node_id, parents in incoming.items()}

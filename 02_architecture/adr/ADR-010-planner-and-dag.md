@@ -32,6 +32,7 @@ The schema is:
 | `nodes` | `TaskNode[]` | Non-empty ordered collection of typed task nodes. |
 | `edges` | `TaskEdge[]` | Directed dependencies between node ids. |
 | `max_depth` | integer | Hard cap of 12, matching the DTE 12-stage template. |
+| `max_fanout` | integer | Hard cap on outgoing edges per node. |
 | `metadata` | object | Deterministic planner metadata; no secrets or external handles. |
 
 Each `TaskNode` contains:
@@ -42,7 +43,7 @@ Each `TaskNode` contains:
 | `tool` | string | Must be registered before dispatch. |
 | `kind` | string | Planner-defined typed node category. |
 | `inputs` | object | Canonical-JSON-serializable request payload. |
-| `retry` | object | Retry policy with a bounded retry budget. |
+| `retry_budget` | integer | Finite bounded retry count. |
 | `gate_set` | string[] | Named safety gates that must pass before dispatch. |
 | `depends_on` | string[] | Parent node ids; must match `edges`. |
 

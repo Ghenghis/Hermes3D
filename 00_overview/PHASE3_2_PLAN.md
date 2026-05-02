@@ -4,7 +4,7 @@ Architecture references: 02_architecture/adr/ADR-008-adapter-lifecycle-and-dock-
 Branch: feat/phase-3-2-planner-readonly (forks from develop after Phase 3.1 merge).
 
 1. Objective
-Add a Planner agent that converts a user prompt into a typed task DAG, and ship a 3D Generation read-only / simulated executor that consumes the first DAG node end-to-end. Prove the Planner→DAG→Executor seam with proof + ledger evidence, without granting any write capability. Smaller than Phase 3.1 (no new HTTP surface, no new live adapter — just one agent + one simulated executor + DAG primitives).
+Add a Planner agent that converts a user prompt into a typed task DAG, and ship a 3D Generation read-only / simulated executor that consumes the first DAG node end-to-end. Prove the Planner→DAG→Executor seam with proof + ledger evidence, without granting any write capability. Smaller than Phase 3.1 (no new live adapter/provider surface; CP3.2-D adds localhost-only preview/read routes — just one agent + one simulated executor + DAG primitives).
 
 The slice ends with a UI affordance on the 3D Generation tab that submits a prompt, the Planner emits a DAG, the simulated executor "produces" a deterministic stub model, and the result flows back through the existing AdapterAPI swap point. No external provider is contacted; no slicer or Blender or printer is invoked.
 

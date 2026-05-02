@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,19 +34,13 @@ class BridgeState:
     """Holds the latest orchestrator poll snapshot for the bridge route."""
 
     last_poll_snapshot: tuple[PrinterSnapshot, ...] = field(default_factory=tuple)
-    ledger: OrchestrationLedger = field(
-        default_factory=lambda: OrchestrationLedger(
-            Path("var") / "orchestration" / "ledger.sqlite"
-        )
-    )
+    ledger: OrchestrationLedger | None = None
     supervisor: OfflineSupervisor | None = None
     planner: PlannerAgent | None = None
 
     def __post_init__(self) -> None:
-        if self.supervisor is None:
-            self.supervisor = OfflineSupervisor(ledger=self.ledger)
-        if self.planner is None:
-            self.planner = PlannerAgent(supervisor=self.supervisor)
+        if self.ledger is None and self.supervisor is not None:
+            self.ledger = self.supervisor.ledger
 
     def update_last_poll_snapshot(self, printers: Sequence[PrinterSnapshot]) -> None:
         self.last_poll_snapshot = tuple(deepcopy([dict(printer) for printer in printers]))
@@ -57,14 +52,15 @@ class BridgeState:
         normalized_prompt = " ".join(prompt.strip().split())
         if not normalized_prompt:
             raise HTTPException(status_code=422, detail="prompt is required")
-        run_id = f"plan-preview-{stable_sha(normalized_prompt.lower())[:12]}"
-        assert self.supervisor is not None
-        assert self.planner is not None
-        token = self.supervisor.issue_token(
+        prompt_sha = stable_sha(normalized_prompt.lower())
+        run_id = f"plan-preview-{prompt_sha[:12]}-{uuid4().hex[:8]}"
+        supervisor = self._ensure_supervisor()
+        planner = self._ensure_planner()
+        token = supervisor.issue_token(
             agent_id="bridge.planner.preview",
             tools=frozenset({"planner.plan"}),
         )
-        result = self.planner.plan(
+        result = planner.plan(
             PlanRequest(
                 run_id=run_id,
                 agent_id="bridge.planner.preview",
@@ -80,9 +76,16 @@ class BridgeState:
                     "message": result.result.message,
                 },
             )
-        return serialize_dag(result.result.value)
+        payload = serialize_dag(result.result.value)
+        payload["metadata"] = {
+            **dict(payload["metadata"]),
+            "prompt_sha256": prompt_sha,
+        }
+        return payload
 
     def run_summary(self, run_id: str) -> dict[str, object]:
+        if self.ledger is None:
+            raise HTTPException(status_code=404, detail="run not found")
         events = self.ledger.events(run_id)
         if not events:
             raise HTTPException(status_code=404, detail="run not found")
@@ -104,6 +107,21 @@ class BridgeState:
                 for event in events
             ],
         }
+
+    def _ensure_ledger(self) -> OrchestrationLedger:
+        if self.ledger is None:
+            self.ledger = OrchestrationLedger(Path("var") / "orchestration" / "ledger.sqlite")
+        return self.ledger
+
+    def _ensure_supervisor(self) -> OfflineSupervisor:
+        if self.supervisor is None:
+            self.supervisor = OfflineSupervisor(ledger=self._ensure_ledger())
+        return self.supervisor
+
+    def _ensure_planner(self) -> PlannerAgent:
+        if self.planner is None:
+            self.planner = PlannerAgent(supervisor=self._ensure_supervisor())
+        return self.planner
 
 
 def create_bridge_app(state: BridgeState | None = None) -> FastAPI:

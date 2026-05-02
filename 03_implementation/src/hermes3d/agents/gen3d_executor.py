@@ -48,7 +48,9 @@ class SimulatedGen3DExecutor:
             seed=request.seed,
             metadata={
                 "tool": GEN3D_TOOL,
-                "artifact_path": str(Path("var") / "orchestration" / "artifacts" / f"{artifact_sha}.json"),
+                "artifact_path": str(
+                    Path("var") / "orchestration" / "artifacts" / f"{artifact_sha}.json"
+                ),
             },
         )
         artifact_path.write_text(

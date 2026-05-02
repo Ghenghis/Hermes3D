@@ -76,6 +76,33 @@ def test_bridge_plan_preview_returns_dag_without_gen3d_execution(tmp_path, monke
     assert not (tmp_path / "var" / "orchestration" / "artifacts").exists()
 
 
+def test_bridge_default_state_has_no_filesystem_side_effect(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    state = BridgeState()
+    client = TestClient(create_bridge_app(state), client=("127.0.0.1", 50000))
+    missing = client.get("/api/runs/not-a-run")
+
+    assert state.ledger is None
+    assert missing.status_code == 404
+    assert not (tmp_path / "var").exists()
+
+
+def test_repeated_plan_previews_get_distinct_run_summaries(tmp_path):
+    ledger = OrchestrationLedger(tmp_path / "preview.sqlite3")
+    state = BridgeState(ledger=ledger)
+    client = TestClient(create_bridge_app(state), client=("127.0.0.1", 50000))
+
+    first = client.post("/api/plan/preview", json={"prompt": "calibration cube"}).json()
+    second = client.post("/api/plan/preview", json={"prompt": "calibration cube"}).json()
+
+    assert first["run_id"] != second["run_id"]
+    assert first["metadata"]["prompt_sha256"] == second["metadata"]["prompt_sha256"]
+    assert client.get(f"/api/runs/{first['run_id']}").json()["event_count"] == 1
+    assert client.get(f"/api/runs/{second['run_id']}").json()["event_count"] == 1
+    assert len(ledger.events()) == 2
+
+
 def test_bridge_run_summary_is_ledger_derived_and_unknown_run_404(tmp_path):
     ledger = OrchestrationLedger(tmp_path / "preview.sqlite3")
     state = BridgeState(ledger=ledger)

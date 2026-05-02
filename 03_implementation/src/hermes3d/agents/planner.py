@@ -52,7 +52,9 @@ class PlannerAgent:
     ) -> None:
         self.supervisor = supervisor
         self.registered_tools = (
-            supervisor.registered_tools() if registered_tools is None else frozenset(registered_tools)
+            supervisor.registered_tools()
+            if registered_tools is None
+            else frozenset(registered_tools)
         )
 
     def plan(self, request: PlanRequest, *, token: CapabilityToken | None) -> PlanResult:
@@ -100,7 +102,11 @@ class PlannerAgent:
             },
         )
         unregistered = sorted(
-            {planned_node.tool for planned_node in dag.nodes if planned_node.tool not in self.registered_tools}
+            {
+                planned_node.tool
+                for planned_node in dag.nodes
+                if planned_node.tool not in self.registered_tools
+            }
         )
         if unregistered:
             return Err(
