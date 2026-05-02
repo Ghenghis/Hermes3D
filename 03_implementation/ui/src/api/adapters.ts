@@ -7,7 +7,7 @@
  * The interface shape stays stable across the Phase-2 → Phase-3 swap so
  * tab components don't change.
  */
-import { getLivePrinters, planPreviewLive } from "./adapters.live";
+import { getLivePrinters, getProviderHealthLive, planPreviewLive } from "./adapters.live";
 import { MOCK_AGENTS } from "../data/mock/agents";
 import { MOCK_PLAN_DAG } from "../data/mock/dag";
 import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
@@ -25,6 +25,7 @@ import type { Job } from "../types/job";
 import type { LogEntry } from "../types/log";
 import type { Notification } from "../types/notification";
 import type { Printer } from "../types/printer";
+import type { ProviderHealth } from "../types/provider";
 import type { ProofBundle } from "../types/proof";
 import type { SystemSnapshot } from "../types/system";
 import type { Workflow } from "../types/workflow";
@@ -41,6 +42,7 @@ export interface AdapterAPI {
   getLogs(): Promise<LogEntry[]>;
   getNotifications(): Promise<Notification[]>;
   planPreview(prompt: string): Promise<TaskDAG>;
+  getProviderHealth(): Promise<ProviderHealth[]>;
 }
 
 type HermesImportMeta = ImportMeta & {
@@ -61,12 +63,31 @@ const mockAdapters: AdapterAPI = {
   getLogs: async () => MOCK_LOGS,
   getNotifications: async () => MOCK_NOTIFICATIONS,
   planPreview: async () => MOCK_PLAN_DAG,
+  getProviderHealth: async () => [
+    {
+      provider_id: "minimax",
+      status: "idle",
+      last_probe_utc: null,
+      http_status: null,
+      latency_ms: null,
+      stale: false,
+    },
+    {
+      provider_id: "deepseek",
+      status: "idle",
+      last_probe_utc: null,
+      http_status: null,
+      latency_ms: null,
+      stale: false,
+    },
+  ],
 };
 
 const liveAdapters: AdapterAPI = {
   ...mockAdapters,
   getPrinters: getLivePrinters,
   planPreview: planPreviewLive,
+  getProviderHealth: getProviderHealthLive,
 };
 
 function adapterMode(): "mock" | "live" {

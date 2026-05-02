@@ -2,6 +2,7 @@ import { MOCK_PRINTERS } from "../data/mock/printers";
 import { MOCK_PLAN_DAG } from "../data/mock/dag";
 import type { TaskDAG, TaskEdge, TaskNode } from "../types/dag";
 import type { Printer, PrinterAdapter, PrinterDataSource, PrinterStatus } from "../types/printer";
+import type { ProviderHealth } from "../types/provider";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -14,6 +15,7 @@ const LIVE_BRIDGE_PORT =
   (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_PRINTERS_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/printers`;
 const LIVE_PLAN_PREVIEW_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/plan/preview`;
+const LIVE_PROVIDER_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/providers/health`;
 
 const MODELS = new Set<Printer["model"]>(["FLSUN T1", "FLSUN S1", "FLSUN V400", "Generic"]);
 const STATUSES = new Set<PrinterStatus>([
@@ -63,6 +65,23 @@ export async function planPreviewLive(prompt: string): Promise<TaskDAG> {
     return parseTaskDAG(payload) ?? fallbackDag(prompt);
   } catch {
     return fallbackDag(prompt);
+  }
+}
+
+export async function getProviderHealthLive(): Promise<ProviderHealth[]> {
+  try {
+    const response = await fetch(LIVE_PROVIDER_HEALTH_URL, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return fallbackProviderHealth();
+    }
+    const payload: unknown = await response.json();
+    return parseProviderHealthArray(payload) ?? fallbackProviderHealth();
+  } catch {
+    return fallbackProviderHealth();
   }
 }
 
@@ -190,6 +209,44 @@ function parseTaskEdge(value: unknown): TaskEdge | null {
   };
 }
 
+function parseProviderHealthArray(payload: unknown): ProviderHealth[] | null {
+  if (!isRecord(payload) || !Array.isArray(payload.providers)) {
+    return null;
+  }
+  const providers = payload.providers.map(parseProviderHealth);
+  if (providers.some((provider) => provider == null)) {
+    return null;
+  }
+  return providers as ProviderHealth[];
+}
+
+function parseProviderHealth(value: unknown): ProviderHealth | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const status = value.status;
+  if (status !== "green" && status !== "amber" && status !== "red" && status !== "idle") {
+    return null;
+  }
+  if (!isString(value.provider_id) || typeof value.stale !== "boolean") {
+    return null;
+  }
+  if (!isNullableString(value.last_probe_utc)) {
+    return null;
+  }
+  if (!isNullableNumber(value.http_status) || !isNullableNumber(value.latency_ms)) {
+    return null;
+  }
+  return {
+    provider_id: value.provider_id,
+    status,
+    last_probe_utc: value.last_probe_utc,
+    http_status: value.http_status,
+    latency_ms: value.latency_ms,
+    stale: value.stale,
+  };
+}
+
 function fallbackPrinters(dataSource: PrinterDataSource): Printer[] {
   return MOCK_PRINTERS.map((printer) => ({ ...printer, data_source: dataSource }));
 }
@@ -202,6 +259,27 @@ function fallbackDag(prompt: string): TaskDAG {
       fallback_prompt: prompt,
     },
   };
+}
+
+function fallbackProviderHealth(): ProviderHealth[] {
+  return [
+    {
+      provider_id: "minimax",
+      status: "idle",
+      last_probe_utc: null,
+      http_status: null,
+      latency_ms: null,
+      stale: false,
+    },
+    {
+      provider_id: "deepseek",
+      status: "idle",
+      last_probe_utc: null,
+      http_status: null,
+      latency_ms: null,
+      stale: false,
+    },
+  ];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
