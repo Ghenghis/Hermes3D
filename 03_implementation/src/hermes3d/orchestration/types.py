@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import TYPE_CHECKING, Generic, Literal, Mapping, TypeAlias, TypeVar
 
 if TYPE_CHECKING:
@@ -10,6 +11,7 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 Verdict: TypeAlias = Literal["pass", "fail", "skip"]
+PlannerMode: TypeAlias = Literal["llm", "template"]
 
 
 @dataclass(frozen=True)
@@ -26,6 +28,28 @@ class Err:
 
 
 Result: TypeAlias = Ok[T] | Err
+
+
+@dataclass(frozen=True)
+class LLMRequest:
+    prompt: str
+    max_completion_tokens: int
+    token_id: str
+
+
+@dataclass(frozen=True)
+class LLMResponse:
+    redacted_text: str
+    tokens_in: int
+    tokens_out: int
+    cost_usd_estimate: Decimal
+
+
+@dataclass(frozen=True)
+class BudgetState:
+    spent_usd_run: Decimal
+    spent_usd_day: Decimal
+    day_started_utc: str
 
 
 @dataclass(frozen=True)

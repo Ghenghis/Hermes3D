@@ -14,6 +14,7 @@ from typing import Callable, Mapping
 from .dag import TaskDAG
 from .ledger import LedgerEvent, OrchestrationLedger
 from .types import (
+    BudgetState,
     CapabilityToken,
     Err,
     Gen3DRequest,
@@ -33,7 +34,9 @@ OfflinePlanHandler = Callable[[PlanRequest], TaskDAG | Result[TaskDAG]]
 OfflineGen3DHandler = Callable[
     [Gen3DRequest], SimulatedModelArtifact | Result[SimulatedModelArtifact]
 ]
-DEFAULT_REGISTERED_TOOLS = frozenset({"printer.poll", "planner.plan", "gen3d.generate"})
+DEFAULT_REGISTERED_TOOLS = frozenset(
+    {"printer.poll", "planner.plan", "gen3d.generate", "llm.complete"}
+)
 
 
 class OfflineSupervisor:
@@ -66,7 +69,8 @@ class OfflineSupervisor:
         ttl_seconds: int = 60,
         now_utc: datetime | None = None,
         phase: int | None = None,
-    ) -> CapabilityToken:
+        budget: BudgetState | None = None,
+    ) -> CapabilityToken | Err:
         now = _normalize_utc(now_utc)
         token_phase = self.current_phase if phase is None else phase
         unsigned = CapabilityToken(
@@ -79,6 +83,14 @@ class OfflineSupervisor:
             phase=token_phase,
             signature="",
         )
+        budget_refusal = self._llm_budget_refusal(
+            unsigned,
+            budget=budget,
+            now_utc=now,
+        )
+        if isinstance(budget_refusal, Err):
+            return budget_refusal
+
         token = replace(unsigned, signature=self._sign(unsigned))
         with self._registry_lock:
             self._tokens[token.token_id] = token
@@ -361,6 +373,65 @@ class OfflineSupervisor:
         )
         self.ledger.append(event)
 
+    def _llm_budget_refusal(
+        self,
+        token: CapabilityToken,
+        *,
+        budget: BudgetState | None,
+        now_utc: datetime,
+    ) -> Err | None:
+        if "llm.complete" not in token.tools or budget is None:
+            return None
+
+        from hermes3d.gateways.budget import check_budget, estimate_cost_usd
+        from hermes3d.gateways.llm import load_policy
+
+        policy = load_policy()
+        estimated_usd = estimate_cost_usd(
+            tokens_in=1,
+            tokens_out=policy.max_completion_tokens,
+            input_usd_per_token=policy.input_usd_per_token,
+            output_usd_per_token=policy.output_usd_per_token,
+        )
+        decision = check_budget(
+            budget,
+            caps=policy.budget_caps,
+            estimated_usd=estimated_usd,
+            now_utc=now_utc,
+        )
+        if decision.allowed:
+            return None
+
+        if self.ledger is not None:
+            self.ledger.append(
+                LedgerEvent(
+                    ts_utc=_iso_utc(now_utc),
+                    run_id=_run_id_from_token(token),
+                    agent_id=token.agent_id,
+                    tool="budget.exceeded",
+                    inputs_sha=stable_sha(
+                        {
+                            "tools": sorted(token.tools),
+                            "token_id": token.token_id,
+                            "budget": {
+                                "day_started_utc": budget.day_started_utc,
+                                "spent_usd_day": str(budget.spent_usd_day),
+                                "spent_usd_run": str(budget.spent_usd_run),
+                            },
+                        }
+                    ),
+                    outputs_sha=stable_sha(
+                        {
+                            "attempted_usd": str(decision.attempted_usd),
+                            "cap": decision.cap,
+                        }
+                    ),
+                    verdict="fail",
+                    message=f"{decision.cap} token_id={token.token_id}",
+                )
+            )
+        return Err("budget_exceeded", decision.cap)
+
     def _validate_dag_tools(self, dag: TaskDAG) -> Result[TaskDAG]:
         unregistered = sorted(
             {node.tool for node in dag.nodes if node.tool not in self._registered_tools}
@@ -456,3 +527,8 @@ def _normalize_utc(value: datetime | None) -> datetime:
 
 def _iso_utc(value: datetime) -> str:
     return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _run_id_from_token(token: CapabilityToken) -> str:
+    scopes = sorted(token.scopes)
+    return scopes[0] if scopes else token.token_id

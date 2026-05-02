@@ -32,6 +32,7 @@ export function Gen3DTab() {
   const [prompt, setPrompt] = useState("calibration cube");
   const [previewDag, setPreviewDag] = useState<TaskDAG | null>(null);
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const plannerMode = previewDag?.metadata?.planner_mode;
 
   const previewPlan = async () => {
     setPreviewState("loading");
@@ -80,6 +81,24 @@ export function Gen3DTab() {
                   <GitBranch size={11} />
                   <span>{previewState === "loading" ? "Previewing" : "Preview plan"}</span>
                 </button>
+                {plannerMode === "llm" && (
+                  <span
+                    data-testid="gen3d-planner-mode-badge"
+                    data-mode="llm"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-cyan/10 border border-accent-cyan/40 text-accent-cyan text-[11px]"
+                  >
+                    via LLM ✓
+                  </span>
+                )}
+                {plannerMode === "template" && (
+                  <span
+                    data-testid="gen3d-planner-mode-badge"
+                    data-mode="template"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-surface2/40 border border-border text-muted text-[11px]"
+                  >
+                    template ↻
+                  </span>
+                )}
                 <LockedAction label="Generate" hint="locked · Phase 4 wires real providers" />
               </div>
             </div>

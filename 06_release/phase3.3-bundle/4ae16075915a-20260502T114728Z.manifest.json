@@ -1,0 +1,53 @@
+{
+  "created_utc": "2026-05-02T11:47:29.469871+00:00",
+  "env": {
+    "machine": "AMD64",
+    "os": "Windows-11-10.0.26100-SP0",
+    "python": "3.14.3",
+    "python_impl": "CPython"
+  },
+  "files": [
+    {
+      "path": "docs/ADR-011-llm-planner-gateway.md",
+      "sha256": "595e4d0e126394066a0a7c3f0b5284d7d114762eb6234e11fc3d25e4fb4eec1a",
+      "size": 14455
+    },
+    {
+      "path": "docs/PHASE3_3_PLAN.md",
+      "sha256": "438306a9be86da88c6fc14ca20d0229836dff0dcdb97063d1ce949c8f77a8d70",
+      "size": 22098
+    },
+    {
+      "path": "evidence/ledger_snapshot.sqlite3",
+      "sha256": "1b8309317a80645f69dc5c70ef95b8201a2dd8327399b6112b25af20bcbcdeab",
+      "size": 8192
+    },
+    {
+      "path": "evidence/llm_redacted_trace_sample.json",
+      "sha256": "7dd9a56a5d1988382de554958c95329b060b53e48890c2bd44899b34a5c8afd9",
+      "size": 741
+    },
+    {
+      "path": "evidence/plan_preview_replay.json",
+      "sha256": "4d677c212b3ec486dc22978f0ba9f2308dcb445c7bc4f1884427eceb9a2d2631",
+      "size": 1114
+    },
+    {
+      "path": "evidence/playwright_report.json",
+      "sha256": "195ec232cf3984364e84a411d9617602327f31e0b6d570a1b4f5b715e865c555",
+      "size": 17437
+    },
+    {
+      "path": "evidence/ui_build_output_hash.json",
+      "sha256": "3b4183c6d49eff0971709cd4bce848d81a2bcc31a99aebae4e8ea551adb54c50",
+      "size": 589
+    }
+  ],
+  "git": {
+    "branch": "feat/phase-3-3-llm-planner-gateway",
+    "dirty": "not-computed",
+    "sha": "4ae16075915a4b03e8026c3ab0a20e064d714603"
+  },
+  "run_id": "4ae16075915a-20260502T114728Z",
+  "schema_version": "phase3.3-bundle-1.0.0"
+}

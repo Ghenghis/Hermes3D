@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://hermes3d/schema/llm_policy.schema.json",
+  "title": "Hermes3D LLM Planner Policy",
+  "description": "Validated at supervisor boot per ADR-011. Phase 3.3 only — refusal at validation failure.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "default_mode",
+    "provider_allowlist",
+    "cost_cap_usd_per_run",
+    "cost_cap_usd_per_day",
+    "timeout_seconds",
+    "prompt_max_bytes",
+    "retry_max",
+    "rate_per_second",
+    "input_usd_per_token",
+    "output_usd_per_token"
+  ],
+  "properties": {
+    "default_mode": {
+      "description": "Planner mode used when caller does not pass mode= explicitly. Phase 3.3 default MUST be 'template'.",
+      "type": "string",
+      "enum": ["template", "llm"]
+    },
+    "provider_allowlist": {
+      "description": "Closed set of allowed LLM provider host identifiers. Hosts not present here are refused at gateway entry (ADR-011 §1).",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[a-z0-9][a-z0-9._\\-]*$"
+      }
+    },
+    "cost_cap_usd_per_run": {
+      "description": "Hard cap on USD spent per orchestration run. R7 fires when an llm.complete call would exceed this cap.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 100.0
+    },
+    "cost_cap_usd_per_day": {
+      "description": "Hard cap on USD spent per UTC day across all runs. R7 fires when an llm.complete call would exceed this cap. MUST be >= cost_cap_usd_per_run.",
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1000.0
+    },
+    "timeout_seconds": {
+      "description": "Per-call timeout for the LLM gateway. Hard upper bound; Phase 3.3 default is 30 seconds.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 120
+    },
+    "prompt_max_bytes": {
+      "description": "Maximum UTF-8 byte length of a sanitized prompt. Sanitizer rejects oversize with Err::PromptTooLarge.",
+      "type": "integer",
+      "minimum": 256,
+      "maximum": 65536
+    },
+    "retry_max": {
+      "description": "Number of transport-class retries the gateway may perform per call. Phase 3.3 default is 1; values >2 require a new ADR.",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 2
+    },
+    "rate_per_second": {
+      "description": "Maximum gateway calls per second per token. Phase 3.3 default is 1.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10
+    },
+    "input_usd_per_token": {
+      "description": "Cost coefficient applied to provider-reported input tokens for budget accounting.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.01
+    },
+    "output_usd_per_token": {
+      "description": "Cost coefficient applied to provider-reported output tokens for budget accounting.",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.01
+    },
+    "max_completion_tokens": {
+      "description": "Worst-case completion size used in pre-call cost estimate (used to enforce R7 before the request leaves the gateway).",
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 8192,
+      "default": 1024
+    },
+    "fallback_mode": {
+      "description": "Mode used when the LLM path fails any check. Phase 3.3 fallback MUST be 'template' (ADR-011 §5).",
+      "type": "string",
+      "enum": ["template"],
+      "default": "template"
+    }
+  }
+}

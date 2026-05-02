@@ -1,0 +1,34 @@
+{
+  "happy": {
+    "content_type": "application/json",
+    "body": {
+      "text": "mini vase",
+      "tokens_in": 4,
+      "tokens_out": 4
+    }
+  },
+  "malformed": {
+    "content_type": "text/plain",
+    "body": "{ not valid"
+  },
+  "unknown": {
+    "content_type": "application/json",
+    "body": {
+      "text": "laser.scan",
+      "tokens_in": 4,
+      "tokens_out": 4
+    }
+  },
+  "write_tool": {
+    "content_type": "text/plain",
+    "body": "printer.print_start"
+  },
+  "rate": {
+    "content_type": "application/json",
+    "body": {
+      "text": "calibration cube",
+      "tokens_in": 4,
+      "tokens_out": 4
+    }
+  }
+}
