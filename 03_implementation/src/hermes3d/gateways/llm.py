@@ -24,7 +24,14 @@ from hermes3d.orchestration.types import (
     Result,
 )
 
-from .budget import BudgetCaps, BudgetDecision, BudgetStore, check_budget, estimate_cost_usd, record_actual
+from .budget import (
+    BudgetCaps,
+    BudgetDecision,
+    BudgetStore,
+    check_budget,
+    estimate_cost_usd,
+    record_actual,
+)
 from .redaction import redact_text
 from .sanitize import sanitize_prompt
 
