@@ -1,0 +1,12 @@
+default_mode: template
+provider_allowlist: [openai-fixture]
+cost_cap_usd_per_run: 0.05
+cost_cap_usd_per_day: 1.00
+timeout_seconds: 30
+prompt_max_bytes: 4096
+retry_max: 1
+rate_per_second: 1
+input_usd_per_token: 0.000001
+output_usd_per_token: 0.000001
+max_completion_tokens: 1024
+fallback_mode: template
