@@ -137,6 +137,12 @@ class OfflineSupervisor:
         validation = self._validate_and_consume_token(token, tool=request.tool, now_utc=now_utc)
         if isinstance(validation, Err):
             return self._refuse(request, validation, token)
+        if request.tool not in self._registered_tools:
+            return self._refuse(
+                request,
+                Err("tool_unregistered", f"tool is not registered: {request.tool}"),
+                token,
+            )
 
         lock = self.mutex_for(request.printer_id)
         with lock:
@@ -174,6 +180,12 @@ class OfflineSupervisor:
         validation = self._validate_and_consume_token(token, tool=request.tool, now_utc=now_utc)
         if isinstance(validation, Err):
             return self._refuse_plan(request, validation, token)
+        if request.tool not in self._registered_tools:
+            return self._refuse_plan(
+                request,
+                Err("tool_unregistered", f"tool is not registered: {request.tool}"),
+                token,
+            )
 
         lock = self.mutex_for_run(request.run_id)
         with lock:

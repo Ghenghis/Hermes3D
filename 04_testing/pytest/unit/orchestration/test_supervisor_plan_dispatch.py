@@ -132,6 +132,29 @@ def test_dispatch_plan_refuses_phase_violation(tmp_path):
     assert result.result.code == "phase_violation"
 
 
+def test_dispatch_plan_refuses_unregistered_plan_tool_before_handler(tmp_path):
+    supervisor = OfflineSupervisor(
+        ledger=OrchestrationLedger(tmp_path / "events.sqlite3"),
+        registered_tools=frozenset({"gen3d.generate"}),
+    )
+    token = supervisor.issue_token(agent_id="planner-a", tools=frozenset({"planner.plan"}))
+    handler_called = False
+
+    def handler(_request: PlanRequest) -> TaskDAG:
+        nonlocal handler_called
+        handler_called = True
+        return _dag()
+
+    result = supervisor.dispatch_plan(_plan_request(), token=token, handler=handler)
+
+    assert isinstance(result.result, Err)
+    assert result.result.code == "tool_unregistered"
+    assert handler_called is False
+    assert supervisor.ledger is not None
+    assert supervisor.ledger.events()[0].tool == "planner.plan"
+    assert supervisor.ledger.events()[0].verdict == "fail"
+
+
 def test_dispatch_plan_enforces_r6_unregistered_tool(tmp_path):
     supervisor = OfflineSupervisor(
         ledger=OrchestrationLedger(tmp_path / "events.sqlite3"),
