@@ -19,6 +19,7 @@ WRITE_CAPABILITIES = frozenset(
 )
 PHASE3_READONLY_CAPABILITIES = {
     "planner.plan": {"phase": 3, "dangerous": False},
+    "llm.complete": {"phase": 3, "dangerous": False},
     "gen3d.generate": {"phase": 3, "dangerous": False},
 }
 

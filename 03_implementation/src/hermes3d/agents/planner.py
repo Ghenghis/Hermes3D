@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import UTC, datetime
 
 from hermes3d.gateways.budget import fresh_budget_state
 from hermes3d.gateways.llm import LLMCaller, LLMGateway, LLMPolicy
@@ -15,6 +16,7 @@ from hermes3d.orchestration import (
     PlanResult,
 )
 from hermes3d.orchestration.dag import TaskDAG, TaskNode
+from hermes3d.orchestration.ledger import LedgerEvent, OrchestrationLedger
 from hermes3d.orchestration.supervisor import stable_sha
 from hermes3d.orchestration.types import BudgetState, PlannerMode, Result
 from hermes3d.planner import try_llm_plan
@@ -55,8 +57,10 @@ class PlannerAgent:
         *,
         supervisor: OfflineSupervisor,
         registered_tools: frozenset[str] | None = None,
+        ledger: OrchestrationLedger | None = None,
     ) -> None:
         self.supervisor = supervisor
+        self.ledger = ledger
         self.registered_tools = (
             supervisor.registered_tools()
             if registered_tools is None
@@ -131,6 +135,7 @@ class PlannerAgent:
             metadata={
                 "planner": "deterministic-template",
                 "fixture_prompt": prompt_key,
+                "planner_mode": "template",
             },
         )
         unregistered = sorted(
@@ -156,9 +161,12 @@ class PlannerAgent:
         gateway: LLMGateway | None,
         caller: LLMCaller | None,
     ) -> Result[TaskDAG]:
+        self._active_llm_request = request
         fallback_result = self._template_fallback(request)
         if gateway is None or llm_token is None:
-            self._log_llm_attempt("fallback", "gateway_or_token_missing")
+            reason = "gateway_or_token_missing"
+            self._log_llm_attempt("fallback", reason)
+            self._emit_fallback_ledger(reason=reason, llm_token=llm_token)
             return fallback_result
 
         llm_result = try_llm_plan(
@@ -169,12 +177,16 @@ class PlannerAgent:
             caller=caller,
         )
         if isinstance(llm_result, Err):
-            self._log_llm_attempt("fallback", llm_result.code)
+            reason = llm_result.code
+            self._log_llm_attempt("fallback", reason)
+            self._emit_fallback_ledger(reason=reason, llm_token=llm_token)
             return fallback_result
 
         accepted = self._validated_llm_plan(request, llm_result.value)
         if isinstance(accepted, Err):
-            self._log_llm_attempt("fallback", accepted.message or accepted.code)
+            reason = accepted.message or accepted.code
+            self._log_llm_attempt("fallback", reason)
+            self._emit_fallback_ledger(reason=reason, llm_token=llm_token)
             return fallback_result
 
         self._log_llm_attempt("success", "accepted")
@@ -229,6 +241,30 @@ class PlannerAgent:
                 "result": result,
                 "reason": reason,
             }
+        )
+
+    def _emit_fallback_ledger(self, *, reason: str, llm_token: CapabilityToken | None) -> None:
+        if self.ledger is None:
+            return
+        request = getattr(self, "_active_llm_request", None)
+        if request is None:
+            run_id = "planner-fallback-unknown"
+            prompt = ""
+        else:
+            run_id = request.run_id
+            prompt = request.prompt
+        token_id = llm_token.token_id if llm_token is not None else "no_llm_token"
+        self.ledger.append(
+            LedgerEvent(
+                ts_utc=datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                run_id=run_id,
+                agent_id="planner",
+                tool="planner.fallback",
+                inputs_sha=stable_sha({"prompt": _normalize_prompt(prompt)}),
+                outputs_sha=stable_sha({"fallback": reason}),
+                verdict="fail",
+                message=f"{reason} token_id={token_id}",
+            )
         )
 
 
