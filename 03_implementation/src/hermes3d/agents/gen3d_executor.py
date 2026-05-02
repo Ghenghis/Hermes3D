@@ -20,7 +20,7 @@ ARTIFACT_ROOT = Path("var") / "orchestration" / "artifacts"
 
 
 class SimulatedGen3DExecutor:
-    """Produces deterministic local stub artifacts for gen3d.generate only."""
+    """Produces deterministic local simulated artifacts for gen3d.generate only."""
 
     def __init__(self, *, supervisor: OfflineSupervisor) -> None:
         self.supervisor = supervisor
