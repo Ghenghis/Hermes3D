@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
+from hermes3d.gateways.budget import fresh_budget_state
+from hermes3d.gateways.llm import LLMCaller, LLMGateway, LLMPolicy
 from hermes3d.orchestration import (
     CapabilityToken,
     Err,
@@ -12,10 +16,12 @@ from hermes3d.orchestration import (
 )
 from hermes3d.orchestration.dag import TaskDAG, TaskNode
 from hermes3d.orchestration.supervisor import stable_sha
-from hermes3d.orchestration.types import Result
+from hermes3d.orchestration.types import BudgetState, PlannerMode, Result
+from hermes3d.planner import try_llm_plan
 
 PLANNER_TOOL = "planner.plan"
 GEN3D_TOOL = "gen3d.generate"
+MAX_LLM_PLAN_BYTES = 4096
 WRITE_CLASS_TOOLS = frozenset(
     {
         "printer.write",
@@ -56,9 +62,35 @@ class PlannerAgent:
             if registered_tools is None
             else frozenset(registered_tools)
         )
+        self.llm_attempt_log: list[dict[str, str]] = []
 
-    def plan(self, request: PlanRequest, *, token: CapabilityToken | None) -> PlanResult:
-        return self.supervisor.dispatch_plan(request, token=token, handler=self._plan_template)
+    def plan(
+        self,
+        request: PlanRequest,
+        *,
+        token: CapabilityToken | None,
+        llm_token: CapabilityToken | None = None,
+        budget: BudgetState | None = None,
+        gateway: LLMGateway | None = None,
+        caller: LLMCaller | None = None,
+        policy: LLMPolicy | None = None,
+        mode: PlannerMode | None = None,
+    ) -> PlanResult:
+        selected_mode = _selected_mode(mode=mode, policy=policy, gateway=gateway)
+        if selected_mode == "template":
+            return self.supervisor.dispatch_plan(request, token=token, handler=self._plan_template)
+
+        return self.supervisor.dispatch_plan(
+            request,
+            token=token,
+            handler=lambda plan_request: self._plan_llm_with_template_fallback(
+                plan_request,
+                llm_token=llm_token or token,
+                budget=budget or fresh_budget_state(),
+                gateway=gateway,
+                caller=caller,
+            ),
+        )
 
     def _plan_template(self, request: PlanRequest) -> Result[TaskDAG]:
         prompt_key = _normalize_prompt(request.prompt)
@@ -115,6 +147,113 @@ class PlannerAgent:
             )
         return Ok(dag, "planner produced deterministic fixture DAG")
 
+    def _plan_llm_with_template_fallback(
+        self,
+        request: PlanRequest,
+        *,
+        llm_token: CapabilityToken | None,
+        budget: BudgetState,
+        gateway: LLMGateway | None,
+        caller: LLMCaller | None,
+    ) -> Result[TaskDAG]:
+        fallback_result = self._template_fallback(request)
+        if gateway is None or llm_token is None:
+            self._log_llm_attempt("fallback", "gateway_or_token_missing")
+            return fallback_result
+
+        llm_result = try_llm_plan(
+            request.prompt,
+            token=llm_token,
+            budget=budget,
+            gateway=gateway,
+            caller=caller,
+        )
+        if isinstance(llm_result, Err):
+            self._log_llm_attempt("fallback", llm_result.code)
+            return fallback_result
+
+        accepted = self._validated_llm_plan(request, llm_result.value)
+        if isinstance(accepted, Err):
+            self._log_llm_attempt("fallback", accepted.message or accepted.code)
+            return fallback_result
+
+        self._log_llm_attempt("success", "accepted")
+        return accepted
+
+    def _template_fallback(self, request: PlanRequest) -> Result[TaskDAG]:
+        fallback_result = self._plan_template(request)
+        if isinstance(fallback_result, Ok):
+            return fallback_result
+        return self._plan_template(replace(request, prompt="calibration cube"))
+
+    def _validated_llm_plan(self, request: PlanRequest, plan_text: str) -> Result[TaskDAG]:
+        normalized = _normalize_prompt(plan_text)
+        if not normalized:
+            return Err("planner_output_rejected", "empty")
+        if len(plan_text.encode("utf-8")) > MAX_LLM_PLAN_BYTES:
+            return Err("planner_output_rejected", "too_large")
+        if _contains_forbidden_plan_text(normalized):
+            return Err("planner_output_rejected", "forbidden_pattern")
+        if normalized not in FIXTURE_PROMPTS:
+            return Err("planner_output_rejected", "unknown_template")
+
+        suggested_request = replace(request, prompt=normalized)
+        template_result = self._plan_template(suggested_request)
+        if isinstance(template_result, Err):
+            return template_result
+
+        dag = template_result.value
+        llm_metadata = {
+            **dag.metadata,
+            "planner": "llm-gateway-suggestion",
+            "planner_mode": "llm",
+            "source_prompt": _normalize_prompt(request.prompt),
+        }
+        return Ok(
+            TaskDAG(
+                dag_id=dag.dag_id,
+                run_id=dag.run_id,
+                nodes=dag.nodes,
+                edges=dag.edges,
+                max_depth=dag.max_depth,
+                max_fanout=dag.max_fanout,
+                metadata=llm_metadata,
+            ),
+            "planner accepted LLM suggestion through deterministic template",
+        )
+
+    def _log_llm_attempt(self, result: str, reason: str) -> None:
+        self.llm_attempt_log.append(
+            {
+                "event": "planner.llm_attempt",
+                "result": result,
+                "reason": reason,
+            }
+        )
+
 
 def _normalize_prompt(prompt: str) -> str:
     return " ".join(prompt.strip().lower().split())
+
+
+def _selected_mode(
+    *,
+    mode: PlannerMode | None,
+    policy: LLMPolicy | None,
+    gateway: LLMGateway | None,
+) -> PlannerMode:
+    if mode is not None:
+        return mode
+    if policy is not None and policy.default_mode == "llm":
+        return "llm"
+    if gateway is not None and gateway.policy.default_mode == "llm":
+        return "llm"
+    return "template"
+
+
+def _contains_forbidden_plan_text(normalized_text: str) -> bool:
+    if normalized_text in UNSAFE_FIXTURE_PROMPTS:
+        return True
+    if normalized_text in WRITE_CLASS_TOOLS:
+        return True
+    return any(tool in normalized_text for tool in WRITE_CLASS_TOOLS)
