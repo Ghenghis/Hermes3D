@@ -9,6 +9,7 @@ import threading
 import uuid
 from dataclasses import fields, is_dataclass, replace
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Callable, Mapping
 
 from .dag import TaskDAG
@@ -35,7 +36,7 @@ OfflineGen3DHandler = Callable[
     [Gen3DRequest], SimulatedModelArtifact | Result[SimulatedModelArtifact]
 ]
 DEFAULT_REGISTERED_TOOLS = frozenset(
-    {"printer.poll", "planner.plan", "gen3d.generate", "llm.complete"}
+    {"printer.poll", "planner.plan", "gen3d.generate", "llm.complete", "provider.probe"}
 )
 
 
@@ -90,6 +91,13 @@ class OfflineSupervisor:
         )
         if isinstance(budget_refusal, Err):
             return budget_refusal
+        probe_refusal = self._probe_budget_refusal(
+            unsigned,
+            budget=budget,
+            now_utc=now,
+        )
+        if isinstance(probe_refusal, Err):
+            return probe_refusal
 
         token = replace(unsigned, signature=self._sign(unsigned))
         with self._registry_lock:
@@ -428,6 +436,63 @@ class OfflineSupervisor:
                     ),
                     verdict="fail",
                     message=f"{decision.cap} token_id={token.token_id}",
+                )
+            )
+        return Err("budget_exceeded", decision.cap)
+
+    def _probe_budget_refusal(
+        self,
+        token: CapabilityToken,
+        *,
+        budget: BudgetState | None,
+        now_utc: datetime,
+    ) -> Err | None:
+        if "provider.probe" not in token.tools or budget is None:
+            return None
+
+        from hermes3d.gateways.budget import BudgetCaps, check_budget
+        from hermes3d.gateways.providers import load_probe_policy
+
+        probe_policy = load_probe_policy()
+        decision = check_budget(
+            budget,
+            caps=BudgetCaps(
+                cost_cap_usd_per_run=probe_policy.probe_budget_usd_per_day,
+                cost_cap_usd_per_day=probe_policy.probe_budget_usd_per_day,
+            ),
+            estimated_usd=Decimal("0.001"),
+            now_utc=now_utc,
+        )
+        if decision.allowed:
+            return None
+
+        if self.ledger is not None:
+            self.ledger.append(
+                LedgerEvent(
+                    ts_utc=_iso_utc(now_utc),
+                    run_id=_run_id_from_token(token),
+                    agent_id=token.agent_id,
+                    tool="budget.exceeded",
+                    inputs_sha=stable_sha(
+                        {
+                            "cap_kind": "probe",
+                            "tools": sorted(token.tools),
+                            "token_id": token.token_id,
+                            "budget": {
+                                "day_started_utc": budget.day_started_utc,
+                                "spent_usd_day": str(budget.spent_usd_day),
+                                "spent_usd_run": str(budget.spent_usd_run),
+                            },
+                        }
+                    ),
+                    outputs_sha=stable_sha(
+                        {
+                            "attempted_usd": str(decision.attempted_usd),
+                            "cap": decision.cap,
+                        }
+                    ),
+                    verdict="fail",
+                    message=f"provider.probe {decision.cap} token_id={token.token_id}",
                 )
             )
         return Err("budget_exceeded", decision.cap)

@@ -4,6 +4,8 @@ Use ``python -m hermes3d.cli <command>`` to invoke. The ``main`` and
 ``build_parser`` functions are importable lazily via:
 
     from hermes3d.cli.__main__ import main, build_parser
+
+Use ``python -m hermes3d.cli.probe <provider_id>`` for Phase 3.4 provider probes.
 """
 
 __all__: list[str] = []
