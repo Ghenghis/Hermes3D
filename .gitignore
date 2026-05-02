@@ -78,3 +78,6 @@ node_modules/
 05_truth_proof/bundles/*.zip
 05_truth_proof/bundles/*.sig
 
+## HermesProof MCP coordination state (created on first connect)
+.hermes3d_orchestrator/
+
