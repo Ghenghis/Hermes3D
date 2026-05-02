@@ -1,8 +1,4 @@
-"""Redaction helpers for Phase 3.3 LLM planner traces.
-
-The redactor is intentionally pure and offline. It never persists reverse maps
-and never opens files or network handles.
-"""
+"""Redaction helpers for Phase 3.3 LLM planner traces."""
 
 from __future__ import annotations
 
@@ -23,8 +19,8 @@ SECRET_FIELD_NAMES = frozenset(
     }
 )
 
-_OPENAI_KEY_RE = re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b")
 _ANTHROPIC_KEY_RE = re.compile(r"\bsk-ant-[A-Za-z0-9_-]{16,}\b")
+_OPENAI_KEY_RE = re.compile(r"\bsk-(?!ant-)[A-Za-z0-9_-]{16,}\b")
 _BEARER_RE = re.compile(r"\bBearer\s+[A-Za-z0-9._\-+/=]{8,}\b", re.IGNORECASE)
 _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 _EMAIL_RE = re.compile(r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b")
@@ -48,9 +44,9 @@ _IPV4_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
 
 def redact_text(text: str) -> str:
-    """Mask secrets and machine-local details from a string."""
+    """Mask secrets and host-local details from text."""
 
-    redacted = _coerce_text(text)
+    redacted = text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
     redacted = _ANTHROPIC_KEY_RE.sub("sk-ant-***", redacted)
     redacted = _OPENAI_KEY_RE.sub("sk-***", redacted)
     redacted = _BEARER_RE.sub("Bearer ***", redacted)
@@ -67,32 +63,26 @@ def redact_text(text: str) -> str:
 
 
 def redact_json(value: Any) -> Any:
-    """Recursively redact JSON-like values."""
+    """Recursively redact JSON-like data."""
 
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, list | tuple):
         return [redact_json(item) for item in value]
     if isinstance(value, dict):
-        redacted: dict[str, Any] = {}
+        result: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if key_text.lower().replace("-", "_") in SECRET_FIELD_NAMES:
-                redacted[key_text] = "***"
-            else:
-                redacted[key_text] = redact_json(item)
-        return redacted
+            normalized_key = key_text.lower().replace("-", "_")
+            result[key_text] = "***" if normalized_key in SECRET_FIELD_NAMES else redact_json(item)
+        return result
     return value
 
 
 def redacted_json_dumps(value: Any) -> str:
-    """Return deterministic redacted JSON for ledger or proof evidence."""
+    """Return deterministic redacted JSON."""
 
     return json.dumps(redact_json(value), sort_keys=True, separators=(",", ":"))
-
-
-def _coerce_text(text: str) -> str:
-    return text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
 
 
 def _redact_url_query(match: re.Match[str]) -> str:
