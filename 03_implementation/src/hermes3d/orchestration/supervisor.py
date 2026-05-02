@@ -420,18 +420,13 @@ def _canonical_json(value: object) -> str:
 def _normalize_payload(value: object) -> object:
     if is_dataclass(value) and not isinstance(value, type):
         return {
-            field.name: _normalize_payload(getattr(value, field.name))
-            for field in fields(value)
+            field.name: _normalize_payload(getattr(value, field.name)) for field in fields(value)
         }
     if isinstance(value, Mapping):
         normalized_items = [
-            (_normalize_mapping_key(key), _normalize_payload(item))
-            for key, item in value.items()
+            (_normalize_mapping_key(key), _normalize_payload(item)) for key, item in value.items()
         ]
-        return {
-            key: item
-            for key, item in sorted(normalized_items, key=lambda pair: pair[0])
-        }
+        return {key: item for key, item in sorted(normalized_items, key=lambda pair: pair[0])}
     if isinstance(value, (set, frozenset)):
         normalized_values = [_normalize_payload(item) for item in value]
         return sorted(normalized_values, key=_canonical_sort_key)
