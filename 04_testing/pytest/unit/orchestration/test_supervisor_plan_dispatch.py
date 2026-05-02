@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime, timedelta
 
 from hermes3d.orchestration import (
@@ -35,7 +37,10 @@ def _gen3d_request() -> Gen3DRequest:
     )
 
 
-def _dag(tool: str = "gen3d.generate") -> TaskDAG:
+def _dag(
+    tool: str = "gen3d.generate",
+    gate_set: frozenset[str] = frozenset(),
+) -> TaskDAG:
     return TaskDAG(
         dag_id="dag-1",
         run_id="run-plan",
@@ -44,6 +49,7 @@ def _dag(tool: str = "gen3d.generate") -> TaskDAG:
                 node_id="gen3d-simulated",
                 tool=tool,
                 kind="gen3d.fixture.calibration_cube",
+                gate_set=gate_set,
             ),
         ),
     )
@@ -56,6 +62,26 @@ def _artifact(_request: Gen3DRequest) -> SimulatedModelArtifact:
         prompt="calibration cube",
         seed=3201,
     )
+
+
+def _sha(payload: object) -> str:
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _plan_outputs_sha(tmp_path, gate_set: frozenset[str]) -> str:
+    ledger = OrchestrationLedger(tmp_path / "events.sqlite3")
+    supervisor = OfflineSupervisor(ledger=ledger)
+    token = supervisor.issue_token(agent_id="planner-a", tools=frozenset({"planner.plan"}))
+
+    result = supervisor.dispatch_plan(
+        _plan_request(),
+        token=token,
+        handler=lambda _request: _dag(gate_set=gate_set),
+    )
+
+    assert isinstance(result.result, Ok)
+    return ledger.events()[0].outputs_sha
 
 
 def test_dispatch_plan_refuses_tokenless_request_and_writes_ledger(tmp_path):
@@ -180,6 +206,52 @@ def test_dispatch_plan_accepts_registered_dag_and_reuses_run_mutex(tmp_path):
     assert ledger.events()[0].tool == "planner.plan"
     assert ledger.events()[0].verdict == "pass"
     assert supervisor.mutex_for_run("run-plan") is supervisor.mutex_for_run("run-plan")
+
+
+def test_dispatch_plan_outputs_sha_normalizes_frozenset_gate_set(tmp_path):
+    outputs_sha = _plan_outputs_sha(
+        tmp_path,
+        frozenset({"slice.dryrun", "mesh.qa"}),
+    )
+
+    assert outputs_sha == _sha(
+        {
+            "ok": True,
+            "value": {
+                "dag_id": "dag-1",
+                "run_id": "run-plan",
+                "nodes": [
+                    {
+                        "node_id": "gen3d-simulated",
+                        "tool": "gen3d.generate",
+                        "kind": "gen3d.fixture.calibration_cube",
+                        "inputs": {},
+                        "retry_budget": 0,
+                        "gate_set": ["mesh.qa", "slice.dryrun"],
+                        "depends_on": [],
+                    }
+                ],
+                "edges": [],
+                "max_depth": 12,
+                "max_fanout": 4,
+                "metadata": {},
+            },
+            "message": "offline plan dispatch completed",
+        }
+    )
+
+
+def test_dispatch_plan_outputs_sha_repeats_for_equivalent_gate_sets(tmp_path):
+    first = _plan_outputs_sha(
+        tmp_path / "first",
+        frozenset({"slice.dryrun", "mesh.qa"}),
+    )
+    second = _plan_outputs_sha(
+        tmp_path / "second",
+        frozenset({"mesh.qa", "slice.dryrun"}),
+    )
+
+    assert first == second
 
 
 def test_dispatch_gen3d_writes_ledger_event(tmp_path):

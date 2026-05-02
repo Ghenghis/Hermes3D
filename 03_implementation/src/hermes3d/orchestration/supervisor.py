@@ -7,7 +7,7 @@ import hmac
 import json
 import threading
 import uuid
-from dataclasses import asdict, is_dataclass, replace
+from dataclasses import fields, is_dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Callable, Mapping
 
@@ -395,16 +395,15 @@ def stable_sha(value: object) -> str:
 
 
 def _request_payload(request: PollRequest | PlanRequest | Gen3DRequest) -> Mapping[str, object]:
-    return asdict(request)
+    payload = _normalize_payload(request)
+    if not isinstance(payload, dict):  # pragma: no cover - dataclass requests normalize to dict
+        raise TypeError("request payload must normalize to a mapping")
+    return payload
 
 
 def _result_payload(result: Result[object]) -> Mapping[str, object]:
     if isinstance(result, Ok):
-        value = result.value
-        if is_dataclass(value):
-            value_payload: object = asdict(value)
-        else:
-            value_payload = value
+        value_payload = _normalize_payload(result.value)
         return {"ok": True, "value": value_payload, "message": result.message}
     return {
         "ok": False,
@@ -415,7 +414,41 @@ def _result_payload(result: Result[object]) -> Mapping[str, object]:
 
 
 def _canonical_json(value: object) -> str:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(_normalize_payload(value), sort_keys=True, separators=(",", ":"))
+
+
+def _normalize_payload(value: object) -> object:
+    if is_dataclass(value) and not isinstance(value, type):
+        return {
+            field.name: _normalize_payload(getattr(value, field.name))
+            for field in fields(value)
+        }
+    if isinstance(value, Mapping):
+        normalized_items = [
+            (_normalize_mapping_key(key), _normalize_payload(item))
+            for key, item in value.items()
+        ]
+        return {
+            key: item
+            for key, item in sorted(normalized_items, key=lambda pair: pair[0])
+        }
+    if isinstance(value, (set, frozenset)):
+        normalized_values = [_normalize_payload(item) for item in value]
+        return sorted(normalized_values, key=_canonical_sort_key)
+    if isinstance(value, (list, tuple)):
+        return [_normalize_payload(item) for item in value]
+    return value
+
+
+def _normalize_mapping_key(key: object) -> str:
+    normalized = _normalize_payload(key)
+    if isinstance(normalized, str):
+        return normalized
+    return _canonical_sort_key(normalized)
+
+
+def _canonical_sort_key(value: object) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
 
 def _normalize_utc(value: datetime | None) -> datetime:
