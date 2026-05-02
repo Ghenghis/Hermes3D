@@ -1,4 +1,6 @@
 import { MOCK_PRINTERS } from "../data/mock/printers";
+import { MOCK_PLAN_DAG } from "../data/mock/dag";
+import type { TaskDAG, TaskEdge, TaskNode } from "../types/dag";
 import type { Printer, PrinterAdapter, PrinterDataSource, PrinterStatus } from "../types/printer";
 
 type HermesImportMeta = ImportMeta & {
@@ -11,6 +13,7 @@ const DEFAULT_BRIDGE_PORT = "8765";
 const LIVE_BRIDGE_PORT =
   (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_PRINTERS_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/printers`;
+const LIVE_PLAN_PREVIEW_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/plan/preview`;
 
 const MODELS = new Set<Printer["model"]>(["FLSUN T1", "FLSUN S1", "FLSUN V400", "Generic"]);
 const STATUSES = new Set<PrinterStatus>([
@@ -39,6 +42,27 @@ export async function getLivePrinters(): Promise<Printer[]> {
     return printers ?? fallbackPrinters("error");
   } catch {
     return fallbackPrinters("error");
+  }
+}
+
+export async function planPreviewLive(prompt: string): Promise<TaskDAG> {
+  try {
+    const response = await fetch(LIVE_PLAN_PREVIEW_URL, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return fallbackDag(prompt);
+    }
+    const payload: unknown = await response.json();
+    return parseTaskDAG(payload) ?? fallbackDag(prompt);
+  } catch {
+    return fallbackDag(prompt);
   }
 }
 
@@ -91,8 +115,93 @@ function parsePrinter(value: unknown): Printer | null {
   };
 }
 
+function parseTaskDAG(value: unknown): TaskDAG | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    !isString(value.dag_id) ||
+    !isString(value.run_id) ||
+    !Array.isArray(value.nodes) ||
+    !Array.isArray(value.edges) ||
+    !isNumber(value.max_depth) ||
+    !isNumber(value.max_fanout) ||
+    !isRecord(value.metadata)
+  ) {
+    return null;
+  }
+  const nodes = value.nodes.map(parseTaskNode);
+  const edges = value.edges.map(parseTaskEdge);
+  if (nodes.some((node) => node == null) || edges.some((edge) => edge == null)) {
+    return null;
+  }
+  return {
+    dag_id: value.dag_id,
+    run_id: value.run_id,
+    nodes: nodes as TaskNode[],
+    edges: edges as TaskEdge[],
+    max_depth: value.max_depth,
+    max_fanout: value.max_fanout,
+    metadata: value.metadata,
+  };
+}
+
+function parseTaskNode(value: unknown): TaskNode | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    !isString(value.node_id) ||
+    !isString(value.tool) ||
+    !isString(value.kind) ||
+    !isRecord(value.inputs) ||
+    !isNumber(value.retry_budget) ||
+    !isStringArray(value.gate_set) ||
+    !isStringArray(value.depends_on)
+  ) {
+    return null;
+  }
+  return {
+    node_id: value.node_id,
+    tool: value.tool,
+    kind: value.kind,
+    inputs: value.inputs,
+    retry_budget: value.retry_budget,
+    gate_set: value.gate_set,
+    depends_on: value.depends_on,
+  };
+}
+
+function parseTaskEdge(value: unknown): TaskEdge | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    !isString(value.from_node) ||
+    !isString(value.to_node) ||
+    !isString(value.condition)
+  ) {
+    return null;
+  }
+  return {
+    from_node: value.from_node,
+    to_node: value.to_node,
+    condition: value.condition,
+  };
+}
+
 function fallbackPrinters(dataSource: PrinterDataSource): Printer[] {
   return MOCK_PRINTERS.map((printer) => ({ ...printer, data_source: dataSource }));
+}
+
+function fallbackDag(prompt: string): TaskDAG {
+  return {
+    ...MOCK_PLAN_DAG,
+    metadata: {
+      ...MOCK_PLAN_DAG.metadata,
+      fallback_prompt: prompt,
+    },
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -109,6 +218,14 @@ function isNullableString(value: unknown): value is string | null {
 
 function isNullableNumber(value: unknown): value is number | null {
   return value === null || (typeof value === "number" && Number.isFinite(value));
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
 function isModel(value: unknown): value is Printer["model"] {

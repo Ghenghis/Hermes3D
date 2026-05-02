@@ -17,6 +17,10 @@ WRITE_CAPABILITIES = frozenset(
         "upload_file",
     }
 )
+PHASE3_READONLY_CAPABILITIES = {
+    "planner.plan": {"phase": 3, "dangerous": False},
+    "gen3d.generate": {"phase": 3, "dangerous": False},
+}
 
 
 class AdapterRegistrationError(ValueError):
@@ -46,6 +50,20 @@ def register_adapter(manifest: AdapterManifest, *, current_phase: int = 3) -> Ad
 
 def is_write_capability(capability: str) -> bool:
     return capability in WRITE_CAPABILITIES
+
+
+def capability_phase(capability: str) -> int | None:
+    metadata = PHASE3_READONLY_CAPABILITIES.get(capability)
+    if metadata is None:
+        return None
+    return int(metadata["phase"])
+
+
+def is_dangerous_capability(capability: str) -> bool:
+    metadata = PHASE3_READONLY_CAPABILITIES.get(capability)
+    if metadata is None:
+        return is_write_capability(capability)
+    return bool(metadata["dangerous"])
 
 
 def _contains_write_capability(manifest: AdapterManifest) -> bool:

@@ -7,8 +7,9 @@
  * The interface shape stays stable across the Phase-2 → Phase-3 swap so
  * tab components don't change.
  */
-import { getLivePrinters } from "./adapters.live";
+import { getLivePrinters, planPreviewLive } from "./adapters.live";
 import { MOCK_AGENTS } from "../data/mock/agents";
+import { MOCK_PLAN_DAG } from "../data/mock/dag";
 import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
 import { MOCK_JOBS } from "../data/mock/jobs";
 import { MOCK_LOGS } from "../data/mock/logs";
@@ -19,6 +20,7 @@ import { MOCK_SYSTEM_SNAPSHOT } from "../data/mock/system";
 import { MOCK_WORKFLOWS } from "../data/mock/workflows";
 import type { Agent } from "../types/agent";
 import type { DimensionalAccuracyReport } from "../types/dimensional";
+import type { TaskDAG } from "../types/dag";
 import type { Job } from "../types/job";
 import type { LogEntry } from "../types/log";
 import type { Notification } from "../types/notification";
@@ -38,6 +40,7 @@ export interface AdapterAPI {
   getDimensionalReports(): Promise<DimensionalAccuracyReport[]>;
   getLogs(): Promise<LogEntry[]>;
   getNotifications(): Promise<Notification[]>;
+  planPreview(prompt: string): Promise<TaskDAG>;
 }
 
 type HermesImportMeta = ImportMeta & {
@@ -57,11 +60,13 @@ const mockAdapters: AdapterAPI = {
   getDimensionalReports: async () => MOCK_DIMENSIONAL_REPORTS,
   getLogs: async () => MOCK_LOGS,
   getNotifications: async () => MOCK_NOTIFICATIONS,
+  planPreview: async () => MOCK_PLAN_DAG,
 };
 
 const liveAdapters: AdapterAPI = {
   ...mockAdapters,
   getPrinters: getLivePrinters,
+  planPreview: planPreviewLive,
 };
 
 function adapterMode(): "mock" | "live" {

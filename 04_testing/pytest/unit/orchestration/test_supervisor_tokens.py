@@ -83,6 +83,25 @@ def test_unauthorized_tool_is_refused(tmp_path):
     assert result.result.code == "tool_not_authorized"
 
 
+def test_unregistered_poll_tool_is_refused_after_token_validation(tmp_path):
+    supervisor = OfflineSupervisor(
+        ledger=OrchestrationLedger(tmp_path / "events.sqlite3"),
+        registered_tools=frozenset({"planner.plan", "gen3d.generate"}),
+    )
+    token = supervisor.issue_token(
+        agent_id="agent-a",
+        tools=frozenset({"printer.poll"}),
+    )
+
+    result = supervisor.dispatch_poll(_request(), token=token, handler=_mirror)
+
+    assert isinstance(result.result, Err)
+    assert result.result.code == "tool_unregistered"
+    assert supervisor.ledger is not None
+    assert supervisor.ledger.events()[0].tool == "printer.poll"
+    assert supervisor.ledger.events()[0].verdict == "fail"
+
+
 def test_authorized_dispatch_consumes_token_and_reuses_printer_mutex(tmp_path):
     supervisor = OfflineSupervisor(ledger=OrchestrationLedger(tmp_path / "events.sqlite3"))
     token = supervisor.issue_token(

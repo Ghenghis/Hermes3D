@@ -7,7 +7,11 @@
 import { Panel } from "../components/layout/Panel";
 import { LockedAction } from "../components/badges/LockedAction";
 import { StatusBadge } from "../components/badges/StatusBadge";
-import { Image as ImageIcon } from "lucide-react";
+import { WorkflowPipeline, type PipelineStage } from "../components/pipeline/WorkflowPipeline";
+import { adapters } from "../api/adapters";
+import type { TaskDAG } from "../types/dag";
+import { GitBranch, Image as ImageIcon } from "lucide-react";
+import { useState } from "react";
 
 const PROVIDERS = [
   { id: "minimax_vision", name: "MiniMax Vision", status: "ready", note: "vision-conditioned 3D" },
@@ -25,6 +29,22 @@ const GENERATED = [
 ];
 
 export function Gen3DTab() {
+  const [prompt, setPrompt] = useState("calibration cube");
+  const [previewDag, setPreviewDag] = useState<TaskDAG | null>(null);
+  const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+
+  const previewPlan = async () => {
+    setPreviewState("loading");
+    try {
+      const dag = await adapters.planPreview(prompt);
+      setPreviewDag(dag);
+      setPreviewState("ready");
+    } catch {
+      setPreviewDag(null);
+      setPreviewState("error");
+    }
+  };
+
   return (
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="gen3d-root">
       <div className="col-span-12 lg:col-span-8">
@@ -37,13 +57,29 @@ export function Gen3DTab() {
         >
           <div className="grid grid-cols-3 gap-3 h-full text-xs">
             <div className="col-span-2 flex flex-col gap-2 min-w-0">
-              <div className="text-muted text-[10px] uppercase tracking-wide">Text Prompt</div>
-              <div className="flex-1 bg-surface2/40 border border-border rounded p-2 font-mono text-[11px] text-fg leading-relaxed overflow-auto">
-                A 3D-printable bracket for an FLSUN T1 frame member, M3 hex
-                socket, 24 mm bore, 2 mm wall, beveled corners. Print
-                orientation: face down. Tolerance: ±0.1 mm.
-              </div>
+              <label
+                htmlFor="gen3d-prompt"
+                className="text-muted text-[10px] uppercase tracking-wide"
+              >
+                Text Prompt
+              </label>
+              <textarea
+                id="gen3d-prompt"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                className="flex-1 bg-surface2/40 border border-border rounded p-2 font-mono text-[11px] text-fg leading-relaxed resize-none outline-none focus:border-accent-cyan/60"
+                spellCheck={false}
+              />
               <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={previewPlan}
+                  disabled={previewState === "loading"}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-accent-cyan/15 border border-accent-cyan/40 text-accent-cyan text-[11px] hover:bg-accent-cyan/20 disabled:opacity-60"
+                >
+                  <GitBranch size={11} />
+                  <span>{previewState === "loading" ? "Previewing" : "Preview plan"}</span>
+                </button>
                 <LockedAction label="Generate" hint="locked · Phase 4 wires real providers" />
               </div>
             </div>
@@ -94,6 +130,44 @@ export function Gen3DTab() {
       </div>
       <div className="col-span-12">
         <Panel
+          id="gen3d.plan"
+          title="PLAN PREVIEW"
+          dense
+          status={{ tone: previewState === "ready" ? "cyan" : "muted", label: previewState }}
+          className="h-[170px]"
+        >
+          <div
+            className="h-full flex flex-col gap-2"
+            data-testid="gen3d-plan-preview"
+            data-run-id={previewDag?.run_id ?? "none"}
+          >
+            {previewDag ? (
+              <>
+                <WorkflowPipeline stages={dagToStages(previewDag)} />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 overflow-auto">
+                  {previewDag.nodes.map((node) => (
+                    <div
+                      key={node.node_id}
+                      data-testid="gen3d-plan-node"
+                      data-tool={node.tool}
+                      className="bg-surface2/40 border border-border rounded px-2 py-1.5 text-xs min-w-0"
+                    >
+                      <div className="text-fg font-medium truncate">{node.kind}</div>
+                      <div className="text-muted text-[10px] font-mono truncate">{node.tool}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <div className="h-full flex items-center justify-center text-muted text-xs">
+                No plan preview loaded
+              </div>
+            )}
+          </div>
+        </Panel>
+      </div>
+      <div className="col-span-12">
+        <Panel
           id="gen3d.results"
           title="GENERATED MODELS"
           dense
@@ -109,6 +183,15 @@ export function Gen3DTab() {
       </div>
     </div>
   );
+}
+
+function dagToStages(dag: TaskDAG): PipelineStage[] {
+  return dag.nodes.map((node, index) => ({
+    id: node.node_id,
+    label: node.kind.split(".").at(-1)?.replaceAll("_", " ") ?? node.tool,
+    status: index === 0 ? "active" : "pending",
+    detail: node.tool,
+  }));
 }
 
 function ModelCard({

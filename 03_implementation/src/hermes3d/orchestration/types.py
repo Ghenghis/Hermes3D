@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Generic, Literal, Mapping, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Generic, Literal, Mapping, TypeAlias, TypeVar
+
+if TYPE_CHECKING:
+    from .dag import TaskDAG
 
 T = TypeVar("T")
 Verdict: TypeAlias = Literal["pass", "fail", "skip"]
@@ -66,4 +69,52 @@ class PollResult:
     printer_id: str
     tool: str
     result: Result[PrinterMirror]
+    token_id: str | None = None
+
+
+@dataclass(frozen=True)
+class PlanRequest:
+    run_id: str
+    agent_id: str
+    prompt: str
+    tool: str = "planner.plan"
+    inputs: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class PlanResult:
+    run_id: str
+    agent_id: str
+    tool: str
+    result: Result["TaskDAG"]
+    token_id: str | None = None
+
+
+@dataclass(frozen=True)
+class Gen3DRequest:
+    run_id: str
+    agent_id: str
+    node_id: str
+    prompt: str
+    seed: int
+    tool: str = "gen3d.generate"
+    inputs: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SimulatedModelArtifact:
+    artifact_id: str
+    sha256: str
+    prompt: str
+    seed: int
+    metadata: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Gen3DResult:
+    run_id: str
+    agent_id: str
+    node_id: str
+    tool: str
+    result: Result[SimulatedModelArtifact]
     token_id: str | None = None
