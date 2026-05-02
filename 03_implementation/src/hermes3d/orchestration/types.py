@@ -142,3 +142,24 @@ class Gen3DResult:
     tool: str
     result: Result[SimulatedModelArtifact]
     token_id: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderConfig:
+    base_url: str
+    probe_path: str
+    completion_path: str
+    api_key_env: str
+    cost_cap_usd_per_run: Decimal | None = None
+    cost_cap_usd_per_day: Decimal | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProbeResult:
+    provider_id: str
+    http_status: int
+    latency_ms: int
+    redacted_excerpt: str
+    response_sha256: str
+    probed_at_utc: str
+    success: bool

@@ -10,3 +10,22 @@ input_usd_per_token: 0.000001
 output_usd_per_token: 0.000001
 max_completion_tokens: 1024
 fallback_mode: template
+
+providers:
+  minimax:
+    base_url: https://api.minimax.io/v1
+    probe_path: /models
+    completion_path: /chat/completions
+    api_key_env: HERMES3D_MINIMAX_API_KEY
+    cost_cap_usd_per_run: 0.05
+    cost_cap_usd_per_day: 1.00
+  deepseek:
+    base_url: https://api.deepseek.com/v1
+    probe_path: /models
+    completion_path: /chat/completions
+    api_key_env: HERMES3D_DEEPSEEK_API_KEY
+    cost_cap_usd_per_run: 0.05
+    cost_cap_usd_per_day: 1.00
+probe_freshness_minutes: 15
+probe_budget_usd_per_day: 0.10
+probe_rate_per_minute: 1
