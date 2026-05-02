@@ -10,8 +10,9 @@ import { StatusBadge } from "../components/badges/StatusBadge";
 import { WorkflowPipeline, type PipelineStage } from "../components/pipeline/WorkflowPipeline";
 import { adapters } from "../api/adapters";
 import type { TaskDAG } from "../types/dag";
+import type { ProviderHealth } from "../types/provider";
 import { GitBranch, Image as ImageIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const PROVIDERS = [
   { id: "minimax_vision", name: "MiniMax Vision", status: "ready", note: "vision-conditioned 3D" },
@@ -32,7 +33,18 @@ export function Gen3DTab() {
   const [prompt, setPrompt] = useState("calibration cube");
   const [previewDag, setPreviewDag] = useState<TaskDAG | null>(null);
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [providerHealth, setProviderHealth] = useState<ProviderHealth[]>([]);
   const plannerMode = previewDag?.metadata?.planner_mode;
+
+  useEffect(() => {
+    let cancelled = false;
+    adapters.getProviderHealth().then((data) => {
+      if (!cancelled) setProviderHealth(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const previewPlan = async () => {
     setPreviewState("loading");
@@ -119,7 +131,7 @@ export function Gen3DTab() {
           title="PROVIDERS"
           dense
           status={{ tone: "green", label: `${PROVIDERS.filter((p) => p.status === "ready").length} ready` }}
-          className="h-[260px]"
+          className="min-h-[260px]"
         >
           <ul className="flex flex-col gap-1 h-full overflow-auto text-xs">
             {PROVIDERS.map((p, i) => (
@@ -145,6 +157,41 @@ export function Gen3DTab() {
               </li>
             ))}
           </ul>
+          <div
+            className="border-t border-border pt-2 mt-2"
+            data-testid="gen3d-provider-health"
+          >
+            <div className="text-muted text-[10px] uppercase tracking-wide mb-1">
+              LLM Provider Health
+            </div>
+            <ul className="flex flex-col gap-1">
+              {providerHealth.map((p) => (
+                <li
+                  key={p.provider_id}
+                  className="flex items-center gap-2 px-1 py-0.5 text-[11px]"
+                >
+                  <span
+                    data-testid="gen3d-provider-dot"
+                    data-provider={p.provider_id}
+                    data-status={p.status}
+                    aria-label={`${p.provider_id} status ${p.status}`}
+                    className={[
+                      "h-1.5 w-1.5 rounded-full shrink-0",
+                      p.status === "green"
+                        ? "bg-accent-green"
+                        : p.status === "amber"
+                          ? "bg-amber-400"
+                          : p.status === "red"
+                            ? "bg-red-500"
+                            : "bg-muted",
+                    ].join(" ")}
+                  />
+                  <span className="text-fg font-medium">{p.provider_id}</span>
+                  <span className="text-muted text-[10px] font-mono">{p.status}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </Panel>
       </div>
       <div className="col-span-12">

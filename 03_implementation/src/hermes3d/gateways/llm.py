@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
@@ -95,11 +95,17 @@ class LLMGateway:
         token: CapabilityToken,
         budget: BudgetState,
         caller: LLMCaller | None = None,
+        provider_id: str = "openai-fixture",
+        now_utc: datetime | None = None,
     ) -> Result[LLMResponse]:
         token_validation = self._validate_token(token)
         if isinstance(token_validation, Err):
             return token_validation
         self._consumed_tokens.add(token.token_id)
+
+        freshness_refusal = self._check_probe_freshness(provider_id, now_utc=now_utc)
+        if isinstance(freshness_refusal, Err):
+            return freshness_refusal
 
         sanitized = sanitize_prompt(prompt, prompt_max_bytes=self.policy.prompt_max_bytes)
         if isinstance(sanitized, Err):
@@ -179,6 +185,32 @@ class LLMGateway:
                 return Err("invalid_llm_response", "LLM response text is empty")
             return Ok(response, "caller returned LLMResponse")
         return Err("upstream_failure", last_message)
+
+    def _check_probe_freshness(
+        self,
+        provider_id: str,
+        *,
+        now_utc: datetime | None,
+    ) -> Err | None:
+        if provider_id == "openai-fixture":
+            return None
+        from hermes3d.gateways.providers import load_probe_policy
+
+        probe_policy = load_probe_policy()
+        threshold = (now_utc or datetime.now(UTC)) - timedelta(
+            minutes=probe_policy.probe_freshness_minutes
+        )
+        needle = f"provider={provider_id} "
+        for event in reversed(self.ledger.events()):
+            if event.tool != "provider.probe" or event.verdict != "pass":
+                continue
+            if needle not in event.message:
+                continue
+            event_time = datetime.fromisoformat(event.ts_utc.replace("Z", "+00:00"))
+            if event_time >= threshold:
+                return None
+            break
+        return Err("provider_not_probed", provider_id)
 
     def _validate_token(self, token: CapabilityToken | None) -> Result[CapabilityToken]:
         if token is None:

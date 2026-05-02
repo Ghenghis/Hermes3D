@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import uuid4
 
@@ -108,6 +109,56 @@ class BridgeState:
             ],
         }
 
+    def provider_health(self) -> dict[str, object]:
+        if self.ledger is None:
+            return {"providers": []}
+        from hermes3d.gateways.providers import load_probe_policy
+
+        probe_policy = load_probe_policy()
+        threshold = datetime.now(UTC) - timedelta(minutes=probe_policy.probe_freshness_minutes)
+        providers: list[dict[str, object]] = []
+        for provider_id in sorted(probe_policy.providers.keys()):
+            most_recent = self._most_recent_probe(provider_id)
+            if most_recent is None:
+                providers.append(
+                    {
+                        "provider_id": provider_id,
+                        "status": "idle",
+                        "last_probe_utc": None,
+                        "http_status": None,
+                        "latency_ms": None,
+                        "stale": False,
+                    }
+                )
+                continue
+            event_time = datetime.fromisoformat(most_recent.ts_utc.replace("Z", "+00:00"))
+            is_stale = event_time < threshold
+            parsed = _parse_probe_event(most_recent.message)
+            if is_stale:
+                status = "amber"
+            elif most_recent.verdict == "pass":
+                status = "green"
+            else:
+                status = "red"
+            providers.append(
+                {
+                    "provider_id": provider_id,
+                    "status": status,
+                    "last_probe_utc": most_recent.ts_utc,
+                    "http_status": parsed.get("http_status"),
+                    "latency_ms": parsed.get("latency_ms"),
+                    "stale": is_stale,
+                }
+            )
+        return {"providers": providers}
+
+    def _most_recent_probe(self, provider_id: str):
+        needle = f"provider={provider_id} "
+        for event in reversed(self.ledger.events()):
+            if event.tool == "provider.probe" and needle in event.message:
+                return event
+        return None
+
     def _ensure_ledger(self) -> OrchestrationLedger:
         if self.ledger is None:
             self.ledger = OrchestrationLedger(Path("var") / "orchestration" / "ledger.sqlite")
@@ -162,7 +213,29 @@ def create_bridge_app(state: BridgeState | None = None) -> FastAPI:
     async def get_run(run_id: str) -> dict[str, object]:
         return bridge_state.run_summary(run_id)
 
+    @app.get("/api/providers/health")
+    async def get_provider_health() -> dict[str, object]:
+        return bridge_state.provider_health()
+
     return app
+
+
+def _parse_probe_event(message: str) -> dict[str, int | None]:
+    """Parse 'provider=X status=N latency_ms=M excerpt=...' into status fields."""
+
+    result: dict[str, int | None] = {"http_status": None, "latency_ms": None}
+    for token in message.split():
+        if token.startswith("status="):
+            try:
+                result["http_status"] = int(token.removeprefix("status="))
+            except ValueError:
+                pass
+        elif token.startswith("latency_ms="):
+            try:
+                result["latency_ms"] = int(token.removeprefix("latency_ms="))
+            except ValueError:
+                pass
+    return result
 
 
 def serialize_dag(dag: TaskDAG) -> dict[str, object]:

@@ -1,0 +1,45 @@
+{
+  "happy": {
+    "probe_status": 200,
+    "probe_body": {
+      "object": "list",
+      "data": [
+        {
+          "id": "deepseek-chat",
+          "object": "model"
+        }
+      ]
+    },
+    "completion_status": 200,
+    "completion_body": {
+      "choices": [
+        {
+          "message": {
+            "role": "assistant",
+            "content": "calibration cube"
+          }
+        }
+      ],
+      "usage": {
+        "prompt_tokens": 4,
+        "completion_tokens": 4
+      }
+    }
+  },
+  "unauthorized": {
+    "probe_status": 401,
+    "probe_body": {
+      "error": "invalid_api_key"
+    }
+  },
+  "rate_limited": {
+    "probe_status": 429,
+    "probe_body": {
+      "error": "rate_limit_exceeded"
+    }
+  },
+  "malformed": {
+    "probe_status": 200,
+    "probe_body": "not json"
+  }
+}
