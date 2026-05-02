@@ -24,7 +24,7 @@ from hermes3d.orchestration.types import (
     Result,
 )
 
-from .budget import BudgetCaps, BudgetDecision, check_budget, estimate_cost_usd, record_actual
+from .budget import BudgetCaps, BudgetDecision, BudgetStore, check_budget, estimate_cost_usd, record_actual
 from .redaction import redact_text
 from .sanitize import sanitize_prompt
 
@@ -73,10 +73,12 @@ class LLMGateway:
         policy_path: Path | str = DEFAULT_POLICY_PATH,
         schema_path: Path | str = DEFAULT_SCHEMA_PATH,
         caller: LLMCaller | None = None,
+        budget_store: BudgetStore | None = None,
     ) -> None:
         self.ledger = ledger
         self.policy = policy or load_policy(Path(policy_path), Path(schema_path))
         self._caller = caller
+        self._budget_store = budget_store
         self._consumed_tokens: set[str] = set()
 
     def complete(
@@ -90,6 +92,7 @@ class LLMGateway:
         token_validation = self._validate_token(token)
         if isinstance(token_validation, Err):
             return token_validation
+        self._consumed_tokens.add(token.token_id)
 
         sanitized = sanitize_prompt(prompt, prompt_max_bytes=self.policy.prompt_max_bytes)
         if isinstance(sanitized, Err):
@@ -148,9 +151,8 @@ class LLMGateway:
             tokens_out=redacted.tokens_out,
             cost_usd_estimate=actual_cost,
         )
-        record_actual(budget, actual_usd=actual_cost)
+        budget = record_actual(budget, actual_usd=actual_cost, store=self._budget_store)
         self._append_success(token=token, request=request, response=redacted)
-        self._consumed_tokens.add(token.token_id)
         return Ok(redacted, "LLM completion accepted")
 
     def _call_with_retry(self, caller: LLMCaller, request: LLMRequest) -> Result[LLMResponse]:
