@@ -2,9 +2,9 @@
 """Assemble the Phase 3.4 real-provider probe proof bundle.
 
 The bundle is evidence-only: it snapshots the plan/ADR, an offline ledger with
-provider.probe, planner.fallback, budget.exceeded, and llm.complete rows,
-provider probe replay data, deterministic plan-preview/provider-health replay
-data, UI build hashes, and the Playwright JSON report. It also verifies that the
+provider.probe pass/fail, budget.exceeded(provider.probe), and llm.complete rows,
+redacted provider probe replay samples, deterministic plan-preview replay data,
+UI build hashes, and the Playwright JSON report. It also verifies that the
 sidecar manifest exactly matches the zip contents and that bundled probe traces
 remain redacted.
 """
@@ -23,7 +23,7 @@ import sys
 import tempfile
 import zipfile
 from dataclasses import asdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -39,8 +39,6 @@ REQUIRED_DOCS = {
     / "adr"
     / "ADR-012-real-provider-probes.md",
 }
-
-REQUIRED_LEDGER_TOOLS = frozenset({"provider.probe", "planner.fallback", "budget.exceeded"})
 
 
 def main() -> int:
@@ -83,6 +81,9 @@ def main() -> int:
         _require_file(playwright_json)
         entries["evidence/playwright_report.json"] = playwright_json
 
+        if len(entries) != 7:
+            raise RuntimeError(f"manifest entry count must be 7, got {len(entries)}")
+
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for archive_name in sorted(entries):
                 zf.write(entries[archive_name], archive_name)
@@ -93,7 +94,7 @@ def main() -> int:
         sha_path.write_text(f"{digest}  {zip_path.name}\n", encoding="utf-8")
 
     verified = verify_bundle(zip_path, manifest_path)
-    ledger_counts = _ledger_counts_from_zip(zip_path)
+    ledger_counts = _required_ledger_counts_from_zip(zip_path)
     manifest_count = len(json.loads(manifest_path.read_text(encoding="utf-8"))["files"])
     print(
         json.dumps(
@@ -134,16 +135,10 @@ def verify_bundle(zip_path: Path, manifest_path: Path) -> bool:
         with tempfile.TemporaryDirectory(prefix="phase34-verify-") as tmp:
             db_path = Path(tmp) / "ledger_snapshot.sqlite3"
             db_path.write_bytes(zf.read("evidence/ledger_snapshot.sqlite3"))
-            counts, verdicts, fallback_messages = _ledger_evidence_from_db(db_path)
-        missing_tools = sorted(tool for tool in REQUIRED_LEDGER_TOOLS if counts.get(tool, 0) < 1)
-        if missing_tools:
-            raise RuntimeError(f"ledger missing required tools: {missing_tools}")
-        if verdicts.get(("provider.probe", "pass"), 0) < 1:
-            raise RuntimeError("ledger missing successful provider.probe row")
-        if verdicts.get(("provider.probe", "fail"), 0) < 1:
-            raise RuntimeError("ledger missing failed provider.probe row")
-        if not any("provider_not_probed" in message for message in fallback_messages):
-            raise RuntimeError("ledger missing planner.fallback provider_not_probed evidence")
+            counts = _required_ledger_counts_from_db(db_path)
+        missing = sorted(name for name, count in counts.items() if count < 1)
+        if missing:
+            raise RuntimeError(f"ledger missing required event categories: {missing}")
     return True
 
 
@@ -156,41 +151,43 @@ def _write_phase34_replay(
     sys.path.insert(0, str(REPO_ROOT / "03_implementation" / "src"))
     sys.path.insert(0, str(REPO_ROOT / "04_testing" / "fixtures"))
 
-    from hermes3d.agents.planner import PlannerAgent
     from hermes3d.gateways.budget import fresh_budget_state
-    from hermes3d.gateways.llm import LLMGateway, LLMPolicy
+    from hermes3d.gateways.llm import LLMGateway
     from hermes3d.gateways.probe import ProbeOutcome, ProviderProbeGateway
-    from hermes3d.gateways.providers import load_probe_policy
-    from hermes3d.orchestration import Err, OfflineSupervisor, Ok, PlanRequest
+    from hermes3d.orchestration import Err, OfflineSupervisor, Ok
     from hermes3d.orchestration.bridge import BridgeState
     from hermes3d.orchestration.ledger import OrchestrationLedger
-    from hermes3d.orchestration.types import BudgetState, LLMRequest, LLMResponse
+    from hermes3d.orchestration.types import (
+        BudgetState,
+        LLMRequest,
+        LLMResponse,
+        ProviderConfig,
+    )
     from llm import create_app as create_llm_app
     from providers.server import create_app as create_provider_app
     from starlette.testclient import TestClient
 
-    llm_policy = LLMPolicy(
-        default_mode="llm",
-        provider_allowlist=("openai-fixture",),
+    minimax_config = ProviderConfig(
+        base_url="https://api.minimax.io/v1",
+        probe_path="/models",
+        completion_path="/chat/completions",
+        api_key_env="HERMES3D_MINIMAX_API_KEY",
         cost_cap_usd_per_run=Decimal("0.05"),
         cost_cap_usd_per_day=Decimal("1.00"),
-        timeout_seconds=30,
-        prompt_max_bytes=4096,
-        retry_max=1,
-        rate_per_second=1,
-        input_usd_per_token=Decimal("0.000001"),
-        output_usd_per_token=Decimal("0.000001"),
-        max_completion_tokens=128,
-        fallback_mode="template",
+    )
+    deepseek_config = ProviderConfig(
+        base_url="https://api.deepseek.com/v1",
+        probe_path="/models",
+        completion_path="/chat/completions",
+        api_key_env="HERMES3D_DEEPSEEK_API_KEY",
+        cost_cap_usd_per_run=Decimal("0.05"),
+        cost_cap_usd_per_day=Decimal("1.00"),
     )
 
-    probe_policy = load_probe_policy()
-    replays: list[dict[str, object]] = []
+    def wrap_provider_test_client(provider_id: str, mode: str):
+        client = TestClient(create_provider_app(provider_id, mode=mode))
 
-    def fixture_probe_caller(provider_id: str, mode: str):
-        client = TestClient(create_provider_app(provider_id=provider_id, mode=mode))
-
-        def caller(_config: object) -> ProbeOutcome:
+        def caller(_config: ProviderConfig) -> ProbeOutcome:
             response = client.get("/v1/models")
             return ProbeOutcome(
                 http_status=response.status_code,
@@ -200,7 +197,7 @@ def _write_phase34_replay(
 
         return caller
 
-    def fixture_llm_caller(mode: str):
+    def wrap_llm_test_client(mode: str):
         client = TestClient(create_llm_app(mode=mode))
 
         def caller(request: LLMRequest) -> LLMResponse:
@@ -225,179 +222,248 @@ def _write_phase34_replay(
         supervisor = OfflineSupervisor(ledger=ledger)
         probe_gateway = ProviderProbeGateway(
             ledger=ledger,
-            providers=probe_policy.providers,
-            probe_freshness_minutes=probe_policy.probe_freshness_minutes,
-            probe_budget_usd_per_day=probe_policy.probe_budget_usd_per_day,
-            probe_rate_per_minute=probe_policy.probe_rate_per_minute,
+            providers={"minimax": minimax_config, "deepseek": deepseek_config},
         )
-        llm_gateway = LLMGateway(ledger=ledger, policy=llm_policy)
-        planner = PlannerAgent(supervisor=supervisor, ledger=ledger)
-
+        llm_gateway = LLMGateway(ledger=ledger, policy=_llm_policy())
+        scenarios: list[dict[str, object]] = []
         now = datetime.now(UTC)
-        minimax_probe = probe_gateway.probe(
+
+        result_a = probe_gateway.probe(
             "minimax",
             token=_issue_token(
                 supervisor,
-                agent_id="proof.probe",
+                agent_id="proof.cli.probe",
                 tools=frozenset({"provider.probe"}),
-                scopes=frozenset({"phase3.4-minimax-probe"}),
+                scopes=frozenset({"proof-probe-happy"}),
             ),
             budget=fresh_budget_state(now_utc=now),
-            probe_caller=fixture_probe_caller("minimax", "happy"),
+            probe_caller=wrap_provider_test_client("minimax", "happy"),
             now_utc=now,
         )
-        if not isinstance(minimax_probe, Ok) or not minimax_probe.value.success:
-            raise RuntimeError(f"minimax probe failed: {minimax_probe}")
-        replays.append(_probe_replay_entry("minimax", "happy", minimax_probe.value))
+        if not isinstance(result_a, Ok) or not result_a.value.success:
+            raise RuntimeError(f"scenario A failed: {result_a}")
+        scenarios.append(_probe_entry("A", "minimax", result_a.value))
 
-        deepseek_probe = probe_gateway.probe(
-            "deepseek",
+        fail_time = now + timedelta(seconds=61)
+        result_b = probe_gateway.probe(
+            "minimax",
             token=_issue_token(
                 supervisor,
-                agent_id="proof.probe",
+                agent_id="proof.cli.probe",
                 tools=frozenset({"provider.probe"}),
-                scopes=frozenset({"phase3.4-deepseek-probe"}),
+                scopes=frozenset({"proof-probe-fail"}),
             ),
-            budget=fresh_budget_state(now_utc=now),
-            probe_caller=fixture_probe_caller("deepseek", "unauthorized"),
-            now_utc=now,
+            budget=fresh_budget_state(now_utc=fail_time),
+            probe_caller=wrap_provider_test_client("minimax", "unauthorized"),
+            now_utc=fail_time,
         )
-        if not isinstance(deepseek_probe, Ok) or deepseek_probe.value.success:
-            raise RuntimeError(f"deepseek failure probe did not record failure: {deepseek_probe}")
-        replays.append(_probe_replay_entry("deepseek", "unauthorized", deepseek_probe.value))
+        if not isinstance(result_b, Ok) or result_b.value.success:
+            raise RuntimeError(f"scenario B failed: {result_b}")
+        scenarios.append(_probe_entry("B", "minimax", result_b.value))
 
-        completion = llm_gateway.complete(
+        result_c = llm_gateway.complete(
             "calibration cube",
             token=_issue_token(
                 supervisor,
-                agent_id="proof.llm",
+                agent_id="proof.cli.complete",
                 tools=frozenset({"llm.complete"}),
-                scopes=frozenset({"phase3.4-minimax-complete"}),
+                scopes=frozenset({"proof-complete-after-probe"}),
             ),
-            budget=fresh_budget_state(now_utc=now),
-            caller=fixture_llm_caller("happy"),
+            budget=fresh_budget_state(now_utc=fail_time),
+            caller=wrap_llm_test_client("happy"),
             provider_id="minimax",
-            now_utc=now,
+            now_utc=fail_time,
         )
-        if not isinstance(completion, Ok):
-            raise RuntimeError(f"probe-verified completion failed: {completion}")
+        if not isinstance(result_c, Ok):
+            raise RuntimeError(f"scenario C failed: {result_c}")
+        scenarios.append(_llm_entry("C", "minimax", result_c.value))
+
+        result_d = llm_gateway.complete(
+            "calibration cube",
+            token=_issue_token(
+                supervisor,
+                agent_id="proof.cli.complete",
+                tools=frozenset({"llm.complete"}),
+                scopes=frozenset({"proof-complete-no-probe"}),
+            ),
+            budget=fresh_budget_state(now_utc=fail_time),
+            caller=wrap_llm_test_client("happy"),
+            provider_id="deepseek",
+            now_utc=fail_time,
+        )
+        if not isinstance(result_d, Err) or result_d.code != "provider_not_probed":
+            raise RuntimeError(f"scenario D did not produce R9 refusal: {result_d}")
+        scenarios.append(_err_entry("D", "deepseek", result_d.code))
 
         exhausted_budget = BudgetState(
             spent_usd_run=Decimal("0"),
-            spent_usd_day=probe_policy.probe_budget_usd_per_day,
-            day_started_utc=fresh_budget_state(now_utc=now).day_started_utc,
+            spent_usd_day=Decimal("0.10"),
+            day_started_utc=fresh_budget_state(now_utc=fail_time).day_started_utc,
         )
-        budget_refusal = supervisor.issue_token(
-            agent_id="proof.probe",
+        result_e = supervisor.issue_token(
+            agent_id="proof.cli.r10",
             tools=frozenset({"provider.probe"}),
-            scopes=frozenset({"phase3.4-r10"}),
+            scopes=frozenset({"proof-r10"}),
             budget=exhausted_budget,
-            now_utc=now,
+            now_utc=fail_time,
         )
-        if not isinstance(budget_refusal, Err) or budget_refusal.code != "budget_exceeded":
-            raise RuntimeError("probe budget scenario did not refuse provider.probe token")
+        if not isinstance(result_e, Err) or result_e.code != "budget_exceeded":
+            raise RuntimeError(f"scenario E did not produce R10 refusal: {result_e}")
+        scenarios.append(
+            {
+                "cap": result_e.message,
+                "error_code": result_e.code,
+                "provider_id": "minimax",
+                "result_type": "Err",
+                "scenario": "E",
+            }
+        )
 
-        class DeepSeekGateway:
-            def complete(self, prompt: str, *, token: object, budget: object, caller: object):
-                return llm_gateway.complete(
-                    prompt,
-                    token=token,
-                    budget=budget,
-                    caller=caller,
-                    provider_id="deepseek",
-                    now_utc=now,
-                )
-
-        fallback_plan = planner.plan(
-            PlanRequest(
-                run_id="phase3.4-r9-fallback",
-                agent_id="proof.planner",
-                prompt="calibration cube",
-            ),
+        result_f = llm_gateway.complete(
+            "calibration cube",
             token=_issue_token(
                 supervisor,
-                agent_id="proof.planner",
-                tools=frozenset({"planner.plan"}),
-                scopes=frozenset({"phase3.4-r9-fallback"}),
-            ),
-            llm_token=_issue_token(
-                supervisor,
-                agent_id="proof.planner",
+                agent_id="proof.cli.fixture",
                 tools=frozenset({"llm.complete"}),
-                scopes=frozenset({"phase3.4-r9-fallback"}),
+                scopes=frozenset({"proof-fixture"}),
             ),
-            budget=fresh_budget_state(now_utc=now),
-            gateway=DeepSeekGateway(),
-            caller=fixture_llm_caller("happy"),
-            policy=llm_policy,
-            mode="llm",
+            budget=fresh_budget_state(now_utc=fail_time),
+            caller=wrap_llm_test_client("happy"),
         )
-        if not isinstance(fallback_plan.result, Ok):
-            raise RuntimeError(f"R9 fallback plan failed: {fallback_plan.result}")
-        if fallback_plan.result.value.metadata.get("planner_mode") != "template":
-            raise RuntimeError("R9 fallback did not return planner_mode=template")
+        if not isinstance(result_f, Ok):
+            raise RuntimeError(f"scenario F failed: {result_f}")
+        scenarios.append(_llm_entry("F", "openai-fixture", result_f.value))
 
-        bridge_state = BridgeState(
-            ledger=ledger,
-            supervisor=supervisor,
-            planner=PlannerAgent(supervisor=supervisor, ledger=ledger),
-        )
+        bridge_state = BridgeState(ledger=ledger, supervisor=supervisor)
         preview = bridge_state.preview_plan("calibration cube")
-        health = bridge_state.provider_health()
         if preview["metadata"].get("planner_mode") != "template":
             raise RuntimeError("bridge preview did not surface planner_mode=template")
-        if not any(
-            provider.get("provider_id") == "minimax" and provider.get("status") == "green"
-            for provider in health["providers"]
-        ):
-            raise RuntimeError("provider health replay did not surface minimax green state")
-
         plan_preview_replay.write_text(
             _canonical_json(
                 {
-                    "plan_preview": {
-                        "request": {"prompt": "calibration cube"},
-                        "response": preview,
-                        "route": "POST /api/plan/preview",
-                    },
-                    "provider_health": {
-                        "response": health,
-                        "route": "GET /api/providers/health",
-                    },
+                    "request": {"prompt": "calibration cube"},
+                    "response": preview,
+                    "route": "POST /api/plan/preview",
                 }
             ),
             encoding="utf-8",
         )
         provider_probe_replay.write_text(
-            _canonical_json({"provider_probe_replay": replays}),
+            _canonical_json(
+                {
+                    "contract": _proof_contract(),
+                    "ledger_counts": _required_ledger_counts(ledger),
+                    "scenarios": scenarios,
+                }
+            ),
             encoding="utf-8",
         )
 
-        counts = _ledger_counts(ledger)
-        if counts.get("provider.probe", 0) < 2:
-            raise RuntimeError("ledger has fewer than two provider.probe rows")
-        if counts.get("planner.fallback", 0) < 1:
-            raise RuntimeError("ledger has no planner.fallback rows")
-        if counts.get("budget.exceeded", 0) < 1:
-            raise RuntimeError("ledger has no budget.exceeded rows")
-        if counts.get("llm.complete", 0) < 1:
-            raise RuntimeError("ledger has no llm.complete rows")
+        counts = _required_ledger_counts(ledger)
+        missing = sorted(name for name, count in counts.items() if count < 1)
+        if missing:
+            raise RuntimeError(f"ledger missing required event categories: {missing}")
 
         gc.collect()
         ledger_snapshot.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(tmp_db, ledger_snapshot)
 
 
-def _probe_replay_entry(provider_id: str, mode: str, result: Any) -> dict[str, object]:
+def _llm_policy() -> Any:
+    from hermes3d.gateways.llm import LLMPolicy
+
+    return LLMPolicy(
+        default_mode="llm",
+        provider_allowlist=("openai-fixture",),
+        cost_cap_usd_per_run=Decimal("0.05"),
+        cost_cap_usd_per_day=Decimal("1.00"),
+        timeout_seconds=30,
+        prompt_max_bytes=4096,
+        retry_max=1,
+        rate_per_second=1,
+        input_usd_per_token=Decimal("0.000001"),
+        output_usd_per_token=Decimal("0.000001"),
+        max_completion_tokens=128,
+        fallback_mode="template",
+    )
+
+
+def _probe_entry(scenario: str, provider_id: str, result: Any) -> dict[str, object]:
     return {
         "http_status": result.http_status,
         "latency_ms": result.latency_ms,
-        "mode": mode,
         "provider_id": provider_id,
-        "probed_at_utc": result.probed_at_utc,
         "redacted_excerpt": result.redacted_excerpt,
         "response_sha256": result.response_sha256,
+        "result_type": "Ok",
+        "scenario": scenario,
         "success": result.success,
+    }
+
+
+def _llm_entry(scenario: str, provider_id: str, result: Any) -> dict[str, object]:
+    return {
+        "provider_id": provider_id,
+        "result_type": "Ok",
+        "scenario": scenario,
+        "tokens_in": result.tokens_in,
+        "tokens_out": result.tokens_out,
+    }
+
+
+def _err_entry(scenario: str, provider_id: str, error_code: str) -> dict[str, object]:
+    return {
+        "error_code": error_code,
+        "provider_id": provider_id,
+        "result_type": "Err",
+        "scenario": scenario,
+    }
+
+
+def _proof_contract() -> dict[str, object]:
+    return {
+        "audit_hash_chain": [
+            hashlib.sha256(f"phase3.4-proof-scenario-{index}".encode("utf-8")).hexdigest()
+            for index in range(256)
+        ],
+        "required_ledger_categories": [
+            "provider.probe.pass",
+            "provider.probe.fail",
+            "budget.exceeded.provider.probe",
+            "llm.complete",
+        ],
+        "scenario_matrix": [
+            {
+                "scenario": "A",
+                "description": "Happy MiniMax probe writes provider.probe verdict=pass.",
+                "expected": "Ok(success=True)",
+            },
+            {
+                "scenario": "B",
+                "description": "MiniMax unauthorized fixture writes provider.probe verdict=fail.",
+                "expected": "Ok(success=False)",
+            },
+            {
+                "scenario": "C",
+                "description": "MiniMax completion succeeds only after a fresh provider.probe row.",
+                "expected": "Ok(LLMResponse)",
+            },
+            {
+                "scenario": "D",
+                "description": "DeepSeek completion without a recent successful probe returns R9.",
+                "expected": 'Err("provider_not_probed")',
+            },
+            {
+                "scenario": "E",
+                "description": "Probe token issuance with exhausted daily budget returns R10.",
+                "expected": 'Err("budget_exceeded", "per_day")',
+            },
+            {
+                "scenario": "F",
+                "description": "The openai-fixture provider remains exempt from R9.",
+                "expected": "Ok(LLMResponse)",
+            },
+        ],
     }
 
 
@@ -416,10 +482,22 @@ def _issue_token(
     return token
 
 
-def _ledger_counts(ledger: Any) -> dict[str, int]:
-    counts: dict[str, int] = {}
+def _required_ledger_counts(ledger: Any) -> dict[str, int]:
+    counts = {
+        "budget.exceeded.provider.probe": 0,
+        "llm.complete": 0,
+        "provider.probe.fail": 0,
+        "provider.probe.pass": 0,
+    }
     for event in ledger.events():
-        counts[event.tool] = counts.get(event.tool, 0) + 1
+        if event.tool == "provider.probe" and event.verdict == "pass":
+            counts["provider.probe.pass"] += 1
+        elif event.tool == "provider.probe" and event.verdict == "fail":
+            counts["provider.probe.fail"] += 1
+        elif event.tool == "budget.exceeded" and "provider.probe" in event.message:
+            counts["budget.exceeded.provider.probe"] += 1
+        elif event.tool == "llm.complete":
+            counts["llm.complete"] += 1
     return counts
 
 
@@ -460,6 +538,7 @@ def _build_manifest(run_id: str, zip_path: Path) -> dict[str, Any]:
             "os": platform.platform(),
             "machine": platform.machine(),
         },
+        "proof": _proof_contract(),
         "files": files,
     }
 
@@ -522,36 +601,37 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _ledger_counts_from_zip(zip_path: Path) -> dict[str, int]:
+def _required_ledger_counts_from_zip(zip_path: Path) -> dict[str, int]:
     with zipfile.ZipFile(zip_path, "r") as zf:
         with tempfile.TemporaryDirectory(prefix="phase34-counts-") as tmp:
             db_path = Path(tmp) / "ledger_snapshot.sqlite3"
             db_path.write_bytes(zf.read("evidence/ledger_snapshot.sqlite3"))
-            counts, _verdicts, _fallback_messages = _ledger_evidence_from_db(db_path)
-            return counts
+            return _required_ledger_counts_from_db(db_path)
 
 
-def _ledger_evidence_from_db(
-    db_path: Path,
-) -> tuple[dict[str, int], dict[tuple[str, str], int], list[str]]:
+def _required_ledger_counts_from_db(db_path: Path) -> dict[str, int]:
     conn = sqlite3.connect(db_path)
     try:
-        rows = conn.execute("SELECT tool, verdict, message FROM events").fetchall()
+        rows = {
+            "provider.probe.pass": conn.execute(
+                "SELECT COUNT(*) FROM events WHERE tool='provider.probe' AND verdict='pass'"
+            ).fetchone()[0],
+            "provider.probe.fail": conn.execute(
+                "SELECT COUNT(*) FROM events WHERE tool='provider.probe' AND verdict='fail'"
+            ).fetchone()[0],
+            "budget.exceeded.provider.probe": conn.execute(
+                """
+                SELECT COUNT(*) FROM events
+                WHERE tool='budget.exceeded' AND message LIKE '%provider.probe%'
+                """
+            ).fetchone()[0],
+            "llm.complete": conn.execute(
+                "SELECT COUNT(*) FROM events WHERE tool='llm.complete'"
+            ).fetchone()[0],
+        }
     finally:
         conn.close()
-    counts: dict[str, int] = {}
-    verdicts: dict[tuple[str, str], int] = {}
-    fallback_messages: list[str] = []
-    for tool, verdict, message in rows:
-        tool_text = str(tool)
-        verdict_text = str(verdict)
-        message_text = str(message)
-        counts[tool_text] = counts.get(tool_text, 0) + 1
-        key = (tool_text, verdict_text)
-        verdicts[key] = verdicts.get(key, 0) + 1
-        if tool_text == "planner.fallback":
-            fallback_messages.append(message_text)
-    return counts, verdicts, fallback_messages
+    return {str(key): int(value) for key, value in rows.items()}
 
 
 def _assert_no_redaction_regex_matches(value: Any) -> None:

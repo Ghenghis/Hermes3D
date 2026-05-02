@@ -14,8 +14,8 @@
 
 ## Bundle
 
-- Path: `06_release/phase3.4-bundle/79aadaf8e611-20260502T212648Z.zip`
-- SHA-256: `bf19783977ed2cf3d6ff16d877d28de2cb2f02770e2e2c342cbb38af95813c91`
+- Path: `06_release/phase3.4-bundle/a10d7b7ab6b4-20260502T221536Z.zip`
+- SHA-256: `97a08570cb4989c2b468de417d5594dfdd0cd32044ea4433de17412c5897730f`
 - Verified: `true`
 
 ## Test plan
@@ -46,7 +46,7 @@
 - [ ] ADR-012 read
 - [ ] PHASE3_4_PLAN.md read
 - [ ] Bundle verifier output reviewed
-- [ ] Ledger snapshot rows confirmed (`provider.probe`, `planner.fallback`, `budget.exceeded`)
+- [ ] Ledger snapshot rows confirmed (`provider.probe` pass, `provider.probe` fail, `budget.exceeded` with `provider.probe`, `llm.complete`)
 - [ ] No LLM/provider SDK import outside allowed gateway/provider files
 - [ ] Bridge route is read-only and UI dot is non-gating
 

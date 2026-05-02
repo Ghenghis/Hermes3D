@@ -22,9 +22,10 @@ summarizes existing ledger evidence. The UI adds a non-gating status dot in the
 existing Gen3D providers panel. It does not trigger probes, edit provider config,
 unlock Generate, add tabs, or add polling.
 
-Out of scope: real 3D providers, write actions, auto-probing, provider config UI,
-default real-provider routing, streaming, function-calling, multi-provider
-routing or fallback chains, and Phase 4 execution capability.
+Out of scope: real 3D providers, planner-side provider_id threading, write
+actions, auto-probing, provider config UI, default real-provider routing,
+streaming, function-calling, multi-provider routing or fallback chains, and
+Phase 4 execution capability.
 
 ## Commit List
 
@@ -104,16 +105,17 @@ git diff origin/develop..HEAD --stat
 ### Planner determinism
 
 Planner source was not modified in Phase 3.4. The deterministic template planner
-remains the fallback and the default. R9 refusal evidence in the bundle shows
-planner LLM mode returning a template DAG with `planner.fallback` when a provider
-is not probe-verified.
+remains the fallback and the default. R9 refusal evidence in the bundle is a
+direct gateway refusal (`provider_not_probed`) for `deepseek`; planner-side
+provider_id threading is explicitly deferred.
 
 ### R9-R10 enforcement
 
 R9 is enforced inside `LLMGateway.complete()` for non-fixture providers. R10 is
 enforced at probe token issuance through the supervisor budget check and inside
 the probe gateway budget/rate substrate. The bundle ledger contains
-`planner.fallback=1` and `budget.exceeded=1`.
+`provider.probe.pass=1`, `provider.probe.fail=1`,
+`budget.exceeded.provider.probe=1`, and `llm.complete=2`.
 
 ### No execution during preview
 
@@ -147,13 +149,13 @@ tests, CLI, bridge code, or UI files import it.
 Path:
 
 ```text
-06_release/phase3.4-bundle/79aadaf8e611-20260502T212648Z.zip
+06_release/phase3.4-bundle/a10d7b7ab6b4-20260502T221536Z.zip
 ```
 
 SHA-256:
 
 ```text
-bf19783977ed2cf3d6ff16d877d28de2cb2f02770e2e2c342cbb38af95813c91
+97a08570cb4989c2b468de417d5594dfdd0cd32044ea4433de17412c5897730f
 ```
 
 Included files:
@@ -172,17 +174,16 @@ Verification result:
 
 ```json
 {
-  "bundle": "06_release\\phase3.4-bundle\\79aadaf8e611-20260502T212648Z.zip",
+  "bundle": "06_release\\phase3.4-bundle\\a10d7b7ab6b4-20260502T221536Z.zip",
   "ledger_counts": {
-    "budget.exceeded": 1,
-    "llm.complete": 1,
-    "planner.fallback": 1,
-    "planner.plan": 2,
-    "provider.probe": 2
+    "budget.exceeded.provider.probe": 1,
+    "llm.complete": 2,
+    "provider.probe.fail": 1,
+    "provider.probe.pass": 1
   },
-  "manifest": "06_release\\phase3.4-bundle\\79aadaf8e611-20260502T212648Z.manifest.json",
+  "manifest": "06_release\\phase3.4-bundle\\a10d7b7ab6b4-20260502T221536Z.manifest.json",
   "manifest_count": 7,
-  "sha256": "bf19783977ed2cf3d6ff16d877d28de2cb2f02770e2e2c342cbb38af95813c91",
+  "sha256": "97a08570cb4989c2b468de417d5594dfdd0cd32044ea4433de17412c5897730f",
   "verified": true
 }
 ```
@@ -190,21 +191,23 @@ Verification result:
 ## Known Follow-ups
 
 - Real 3D providers / Phase 3.5+.
-- Blender MCP read-only.
-- Slicer dry-run.
-- Write capability / Phase 4.
-- Per-provider completion budget caps beyond the initial provider config map.
+- Planner-side provider_id threading, so planner fallback can carry
+  `provider_not_probed` reason evidence.
+- Per-provider routing / failover.
 - Streaming and function-calling LLM modes.
+- UI provider editing; provider config stays YAML-only.
 
 ## Risks Observed
 
 R-9 Provider not probe-verified: mitigated by a probe-freshness check before
-real-provider completion. Refusal: R9. Bundle evidence: `planner.fallback=1`
-with `provider_not_probed`. Tests: `test_provider_probe_roundtrip.py`.
+real-provider completion. Refusal: R9. Bundle evidence: replay scenario D
+returns `Err("provider_not_probed")` for `deepseek`. Tests:
+`test_provider_probe_roundtrip.py`.
 
 R-10 Probe budget exhaustion: mitigated by supervisor preflight budget checks and
 probe gateway budget/rate checks. Refusal: R10. Bundle evidence:
-`budget.exceeded=1`. Tests: `test_probe.py`, `test_provider_probe_roundtrip.py`.
+`budget.exceeded.provider.probe=1`. Tests: `test_probe.py`,
+`test_provider_probe_roundtrip.py`.
 
 R-11 Provider key leakage: mitigated by env-only key names, redaction of probe
 excerpts, and bundle verifier redaction-regex scanning. Refusal: defense in
@@ -214,8 +217,8 @@ Tests: `test_minimax.py`, `test_deepseek.py`, bundle verifier.
 R-12 Provider response drift: mitigated by adapter normalization and failure
 classification for malformed or unexpected provider responses. Refusal: R8 where
 planner output would otherwise be accepted. Bundle evidence:
-`provider.probe=2`, including one failed probe. Tests: `test_minimax.py`,
-`test_deepseek.py`.
+`provider.probe.pass=1` and `provider.probe.fail=1`. Tests:
+`test_minimax.py`, `test_deepseek.py`.
 
 R-13 Probe storm on degraded provider: mitigated by per-provider rate cap plus
 per-day probe budget. Refusal: R10. Bundle evidence: failed probes are ledgered
@@ -223,8 +226,9 @@ as `provider.probe` failures. Tests: `test_probe.py::test_rate_cap_exceeded`.
 
 R-14 Cost surprise on real-provider opt-in: mitigated by default template mode,
 fixture-provider exemption, and R9 probe-first refusal for non-fixture providers.
-Refusal: R7 + R9. Bundle evidence: `llm.complete=1` only after a successful
-`provider.probe` row; otherwise planner fallback is recorded. Tests:
+Refusal: R7 + R9. Bundle evidence: `llm.complete=2`, with one completion after a
+successful MiniMax probe and one `openai-fixture` completion exempt from R9;
+scenario D records the unprobed DeepSeek refusal. Tests:
 `test_provider_probe_roundtrip.py`.
 
 ## Stop Point
