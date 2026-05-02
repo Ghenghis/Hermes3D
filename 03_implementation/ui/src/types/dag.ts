@@ -21,5 +21,5 @@ export interface TaskDAG {
   edges: TaskEdge[];
   max_depth: number;
   max_fanout: number;
-  metadata: Record<string, unknown>;
+  metadata: { planner_mode?: "llm" | "template" } & Record<string, unknown>;
 }

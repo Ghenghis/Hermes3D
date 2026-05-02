@@ -120,7 +120,10 @@ class BridgeState:
 
     def _ensure_planner(self) -> PlannerAgent:
         if self.planner is None:
-            self.planner = PlannerAgent(supervisor=self._ensure_supervisor())
+            self.planner = PlannerAgent(
+                supervisor=self._ensure_supervisor(),
+                ledger=self._ensure_ledger(),
+            )
         return self.planner
 
 
