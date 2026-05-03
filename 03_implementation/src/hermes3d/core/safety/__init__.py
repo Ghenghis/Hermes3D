@@ -153,9 +153,7 @@ def run_all_safety_gates(
             bundle.passed_gates.append(GATE_GCODE_BOUNDS)
         else:
             bundle.violations.append(
-                _gcode_bounds_payload(
-                    job_id=job_id, printer_id=printer_id, report=report
-                )
+                _gcode_bounds_payload(job_id=job_id, printer_id=printer_id, report=report)
             )
     else:
         bundle.skipped_gates.append(GATE_GCODE_BOUNDS)
@@ -173,9 +171,7 @@ def run_all_safety_gates(
             bundle.passed_gates.append(GATE_MATERIAL_WINDOW)
         else:
             bundle.violations.append(
-                _material_payload(
-                    job_id=job_id, printer_id=printer_id, result=result
-                )
+                _material_payload(job_id=job_id, printer_id=printer_id, result=result)
             )
     else:
         bundle.skipped_gates.append(GATE_MATERIAL_WINDOW)

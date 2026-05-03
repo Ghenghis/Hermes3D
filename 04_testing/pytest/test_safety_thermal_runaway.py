@@ -28,9 +28,7 @@ def _ramp_up_trace(
     # Each sample at temp = target + overshoot_c (above the +15 threshold).
     for _ in range(samples_above):
         trace.append(
-            TemperatureSample(
-                ts=t, temperature_c=target_c + overshoot_c, target_c=target_c
-            )
+            TemperatureSample(ts=t, temperature_c=target_c + overshoot_c, target_c=target_c)
         )
         t += period_s
     return trace
@@ -115,9 +113,7 @@ def test_high_resolution_trace_detects_within_budget() -> None:
     samples: list[TemperatureSample] = []
     t = 0.0
     while t <= 6.0:
-        samples.append(
-            TemperatureSample(ts=t, temperature_c=216.0, target_c=target)
-        )
+        samples.append(TemperatureSample(ts=t, temperature_c=216.0, target_c=target))
         t += 0.05
     evt, _ = replay_trace(samples)
     assert evt is not None

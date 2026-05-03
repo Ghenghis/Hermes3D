@@ -36,8 +36,10 @@ G1 X1000 Y10
 
 def _bounds() -> PrinterBounds:
     return PrinterBounds(
-        x_min_mm=0.0, x_max_mm=250.0,
-        y_min_mm=0.0, y_max_mm=210.0,
+        x_min_mm=0.0,
+        x_max_mm=250.0,
+        y_min_mm=0.0,
+        y_max_mm=210.0,
         z_max_mm=210.0,
     )
 
@@ -52,10 +54,7 @@ def test_all_gate_ids_registered() -> None:
 
 def test_all_pass_when_inputs_clean() -> None:
     sim = KlipperMockSimulator(response_delay_s=0.040)
-    samples = [
-        TemperatureSample(ts=t, temperature_c=200.0, target_c=200.0)
-        for t in range(0, 6)
-    ]
+    samples = [TemperatureSample(ts=t, temperature_c=200.0, target_c=200.0) for t in range(0, 6)]
     bundle: SafetyBundle = run_all_safety_gates(
         job_id="j",
         printer_id="p",
@@ -103,8 +102,7 @@ def test_skips_record_correctly() -> None:
 
 def test_thermal_runaway_violation_recorded_in_bundle() -> None:
     samples = [
-        TemperatureSample(ts=float(i), temperature_c=216.0, target_c=200.0)
-        for i in range(7)
+        TemperatureSample(ts=float(i), temperature_c=216.0, target_c=200.0) for i in range(7)
     ]
     bundle = run_all_safety_gates(
         job_id="j",
@@ -124,6 +122,4 @@ def test_emergency_stop_timing_failure_recorded_in_bundle() -> None:
         emergency_stop_budget_ms=200.0,
     )
     assert not bundle.passed
-    assert any(
-        v["gate"] == GATE_EMERGENCY_STOP_TIMING for v in bundle.violations
-    )
+    assert any(v["gate"] == GATE_EMERGENCY_STOP_TIMING for v in bundle.violations)

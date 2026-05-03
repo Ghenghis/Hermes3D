@@ -11,16 +11,22 @@ from hermes3d.core.safety.gcode_bounds import (
 
 # Standard rectangular 250x210x210 (Prusa-shape) for direct tests.
 RECT_BOUNDS = PrinterBounds(
-    x_min_mm=0.0, x_max_mm=250.0,
-    y_min_mm=0.0, y_max_mm=210.0,
-    z_min_mm=0.0, z_max_mm=210.0,
+    x_min_mm=0.0,
+    x_max_mm=250.0,
+    y_min_mm=0.0,
+    y_max_mm=210.0,
+    z_min_mm=0.0,
+    z_max_mm=210.0,
 )
 
 # A delta-shape circular bed (FLSUN QQ-S) — 260mm diameter.
 CIRCULAR_BOUNDS = PrinterBounds(
-    x_min_mm=-130.0, x_max_mm=130.0,
-    y_min_mm=-130.0, y_max_mm=130.0,
-    z_min_mm=0.0, z_max_mm=370.0,
+    x_min_mm=-130.0,
+    x_max_mm=130.0,
+    y_min_mm=-130.0,
+    y_max_mm=130.0,
+    z_min_mm=0.0,
+    z_max_mm=370.0,
     circular_diameter_mm=260.0,
 )
 

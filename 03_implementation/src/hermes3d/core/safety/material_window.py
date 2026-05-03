@@ -134,9 +134,7 @@ def load_material_db(
                 notes=str(entry.get("notes", "")),
             )
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError(
-                f"material_window: malformed entry for {name!r}: {exc}"
-            ) from exc
+            raise ValueError(f"material_window: malformed entry for {name!r}: {exc}") from exc
     return MaterialDB(materials=materials)
 
 
@@ -223,8 +221,7 @@ def check_material_window(
             bed_c=bed_c,
             window=None,
             reason=(
-                f"Unknown material {material!r}; "
-                f"known: {', '.join(db.names()) or '(empty db)'}"
+                f"Unknown material {material!r}; known: {', '.join(db.names()) or '(empty db)'}"
             ),
         )
 
@@ -241,14 +238,10 @@ def check_material_window(
     why_parts: list[str] = []
     if not (window.nozzle_min_c <= nozzle_c <= window.nozzle_max_c):
         why_parts.append(
-            f"nozzle {nozzle_c:.1f}C out of [{window.nozzle_min_c:.0f},"
-            f"{window.nozzle_max_c:.0f}]"
+            f"nozzle {nozzle_c:.1f}C out of [{window.nozzle_min_c:.0f},{window.nozzle_max_c:.0f}]"
         )
     if not (window.bed_min_c <= bed_c <= window.bed_max_c):
-        why_parts.append(
-            f"bed {bed_c:.1f}C out of [{window.bed_min_c:.0f},"
-            f"{window.bed_max_c:.0f}]"
-        )
+        why_parts.append(f"bed {bed_c:.1f}C out of [{window.bed_min_c:.0f},{window.bed_max_c:.0f}]")
     reason = "; ".join(why_parts)
 
     if _override_active(env):

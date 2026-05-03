@@ -96,9 +96,12 @@ class PrinterBounds:
 # Prusa MK3S+ defaults — the documented fallback when a printer is not
 # in the fleet config.
 PRUSA_MK3S_DEFAULT_BOUNDS = PrinterBounds(
-    x_min_mm=0.0, x_max_mm=250.0,
-    y_min_mm=-3.0, y_max_mm=210.0,  # MK3S+ has y starting slightly negative
-    z_min_mm=0.0, z_max_mm=210.0,
+    x_min_mm=0.0,
+    x_max_mm=250.0,
+    y_min_mm=-3.0,
+    y_max_mm=210.0,  # MK3S+ has y starting slightly negative
+    z_min_mm=0.0,
+    z_max_mm=210.0,
 )
 
 
@@ -144,7 +147,7 @@ class BoundsViolation:
 
     line_no: int
     line_text: str
-    axis: str        # "X", "Y", "Z", "XY-radial"
+    axis: str  # "X", "Y", "Z", "XY-radial"
     value: float
     bound_min: float
     bound_max: float
@@ -191,9 +194,12 @@ class GcodeBoundsReport:
 
 
 def _arc_extrema(
-    start_x: float, start_y: float,
-    end_x: float, end_y: float,
-    cx: float, cy: float,
+    start_x: float,
+    start_y: float,
+    end_x: float,
+    end_y: float,
+    cx: float,
+    cy: float,
     clockwise: bool,
 ) -> list[tuple[float, float]]:
     """Return cardinal-tangent extrema of an arc that fall on the arc.
@@ -389,9 +395,12 @@ def parse_and_check(
             _check_xy_z(target_x, target_y, target_z, raw_line_no, raw_line.strip())
             # Then any tangent extrema on the arc.
             for ex, ey in _arc_extrema(
-                state.x, state.y,
-                target_x, target_y,
-                cx, cy,
+                state.x,
+                state.y,
+                target_x,
+                target_y,
+                cx,
+                cy,
                 clockwise=(gnum == 2),
             ):
                 _check_xy_z(ex, ey, target_z, raw_line_no, raw_line.strip())
@@ -405,9 +414,12 @@ def parse_and_check(
 
     if math.isfinite(bbox_x_min):
         report.bbox_observed = (
-            bbox_x_min, bbox_x_max,
-            bbox_y_min, bbox_y_max,
-            bbox_z_min, bbox_z_max,
+            bbox_x_min,
+            bbox_x_max,
+            bbox_y_min,
+            bbox_y_max,
+            bbox_z_min,
+            bbox_z_max,
         )
     return report
 
@@ -454,18 +466,24 @@ def resolve_bounds(
         r = bed.diameter_mm / 2.0
         return (
             PrinterBounds(
-                x_min_mm=-r, x_max_mm=r,
-                y_min_mm=-r, y_max_mm=r,
-                z_min_mm=0.0, z_max_mm=profile.z_height_mm,
+                x_min_mm=-r,
+                x_max_mm=r,
+                y_min_mm=-r,
+                y_max_mm=r,
+                z_min_mm=0.0,
+                z_max_mm=profile.z_height_mm,
                 circular_diameter_mm=bed.diameter_mm,
             ),
             False,
         )
     return (
         PrinterBounds(
-            x_min_mm=0.0, x_max_mm=bed.x_mm,
-            y_min_mm=0.0, y_max_mm=bed.y_mm,
-            z_min_mm=0.0, z_max_mm=profile.z_height_mm,
+            x_min_mm=0.0,
+            x_max_mm=bed.x_mm,
+            y_min_mm=0.0,
+            y_max_mm=bed.y_mm,
+            z_min_mm=0.0,
+            z_max_mm=profile.z_height_mm,
         ),
         False,
     )

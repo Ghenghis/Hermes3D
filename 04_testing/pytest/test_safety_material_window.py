@@ -48,9 +48,7 @@ def test_abs_bed_too_cold_fails() -> None:
 
 def test_unknown_material_fails_without_override() -> None:
     db = load_material_db()
-    result = check_material_window(
-        material="Unobtanium", nozzle_c=200.0, bed_c=60.0, db=db
-    )
+    result = check_material_window(material="Unobtanium", nozzle_c=200.0, bed_c=60.0, db=db)
     assert not result.passed
     assert "Unknown material" in result.reason
 
@@ -96,18 +94,14 @@ def test_override_env_var_disabled_does_not_pass_oob() -> None:
 
 def test_case_insensitive_material_lookup() -> None:
     db = load_material_db()
-    result = check_material_window(
-        material="pla", nozzle_c=205.0, bed_c=60.0, db=db
-    )
+    result = check_material_window(material="pla", nozzle_c=205.0, bed_c=60.0, db=db)
     assert result.passed
 
 
 def test_violation_payload_shape() -> None:
     db = load_material_db()
     result = check_material_window(material="PLA", nozzle_c=300.0, bed_c=60.0, db=db)
-    payload = build_violation_payload(
-        job_id="j", printer_id="p", result=result
-    )
+    payload = build_violation_payload(job_id="j", printer_id="p", result=result)
     assert payload["kind"] == "safety.violation"
     assert payload["gate"] == "safety.material_temperature_window"
     assert payload["result"]["passed"] is False
@@ -127,9 +121,7 @@ def test_user_overrides_default_entries(tmp_path) -> None:
         encoding="utf-8",
     )
     user_path.write_text(
-        "materials:\n"
-        "  PLA:\n"
-        "    nozzle_max_c: 200\n",  # override only this field
+        "materials:\n  PLA:\n    nozzle_max_c: 200\n",  # override only this field
         encoding="utf-8",
     )
     db = load_material_db(default_path=default_path, user_path=user_path)
@@ -140,9 +132,7 @@ def test_user_overrides_default_entries(tmp_path) -> None:
 
 
 def test_material_window_contains() -> None:
-    mw = MaterialWindow(
-        name="X", nozzle_min_c=200, nozzle_max_c=220, bed_min_c=50, bed_max_c=70
-    )
+    mw = MaterialWindow(name="X", nozzle_min_c=200, nozzle_max_c=220, bed_min_c=50, bed_max_c=70)
     assert mw.contains(nozzle_c=210, bed_c=60)
     assert not mw.contains(nozzle_c=199, bed_c=60)
     assert not mw.contains(nozzle_c=210, bed_c=80)
