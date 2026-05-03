@@ -1,0 +1,86 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    environment:
+      HERMES_PUBLIC_DOMAIN: ${HERMES_PUBLIC_DOMAIN}
+    depends_on:
+      - hermes3d
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - caddy_logs:/var/log/caddy
+
+  hermes3d:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM python:3.11-slim-bookworm
+        ENV PYTHONUNBUFFERED=1 \
+            PYTHONDONTWRITEBYTECODE=1
+        RUN python -m pip install --no-cache-dir --upgrade pip \
+          && python -m pip install --no-cache-dir \
+            https://github.com/Ghenghis/Hermes3D/releases/download/v5.1.0/hermes3d_os_lite-5.1.0-py3-none-any.whl
+        EXPOSE 7860 8000
+        CMD ["sh", "-c", "uvicorn hermes3d.api.server:app --host 0.0.0.0 --port 8000 & python -m hermes3d.app.launcher"]
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://hermes:${POSTGRES_PASSWORD}@postgres:5432/hermes
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      HERMES3D_HOST: 0.0.0.0
+      HERMES3D_PORT: "7860"
+      HERMES3D_PROOF_KEY: ${HERMES3D_PROOF_KEY}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL}
+    depends_on:
+      - postgres
+      - redis
+      - tailscale-sidecar
+    expose:
+      - "7860"
+      - "8000"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: hermes
+      POSTGRES_USER: hermes
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - hermes_pg_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - hermes_redis_data:/data
+
+  tailscale-sidecar:
+    image: tailscale/tailscale:v1.78.1
+    restart: unless-stopped
+    hostname: hermes3d-vps
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_EXTRA_ARGS: --advertise-tags=tag:vps
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+
+volumes:
+  caddy_data:
+  caddy_config:
+  caddy_logs:
+  hermes_pg_data:
+  hermes_redis_data:
+  tailscale_state:
