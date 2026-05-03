@@ -295,6 +295,7 @@ Latest release: <https://github.com/Ghenghis/Hermes3D/releases>
 
 - **Architecture** — [`02_architecture/`](./02_architecture/) (ADRs · diagrams · contracts)
 - **Phase reports** — [`00_overview/`](./00_overview/) (Phase 1 → 5.1, evidence-backed)
+- **Release notes** — [`00_overview/V5_3_0_RELEASE_NOTES.md`](./00_overview/V5_3_0_RELEASE_NOTES.md) (v5.3.0 RC — draft for review)
 - **Honesty ledger** — [`00_overview/contract/HONESTY_LEDGER.md`](./00_overview/contract/HONESTY_LEDGER.md) (every claim, with status)
 - **Roadmap** — [`00_overview/contract/ROADMAP.md`](./00_overview/contract/ROADMAP.md)
 - **Live proof** — [`PROOF_E2E_REPORT.md`](./PROOF_E2E_REPORT.md) (refreshed by CI on every push)
@@ -338,7 +339,7 @@ CI layers (all must pass on every PR to develop):
 
 <br/>
 
-**Current sprint:** Phase 5.1 (kit hardening) — see [`00_overview/PHASE5_1_PLAN.md`](./00_overview/PHASE5_1_PLAN.md).
+**Current track:** v5.3.0 RC (Contract Kit hardening complete) — see [`00_overview/V5_3_0_RELEASE_NOTES.md`](./00_overview/V5_3_0_RELEASE_NOTES.md). Phase 5.1 kit hardening is closed: [`00_overview/PHASE5_1_COMPLETION_REPORT.md`](./00_overview/PHASE5_1_COMPLETION_REPORT.md).
 
 **Repository layout:**
 
