@@ -215,6 +215,7 @@ def test_moonraker_specs_from_config_parses_stock(tmp_path):
     assert "Moonraker — test_a" in by_name
     assert by_name["Moonraker — test_a"].host == "printer-a.local"
     assert by_name["Moonraker — test_a"].port == 7125
+    assert by_name["Moonraker — test_a"].http_health_path == "/server/info"
     assert by_name["Moonraker — test_b"].port == 7125
 
 
@@ -243,6 +244,7 @@ def test_moonraker_specs_user_overrides_stock(tmp_path):
     by_name = {s.name: s for s in specs}
     assert by_name["Moonraker — test_a"].host == "192.168.1.42"
     assert by_name["Moonraker — test_a"].port == 7125
+    assert by_name["Moonraker — test_a"].http_health_path == "/server/info"
 
 
 # -----------------------------------------------------------------------------
@@ -260,6 +262,33 @@ def test_live_probe_against_known_services():
     # We don't assert which services are up — just that the call succeeds and
     # at least one well-known port responds (LM Studio / Ollama / Hermes).
     assert isinstance(online, list)
+
+
+@pytest.mark.skipif(
+    os.environ.get("HERMES3D_HEALTH_LIVE") != "1",
+    reason="set HERMES3D_HEALTH_LIVE=1 to run live probes against real printers",
+)
+def test_live_moonraker_health_for_t1_and_v400():
+    """Live guard: T1 + V400 must answer Moonraker /server/info as Klipper ready."""
+
+    required = {"flsun_t1_a", "flsun_v400"}
+    user_override = os.environ.get("HERMES3D_PRINTERS_USER_TOML")
+    specs = moonraker_specs_from_config(
+        user=Path(user_override) if user_override else None,
+    )
+    by_printer = {spec.name.removeprefix("Moonraker — "): spec for spec in specs}
+
+    assert required <= set(by_printer), (
+        f"missing printer specs: {sorted(required - set(by_printer))}"
+    )
+    for printer_id in sorted(required):
+        spec = by_printer[printer_id]
+        assert spec.http_health_path == "/server/info"
+        result = probe_one(spec, timeout_s=5.0)
+        if result.status is not Status.ONLINE:
+            pytest.fail(f"{printer_id} health: {result.status.value}", pytrace=False)
+        if "Klipper ready" not in result.detail:
+            pytest.fail(f"{printer_id} health detail was not Klipper-ready", pytrace=False)
 
 
 # -----------------------------------------------------------------------------
