@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from hermes3d.core.agents.materials import get_material
-from hermes3d.core.memory import SkillKind, SkillStore
+from hermes3d.core.memory.skill_store import Skill, SkillKind, SkillStoreReader
 from hermes3d.core.printers import Kinematics, PrinterProfile, get_profile
 
 # =============================================================================
@@ -145,7 +145,7 @@ def generate_profile(
     printer_id: str,
     material: str,
     quality_level: str = "normal",
-    skills: SkillStore | None = None,
+    skills: SkillStoreReader | None = None,
     nozzle_diameter_mm: float = 0.4,
     filament_diameter_mm: float = 1.75,
 ) -> GeneratedProfile:
@@ -246,13 +246,16 @@ def generate_profile(
 
     # ---- Skill overrides ----
     if skills is not None:
-        matches = skills.lookup(
-            kind=SkillKind.PARAMETER_OVERRIDE,
-            printer_id=printer_id,
-            material=material,
-            quality_level=quality_level,
-            min_confidence=0.4,
-        )
+        matches: list[Skill] = [
+            sk
+            for sk in skills.reinforced_only(min_score=0.4)
+            if sk.skill_kind == SkillKind.PARAMETER_OVERRIDE
+            and sk.scope.matches(
+                printer_id=printer_id,
+                material=material,
+                quality_level=quality_level,
+            )
+        ]
         # Apply lowest-specificity first so most-specific wins
         for sk in sorted(matches, key=lambda s: s.scope.specificity()):
             applied_any = False

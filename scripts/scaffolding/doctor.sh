@@ -13,6 +13,186 @@ if [[ "${1:-}" == "--json" ]]; then
     JSON_MODE=1
 fi
 
+JSON_CHECKS=()
+JSON_FIX_HINTS=()
+
+json_escape() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+env_bool() {
+    local name="$1"
+    local value="${!name:-}"
+    case "$value" in
+        1|true|TRUE|yes|YES|on|ON) printf 'true' ;;
+        0|false|FALSE|no|NO|off|OFF) printf 'false' ;;
+        *) printf '' ;;
+    esac
+}
+
+json_add_check() {
+    local id="$1"
+    local ok="$2"
+    local detail="$3"
+    local hint="${4:-}"
+    JSON_CHECKS+=("${id}|${ok}|${detail}")
+    if [[ "$ok" == "false" && -n "$hint" ]]; then
+        JSON_FIX_HINTS+=("$hint")
+    fi
+}
+
+json_platform() {
+    if [[ -n "${HERMES3D_DOCTOR_PLATFORM:-}" ]]; then
+        printf '%s' "$HERMES3D_DOCTOR_PLATFORM"
+        return
+    fi
+    case "$(uname -s 2>/dev/null || printf Linux)" in
+        Darwin*) printf 'macos' ;;
+        *) printf 'linux' ;;
+    esac
+}
+
+json_check_python() {
+    local ver="${HERMES3D_DOCTOR_PYTHON_VERSION:-}"
+    if [[ -z "$ver" ]]; then
+        if ! command -v python3 >/dev/null 2>&1; then
+            json_add_check "python_3_11_or_12" "false" "python3 not found on PATH" \
+                "Install Python 3.11 or 3.12"
+            return
+        fi
+        ver="$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}")' 2>/dev/null || true)"
+    fi
+    local major minor
+    major="$(printf '%s' "$ver" | cut -d. -f1)"
+    minor="$(printf '%s' "$ver" | cut -d. -f2)"
+    if [[ "$major" == "3" && ( "$minor" == "11" || "$minor" == "12" ) ]]; then
+        json_add_check "python_3_11_or_12" "true" "$ver"
+    else
+        json_add_check "python_3_11_or_12" "false" "${ver:-unknown} (need 3.11 or 3.12)" \
+            "Install Python 3.11 or 3.12"
+    fi
+}
+
+json_check_port_8080() {
+    local override
+    override="$(env_bool HERMES3D_DOCTOR_PORT_8080_FREE)"
+    if [[ -n "$override" ]]; then
+        if [[ "$override" == "true" ]]; then
+            json_add_check "port_8080_free" "true" "port 8080 available"
+        else
+            json_add_check "port_8080_free" "false" "port 8080 is in use" \
+                "Stop the process using port 8080 or choose another port"
+        fi
+        return
+    fi
+    if command -v python3 >/dev/null 2>&1 && python3 - <<'PY' >/dev/null 2>&1
+import socket
+s = socket.socket()
+try:
+    s.bind(("127.0.0.1", 8080))
+finally:
+    s.close()
+PY
+    then
+        json_add_check "port_8080_free" "true" "port 8080 available"
+    else
+        json_add_check "port_8080_free" "false" "port 8080 is in use or could not be probed" \
+            "Stop the process using port 8080 or choose another port"
+    fi
+}
+
+json_check_git() {
+    local override
+    override="$(env_bool HERMES3D_DOCTOR_GIT_PRESENT)"
+    if [[ -n "$override" ]]; then
+        if [[ "$override" == "true" ]]; then
+            json_add_check "git_present" "true" "git found on PATH"
+        else
+            json_add_check "git_present" "false" "git not found on PATH" "Install git"
+        fi
+        return
+    fi
+    if command -v git >/dev/null 2>&1; then
+        json_add_check "git_present" "true" "git found on PATH"
+    else
+        json_add_check "git_present" "false" "git not found on PATH" "Install git"
+    fi
+}
+
+json_check_libgl() {
+    local platform="$1"
+    if [[ "$platform" != "linux" ]]; then
+        json_add_check "libgl_present" "null" "skipped: not applicable on this platform"
+        return
+    fi
+    local override
+    override="$(env_bool HERMES3D_DOCTOR_LIBGL_PRESENT)"
+    if [[ -n "$override" ]]; then
+        if [[ "$override" == "true" ]]; then
+            json_add_check "libgl_present" "true" "libGL present"
+        else
+            json_add_check "libgl_present" "false" "libGL not found" "Install libgl1"
+        fi
+        return
+    fi
+    if { command -v ldconfig >/dev/null 2>&1 && ldconfig -p 2>/dev/null | grep -q 'libGL\.so'; } ||
+       [[ -e /usr/lib/x86_64-linux-gnu/libGL.so.1 ]] ||
+       [[ -e /usr/lib64/libGL.so.1 ]]; then
+        json_add_check "libgl_present" "true" "libGL present"
+    else
+        json_add_check "libgl_present" "false" "libGL not found" "Install libgl1"
+    fi
+}
+
+emit_json_envelope() {
+    local platform
+    platform="$(json_platform)"
+    json_add_check "wsl2_present" "null" "skipped: not applicable on this platform"
+    json_add_check "kernel_version" "null" "skipped: not applicable on this platform"
+    json_check_python
+    json_check_port_8080
+    json_check_libgl "$platform"
+    json_check_git
+
+    local ok="true"
+    local entry check_ok
+    for entry in "${JSON_CHECKS[@]}"; do
+        IFS='|' read -r _ check_ok _ <<<"$entry"
+        if [[ "$check_ok" == "false" ]]; then
+            ok="false"
+            break
+        fi
+    done
+
+    printf '{\n'
+    printf '  "json_schema_version": 1,\n'
+    printf '  "platform": "%s",\n' "$(json_escape "$platform")"
+    printf '  "checks": [\n'
+    local first=1 id detail
+    for entry in "${JSON_CHECKS[@]}"; do
+        IFS='|' read -r id check_ok detail <<<"$entry"
+        if [[ "$first" -eq 1 ]]; then first=0; else printf ',\n'; fi
+        printf '    {"id": "%s", "ok": %s, "detail": "%s"}' \
+            "$(json_escape "$id")" "$check_ok" "$(json_escape "$detail")"
+    done
+    printf '\n  ],\n'
+    printf '  "ok": %s,\n' "$ok"
+    printf '  "fix_hints": ['
+    first=1
+    local hint
+    for hint in "${JSON_FIX_HINTS[@]}"; do
+        if [[ "$first" -eq 1 ]]; then first=0; else printf ', '; fi
+        printf '"%s"' "$(json_escape "$hint")"
+    done
+    printf ']\n'
+    printf '}\n'
+}
+
+if [[ "$JSON_MODE" -eq 1 ]]; then
+    emit_json_envelope
+    exit 0
+fi
+
 PASS_COUNT=0
 WARN_COUNT=0
 FAIL_COUNT=0
