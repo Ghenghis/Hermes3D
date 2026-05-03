@@ -1,0 +1,59 @@
+# Material temperature window database
+# -------------------------------------
+# Schema (per material entry):
+#   nozzle_min_c / nozzle_max_c   – allowed nozzle temperature range
+#   bed_min_c    / bed_max_c      – allowed bed temperature range
+#   notes                          – free-form (string)
+#
+# These windows are conservative defaults compatible with virtually all
+# branded filaments in the named family. Specific filament SKUs may have
+# narrower or wider bands; users should override per-spool via
+# `material_db.user.yaml` rather than editing this file.
+#
+# Sources cross-checked against published spec sheets from PolyMaker,
+# Prusa, eSun, Hatchbox, and Overture as of 2026-04. The windows here
+# are the *intersection* of all those vendors' "safe" ranges, deliberately
+# erring on the conservative side.
+
+materials:
+  PLA:
+    nozzle_min_c: 180
+    nozzle_max_c: 220
+    bed_min_c: 0
+    bed_max_c: 65
+    notes: "Standard PLA / PLA+; bed 0-65C (room-temp prints OK)."
+
+  PETG:
+    nozzle_min_c: 220
+    nozzle_max_c: 250
+    bed_min_c: 70
+    bed_max_c: 90
+    notes: "Higher bed adhesion; watch for stringing above 245C."
+
+  ABS:
+    nozzle_min_c: 230
+    nozzle_max_c: 260
+    bed_min_c: 90
+    bed_max_c: 110
+    notes: "Requires enclosure; warping risk on open-frame printers."
+
+  TPU:
+    nozzle_min_c: 220
+    nozzle_max_c: 240
+    bed_min_c: 30
+    bed_max_c: 60
+    notes: "Flexible; direct-drive recommended. Slow print speeds."
+
+  PC:
+    nozzle_min_c: 260
+    nozzle_max_c: 305
+    bed_min_c: 100
+    bed_max_c: 120
+    notes: "Polycarbonate; needs all-metal hotend + enclosure."
+
+  Nylon:
+    nozzle_min_c: 240
+    nozzle_max_c: 270
+    bed_min_c: 70
+    bed_max_c: 100
+    notes: "Nylon / PA; very hygroscopic, dry filament before printing."
