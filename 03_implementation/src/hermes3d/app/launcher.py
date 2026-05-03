@@ -33,6 +33,46 @@ from hermes3d.core.visual import render_all_views
 LOG = logging.getLogger(__name__)
 
 
+def _maybe_init_velopack() -> None:
+    """Initialize Velopack when running from a packed Windows bundle."""
+    try:
+        import velopack  # type: ignore[import-not-found]
+    except ImportError:
+        return
+
+    app_factory = getattr(velopack, "App", None)
+    if callable(app_factory):
+        app = app_factory()
+        run = getattr(app, "run", None)
+        if callable(run):
+            run()
+
+    if os.environ.get("HERMES3D_AUTO_UPDATE") != "1":
+        return
+
+    update_manager = getattr(velopack, "UpdateManager", None)
+    if update_manager is None:
+        LOG.warning("Velopack auto-update requested, but UpdateManager is unavailable.")
+        return
+    update_source = os.environ.get(
+        "HERMES3D_UPDATE_SOURCE",
+        "https://github.com/Ghenghis/Hermes3D/releases/latest/download",
+    )
+    try:
+        manager = update_manager(update_source)
+    except TypeError:
+        LOG.warning("Velopack auto-update requested, but update source is invalid.")
+        return
+    check = getattr(manager, "check_for_updates", None) or getattr(manager, "checkForUpdates", None)
+    if callable(check):
+        try:
+            check()
+        except Exception as exc:
+            LOG.warning("Velopack update check failed: %s", exc)
+    else:
+        LOG.warning("Velopack auto-update requested, but no update-check method is available.")
+
+
 def _validate_stl(stl_path: str | None) -> tuple[str, str]:
     """Tab 1 handler: run Truth Gate on an uploaded STL."""
     if not stl_path:
@@ -217,6 +257,7 @@ def build_app():  # type: ignore[no-untyped-def]
 
 def main() -> None:
     """Module entrypoint: ``python -m hermes3d.app.launcher`` or via run.bat."""
+    _maybe_init_velopack()
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
