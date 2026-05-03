@@ -13,3 +13,9 @@ uvicorn>=0.29,<1.0
 pydantic>=2.7,<3.0
 httpx>=0.27,<1.0
 matplotlib>=3.8,<4.0
+
+# Optional: local-first recall layer (soft-imported in
+# hermes3d.core.memory.mnemosyne_recall — wrapper degrades to no-op when
+# the package is not installed). Pin range matches pyproject.toml
+# [project.optional-dependencies].mnemosyne.
+mnemosyne-memory>=2.0,<3
