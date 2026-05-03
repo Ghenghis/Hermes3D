@@ -2,7 +2,7 @@ import { TABS, type TabDef } from "../../app/routes";
 import { useStore } from "../../app/store";
 
 /**
- * Left rail per visual contract: ~220px wide, dense vertical list of 13 tabs,
+ * Left rail per visual contract: ~220px wide, dense vertical list of tabs,
  * each row with lucide icon + label. Active row gets a cyan-glow ring + bold
  * text. Bottom slot reserved for "Quick Actions" / "Truth Engine" badges
  * (lands with Dashboard tab in Task 19+).

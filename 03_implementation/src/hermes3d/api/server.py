@@ -33,6 +33,8 @@ Endpoints:
   GET  /metrics                             aggregated print history metrics
   GET  /metrics/prometheus                  Prometheus-format text exposition
 
+  GET  /api/health/services                 service-health probe results (UI)
+
 Authentication: a single shared bearer token from HERMES3D_API_TOKEN. If
 unset, the server runs in "open" mode and logs a warning. CORS is open to
 localhost by default.
@@ -150,6 +152,7 @@ def create_app(
         log.warning("HERMES3D_API_TOKEN unset — API is OPEN (no auth)")
 
     # Lazy imports — avoid cost at module import time
+    from hermes3d.api.health import register_health_routes
     from hermes3d.core.agents.dispatcher import (
         DispatchRequest,
         DispatchStrategy,
@@ -403,6 +406,9 @@ def create_app(
                 for mat, ma in m.per_material.items()
             },
         }
+
+    # ---- Service Health ----
+    register_health_routes(app, _auth)
 
     @app.get("/metrics/prometheus", response_class=PlainTextResponse)
     def metrics_prom() -> str:

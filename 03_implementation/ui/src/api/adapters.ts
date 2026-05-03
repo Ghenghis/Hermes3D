@@ -7,7 +7,12 @@
  * The interface shape stays stable across the Phase-2 → Phase-3 swap so
  * tab components don't change.
  */
-import { getLivePrinters, getProviderHealthLive, planPreviewLive } from "./adapters.live";
+import {
+  getLivePrinters,
+  getProviderHealthLive,
+  getServiceHealthLive,
+  planPreviewLive,
+} from "./adapters.live";
 import { MOCK_AGENTS } from "../data/mock/agents";
 import { MOCK_PLAN_DAG } from "../data/mock/dag";
 import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
@@ -16,6 +21,7 @@ import { MOCK_LOGS } from "../data/mock/logs";
 import { MOCK_NOTIFICATIONS } from "../data/mock/notifications";
 import { MOCK_PRINTERS } from "../data/mock/printers";
 import { MOCK_PROOF_BUNDLES, LATEST_BUNDLE } from "../data/mock/proof";
+import { MOCK_SERVICE_HEALTH } from "../data/mock/serviceHealth";
 import { MOCK_SYSTEM_SNAPSHOT } from "../data/mock/system";
 import { MOCK_WORKFLOWS } from "../data/mock/workflows";
 import type { Agent } from "../types/agent";
@@ -27,6 +33,7 @@ import type { Notification } from "../types/notification";
 import type { Printer } from "../types/printer";
 import type { ProviderHealth } from "../types/provider";
 import type { ProofBundle } from "../types/proof";
+import type { ServiceHealthEntry } from "../types/serviceHealth";
 import type { SystemSnapshot } from "../types/system";
 import type { Workflow } from "../types/workflow";
 
@@ -43,6 +50,7 @@ export interface AdapterAPI {
   getNotifications(): Promise<Notification[]>;
   planPreview(prompt: string): Promise<TaskDAG>;
   getProviderHealth(): Promise<ProviderHealth[]>;
+  getServiceHealth(): Promise<ServiceHealthEntry[]>;
 }
 
 type HermesImportMeta = ImportMeta & {
@@ -81,6 +89,7 @@ const mockAdapters: AdapterAPI = {
       stale: false,
     },
   ],
+  getServiceHealth: async () => MOCK_SERVICE_HEALTH,
 };
 
 const liveAdapters: AdapterAPI = {
@@ -88,6 +97,7 @@ const liveAdapters: AdapterAPI = {
   getPrinters: getLivePrinters,
   planPreview: planPreviewLive,
   getProviderHealth: getProviderHealthLive,
+  getServiceHealth: getServiceHealthLive,
 };
 
 function adapterMode(): "mock" | "live" {
