@@ -44,13 +44,13 @@ The following are **NOT** in Phase 5.1. Each is deferred to a later phase with i
 |---|---|---|---|
 | `00_overview/PHASE5_1_PLAN.md` | CP5.1-A | new | this plan |
 | `02_architecture/adr/ADR-013-kit-hardening-v5_1.md` | CP5.1-A | new | wiring contract: end-to-end loop boundaries, supervisor scheduler hook, doctor surface |
-| `03_implementation/src/hermes3d/intelligence/failure_predictor.py` | CP5.1-B | modify (additive) | accept a `PrintHistoryReader` protocol; default to live `print_history` source; remove fixture-only paths |
-| `03_implementation/src/hermes3d/farm/print_history.py` | CP5.1-B | modify (additive) | expose a thin `PrintHistoryReader` interface (read-only iter / since(ts) / by_printer(id)); existing append API unchanged |
-| `03_implementation/src/hermes3d/supervisor/daemon.py` | CP5.1-B | modify (additive) | scheduler tick wires `farm.backup.run_scheduled_backup()` per `BackupPolicy.interval_minutes`; tick is opt-in via config |
-| `03_implementation/src/hermes3d/farm/backup.py` | CP5.1-B | modify (additive) | new `run_scheduled_backup(state_dir, target_dir, *, now)` helper; existing API unchanged |
+| `03_implementation/src/hermes3d/core/intelligence/failure_predictor.py` | CP5.1-B | modify (additive) | accept a `PrintHistoryReader` protocol; default to live `print_history` source; remove fixture-only paths |
+| `03_implementation/src/hermes3d/core/farm/print_history.py` | CP5.1-B | modify (additive) | expose a thin `PrintHistoryReader` interface (read-only iter / since(ts) / by_printer(id)); existing append API unchanged |
+| `03_implementation/src/hermes3d/core/supervisor/daemon.py` | CP5.1-B | modify (additive) | scheduler tick wires `farm.backup.run_scheduled_backup()` per `BackupPolicy.interval_minutes`; tick is opt-in via config |
+| `03_implementation/src/hermes3d/core/farm/backup.py` | CP5.1-B | modify (additive) | new `run_scheduled_backup(state_dir, target_dir, *, now)` helper; existing API unchanged |
 | `03_implementation/config/backup_policy.yaml` | CP5.1-B | new | small policy file: `enabled: false` default, `interval_minutes: 60`, `retain_count: 24`, `target_dir: ./var/backups/<utc>` |
-| `03_implementation/src/hermes3d/slicer/profile_generator.py` | CP5.1-C | modify (additive) | accept optional `SkillStoreReader`; when present, derive (printer × material × quality) suggestions from skill rows; deterministic fallback when None |
-| `03_implementation/src/hermes3d/memory/skill_store.py` | CP5.1-C | modify (additive) | expose `SkillStoreReader` protocol matching the four query shapes profile_generator needs |
+| `03_implementation/src/hermes3d/core/slicer/profile_generator.py` | CP5.1-C | modify (additive) | accept optional `SkillStoreReader`; when present, derive (printer × material × quality) suggestions from skill rows; deterministic fallback when None |
+| `03_implementation/src/hermes3d/core/memory/skill_store.py` | CP5.1-C | modify (additive) | expose `SkillStoreReader` protocol matching the four query shapes profile_generator needs |
 | `scripts/doctor.ps1` | CP5.1-C | modify | add Windows-specific prerequisite checks: WSL2 presence, kernel version, distro list, distro user, repo bind mount, ports 80/8080/4408 free |
 | `scripts/doctor.sh` | CP5.1-C | modify | mirror in bash; on macOS skip WSL; on Linux check distro + Python toolchain + libGL |
 

@@ -9,9 +9,9 @@
 
 Hermes3D v5.0 baseline (delivered) and Phase 3.4 (real provider probes, merged at `e25fe7e`) leave four modules in a state the HONESTY_LEDGER calls "runnable" but which the ROADMAP v5.1 row asks to be **end-to-end wired**:
 
-- `core.intelligence.failure_predictor` — has unit tests, but its `PrintHistory` reads in production go through a fixture-derived adapter, not the live `core.farm.print_history` JSONL.
-- `core.farm.backup` — has tar.gz round-trip tests, but no scheduler invokes it.
-- `core.slicer.profile_generator` — has 6 unit tests against explicit inputs, but cannot derive (printer × material × quality) suggestions from `core.memory.skill_store` rows.
+- `hermes3d.core.intelligence.failure_predictor` (file: `03_implementation/src/hermes3d/core/intelligence/failure_predictor.py`) — has unit tests, but its `PrintHistory` reads in production go through a fixture-derived adapter, not the live `hermes3d.core.farm.print_history` JSONL.
+- `hermes3d.core.farm.backup` (file: `03_implementation/src/hermes3d/core/farm/backup.py`) — has tar.gz round-trip tests, but no scheduler invokes it.
+- `hermes3d.core.slicer.profile_generator` (file: `03_implementation/src/hermes3d/core/slicer/profile_generator.py`) — has 6 unit tests against explicit inputs, but cannot derive (printer × material × quality) suggestions from `hermes3d.core.memory.skill_store` rows.
 - `scripts/doctor.{ps1,sh}` — verifies env vars but does not exercise platform-specific prerequisites (WSL2, kernel version, port availability, libGL).
 
 This ADR fixes the contract for what those wirings must look like, so multiple agents (Claude, Codex, Windsurf) can execute the implementation in parallel without re-litigating the boundaries.
@@ -23,13 +23,13 @@ This ADR fixes the contract for what those wirings must look like, so multiple a
 Each consumer takes its data dependency as a **reader protocol** parameter with a sane production default. This keeps unit tests fixture-driven while letting integration tests exercise the live wire.
 
 ```python
-# core/farm/print_history.py
+# 03_implementation/src/hermes3d/core/farm/print_history.py
 class PrintHistoryReader(Protocol):
     def iter_jobs(self) -> Iterator[CompletedJob]: ...
     def since(self, ts_utc: datetime) -> Iterator[CompletedJob]: ...
     def by_printer(self, printer_id: str) -> Iterator[CompletedJob]: ...
 
-# core/intelligence/failure_predictor.py
+# 03_implementation/src/hermes3d/core/intelligence/failure_predictor.py
 def predict(
     printer_id: str,
     material: str,
@@ -42,14 +42,14 @@ def predict(
 
 The fixture-based unit tests pass an in-memory `FakePrintHistoryReader`. The new integration test seeds a real `print_history.jsonl` and lets `default_print_history_reader()` discover it.
 
-`core.slicer.profile_generator.generate_profile()` follows the identical pattern with `SkillStoreReader`.
+`hermes3d.core.slicer.profile_generator.generate_profile()` (file: `03_implementation/src/hermes3d/core/slicer/profile_generator.py`) follows the identical pattern with `SkillStoreReader` exposed by `hermes3d.core.memory.skill_store` (file: `03_implementation/src/hermes3d/core/memory/skill_store.py`).
 
 ### 2. Scheduler tick for `farm.backup`
 
-The supervisor daemon already exists (`core.supervisor.daemon` — Tier 3, 2 tests). v5.1 adds **one** scheduler hook:
+The supervisor daemon already exists (`hermes3d.core.supervisor.daemon` — file: `03_implementation/src/hermes3d/core/supervisor/daemon.py` — Tier 3, 2 tests). v5.1 adds **one** scheduler hook:
 
 ```python
-# core/supervisor/daemon.py
+# 03_implementation/src/hermes3d/core/supervisor/daemon.py
 class SupervisorDaemon:
     async def _on_tick(self, now: datetime) -> None:
         ...
@@ -126,9 +126,9 @@ Adding a status check requires touching repo branch protection. Instead, a singl
 
 | Module | Before v5.1 | After v5.1 |
 |---|---|---|
-| `core.intelligence.failure_predictor` | runnable (unit) | runnable (unit) + e2e-wired |
-| `core.farm.backup` | runnable (unit) | runnable (unit) + scheduled |
-| `core.slicer.profile_generator` | runnable (unit) | runnable (unit) + skill-wired |
+| `hermes3d.core.intelligence.failure_predictor` | runnable (unit) | runnable (unit) + e2e-wired |
+| `hermes3d.core.farm.backup` | runnable (unit) | runnable (unit) + scheduled |
+| `hermes3d.core.slicer.profile_generator` | runnable (unit) | runnable (unit) + skill-wired |
 | `scripts/doctor.{ps1,sh}` | runnable (env-vars) | runnable (full prerequisite) |
 
 `HONESTY_LEDGER.md` gets updated in CP5.1-E to reflect this.
