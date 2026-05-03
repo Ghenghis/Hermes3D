@@ -26,6 +26,7 @@ from enum import Enum
 from typing import Any
 
 from hermes3d.core.agents.materials import MaterialProfile, get_material
+from hermes3d.core.memory import RecallHint
 from hermes3d.core.printers import (
     FLEET,
     Kinematics,
@@ -76,6 +77,15 @@ class DispatchRequest:
     excluded_printers: tuple[str, ...] = ()
     # Optional restriction to a specific subset (e.g., from a UI selector)
     allowed_printers: tuple[str, ...] = ()
+    # Optional pre-resolved hints from the recall layer. The orchestrator
+    # populates these BEFORE calling :func:`dispatch` so the dispatcher
+    # itself stays a pure function (no I/O, no DB reads). When a hint's
+    # ``content`` mentions a printer_id in the fleet, the corresponding
+    # candidate gets a small soft bias (capped) that is folded into the
+    # AUTO score under the ``recall`` rationale tag. Recall NEVER
+    # unblocks a hard-filtered printer and NEVER overrides eligibility.
+    # See ADR-014.
+    recall_hints: tuple[RecallHint, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -264,6 +274,32 @@ _SINGLE_STRATEGIES = {
 }
 
 
+def _score_recall_bias(profile: PrinterProfile, req: DispatchRequest) -> float:
+    """Soft bias from pre-resolved recall hints.
+
+    Pure function: reads only ``req.recall_hints`` (immutable tuple
+    populated upstream). Returns a bounded ``[0, 1]`` score derived
+    from the highest-importance hint that mentions this profile's
+    ``profile_id``. Returns ``0.0`` when no hint matches.
+
+    Recall is intentionally a *small* contribution — capped well below
+    the hard filters and the primary strategies — so a stale hint can
+    never override eligibility or fleet-wide scheduling logic.
+    """
+    if not req.recall_hints:
+        return 0.0
+    best = 0.0
+    pid = profile.profile_id
+    for hint in req.recall_hints:
+        if pid and pid in hint.content:
+            # Blend mnemosyne's own ranking score with importance to
+            # rank fresher / more confident hints higher.
+            blended = max(0.0, min(1.0, 0.5 * hint.importance + 0.5 * hint.score))
+            if blended > best:
+                best = blended
+    return best
+
+
 def _score_auto(
     profile: PrinterProfile, req: DispatchRequest, material: MaterialProfile
 ) -> tuple[float, list[str]]:
@@ -276,10 +312,13 @@ def _score_auto(
     weights: dict[str, float] = {
         "fastest": 0.20,
         "quality": 0.20,
-        "least_busy": 0.30,
-        "smallest_fit": 0.15,  # avoid hogging the big printers
+        "least_busy": 0.28,
+        "smallest_fit": 0.14,  # avoid hogging the big printers
         "kinematics": 0.10,
         "material_pref": 0.05,
+        # Recall is a *soft* nudge — capped low so a stale hint can
+        # never outweigh the hard filters or live-state signals.
+        "recall": 0.03,
     }
     contribs: dict[str, float] = {}
 
@@ -287,6 +326,7 @@ def _score_auto(
     contribs["quality"] = _score_quality(profile, req) * weights["quality"]
     contribs["least_busy"] = _score_least_busy(profile, req) * weights["least_busy"]
     contribs["smallest_fit"] = _score_smallest_fit(profile, req) * weights["smallest_fit"]
+    contribs["recall"] = _score_recall_bias(profile, req) * weights["recall"]
 
     # Kinematics: blend delta-prefer and cartesian-prefer based on aspect.
     dx, dy, dz = req.mesh_extents_mm

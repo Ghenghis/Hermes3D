@@ -48,7 +48,11 @@ dev = [
   "mypy>=1.10",
 ]
 langgraph = ["langgraph>=0.2"]
-all = ["hermes3d-os-lite[ui,dev,langgraph]"]
+# Optional local-first recall layer (SQLite-backed, sub-millisecond).
+# Recall is NOT canonical — the evidence ledger remains source of truth.
+# See 02_architecture/adr/ADR-014-mnemosyne-recall-layer.md.
+mnemosyne = ["mnemosyne-memory>=2.0,<3"]
+all = ["hermes3d-os-lite[ui,dev,langgraph,mnemosyne]"]
 
 [project.scripts]
 hermes3d = "hermes3d.cli.__main__:main"
