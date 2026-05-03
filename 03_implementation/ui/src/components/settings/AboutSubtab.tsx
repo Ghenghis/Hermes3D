@@ -3,7 +3,7 @@
  *
  * Static panel showing version, license and reference links. All anchors
  * use `target="_blank" rel="noopener noreferrer"` because the universal
- * shell forbids in-process navigation.
+ * app frame forbids in-process navigation.
  */
 import { BookOpen, ExternalLink, Github, Info, Scale } from "lucide-react";
 
@@ -78,7 +78,7 @@ export function AboutSubtab() {
       </section>
 
       <footer className="text-muted text-[10px] pt-2 border-t border-border">
-        Hermes3D-OS — local-first 3D printing orchestrator. Phase 2 ships a mock-only React shell.
+        Hermes3D-OS — local-first 3D printing orchestrator. Phase 2 ships a mock-only React frontend.
       </footer>
     </div>
   );
