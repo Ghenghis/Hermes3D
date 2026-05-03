@@ -29,6 +29,12 @@ jobs:
 
       - name: Setup Pages
         uses: actions/configure-pages@1f0c5cde4bc74cd7e1254d0cb4de8d49e9068c7d   # v4.0.0
+        with:
+          # Auto-enable Pages on first run if the repo's Pages site doesn't
+          # exist yet (was failing with "Get Pages site failed: HttpError 404"
+          # because Pages was never enabled in repo Settings). enablement=true
+          # tells the action to create the Pages site via the API on first deploy.
+          enablement: true
 
       - name: Upload site/ as Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b   # v4.0.0
