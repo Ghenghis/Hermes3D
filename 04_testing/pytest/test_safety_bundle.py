@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from hermes3d.core.safety import (
     ALL_SAFETY_GATE_IDS,
+    GATE_BED_ADHESION,
     GATE_EMERGENCY_STOP_TIMING,
     GATE_GCODE_BOUNDS,
     GATE_MATERIAL_WINDOW,
@@ -49,7 +50,8 @@ def test_all_gate_ids_registered() -> None:
     assert GATE_EMERGENCY_STOP_TIMING in ALL_SAFETY_GATE_IDS
     assert GATE_GCODE_BOUNDS in ALL_SAFETY_GATE_IDS
     assert GATE_MATERIAL_WINDOW in ALL_SAFETY_GATE_IDS
-    assert len(ALL_SAFETY_GATE_IDS) == 4
+    assert GATE_BED_ADHESION in ALL_SAFETY_GATE_IDS
+    assert len(ALL_SAFETY_GATE_IDS) == 5
 
 
 def test_all_pass_when_inputs_clean() -> None:
@@ -63,6 +65,11 @@ def test_all_pass_when_inputs_clean() -> None:
         material="PLA",
         nozzle_c=205.0,
         bed_c=60.0,
+        first_layer_z_offset_mm=0.20,
+        target_first_layer_z_offset_mm=0.20,
+        bed_actual_c=58.2,
+        bed_target_c=60.0,
+        bed_adhesion_homed=False,
         thermal_samples=samples,
         emergency_stop_transport=sim,
     )
@@ -92,6 +99,20 @@ def test_unknown_material_violates() -> None:
     )
     assert not bundle.passed
     assert any(v["gate"] == GATE_MATERIAL_WINDOW for v in bundle.violations)
+
+
+def test_bed_adhesion_violation_recorded_in_bundle() -> None:
+    bundle = run_all_safety_gates(
+        job_id="j",
+        printer_id="p",
+        first_layer_z_offset_mm=0.29,
+        target_first_layer_z_offset_mm=0.20,
+        bed_actual_c=52.0,
+        bed_target_c=60.0,
+        bed_adhesion_homed=False,
+    )
+    assert not bundle.passed
+    assert any(v["gate"] == GATE_BED_ADHESION for v in bundle.violations)
 
 
 def test_skips_record_correctly() -> None:

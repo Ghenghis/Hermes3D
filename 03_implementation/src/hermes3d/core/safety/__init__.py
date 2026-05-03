@@ -1,11 +1,13 @@
 """Hermes3D 3D-printing safety gates.
 
-Public package surface for the four P1 safety gates:
+Public package surface for the four P1 safety gates plus the P2
+bed-adhesion precondition:
 
   - :mod:`thermal_runaway`             (gate ``safety.thermal_runaway_detection``)
   - :mod:`emergency_stop`              (gate ``safety.emergency_stop_timing``)
   - :mod:`gcode_bounds`                (gate ``safety.gcode_bounds_precondition``)
   - :mod:`material_window`             (gate ``safety.material_temperature_window``)
+  - :mod:`bed_adhesion`                (gate ``safety.bed_adhesion_precondition``)
 
 Each safety check is meant to run as a pre-flight assertion before
 ``submit_print_job``. Failures emit ``safety.violation`` events to the
@@ -38,6 +40,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .bed_adhesion import (
+    BedAdhesionCheckResult,
+    check_bed_adhesion_precondition,
+)
+from .bed_adhesion import (
+    build_violation_payload as _bed_adhesion_payload,
+)
 from .emergency_stop import (
     EmergencyStopTransport,
     HaltEvidence,
@@ -85,12 +94,14 @@ GATE_THERMAL_RUNAWAY = "safety.thermal_runaway_detection"
 GATE_EMERGENCY_STOP_TIMING = "safety.emergency_stop_timing"
 GATE_GCODE_BOUNDS = "safety.gcode_bounds_precondition"
 GATE_MATERIAL_WINDOW = "safety.material_temperature_window"
+GATE_BED_ADHESION = "safety.bed_adhesion_precondition"
 
 ALL_SAFETY_GATE_IDS = (
     GATE_THERMAL_RUNAWAY,
     GATE_EMERGENCY_STOP_TIMING,
     GATE_GCODE_BOUNDS,
     GATE_MATERIAL_WINDOW,
+    GATE_BED_ADHESION,
 )
 
 
@@ -129,12 +140,19 @@ def run_all_safety_gates(
     nozzle_c: float | None = None,
     bed_c: float | None = None,
     material_db: MaterialDB | None = None,
+    first_layer_z_offset_mm: float | None = None,
+    target_first_layer_z_offset_mm: float | None = None,
+    bed_actual_c: float | None = None,
+    bed_target_c: float | None = None,
+    bed_adhesion_z_tolerance_mm: float = 0.05,
+    bed_adhesion_min_bed_fraction: float = 0.97,
+    bed_adhesion_homed: bool | None = None,
     thermal_samples: list[TemperatureSample] | None = None,
     emergency_stop_transport: EmergencyStopTransport | None = None,
     emergency_stop_budget_ms: float = 200.0,
     env: dict[str, str] | None = None,
 ) -> SafetyBundle:
-    """Run all four safety gates as pre-flight assertions.
+    """Run all registered safety gates as pre-flight assertions.
 
     Each gate is independent: missing inputs cause that gate to be
     *skipped* (not failed), so the bundle can be used in dry-run paths
@@ -176,7 +194,32 @@ def run_all_safety_gates(
     else:
         bundle.skipped_gates.append(GATE_MATERIAL_WINDOW)
 
-    # 3. thermal runaway (replay trace if provided; live loop is wired
+    # 3. bed adhesion
+    if (
+        first_layer_z_offset_mm is not None
+        and target_first_layer_z_offset_mm is not None
+        and bed_actual_c is not None
+        and bed_target_c is not None
+    ):
+        result = check_bed_adhesion_precondition(
+            first_layer_z_offset_mm=first_layer_z_offset_mm,
+            target_first_layer_z_offset_mm=target_first_layer_z_offset_mm,
+            bed_actual_c=bed_actual_c,
+            bed_target_c=bed_target_c,
+            z_tolerance_mm=bed_adhesion_z_tolerance_mm,
+            min_bed_fraction=bed_adhesion_min_bed_fraction,
+            homed=bed_adhesion_homed,
+        )
+        if result.passed:
+            bundle.passed_gates.append(GATE_BED_ADHESION)
+        else:
+            bundle.violations.append(
+                _bed_adhesion_payload(job_id=job_id, printer_id=printer_id, result=result)
+            )
+    else:
+        bundle.skipped_gates.append(GATE_BED_ADHESION)
+
+    # 4. thermal runaway (replay trace if provided; live loop is wired
     #    into the orchestrator's monitoring thread separately).
     if thermal_samples is not None:
         evt, _ = replay_trace(thermal_samples)
@@ -195,7 +238,7 @@ def run_all_safety_gates(
     else:
         bundle.skipped_gates.append(GATE_THERMAL_RUNAWAY)
 
-    # 4. emergency-stop timing
+    # 5. emergency-stop timing
     if emergency_stop_transport is not None:
         evidence = measure_m112_round_trip(
             emergency_stop_transport,
@@ -223,8 +266,10 @@ def run_all_safety_gates(
 
 __all__ = [
     "ALL_SAFETY_GATE_IDS",
+    "BedAdhesionCheckResult",
     "EmergencyStopEvent",
     "EmergencyStopTransport",
+    "GATE_BED_ADHESION",
     "GATE_EMERGENCY_STOP_TIMING",
     "GATE_GCODE_BOUNDS",
     "GATE_MATERIAL_WINDOW",
@@ -243,6 +288,7 @@ __all__ = [
     "ThermalRunawayDetector",
     "TripReason",
     "assert_within_budget",
+    "check_bed_adhesion_precondition",
     "check_material_window",
     "load_material_db",
     "measure_m112_round_trip",
