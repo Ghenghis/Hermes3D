@@ -1,0 +1,24 @@
+{
+    admin off
+}
+
+{$HERMES_PUBLIC_DOMAIN} {
+    encode zstd gzip
+
+    @gradio path / /assets/* /file=*
+    handle @gradio {
+        reverse_proxy hermes3d:7860
+    }
+
+    handle /api/* {
+        reverse_proxy hermes3d:8000
+    }
+
+    handle_errors {
+        respond "Hermes3D is starting..." 503
+    }
+
+    log {
+        output file /var/log/caddy/access.log
+    }
+}
