@@ -28,7 +28,7 @@
 
 ---
 
-## v5.1 — Hardening (next, committed)
+## v5.1 — Hardening (✅ shipped v5.1.0, 2026-05-03)
 
 **Goal:** raise every Tier-2 module to Tier-1 (runnable + tested) and
 close the documented honesty-ledger gaps.
@@ -43,13 +43,17 @@ close the documented honesty-ledger gaps.
 | Layer-D UI smoke tests against Gradio launcher | new test tier |
 | GitHub Actions CI matrix (Windows + Ubuntu, 3.11 + 3.12) | infrastructure |
 
-**Definition of done for v5.1:** every entry in
-`HONESTY_LEDGER.md`'s "scaffold" tier promoted to "runnable", with
-tests, or removed from the kit and the ledger.
+**Completion evidence:** `00_overview/PHASE5_1_COMPLETION_REPORT.md` and
+`00_overview/proofs/phase_5_1_proof.json`.
+
+**Definition of done for v5.1:** every targeted kit-hardening entry is now
+documented in `HONESTY_LEDGER.md` as runnable plus end-to-end wired where
+evidence exists. Layer D3 exists but remains advisory until a later hard-gate
+promotion.
 
 ---
 
-## v5.2 — Multi-agent maturity (committed)
+## v5.2 — Multi-agent maturity (next, committed)
 
 **Goal:** turn the multi-agent scaffolding into a daily-driver.
 

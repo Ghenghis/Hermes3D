@@ -1,4 +1,4 @@
-# Hermes3D-OS Lite — Honesty Ledger (v5.0)
+# Hermes3D-OS Lite — Honesty Ledger (v5.1.0)
 
 This file is the source of truth for what works vs what's specified-only.
 Every component below is in one of three states:
@@ -9,6 +9,12 @@ Every component below is in one of three states:
 
 The ledger is updated with every commit. When a gap is fixed, the row
 moves up. Nothing claims `runnable` until it has tests passing in CI.
+
+Phase 5.1 promoted the kit-hardening claims from module-runnable to
+end-to-end-wired where evidence exists: print history feeds the failure
+predictor, backups run on a scheduler tick, profile generation consumes a
+read-only skill-store protocol, doctor scripts emit a versioned JSON envelope,
+and CI verifies matrix completeness. Layer D3 exists but remains advisory.
 
 ---
 
@@ -44,11 +50,11 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 | `core/agents/parallel_planner.py` | ✓ 3 tests | distinct-printer assignment + caps |
 | `core/farm/spool_tracker.py` | ✓ 3 tests | load/unload/consume with auto-replace |
 | `core/farm/dashboard.py` | smoke | aggregates probe + queue + spool |
-| `core/farm/print_history.py` | ✓ 2 tests | append-only JSONL + aggregations |
+| `core/farm/print_history.py` | ✓ 2 tests + e2e reader wiring | append-only JSONL + aggregations; CP5.1-B reader protocol feeds `failure_predictor` |
 | `core/farm/cost_estimator.py` | ✓ 3 tests | $/print + Wh per job |
-| `core/farm/backup.py` | ✓ 2 tests | tar.gz round-trip with manifest |
+| `core/farm/backup.py` | ✓ 2 tests + scheduler integration | tar.gz round-trip with manifest; CP5.1-B scheduler tick exercises archive creation + retention |
 | `core/notifications/notifier.py` | ✓ 2 tests | Discord/Slack/Generic, env-only secrets |
-| `core/slicer/profile_generator.py` | ✓ 6 tests | (printer × material × quality) → .ini |
+| `core/slicer/profile_generator.py` | ✓ 6 tests + skill-wired integration | (printer × material × quality) → .ini; CP5.1-C accepts `SkillStoreReader` overrides |
 
 ## Tier 3 — Brain Layer (all **runnable**)
 
@@ -56,14 +62,14 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 |---|---|---|
 | `core/orchestration/agent_graph.py` | ✓ 1 test | LangGraph-style stateful workflow + checkpoints |
 | `core/orchestration/print_workflow.py` | ✓ 3 tests | 12-node pipeline composes every agent |
-| `core/memory/skill_store.py` | ✓ 4 tests | persistent typed skills, scope matching, reinforce |
+| `core/memory/skill_store.py` | ✓ 4 tests + reader protocol | persistent typed skills, scope matching, reinforce; CP5.1-C exposes `SkillStoreReader` |
 | `core/memory/skill_pack.py` | ✓ 3 tests | hash-verified import/export bundles |
 | `core/llm/ollama_client.py` | ✓ 4 tests | local LLM, graceful when unavailable |
 | `core/agents/multi_agent.py` | ✓ 7 tests (3 dispatch + 4 LLM loop) | Critic+Optimizer+Executor (deterministic) plus real Executor/Critic/Optimizer LLM loop with graceful no-llm degradation |
 | `core/integrations/octoprint_client.py` | ✓ 1 test | mirror Moonraker shape |
 | `core/integrations/obico_client.py` | ✓ 2 tests | spaghetti detection + actions |
-| `core/intelligence/failure_predictor.py` | ✓ 3 tests | calibrated probability + citations |
-| `core/supervisor/daemon.py` | ✓ 2 tests | long-running monitor with event listeners |
+| `core/intelligence/failure_predictor.py` | ✓ 3 tests + e2e JSONL integration | calibrated probability + citations; CP5.1-B reads real print history |
+| `core/supervisor/daemon.py` | ✓ 2 tests + backup scheduler integration | long-running monitor with event listeners; CP5.1-B opt-in backup tick |
 
 ## Tier 4 — Surfaces (all **runnable**)
 
@@ -121,7 +127,7 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 | `requirements-dev.txt` | runnable |
 | `.gitignore` / `.editorconfig` | runnable |
 | `env/.env.example` | runnable |
-| `scripts/doctor.{ps1,sh}` | runnable |
+| `scripts/scaffolding/doctor.{ps1,sh}` | runnable + JSON envelope tests |
 | `scripts/run-dev.{ps1,sh}` | runnable |
 | `scripts/test.{ps1,sh}` | runnable |
 | `scripts/format.{ps1,sh}` | runnable |
@@ -140,18 +146,13 @@ moves up. Nothing claims `runnable` until it has tests passing in CI.
 ## Test sweep summary (latest local run)
 
 ```
-261 collected on a clean clone (unit + conformance suites).
-Integration tests (3) require matplotlib and are collected once
-`pip install -e .[ui]` (or the explicit `matplotlib>=3.8` dep
-added in v5.0.1 hardening) is in place.
+670 collected and passed in the Phase 5.1 completion sweep.
 ```
 
 Honest current state on a clean clone:
 
-- 261 unit + conformance tests collected and passing.
-- 3 integration tests gated behind the matplotlib dependency.
-  After the v5.0.1 hardening PR (which adds `matplotlib>=3.8` to
-  `pyproject.toml` and `requirements.txt`), the integration suite
-  also collects cleanly. Target post-hardening total: 264 collected.
+- 670 unit, integration, conformance, and checkpoint tests collected and passing.
+- Phase 5.1 CI on `develop@3bcf191` concluded success, including Layer M matrix
+  coverage. Layer D3 Gradio smoke ran but remains advisory/non-blocking.
 
 Every "runnable" row above contributes at least one passing test.
