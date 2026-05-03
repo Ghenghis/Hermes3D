@@ -30,6 +30,7 @@ import tarfile
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +113,27 @@ def create_backup(
     return bundle_path
 
 
+def run_scheduled_backup(
+    state_dir: str | Path,
+    target_dir: str | Path,
+    *,
+    now: datetime,
+    retain_count: int = 24,
+) -> Path:
+    """Create a scheduled backup and prune older archives."""
+    bundle_path = create_backup(
+        state_dir=state_dir,
+        out_dir=target_dir,
+        notes=f"scheduled backup at {now.isoformat()}",
+    )
+    bundles = sorted(Path(target_dir).resolve().glob("*.tar.gz"))
+    excess = len(bundles) - max(0, retain_count)
+    for old in bundles[:excess]:
+        if old != bundle_path:
+            old.unlink(missing_ok=True)
+    return bundle_path
+
+
 def restore_backup(
     bundle_path: str | Path, *, target_dir: str | Path, overwrite: bool = False
 ) -> BackupManifest:
@@ -157,5 +179,6 @@ __all__ = [
     "SCHEMA_VERSION",
     "BackupManifest",
     "create_backup",
+    "run_scheduled_backup",
     "restore_backup",
 ]

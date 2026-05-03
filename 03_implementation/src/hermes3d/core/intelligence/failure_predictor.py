@@ -26,8 +26,9 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from hermes3d.core.farm.print_history import (
-    PrintHistory,
+    PrintHistoryReader,
     aggregate_metrics,
+    default_print_history_reader,
 )
 from hermes3d.core.memory import SkillKind, SkillStore
 
@@ -56,7 +57,7 @@ class FailureForecast:
 
 
 def _printer_component(
-    history: PrintHistory | None, printer_id: str
+    history: PrintHistoryReader | None, printer_id: str
 ) -> tuple[float, int, str | None]:
     if history is None:
         return DEFAULT_BASELINE_FAILURE_RATE, 0, None
@@ -72,7 +73,7 @@ def _printer_component(
 
 
 def _material_component(
-    history: PrintHistory | None, material: str
+    history: PrintHistoryReader | None, material: str
 ) -> tuple[float, int, str | None]:
     if history is None:
         return DEFAULT_BASELINE_FAILURE_RATE, 0, None
@@ -113,7 +114,7 @@ def predict_failure(
     *,
     printer_id: str,
     material: str,
-    history: PrintHistory | None = None,
+    history: PrintHistoryReader | None = None,
     skills: SkillStore | None = None,
 ) -> FailureForecast:
     """Blend printer-history, material-history, and skill signals.
@@ -128,6 +129,7 @@ def predict_failure(
     citations: list[str] = []
     weight_used = 0.0
     weighted_sum = 0.0
+    history = history or default_print_history_reader()
 
     skill_rate, skill_cites = _skill_component(skills, printer_id, material)
     if skill_rate is not None:

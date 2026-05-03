@@ -28,9 +28,12 @@ import logging
 import threading
 import time
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
+from hermes3d.core.farm.backup import run_scheduled_backup
 from hermes3d.core.farm.print_history import PrintHistory
 from hermes3d.core.farm.spool_tracker import SpoolTracker
 from hermes3d.core.integrations import (
@@ -81,6 +84,16 @@ class SupervisorPolicy:
 
 
 @dataclass
+class BackupPolicy:
+    """Opt-in backup scheduler policy."""
+
+    enabled: bool = False
+    interval_minutes: float = 60.0
+    retain_count: int = 24
+    target_dir: Path = field(default_factory=lambda: Path("./backups"))
+
+
+@dataclass
 class PrinterState:
     """Cached last-known state of a printer."""
 
@@ -122,6 +135,8 @@ class PrintSupervisor:
         skills: SkillStore,
         notifier: Notifier,
         policy: SupervisorPolicy | None = None,
+        state_dir: str | Path = "./var",
+        backup_policy: BackupPolicy | None = None,
         printer_ids: Iterable[str] | None = None,
     ) -> None:
         self.history = history
@@ -129,6 +144,9 @@ class PrintSupervisor:
         self.skills = skills
         self.notifier = notifier
         self.policy = policy or SupervisorPolicy()
+        self.state_dir = Path(state_dir)
+        self._backup_policy = backup_policy or BackupPolicy()
+        self._last_backup_at: datetime | None = None
         ids = list(printer_ids) if printer_ids is not None else [p.profile_id for p in FLEET]
         self.states: dict[str, PrinterState] = {pid: PrinterState(printer_id=pid) for pid in ids}
         self._stop_event = threading.Event()
@@ -179,11 +197,31 @@ class PrintSupervisor:
     def _loop(self) -> None:
         while not self._stop_event.is_set():
             try:
+                self._on_tick(datetime.now(UTC))
                 self.poll_once()
             except Exception as exc:
                 log.exception("supervisor poll iteration failed: %s", exc)
             # Sleep with early-exit if stopped
             self._stop_event.wait(self.policy.poll_interval_s)
+
+    def _on_tick(self, now: datetime) -> None:
+        if not self._backup_policy.enabled:
+            return
+        if not self._is_backup_due(now):
+            return
+        run_scheduled_backup(
+            state_dir=self.state_dir,
+            target_dir=self._backup_policy.target_dir,
+            now=now,
+            retain_count=self._backup_policy.retain_count,
+        )
+        self._last_backup_at = now
+
+    def _is_backup_due(self, now: datetime) -> bool:
+        if self._last_backup_at is None:
+            return True
+        elapsed_s = (now - self._last_backup_at).total_seconds()
+        return elapsed_s >= self._backup_policy.interval_minutes * 60.0
 
     def poll_once(self) -> None:
         """One sweep of all printers. Public so tests can drive it."""
@@ -381,6 +419,7 @@ class PrintSupervisor:
 
 
 __all__ = [
+    "BackupPolicy",
     "PrintSupervisor",
     "PrinterState",
     "SupervisorEvent",

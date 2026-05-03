@@ -1,0 +1,4 @@
+enabled: false
+interval_minutes: 60
+retain_count: 24
+target_dir: ./backups

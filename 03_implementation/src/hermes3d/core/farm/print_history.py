@@ -22,13 +22,15 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import os
 import threading
 import time
 import uuid
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -71,6 +73,16 @@ class PrintRecord:
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> PrintRecord:
         return cls(**d)
+
+
+class PrintHistoryReader(Protocol):
+    """Read-only view over completed print history."""
+
+    def iter_jobs(self) -> Iterator[PrintRecord]: ...
+
+    def since(self, ts_utc: datetime) -> Iterator[PrintRecord]: ...
+
+    def by_printer(self, printer_id: str) -> Iterator[PrintRecord]: ...
 
 
 # =============================================================================
@@ -137,6 +149,26 @@ class PrintHistory:
     def list(self) -> list[PrintRecord]:
         return list(self.iter_records())
 
+    def iter_jobs(self) -> Iterator[PrintRecord]:
+        yield from self.iter_records()
+
+    def since(self, ts_utc: datetime) -> Iterator[PrintRecord]:
+        threshold = ts_utc.timestamp()
+        for record in self.iter_records():
+            if record.ended_unix >= threshold:
+                yield record
+
+    def by_printer(self, printer_id: str) -> Iterator[PrintRecord]:
+        for record in self.iter_records():
+            if record.printer_id == printer_id:
+                yield record
+
+
+def default_print_history_reader() -> PrintHistoryReader:
+    """Resolve the production print-history JSONL reader."""
+    configured = os.environ.get("HERMES3D_PRINT_HISTORY") or os.environ.get("HERMES3D_HISTORY")
+    return PrintHistory(configured or "./var/print_history.jsonl")
+
 
 # =============================================================================
 # Aggregations
@@ -179,12 +211,12 @@ class FleetMetrics:
 
 
 def aggregate_metrics(
-    history: PrintHistory, *, since_unix: float | None = None, until_unix: float | None = None
+    history: PrintHistoryReader, *, since_unix: float | None = None, until_unix: float | None = None
 ) -> FleetMetrics:
     metrics = FleetMetrics()
     earliest = None
     latest = None
-    for r in history.iter_records():
+    for r in history.iter_jobs():
         if since_unix is not None and r.started_unix < since_unix:
             continue
         if until_unix is not None and r.started_unix > until_unix:
@@ -228,7 +260,9 @@ __all__ = [
     "FleetMetrics",
     "MaterialAggregate",
     "PrintHistory",
+    "PrintHistoryReader",
     "PrintRecord",
     "PrinterAggregate",
     "aggregate_metrics",
+    "default_print_history_reader",
 ]
