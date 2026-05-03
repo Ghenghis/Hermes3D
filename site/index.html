@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#07091c" />
+  <title>Hermes3D · An operating system for your print farm</title>
+  <meta name="description" content="Hermes3D-OS is a verifiable, multi-agent 3D printing operating system. Auto-orient and repair meshes, validate printability through the Truth Gate, dispatch jobs across a fleet, and prove every print with a signed envelope. Self-host on a VPS, keep inference local, governed end-to-end by HermesProof." />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Hermes3D · An operating system for your print farm" />
+  <meta property="og:description" content="Verifiable multi-agent 3D printing OS — truth-gate every mesh, dispatch across a fleet, sign every print, self-host with local models." />
+  <meta property="og:image" content="./diagrams/pipeline-9-stage.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="preconnect" href="https://api.github.com" crossorigin />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="#top">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span>Hermes3D-OS</span>
+    </a>
+    <nav class="nav__links" aria-label="Primary">
+      <a href="#pipeline">Pipeline</a>
+      <a href="#truth-gate">Truth Gate</a>
+      <a href="#fleet">Fleet</a>
+      <a href="#mcp">MCP</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/Ghenghis/Hermes3D">GitHub</a>
+    </nav>
+    <a class="btn btn--primary" href="#install">Get started</a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ================= HERO ================= -->
+<section class="hero">
+  <div class="container">
+    <div class="hero__inner">
+      <div class="hero__copy">
+        <div class="hero__pills">
+          <span class="pill pill--green"><span class="dot"></span>77 / 79 features REAL</span>
+          <span class="pill pill--purple"><span class="dot"></span>24 MCP tools</span>
+          <span class="pill pill--cyan"><span class="dot"></span>17 truth gates</span>
+        </div>
+        <h1 class="hero__h1">An operating system for your print farm.</h1>
+        <p class="lead">Hermes3D-OS turns a pile of printers into a fleet you can trust. <strong>Auto-orient and repair meshes</strong>, <strong>validate printability</strong> through the Truth Gate, <strong>dispatch jobs</strong> across every machine on your network, and <strong>sign every print</strong> with a verifiable proof envelope — all governed end-to-end by HermesProof so Claude, Codex, Cursor, Windsurf and Kilo Code can collaborate on it without clobbering each other.</p>
+        <div class="hero__cta">
+          <a class="btn btn--primary" href="#install">Install</a>
+          <a class="btn" href="#pipeline">See the pipeline</a>
+          <a class="btn" href="https://github.com/Ghenghis/Hermes3D/releases">Releases ↓</a>
+        </div>
+      </div>
+      <div class="hero__visual" aria-label="A 3D model printing itself layer by layer with a hot-end glow">
+        <div class="layer-stack">
+          <div class="layer-stack__inner">
+            <div class="layer-stack__base"></div>
+            <div class="layer-stack__layer"></div>
+            <div class="layer-stack__glow" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats reveal" aria-label="Project stats">
+      <div class="stat"><div class="stat__num"><span data-count-to="79">0</span></div><div class="stat__label">User-visible features</div></div>
+      <div class="stat"><div class="stat__num"><span data-count-to="24">0</span></div><div class="stat__label">MCP tools</div></div>
+      <div class="stat"><div class="stat__num"><span data-count-to="17">0</span></div><div class="stat__label">Truth gates</div></div>
+      <div class="stat"><div class="stat__num"><span data-count-to="15">0</span></div><div class="stat__label">Slicer + printer adapters</div></div>
+      <div class="stat"><div class="stat__num"><span data-count-to="13">0</span></div><div class="stat__label">React UI tabs</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PIPELINE ================= -->
+<section id="pipeline" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Pipeline</span>
+      <h2>Nine stages, one source of truth.</h2>
+      <p class="lead">Every print walks the same orchestrator state machine — from intent to delivery — and emits structured evidence at every transition.</p>
+    </div>
+    <div class="diagram reveal">
+      <img src="./diagrams/pipeline-9-stage.svg" alt="Animated 9-stage Hermes3D pipeline: INIT, VISION, GENERATE, REPAIR, TRUTH GATE, SLICE, PRINT, REPORT, DONE — with a flowing pulse moving stage to stage" loading="lazy" />
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>Deterministic dry-run</h4>
+        <p>Walk the entire pipeline without an LLM, network, or printer. The state machine is the same. Use it for tests, for CI, for ground-truth comparison against the autonomous mode.</p>
+      </div>
+      <div class="card">
+        <h4>LangGraph + checkpoints</h4>
+        <p>Switch the same orchestrator to LangGraph runtime and you get conditional edges, checkpointing, retry-with-context, and observable agent traces — without rewriting a single stage.</p>
+      </div>
+      <div class="card">
+        <h4>Repair loop</h4>
+        <p>Stage 04 is allowed to bounce back to GENERATE up to N times when the truth gate fails. The repair iteration count is part of the evidence — silent regressions cannot hide.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= TRUTH GATE ================= -->
+<section id="truth-gate" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Truth Gate</span>
+      <h2>Six independent verifications. One signed verdict.</h2>
+      <p class="lead">Drop an STL into the launcher and Hermes3D runs six concurrent printability checks, then HMAC-signs the verdict so it can be verified later — even by parties who don't trust the printer that ran the job.</p>
+    </div>
+    <div class="diagram reveal">
+      <img src="./diagrams/truth-gate-verification.svg" alt="Animated truth-gate flow showing source mesh entering, six checks (manifold closure, wall thickness, overhang ratio, support estimate, bridge spans, first-layer area) flipping from amber pending to green pass, and a signed proof envelope being emitted" loading="lazy" />
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>Manifold closure</h4>
+        <p>Watertight surface required. No floating triangles, no flipped normals, no holes the slicer would silently fill.</p>
+      </div>
+      <div class="card">
+        <h4>Wall thickness</h4>
+        <p>Minimum wall thickness vs. configured nozzle diameter. Caught before the first layer is committed to gcode.</p>
+      </div>
+      <div class="card">
+        <h4>Overhang &amp; bridges</h4>
+        <p>Slope above 45° and unsupported spans &gt; 25 mm flagged. Surfaceable by the auto-orient agent into a printable orientation.</p>
+      </div>
+      <div class="card">
+        <h4>Support estimate</h4>
+        <p>Predicted cm³ of support material, factored into cost estimate and feasibility.</p>
+      </div>
+      <div class="card">
+        <h4>First-layer area</h4>
+        <p>Bed adhesion is one of the top failure modes. Hermes computes it and gates on it.</p>
+      </div>
+      <div class="card">
+        <h4>HMAC envelope</h4>
+        <p>Verdict + check matrix + source mesh hash + run timestamp, signed with a per-instance key. Tampering invalidates the seal.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FLEET ================= -->
+<section id="fleet" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Print farm</span>
+      <h2>Dispatch, lock, print, report — in parallel.</h2>
+      <p class="lead">Fleet-wide orchestration with per-file locks and atomic handoffs. Multiple agents, multiple printers, no clobber.</p>
+    </div>
+    <div class="diagram reveal">
+      <img src="./diagrams/print-farm-orchestration.svg" alt="Animated print-farm orchestration: a job queue feeds a dispatcher with bed/material/load scoring; the dispatcher selects a printer; the LOCK badge appears, progress fills, three other printers run independent jobs in parallel" loading="lazy" />
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>15 adapters</h4>
+        <p>Cura · PrusaSlicer · OrcaSlicer · FLSun Slicer · Moonraker (RW + RO) · OctoPrint · Fluidd · Mainsail · Printrun · Blender · Blender-MCP. Stock implementations, capability flags, version detection.</p>
+      </div>
+      <div class="card">
+        <h4>17 agents</h4>
+        <p>Orchestrator · parallel planner · dispatcher · mesh analyzer · mesh repair · auto-orient · auto-recovery · job queue · calibration · incident detector · quality scorer · materials · scheduler · preflight · equivalence · multi-agent critic.</p>
+      </div>
+      <div class="card">
+        <h4>4 integrations</h4>
+        <p>Obico AI failure detection · OctoPrint REST · farm auto-discovery (Moonraker / Mainsail / Fluidd / OctoPrint) · remote control plane.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= MCP COORDINATION ================= -->
+<section id="mcp" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">MCP coordination</span>
+      <h2>Six AI clients. Sixteen tools. One governed surface.</h2>
+      <p class="lead">Hermes3D ships an MCP server with 16 tools that any compliant client can call — and HermesProof's governance layer makes sure they don't step on each other.</p>
+    </div>
+    <div class="diagram reveal">
+      <img src="./diagrams/mcp-coordination.svg" alt="Animated MCP coordination: Claude, Codex, Cursor, Windsurf, VS Code Copilot, and Kilo Code drop staggered pulses into the HermesProof governance band; six tool category groups (DISPATCH, QUEUE, FLEET, VALIDATE, SLICE, INTELLIGENCE, COST) light up in sequence" loading="lazy" />
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>Per-file locks</h4>
+        <p>Every concurrent agent must claim a lock on the files it intends to edit. The lock is atomic (mkdir EEXIST), TTL-expiring, and ownership-checked server-side. No two agents stomp.</p>
+      </div>
+      <div class="card">
+        <h4>Hash-chained evidence</h4>
+        <p>Every tool call appends to an evidence ledger where each entry binds to the previous via prev_hash + entry_hash. Mid-chain tamper detected on the next verify.</p>
+      </div>
+      <div class="card">
+        <h4>Atomic handoffs</h4>
+        <p>Need to hand a task from Codex to Claude for review? Single tool call, evidence-emitting, ownership-tracked, blocked-handoff fallback for safe failure.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LAUNCHER TOUR ================= -->
+<section id="launcher" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Gradio launcher</span>
+      <h2>Drop an STL. Get a verdict. Generate a part.</h2>
+      <p class="lead">The Lite launcher (`python -m hermes3d.app.launcher`) ships four tabs. Three are real; one is conspicuously disabled until Blender + ComfyUI + LLM keys are provisioned. <strong>No "Coming Soon" buttons. Ever.</strong></p>
+    </div>
+
+    <!-- Screenshot slots (will populate after capture pass) -->
+    <div class="shot reveal">
+      <div class="shot__frame" id="shot-launcher-hero" data-src="./screenshots/01-launcher-hero.png" data-alt="Hermes3D Gradio launcher main page with 4 tabs visible">
+        <span>Shot 01 · Launcher hero · 1440×900 · capture pending</span>
+      </div>
+      <div class="shot__caption"><span class="shot__tag">Shot 01</span><span>Launcher first-load · 4 tabs · 3 enabled · 1 disabled-with-explanation</span></div>
+    </div>
+
+    <div class="grid grid--3 reveal">
+      <div class="shot">
+        <div class="shot__frame" data-src="./screenshots/04-truth-gate-input.png" data-alt="Truth Gate Validator tab idle state with file upload input">
+          <span>Shot 04 · Truth Gate input</span>
+        </div>
+        <div class="shot__caption"><span class="shot__tag">Shot 04</span><span>STL upload + Run Truth Gate</span></div>
+      </div>
+      <div class="shot">
+        <div class="shot__frame" data-src="./screenshots/05-truth-gate-result.png" data-alt="Truth Gate result with check matrix table">
+          <span>Shot 05 · Truth Gate result</span>
+        </div>
+        <div class="shot__caption"><span class="shot__tag">Shot 05</span><span>Verdict table · pass/fail/skip per check</span></div>
+      </div>
+      <div class="shot">
+        <div class="shot__frame" data-src="./screenshots/09-organizer-renders.png" data-alt="6-view canonical renders folder of the parametric desk organizer">
+          <span>Shot 09 · 6-view organizer renders</span>
+        </div>
+        <div class="shot__caption"><span class="shot__tag">Shot 09</span><span>iso · front · top · side · L · R · auto-rendered</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= REACT UI TOUR ================= -->
+<section id="ui" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">React control plane · 13 tabs</span>
+      <h2>Operate the farm from anywhere.</h2>
+      <p class="lead">A full-fat React UI for ops mode — Dashboard, Agents, Workflows, 3D Generation, Blender MCP, Slicing, Printer Fleet, Print Queue, Printer Control, Docked Apps, Proof &amp; Reports, System Logs, Settings.</p>
+    </div>
+
+    <div class="tab-tour reveal">
+      <div class="tab-tour__cell" data-shot="13" data-src="./screenshots/13-dashboard.png"><strong>Dashboard</strong>Fleet KPIs · active prints</div>
+      <div class="tab-tour__cell" data-shot="14" data-src="./screenshots/14-agents.png"><strong>Agents</strong>Execution + state logs</div>
+      <div class="tab-tour__cell" data-shot="15" data-src="./screenshots/15-workflows.png"><strong>Workflows</strong>Pipeline visualizer</div>
+      <div class="tab-tour__cell" data-shot="16" data-src="./screenshots/16-3d-gen.png"><strong>3D Generation</strong>Text→model</div>
+      <div class="tab-tour__cell" data-shot="17" data-src="./screenshots/17-blender-mcp.png"><strong>Blender MCP</strong>Agentic mesh ops</div>
+      <div class="tab-tour__cell" data-shot="18" data-src="./screenshots/18-slicing.png"><strong>Slicing</strong>Profile + preview</div>
+      <div class="tab-tour__cell" data-shot="19" data-src="./screenshots/19-fleet.png"><strong>Printer Fleet</strong>Health + topology</div>
+      <div class="tab-tour__cell" data-shot="20" data-src="./screenshots/20-queue.png"><strong>Print Queue</strong>Job CRUD + state</div>
+      <div class="tab-tour__cell" data-shot="21" data-src="./screenshots/21-control.png"><strong>Printer Control</strong>Temp · motion · pause</div>
+      <div class="tab-tour__cell" data-shot="22" data-src="./screenshots/22-docked.png"><strong>Docked Apps</strong>External tools</div>
+      <div class="tab-tour__cell" data-shot="23" data-src="./screenshots/23-proof.png"><strong>Proof &amp; Reports</strong>Signed history</div>
+      <div class="tab-tour__cell" data-shot="24" data-src="./screenshots/24-logs.png"><strong>System Logs</strong>Structured events</div>
+      <div class="tab-tour__cell" data-shot="25" data-src="./screenshots/25-settings.png"><strong>Settings ⚙</strong>Providers · keys</div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= CLI TERMINAL ================= -->
+<section id="cli" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Headless · scriptable</span>
+      <h2>Every UI action has a CLI verb.</h2>
+      <p class="lead">The launcher is a face for the same code your CI runs. Truth-gate batches of STLs, probe a fleet, dispatch a job — all from the terminal, all with structured output.</p>
+    </div>
+    <div class="terminal reveal" data-terminal>
+      <div class="terminal__head">
+        <div class="terminal__dots"><span></span><span></span><span></span></div>
+        <span class="terminal__title">hermes3d · live</span>
+      </div>
+      <div class="terminal__body" id="terminal-body" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= INSTALL ================= -->
+<section id="install" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Install · run · prove</span>
+      <h2>Three commands and you're at <code>localhost:7860</code>.</h2>
+      <p class="lead">Hermes3D runs on Python 3.11+ with no external services required. The base launcher needs zero API keys — Blender, ComfyUI, and LLM provisioning are opt-in.</p>
+    </div>
+
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>Windows · macOS · Linux</h4>
+        <pre><code>git clone https://github.com/Ghenghis/Hermes3D
+cd Hermes3D
+pip install -e ".[ui]"
+python -m hermes3d.app.launcher</code></pre>
+      </div>
+      <div class="card">
+        <h4>Verify</h4>
+        <pre><code>python scripts/scaffolding/doctor.py --json
+pytest -q
+hermes3d truth-gate ./mymesh.stl</code></pre>
+      </div>
+      <div class="card">
+        <h4>Wire MCP clients</h4>
+        <pre><code>npm run wizard --prefix ../HermesProof
+# pick: claude-desktop, claude-code,
+#       codex, cursor, windsurf,
+#       vscode-copilot, kilo-code</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RELEASES ================= -->
+<section id="releases" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Releases</span>
+      <h2>Signed binaries on every tag.</h2>
+      <p class="lead">Windows installer (PyInstaller + Velopack auto-update + Azure Artifact Signing), source bundle with Sigstore-signed proof envelope, GitHub native build-provenance attestation.</p>
+    </div>
+    <div class="reveal" id="releases-list">
+      <p class="sub">Loading latest releases…</p>
+    </div>
+    <pre class="reveal"><code>cosign verify-blob \
+  --certificate-identity-regexp 'https://github.com/Ghenghis/Hermes3D' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --bundle hermes3d-os.json.cosign.bundle hermes3d-os.json
+
+gh attestation verify Hermes3D-Setup.exe --repo Ghenghis/Hermes3D
+winget install Hermes3D</code></pre>
+  </div>
+</section>
+
+<!-- ================= DEPLOY ================= -->
+<section id="deploy" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">Self-host · own your inference</span>
+      <h2>VPS for the UI. Your gaming PC for the brain.</h2>
+      <p class="lead">A turnkey deploy bundle puts Hermes3D's web UI on a Hostinger VPS while inference stays on your local machine over a Tailscale tailnet. No port forwarding, no public LLM endpoint, ~$8/month total.</p>
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>$7/mo · Hostinger KVM 2</h4>
+        <p>2 vCPU · 8 GB RAM · 100 GB NVMe · 8 TB BW. Runs Caddy 2.8 + Gradio + FastAPI + Postgres + Redis under Docker Compose.</p>
+      </div>
+      <div class="card">
+        <h4>Free · Tailscale Personal</h4>
+        <p>Unlimited devices in 2026. The VPS calls your gaming PC's Ollama on <code>:11434</code> over WireGuard. ACL pins it to a single port, single direction.</p>
+      </div>
+      <div class="card">
+        <h4>~$1/mo · Restic → B2</h4>
+        <p>Nightly snapshots of the VPS to Backblaze B2. AES-256, dedup, ~1/5 the cost of S3, 3× free egress. Local <code>.env</code> + <code>printers.user.toml</code> never leaves your machine.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= GOVERNANCE STORY ================= -->
+<section id="governance" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker">HermesProof governance</span>
+      <h2>Every claim is verifiable.</h2>
+      <p class="lead">Hermes3D doesn't ask you to trust it. <strong>17 truth gates</strong> re-attest the system on every push to main, sign <code>PROOF/latest.json</code> with Sigstore (keyless OIDC), publish a build-provenance attestation, and commit the refreshed proof bundle back to the repo.</p>
+    </div>
+    <div class="grid grid--4 reveal">
+      <div class="card"><h4>Source integrity</h4><p>SHA-256 manifest of every source file. Drift surfaces as hash break.</p></div>
+      <div class="card"><h4>Tests · 670+</h4><p>Full pytest suite gated; no merge if a single test regresses.</p></div>
+      <div class="card"><h4>Stdio handshake</h4><p>Real <code>node src/server.mjs</code> spawns and returns 24 tools every CI run.</p></div>
+      <div class="card"><h4>Doctor JSON</h4><p>Cross-platform prereq check emits <code>json_schema_version: 1</code>.</p></div>
+      <div class="card"><h4>e2e flow · 14 checks</h4><p>Real claim → lock → block → handoff → gate → release stdio probe.</p></div>
+      <div class="card"><h4>Hash-chain valid</h4><p>Mid-chain tamper detected at the right index.</p></div>
+      <div class="card"><h4>Tool hygiene</h4><p>Server descriptions free of prompt-injection markers (OWASP MCP).</p></div>
+      <div class="card"><h4>Wizard dry-run</h4><p>Universal setup wizard plans client wiring without writing state.</p></div>
+    </div>
+    <p class="reveal" style="text-align:center; margin-top:2rem; color: var(--text-faint);"><code>npm run truth-gates</code> · <a href="https://ghenghis.github.io/HermesProof/">view HermesProof site →</a></p>
+  </div>
+</section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer">
+  <div class="container footer__row">
+    <div>
+      <a class="brand" href="#top">
+        <span class="brand__mark" aria-hidden="true"></span>
+        <span>Hermes3D-OS</span>
+      </a>
+      <p style="margin-top:0.5rem; max-width: 420px;">An operating system for your print farm. Verifiable, multi-agent, self-hostable. MIT-licensed.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <p><a href="https://github.com/Ghenghis/Hermes3D">GitHub</a><br/>
+      <a href="https://github.com/Ghenghis/Hermes3D/releases">Releases</a><br/>
+      <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/LICENSE">License (MIT)</a></p>
+    </div>
+    <div>
+      <h4>Governance</h4>
+      <p><a href="https://github.com/Ghenghis/HermesProof">HermesProof</a><br/>
+      <a href="https://ghenghis.github.io/HermesProof/">Live site</a><br/>
+      <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/PROOF_E2E_REPORT.md">Latest proof</a></p>
+    </div>
+  </div>
+</footer>
+
+<script src="./js/app.js" defer></script>
+</body>
+</html>

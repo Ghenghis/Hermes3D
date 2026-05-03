@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="100%" role="img" aria-labelledby="pipeline-title pipeline-desc">
+  <title id="pipeline-title">The Hermes3D 9-stage orchestration pipeline</title>
+  <desc id="pipeline-desc">Animated flow showing nine sequential stages — Init, Vision, Generate, Repair, Truth Gate, Slice, Print, Report, Done — with a flowing data pulse moving left to right. Each stage activates in sequence: from intent capture to mesh generation through automated repair, printability validation, slicing, physical print, evidence reporting, and final completion. Honors prefers-reduced-motion.</desc>
+  <defs>
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; animation-duration: 0.001s !important; }
+      }
+      .stage-label { font: 600 14px ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: #cbd5e1; }
+      .stage-sub { font: 400 11px ui-monospace, "Cascadia Mono", Menlo, monospace; fill: #64748b; }
+      .stage-num { font: 700 11px ui-monospace, monospace; fill: #06b6d4; }
+      .header { font: 600 16px ui-sans-serif, system-ui, sans-serif; fill: #06b6d4; letter-spacing: 0.08em; }
+    </style>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#07091c"/>
+      <stop offset="1" stop-color="#0b0e25"/>
+    </linearGradient>
+    <linearGradient id="rail" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#06b6d4" stop-opacity="0.1"/>
+      <stop offset="0.5" stop-color="#a855f7" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#ec4899" stop-opacity="0.1"/>
+    </linearGradient>
+    <radialGradient id="pulse" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#22c55e" stop-opacity="1"/>
+      <stop offset="0.4" stop-color="#06b6d4" stop-opacity="0.6"/>
+      <stop offset="1" stop-color="#06b6d4" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+
+  <rect width="1200" height="320" fill="url(#bg)" rx="14"/>
+  <text x="40" y="40" class="header">HERMES3D · 9-STAGE PIPELINE</text>
+  <text x="40" y="58" class="stage-sub">orchestrator state machine · deterministic dry-run · LLM-augmented full mode</text>
+
+  <!-- The rail -->
+  <rect x="60" y="178" width="1080" height="4" fill="url(#rail)" rx="2"/>
+
+  <!-- 9 stages -->
+  <g>
+    <!-- Stage circles + labels via repeated groups; animate each one's "activate" via opacity and a pulse ball moving along the rail -->
+    <g transform="translate(80,180)">
+      <circle r="22" fill="#0b0e25" stroke="#06b6d4" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">01</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">INIT</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">intent</text>
+    </g>
+    <g transform="translate(212,180)">
+      <circle r="22" fill="#0b0e25" stroke="#06b6d4" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">02</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">VISION</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">analyze</text>
+    </g>
+    <g transform="translate(344,180)">
+      <circle r="22" fill="#0b0e25" stroke="#06b6d4" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">03</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">GENERATE</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">mesh build</text>
+    </g>
+    <g transform="translate(476,180)">
+      <circle r="22" fill="#0b0e25" stroke="#a855f7" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">04</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">REPAIR</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">auto-fix</text>
+    </g>
+    <g transform="translate(608,180)">
+      <circle r="22" fill="#0b0e25" stroke="#a855f7" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">05</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">TRUTH GATE</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">printable?</text>
+    </g>
+    <g transform="translate(740,180)">
+      <circle r="22" fill="#0b0e25" stroke="#ec4899" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">06</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">SLICE</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">gcode</text>
+    </g>
+    <g transform="translate(872,180)">
+      <circle r="22" fill="#0b0e25" stroke="#ec4899" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">07</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">PRINT</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">execute</text>
+    </g>
+    <g transform="translate(1004,180)">
+      <circle r="22" fill="#0b0e25" stroke="#22c55e" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">08</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">REPORT</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">evidence</text>
+    </g>
+    <g transform="translate(1120,180)">
+      <circle r="22" fill="#0b0e25" stroke="#22c55e" stroke-width="2"/>
+      <text x="0" y="5" text-anchor="middle" class="stage-num">09</text>
+      <text x="0" y="48" text-anchor="middle" class="stage-label">DONE</text>
+      <text x="0" y="64" text-anchor="middle" class="stage-sub">closed</text>
+    </g>
+  </g>
+
+  <!-- The flowing pulse -->
+  <g filter="url(#glow)">
+    <circle r="14" fill="url(#pulse)">
+      <animate attributeName="cx" values="80;212;344;476;608;740;872;1004;1120" keyTimes="0;0.125;0.25;0.375;0.5;0.625;0.75;0.875;1" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="180" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="14;18;14" dur="0.8s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- Activation glow on each stage as the pulse passes -->
+  <g>
+    <circle cx="80" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0;0.125;0.25" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0;0.125;0.25" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="212" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0.125;0.25;0.375" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0.125;0.25;0.375" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="344" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0.25;0.375;0.5" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0.25;0.375;0.5" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="476" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0.375;0.5;0.625" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0.375;0.5;0.625" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="608" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0.5;0.625;0.75" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0.5;0.625;0.75" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="740" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0.625;0.75;0.875" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0.625;0.75;0.875" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="872" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;0" keyTimes="0.75;0.875;1" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;30;22" keyTimes="0.75;0.875;1" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1004" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1;1" keyTimes="0.875;0.95;1" dur="9s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="22;28;28" keyTimes="0.875;0.95;1" dur="9s" repeatCount="indefinite"/>
+    </circle>
+    <circle cx="1120" cy="180" r="22" fill="none" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;1" keyTimes="0.95;1" dur="9s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <text x="600" y="290" text-anchor="middle" class="stage-sub">Every stage emits structured evidence to the append-only ledger. The repair stage may loop back to generate (max N iterations).</text>
+</svg>

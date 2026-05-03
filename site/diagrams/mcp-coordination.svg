@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="100%" role="img" aria-labelledby="mcp-title mcp-desc">
+  <title id="mcp-title">Hermes3D MCP coordination — clients, governance, fleet</title>
+  <desc id="mcp-desc">Animated diagram showing how six AI clients — Claude, Codex, Cursor, Windsurf, VS Code Copilot, and Kilo Code — connect via stdio JSON-RPC to the Hermes3D MCP server, which exposes 16 tools across categories: dispatch, queue, fleet status, materials, truth gate, mesh analysis, profile generation, parallel planning, skill lookup, failure prediction, proof verification, and cost estimation. Every tool call is governed by HermesProof's lock layer, ensuring that concurrent clients cannot stomp on each other's work. Tool calls flow as colored pulses from clients through the governance layer to the Hermes3D core, and back as structured responses. Honors prefers-reduced-motion.</desc>
+  <defs>
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; animation-duration: 0.001s !important; }
+      }
+      .h { font: 600 16px ui-sans-serif, system-ui, sans-serif; fill: #06b6d4; letter-spacing: 0.08em; }
+      .lbl { font: 600 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .sub { font: 400 11px ui-monospace, "Cascadia Mono", Menlo, monospace; fill: #64748b; }
+      .client { font: 700 12px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .tool { font: 500 10px ui-monospace, "Cascadia Mono", Menlo, monospace; fill: #cbd5e1; }
+      .cat { font: 700 10px ui-monospace, monospace; fill: #06b6d4; letter-spacing: 0.06em; }
+    </style>
+    <linearGradient id="bg4" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#07091c"/>
+      <stop offset="1" stop-color="#0b0e25"/>
+    </linearGradient>
+    <linearGradient id="govBand" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#a855f7" stop-opacity="0.15"/>
+      <stop offset="0.5" stop-color="#a855f7" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#a855f7" stop-opacity="0.15"/>
+    </linearGradient>
+    <filter id="glow4"><feGaussianBlur stdDeviation="2"/></filter>
+  </defs>
+
+  <rect width="1200" height="460" fill="url(#bg4)" rx="14"/>
+  <text x="40" y="40" class="h">MCP COORDINATION · CLIENTS · GOVERNANCE · FLEET</text>
+  <text x="40" y="58" class="sub">stdio JSON-RPC · 16 tools · per-file locks · evidence-bound calls</text>
+
+  <!-- Six clients (top row) — evenly spaced at x = 130, 318, 506, 694, 882, 1070 -->
+  <g>
+    <!-- Claude -->
+    <g transform="translate(130,110)">
+      <rect x="-60" y="-26" width="120" height="52" rx="8" fill="#0b0e25" stroke="#06b6d4" stroke-width="1.5"/>
+      <circle cx="-40" cy="0" r="8" fill="#d97706"/>
+      <text x="-22" y="-2" class="client">Claude</text>
+      <text x="-22" y="14" class="sub">Code · Desktop</text>
+    </g>
+    <!-- Codex -->
+    <g transform="translate(318,110)">
+      <rect x="-60" y="-26" width="120" height="52" rx="8" fill="#0b0e25" stroke="#22c55e" stroke-width="1.5"/>
+      <circle cx="-40" cy="0" r="8" fill="#22c55e"/>
+      <text x="-22" y="-2" class="client">Codex</text>
+      <text x="-22" y="14" class="sub">CLI · web</text>
+    </g>
+    <!-- Cursor -->
+    <g transform="translate(506,110)">
+      <rect x="-60" y="-26" width="120" height="52" rx="8" fill="#0b0e25" stroke="#a855f7" stroke-width="1.5"/>
+      <circle cx="-40" cy="0" r="8" fill="#a855f7"/>
+      <text x="-22" y="-2" class="client">Cursor</text>
+      <text x="-22" y="14" class="sub">IDE</text>
+    </g>
+    <!-- Windsurf -->
+    <g transform="translate(694,110)">
+      <rect x="-60" y="-26" width="120" height="52" rx="8" fill="#0b0e25" stroke="#ec4899" stroke-width="1.5"/>
+      <circle cx="-40" cy="0" r="8" fill="#ec4899"/>
+      <text x="-22" y="-2" class="client">Windsurf</text>
+      <text x="-22" y="14" class="sub">Cascade</text>
+    </g>
+    <!-- VS Code Copilot -->
+    <g transform="translate(882,110)">
+      <rect x="-60" y="-26" width="120" height="52" rx="8" fill="#0b0e25" stroke="#06b6d4" stroke-width="1.5"/>
+      <circle cx="-40" cy="0" r="8" fill="#06b6d4"/>
+      <text x="-22" y="-2" class="client">VS Code</text>
+      <text x="-22" y="14" class="sub">Copilot</text>
+    </g>
+    <!-- Kilo Code -->
+    <g transform="translate(1070,110)">
+      <rect x="-60" y="-26" width="120" height="52" rx="8" fill="#0b0e25" stroke="#f59e0b" stroke-width="1.5"/>
+      <circle cx="-40" cy="0" r="8" fill="#f59e0b"/>
+      <text x="-22" y="-2" class="client">Kilo Code</text>
+      <text x="-22" y="14" class="sub">VS Code ext.</text>
+    </g>
+  </g>
+
+  <!-- HermesProof governance band -->
+  <g>
+    <rect x="60" y="200" width="1080" height="50" rx="10" fill="url(#govBand)" stroke="#a855f7" stroke-width="1.2"/>
+    <text x="600" y="222" text-anchor="middle" class="lbl">HermesProof governance · per-file locks · atomic handoffs · evidence ledger</text>
+    <text x="600" y="240" text-anchor="middle" class="sub">stdio · MCP 2025-11-25 · 24 tools · zod-validated</text>
+  </g>
+
+  <!-- Pulses from each client to governance band — 6 staggered streams -->
+  <g filter="url(#glow4)">
+    <circle r="5" fill="#d97706">
+      <animate attributeName="cx" values="130;130" dur="3.6s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="140;200" keyTimes="0;1" dur="3.6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="3.6s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#22c55e">
+      <animate attributeName="cx" values="318;318" dur="3.6s" begin="0.4s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="140;200" keyTimes="0;1" dur="3.6s" begin="0.4s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="3.6s" begin="0.4s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#a855f7">
+      <animate attributeName="cx" values="506;506" dur="3.6s" begin="0.8s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="140;200" keyTimes="0;1" dur="3.6s" begin="0.8s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="3.6s" begin="0.8s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#ec4899">
+      <animate attributeName="cx" values="694;694" dur="3.6s" begin="1.2s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="140;200" keyTimes="0;1" dur="3.6s" begin="1.2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="3.6s" begin="1.2s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#06b6d4">
+      <animate attributeName="cx" values="882;882" dur="3.6s" begin="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="140;200" keyTimes="0;1" dur="3.6s" begin="1.6s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="3.6s" begin="1.6s" repeatCount="indefinite"/>
+    </circle>
+    <circle r="5" fill="#f59e0b">
+      <animate attributeName="cx" values="1070;1070" dur="3.6s" begin="2.0s" repeatCount="indefinite"/>
+      <animate attributeName="cy" values="140;200" keyTimes="0;1" dur="3.6s" begin="2.0s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.95;1" dur="3.6s" begin="2.0s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <!-- 16 MCP tools grouped by category -->
+  <g transform="translate(80,290)">
+    <!-- Group 1: DISPATCH -->
+    <g transform="translate(0,0)">
+      <text x="0" y="0" class="cat">DISPATCH</text>
+      <text x="0" y="20" class="tool">hermes3d.dispatch</text>
+      <text x="0" y="36" class="tool">hermes3d.parallel_plan</text>
+    </g>
+    <!-- Group 2: QUEUE -->
+    <g transform="translate(220,0)">
+      <text x="0" y="0" class="cat">QUEUE</text>
+      <text x="0" y="20" class="tool">queue_list</text>
+      <text x="0" y="36" class="tool">queue_enqueue</text>
+      <text x="0" y="52" class="tool">queue_cancel</text>
+    </g>
+    <!-- Group 3: FLEET -->
+    <g transform="translate(420,0)">
+      <text x="0" y="0" class="cat">FLEET</text>
+      <text x="0" y="20" class="tool">fleet_status</text>
+      <text x="0" y="36" class="tool">spool_list</text>
+    </g>
+    <!-- Group 4: VALIDATE -->
+    <g transform="translate(580,0)">
+      <text x="0" y="0" class="cat">VALIDATE</text>
+      <text x="0" y="20" class="tool">truth_gate</text>
+      <text x="0" y="36" class="tool">analyze_mesh</text>
+      <text x="0" y="52" class="tool">proof_verify</text>
+    </g>
+    <!-- Group 5: SLICE -->
+    <g transform="translate(760,0)">
+      <text x="0" y="0" class="cat">SLICE</text>
+      <text x="0" y="20" class="tool">generate_profile</text>
+      <text x="0" y="36" class="tool">list_materials</text>
+    </g>
+    <!-- Group 6: INTEL -->
+    <g transform="translate(920,0)">
+      <text x="0" y="0" class="cat">INTELLIGENCE</text>
+      <text x="0" y="20" class="tool">predict_failure</text>
+      <text x="0" y="36" class="tool">skill_lookup</text>
+      <text x="0" y="52" class="tool">skill_list</text>
+    </g>
+    <!-- Group 7: COST -->
+    <g transform="translate(1100,0)">
+      <text x="-30" y="0" class="cat">COST</text>
+      <text x="-30" y="20" class="tool">estimate_cost</text>
+    </g>
+  </g>
+
+  <!-- Tool activation glow (each tool group lights up in turn) -->
+  <g>
+    <rect x="78" y="284" width="200" height="60" rx="6" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.8;0;0;0;0;0" keyTimes="0;0.07;0.14;0.28;0.42;0.56;1" dur="7s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="298" y="284" width="180" height="60" rx="6" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;0.8;0;0;0;0" keyTimes="0;0.14;0.21;0.28;0.42;0.56;1" dur="7s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="498" y="284" width="160" height="60" rx="6" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0.8;0;0;0" keyTimes="0;0.21;0.28;0.35;0.42;0.56;1" dur="7s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="658" y="284" width="180" height="60" rx="6" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;0.8;0;0" keyTimes="0;0.28;0.35;0.42;0.49;0.56;1" dur="7s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="838" y="284" width="180" height="60" rx="6" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;0;0.8;0" keyTimes="0;0.35;0.42;0.49;0.56;0.63;1" dur="7s" repeatCount="indefinite"/>
+    </rect>
+    <rect x="1018" y="284" width="160" height="60" rx="6" fill="none" stroke="#22c55e" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0;0;0;0;0;0.8;0" keyTimes="0;0.42;0.49;0.56;0.63;0.7;0.77;1" dur="7s" repeatCount="indefinite"/>
+    </rect>
+  </g>
+
+  <!-- Bottom: Hermes3D core -->
+  <g transform="translate(600,420)">
+    <rect x="-160" y="-22" width="320" height="36" rx="8" fill="#0b0e25" stroke="#06b6d4" stroke-width="1.5"/>
+    <text x="0" y="-2" text-anchor="middle" class="lbl">Hermes3D core · 79 features</text>
+    <text x="0" y="11" text-anchor="middle" class="sub">17 agents · 15 adapters · 4 integrations · 13 React tabs</text>
+  </g>
+</svg>
