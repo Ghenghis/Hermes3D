@@ -115,6 +115,24 @@ def test_bed_adhesion_violation_recorded_in_bundle() -> None:
     assert any(v["gate"] == GATE_BED_ADHESION for v in bundle.violations)
 
 
+def test_room_temperature_bed_profile_passes_bundle() -> None:
+    bundle = run_all_safety_gates(
+        job_id="j",
+        printer_id="p",
+        material="PLA",
+        nozzle_c=205.0,
+        bed_c=0.0,
+        first_layer_z_offset_mm=0.20,
+        target_first_layer_z_offset_mm=0.20,
+        bed_actual_c=22.0,
+        bed_target_c=0.0,
+        bed_adhesion_homed=False,
+    )
+    assert bundle.passed
+    assert GATE_MATERIAL_WINDOW in bundle.passed_gates
+    assert GATE_BED_ADHESION in bundle.passed_gates
+
+
 def test_skips_record_correctly() -> None:
     bundle = run_all_safety_gates(job_id="j", printer_id="p")
     assert bundle.passed  # nothing failed because nothing ran

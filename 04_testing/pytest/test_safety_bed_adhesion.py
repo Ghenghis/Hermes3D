@@ -103,6 +103,17 @@ def test_bed_temperature_boundary_is_inclusive() -> None:
     assert above.passed
 
 
+def test_zero_bed_target_is_allowed_for_room_temperature_profiles() -> None:
+    result = check_bed_adhesion_precondition(
+        first_layer_z_offset_mm=0.20,
+        target_first_layer_z_offset_mm=0.20,
+        bed_actual_c=22.0,
+        bed_target_c=0.0,
+    )
+    assert result.passed
+    assert result.bed_min_c == pytest.approx(0.0)
+
+
 def test_combined_failures_are_all_reported() -> None:
     result = check_bed_adhesion_precondition(
         first_layer_z_offset_mm=0.12,
@@ -151,6 +162,15 @@ def test_already_homed_fails_as_too_late() -> None:
 
 
 def test_invalid_thresholds_raise() -> None:
+    negative_bed = check_bed_adhesion_precondition(
+        first_layer_z_offset_mm=0.20,
+        target_first_layer_z_offset_mm=0.20,
+        bed_actual_c=22.0,
+        bed_target_c=-1.0,
+    )
+    assert not negative_bed.passed
+    assert any("must be non-negative" in reason for reason in negative_bed.reasons)
+
     with pytest.raises(ValueError, match="z_tolerance"):
         check_bed_adhesion_precondition(
             first_layer_z_offset_mm=0.20,

@@ -90,8 +90,8 @@ def check_bed_adhesion_precondition(
     if homed is True:
         reasons.append("bed adhesion precondition must run before homing")
 
-    if math.isfinite(bed_target_c) and bed_target_c <= 0:
-        reasons.append(f"bed target {bed_target_c:.1f}C must be positive")
+    if math.isfinite(bed_target_c) and bed_target_c < 0:
+        reasons.append(f"bed target {bed_target_c:.1f}C must be non-negative")
 
     z_delta = first_layer_z_offset_mm - target_first_layer_z_offset_mm
     if math.isfinite(z_delta) and abs(z_delta) - z_tolerance_mm > 1e-9:
@@ -100,7 +100,12 @@ def check_bed_adhesion_precondition(
         )
 
     bed_min_c = bed_target_c * min_bed_fraction
-    if math.isfinite(bed_actual_c) and math.isfinite(bed_min_c) and bed_actual_c < bed_min_c:
+    if (
+        math.isfinite(bed_actual_c)
+        and math.isfinite(bed_min_c)
+        and bed_target_c > 0
+        and bed_actual_c < bed_min_c
+    ):
         reasons.append(
             f"bed {bed_actual_c:.1f}C below {min_bed_fraction:.0%} of target "
             f"{bed_target_c:.1f}C ({bed_min_c:.1f}C)"
