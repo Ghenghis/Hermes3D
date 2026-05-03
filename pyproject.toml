@@ -50,7 +50,7 @@ dev = [
 langgraph = ["langgraph>=0.2"]
 # Optional local-first recall layer (SQLite-backed, sub-millisecond).
 # Recall is NOT canonical — the evidence ledger remains source of truth.
-# See 02_architecture/adr/ADR-014-mnemosyne-recall-layer.md.
+# See 02_architecture/adr/ADR-015-mnemosyne-recall-layer.md.
 mnemosyne = ["mnemosyne-memory>=2.0,<3"]
 all = ["hermes3d-os-lite[ui,dev,langgraph,mnemosyne]"]
 
