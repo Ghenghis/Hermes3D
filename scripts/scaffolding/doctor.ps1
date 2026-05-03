@@ -12,10 +12,16 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$Json
+    [switch]$Json,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$RemainingArgs
 )
 
 $ErrorActionPreference = 'Stop'
+
+if ($RemainingArgs -contains '--json') {
+    $Json = $true
+}
 
 $results = New-Object System.Collections.Generic.List[hashtable]
 
@@ -202,6 +208,217 @@ function Test-Docker {
     } else {
         Add-Result WARN 'docker' 'docker not on PATH (optional for integration tests)'
     }
+}
+
+function Get-DoctorPlatform {
+    if ($env:HERMES3D_DOCTOR_PLATFORM) {
+        return $env:HERMES3D_DOCTOR_PLATFORM
+    }
+    if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+            [System.Runtime.InteropServices.OSPlatform]::Windows
+        )) {
+        return 'windows'
+    }
+    if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform(
+            [System.Runtime.InteropServices.OSPlatform]::OSX
+        )) {
+        return 'macos'
+    }
+    return 'linux'
+}
+
+function Get-EnvBool {
+    param([string]$Name)
+    $value = [Environment]::GetEnvironmentVariable($Name)
+    switch -Regex ($value) {
+        '^(1|true|yes|on)$' { return $true }
+        '^(0|false|no|off)$' { return $false }
+        default { return $null }
+    }
+}
+
+function New-DoctorCheck {
+    param(
+        [Parameter(Mandatory)][string]$Id,
+        [AllowNull()][Nullable[bool]]$Ok,
+        [Parameter(Mandatory)][string]$Detail
+    )
+    [pscustomobject]@{
+        id = $Id
+        ok = $Ok
+        detail = $Detail
+    }
+}
+
+function Test-JsonWsl2 {
+    param([string]$Platform)
+    if ($Platform -ne 'windows') {
+        return New-DoctorCheck 'wsl2_present' $null 'skipped: not applicable on this platform'
+    }
+    $override = Get-EnvBool 'HERMES3D_DOCTOR_WSL_PRESENT'
+    if ($null -ne $override) {
+        if ($override) {
+            return New-DoctorCheck 'wsl2_present' $true 'WSL2 present'
+        }
+        return New-DoctorCheck 'wsl2_present' $false 'WSL2 not found'
+    }
+    if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
+        return New-DoctorCheck 'wsl2_present' $false 'wsl not found on PATH'
+    }
+    try {
+        $listing = & wsl --list --verbose 2>$null | Out-String
+        if ($listing -match '\b2\b') {
+            return New-DoctorCheck 'wsl2_present' $true 'WSL2 distribution found'
+        }
+        return New-DoctorCheck 'wsl2_present' $false 'wsl present but no WSL2 distribution found'
+    } catch {
+        return New-DoctorCheck 'wsl2_present' $false 'wsl query failed'
+    }
+}
+
+function Test-JsonKernel {
+    param([string]$Platform)
+    if ($Platform -ne 'windows') {
+        return New-DoctorCheck 'kernel_version' $null 'skipped: not applicable on this platform'
+    }
+    $version = $env:HERMES3D_DOCTOR_KERNEL_VERSION
+    if (-not $version) {
+        if (-not (Get-Command wsl -ErrorAction SilentlyContinue)) {
+            return New-DoctorCheck 'kernel_version' $false 'wsl not found on PATH'
+        }
+        try {
+            $version = (& wsl uname -r 2>$null | Select-Object -First 1).Trim()
+        } catch {
+            return New-DoctorCheck 'kernel_version' $false 'could not query WSL kernel version'
+        }
+    }
+    $parts = $version.Split('.')
+    $major = if ($parts.Count -gt 0) { [int]$parts[0] } else { 0 }
+    $minor = if ($parts.Count -gt 1) { [int]$parts[1] } else { 0 }
+    if ($major -gt 5 -or ($major -eq 5 -and $minor -ge 10)) {
+        return New-DoctorCheck 'kernel_version' $true $version
+    }
+    return New-DoctorCheck 'kernel_version' $false "$version (need >=5.10)"
+}
+
+function Test-JsonPython {
+    $version = $env:HERMES3D_DOCTOR_PYTHON_VERSION
+    if (-not $version) {
+        $py = $null
+        foreach ($cmd in @('python', 'py', 'python3')) {
+            if (Get-Command $cmd -ErrorAction SilentlyContinue) {
+                $py = $cmd
+                break
+            }
+        }
+        if (-not $py) {
+            return New-DoctorCheck 'python_3_11_or_12' $false 'python not found on PATH'
+        }
+        $version = & $py -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}")' 2>$null
+    }
+    $parts = $version.Split('.')
+    if (
+        $parts.Count -ge 2 -and (
+            [int]$parts[0] -gt 3 -or
+            ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 11)
+        )
+    ) {
+        return New-DoctorCheck 'python_3_11_or_12' $true $version
+    }
+    return New-DoctorCheck 'python_3_11_or_12' $false "$version (need >=3.11)"
+}
+
+function Test-JsonPort8080 {
+    $override = Get-EnvBool 'HERMES3D_DOCTOR_PORT_8080_FREE'
+    if ($null -ne $override) {
+        if ($override) {
+            return New-DoctorCheck 'port_8080_free' $true 'port 8080 available'
+        }
+        return New-DoctorCheck 'port_8080_free' $false 'port 8080 is in use'
+    }
+    $listener = $null
+    try {
+        $listener = [System.Net.Sockets.TcpListener]::new(
+            [System.Net.IPAddress]::Parse('127.0.0.1'),
+            8080
+        )
+        $listener.Start()
+        return New-DoctorCheck 'port_8080_free' $true 'port 8080 available'
+    } catch {
+        return New-DoctorCheck 'port_8080_free' $false 'port 8080 is in use or could not be probed'
+    } finally {
+        if ($listener) { $listener.Stop() }
+    }
+}
+
+function Test-JsonLibGl {
+    param([string]$Platform)
+    if ($Platform -ne 'linux') {
+        return New-DoctorCheck 'libgl_present' $null 'skipped: not applicable on this platform'
+    }
+    $override = Get-EnvBool 'HERMES3D_DOCTOR_LIBGL_PRESENT'
+    if ($null -ne $override) {
+        if ($override) {
+            return New-DoctorCheck 'libgl_present' $true 'libGL present'
+        }
+        return New-DoctorCheck 'libgl_present' $false 'libGL not found'
+    }
+    foreach ($path in @('/usr/lib/x86_64-linux-gnu/libGL.so.1', '/usr/lib64/libGL.so.1')) {
+        if (Test-Path $path) {
+            return New-DoctorCheck 'libgl_present' $true 'libGL present'
+        }
+    }
+    return New-DoctorCheck 'libgl_present' $false 'libGL not found'
+}
+
+function Test-JsonGit {
+    $override = Get-EnvBool 'HERMES3D_DOCTOR_GIT_PRESENT'
+    if ($null -ne $override) {
+        if ($override) {
+            return New-DoctorCheck 'git_present' $true 'git found on PATH'
+        }
+        return New-DoctorCheck 'git_present' $false 'git not found on PATH'
+    }
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        return New-DoctorCheck 'git_present' $true 'git found on PATH'
+    }
+    return New-DoctorCheck 'git_present' $false 'git not found on PATH'
+}
+
+function Invoke-JsonDoctor {
+    $platform = Get-DoctorPlatform
+    $checks = @(
+        (Test-JsonWsl2 -Platform $platform),
+        (Test-JsonKernel -Platform $platform),
+        (Test-JsonPython),
+        (Test-JsonPort8080),
+        (Test-JsonLibGl -Platform $platform),
+        (Test-JsonGit)
+    )
+    $failed = @($checks | Where-Object { $null -ne $_.ok -and -not $_.ok })
+    $fixHints = @()
+    foreach ($check in $failed) {
+        switch ($check.id) {
+            'wsl2_present' { $fixHints += 'Install WSL2 and a Linux distribution' }
+            'kernel_version' { $fixHints += 'Update WSL kernel to 5.10 or newer' }
+            'python_3_11_or_12' { $fixHints += 'Install Python 3.11 or 3.12' }
+            'port_8080_free' { $fixHints += 'Stop the process using port 8080 or choose another port' }
+            'libgl_present' { $fixHints += 'Install libGL' }
+            'git_present' { $fixHints += 'Install git' }
+        }
+    }
+    [pscustomobject]@{
+        json_schema_version = 1
+        platform = $platform
+        checks = $checks
+        ok = ($failed.Count -eq 0)
+        fix_hints = $fixHints
+    } | ConvertTo-Json -Depth 5
+}
+
+if ($Json) {
+    Invoke-JsonDoctor
+    exit 0
 }
 
 # --- Run checks ---

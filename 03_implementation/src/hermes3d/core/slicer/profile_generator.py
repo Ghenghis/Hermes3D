@@ -28,7 +28,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from hermes3d.core.agents.materials import get_material
-from hermes3d.core.memory import SkillKind, SkillStore
+from hermes3d.core.memory.skill_store import SkillKind, SkillStoreReader
 from hermes3d.core.printers import Kinematics, PrinterProfile, get_profile
 
 # =============================================================================
@@ -145,7 +145,7 @@ def generate_profile(
     printer_id: str,
     material: str,
     quality_level: str = "normal",
-    skills: SkillStore | None = None,
+    skills: SkillStoreReader | None = None,
     nozzle_diameter_mm: float = 0.4,
     filament_diameter_mm: float = 1.75,
 ) -> GeneratedProfile:

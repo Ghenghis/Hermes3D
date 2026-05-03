@@ -40,7 +40,7 @@ import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Protocol
 
 SCHEMA_VERSION = "1.0.0"
 
@@ -138,6 +138,35 @@ class Skill:
 # =============================================================================
 
 
+class SkillStoreReader(Protocol):
+    """Read-only skill-store protocol for deterministic consumers."""
+
+    def by_printer(self, printer_id: str) -> Iterable[Skill]: ...
+
+    def by_material(self, material: str) -> Iterable[Skill]: ...
+
+    def by_quality(self, quality_level: str) -> Iterable[Skill]: ...
+
+    def reinforced_only(self, *, min_score: float = 0.0) -> Iterable[Skill]: ...
+
+    def lookup(
+        self,
+        *,
+        kind: SkillKind,
+        printer_id: str | None = None,
+        material: str | None = None,
+        quality_level: str | None = None,
+        hour_of_day: int | None = None,
+        min_confidence: float = 0.0,
+    ) -> list[Skill]: ...
+
+
+def default_skill_store_reader() -> SkillStoreReader:
+    """Return the production skill-store reader."""
+
+    return SkillStore(os.environ.get("HERMES3D_SKILLS", "./var/skills.json"))
+
+
 class SkillStore:
     """Persistent JSON-backed skill memory."""
 
@@ -214,6 +243,18 @@ class SkillStore:
             if kind is not None:
                 out = [s for s in out if s.skill_kind == kind]
             return sorted(out, key=lambda s: -s.updated_unix)
+
+    def by_printer(self, printer_id: str) -> Iterable[Skill]:
+        return [s for s in self.list() if s.scope.matches(printer_id=printer_id)]
+
+    def by_material(self, material: str) -> Iterable[Skill]:
+        return [s for s in self.list() if s.scope.matches(material=material)]
+
+    def by_quality(self, quality_level: str) -> Iterable[Skill]:
+        return [s for s in self.list() if s.scope.matches(quality_level=quality_level)]
+
+    def reinforced_only(self, *, min_score: float = 0.0) -> Iterable[Skill]:
+        return [s for s in self.list() if s.confidence >= min_score]
 
     def reinforce(self, skill_id: str, *, confidence_delta: float = 0.05, note: str = "") -> Skill:
         """Increment evidence count + bump confidence (capped at 1.0)."""
@@ -292,5 +333,7 @@ __all__ = [
     "Skill",
     "SkillKind",
     "SkillScope",
+    "SkillStoreReader",
     "SkillStore",
+    "default_skill_store_reader",
 ]
