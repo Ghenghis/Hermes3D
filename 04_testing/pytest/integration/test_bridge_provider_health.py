@@ -55,9 +55,12 @@ def test_bridge_returns_idle_when_no_probes_yet(tmp_path) -> None:
     assert r.status_code == 200
     body = r.json()
     assert isinstance(body["providers"], list)
-    assert len(body["providers"]) == 2
+    # ADR-015: lm_studio + hipfire are now first-class entries in
+    # llm_policy.yaml alongside the original minimax + deepseek pair.
+    # Assert the cloud pair is still present rather than locking the
+    # exact length, so future local providers don't break this gate.
     ids = {p["provider_id"] for p in body["providers"]}
-    assert ids == {"minimax", "deepseek"}
+    assert {"minimax", "deepseek"}.issubset(ids)
     for provider in body["providers"]:
         assert provider["status"] == "idle"
         assert provider["last_probe_utc"] is None
