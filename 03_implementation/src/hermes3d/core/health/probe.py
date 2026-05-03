@@ -324,6 +324,7 @@ def moonraker_specs_from_config(
                 port=port,
                 category="printer",
                 enabled=True,
+                http_health_path="/server/info",
             )
         )
     return tuple(specs)
