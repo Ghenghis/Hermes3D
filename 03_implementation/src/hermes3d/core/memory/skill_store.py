@@ -149,6 +149,17 @@ class SkillStoreReader(Protocol):
 
     def reinforced_only(self, *, min_score: float = 0.0) -> Iterable[Skill]: ...
 
+    def lookup(
+        self,
+        *,
+        kind: SkillKind,
+        printer_id: str | None = None,
+        material: str | None = None,
+        quality_level: str | None = None,
+        hour_of_day: int | None = None,
+        min_confidence: float = 0.0,
+    ) -> list[Skill]: ...
+
 
 def default_skill_store_reader() -> SkillStoreReader:
     """Return the production skill-store reader."""

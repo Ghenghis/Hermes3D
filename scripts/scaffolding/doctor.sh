@@ -65,11 +65,11 @@ json_check_python() {
     local major minor
     major="$(printf '%s' "$ver" | cut -d. -f1)"
     minor="$(printf '%s' "$ver" | cut -d. -f2)"
-    if [[ "$major" == "3" && ( "$minor" == "11" || "$minor" == "12" ) ]]; then
+    if [[ "$major" -gt 3 || ( "$major" == "3" && "$minor" -ge 11 ) ]]; then
         json_add_check "python_3_11_or_12" "true" "$ver"
     else
-        json_add_check "python_3_11_or_12" "false" "${ver:-unknown} (need 3.11 or 3.12)" \
-            "Install Python 3.11 or 3.12"
+        json_add_check "python_3_11_or_12" "false" "${ver:-unknown} (need >=3.11)" \
+            "Install Python 3.11 or newer"
     fi
 }
 

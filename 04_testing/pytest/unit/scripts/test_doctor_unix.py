@@ -42,7 +42,7 @@ def _run_doctor(platform: str, **overrides: str) -> dict[str, object]:
     env.update(
         {
             "HERMES3D_DOCTOR_PLATFORM": platform,
-            "HERMES3D_DOCTOR_PYTHON_VERSION": "3.12.1",
+            "HERMES3D_DOCTOR_PYTHON_VERSION": "3.14.3",
             "HERMES3D_DOCTOR_PORT_8080_FREE": "true",
             "HERMES3D_DOCTOR_GIT_PRESENT": "true",
         }

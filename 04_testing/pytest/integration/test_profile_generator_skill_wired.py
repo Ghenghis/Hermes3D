@@ -22,6 +22,29 @@ class FakeSkillStoreReader:
     def reinforced_only(self, *, min_score: float = 0.0) -> Iterable[Skill]:
         return [s for s in self._rows if s.confidence >= min_score]
 
+    def lookup(
+        self,
+        *,
+        kind: SkillKind,
+        printer_id: str | None = None,
+        material: str | None = None,
+        quality_level: str | None = None,
+        hour_of_day: int | None = None,
+        min_confidence: float = 0.0,
+    ) -> list[Skill]:
+        return [
+            s
+            for s in self._rows
+            if s.skill_kind == kind
+            and s.confidence >= min_confidence
+            and s.scope.matches(
+                printer_id=printer_id,
+                material=material,
+                quality_level=quality_level,
+                hour_of_day=hour_of_day,
+            )
+        ]
+
 
 def _skill(
     skill_id: str,

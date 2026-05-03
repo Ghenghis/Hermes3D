@@ -317,10 +317,15 @@ function Test-JsonPython {
         $version = & $py -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}")' 2>$null
     }
     $parts = $version.Split('.')
-    if ($parts.Count -ge 2 -and $parts[0] -eq '3' -and $parts[1] -in @('11', '12')) {
+    if (
+        $parts.Count -ge 2 -and (
+            [int]$parts[0] -gt 3 -or
+            ([int]$parts[0] -eq 3 -and [int]$parts[1] -ge 11)
+        )
+    ) {
         return New-DoctorCheck 'python_3_11_or_12' $true $version
     }
-    return New-DoctorCheck 'python_3_11_or_12' $false "$version (need 3.11 or 3.12)"
+    return New-DoctorCheck 'python_3_11_or_12' $false "$version (need >=3.11)"
 }
 
 function Test-JsonPort8080 {
