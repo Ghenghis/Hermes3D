@@ -1,0 +1,168 @@
+{
+  "acceptance_gates": [
+    {
+      "evidence": "ci run 25271637727: Layer A \u2014 static gates",
+      "gate": "Layer A",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ci run 25271637727: 4/4 matrix cells passed",
+      "gate": "Layer B",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer C \u2014 integration",
+      "gate": "Layer C",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer D \u2014 UI E2E",
+      "gate": "Layer D",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ui-ci path filters did not trigger on develop@3bcf191",
+      "gate": "Layer D2",
+      "status": "SKIPPED"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer D3 job failed but remains non-blocking in CP5.1",
+      "gate": "Layer D3",
+      "status": "ADVISORY_FAIL"
+    },
+    {
+      "evidence": "release dry-run skipped on non-release branch",
+      "gate": "Layer E",
+      "status": "SKIPPED"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer F \u2014 honesty gates",
+      "gate": "Layer F",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer M \u2014 matrix coverage",
+      "gate": "Layer M",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer T \u2014 Unified Truth Gate",
+      "gate": "Layer T",
+      "status": "PASS"
+    },
+    {
+      "evidence": "ci run 25271637727: Layer W \u2014 Wizard E2E",
+      "gate": "Layer W",
+      "status": "PASS"
+    },
+    {
+      "evidence": "scripts/scaffolding/_build_phase_proof.py --phase 5.1",
+      "gate": "Layer P5.1",
+      "status": "PASS"
+    }
+  ],
+  "checkpoints": [
+    {
+      "evidence": "00_overview/PHASE5_1_PLAN.md + 02_architecture/adr/ADR-013-kit-hardening-v5_1.md",
+      "head_commit": "b1a5182f71aca90791564c96ff88def9a1b18e23",
+      "id": "CP5.1-A",
+      "merge_commit": "ec5634af3870f620503439c379ce9e483bb31c52",
+      "merge_commit_in_head": true,
+      "pr": "18",
+      "title": "Plan + ADR-013 for kit hardening",
+      "url": "https://github.com/Ghenghis/Hermes3D/pull/18"
+    },
+    {
+      "evidence": "04_testing/pytest/integration/test_failure_predictor_e2e.py + test_backup_scheduler.py",
+      "head_commit": "8fb9d751537be18f7a1b8b3b888a335fffb96165",
+      "id": "CP5.1-B",
+      "merge_commit": "d28d2c16c9e128ea6d86bc40d57f3739eb3ffc7e",
+      "merge_commit_in_head": true,
+      "pr": "21",
+      "title": "failure_predictor end-to-end + backup scheduler tick",
+      "url": "https://github.com/Ghenghis/Hermes3D/pull/21"
+    },
+    {
+      "evidence": "04_testing/pytest/integration/test_profile_generator_skill_wired.py + doctor JSON tests",
+      "head_commit": "6ccdf3a5de74dc2c70c443002dadff2f8aae7a35",
+      "id": "CP5.1-C",
+      "merge_commit": "3bcf191d832b91852af86363bf06230d43ca3075",
+      "merge_commit_in_head": true,
+      "pr": "23",
+      "title": "profile_generator + skill_store reader + doctor JSON envelope",
+      "url": "https://github.com/Ghenghis/Hermes3D/pull/23"
+    },
+    {
+      "evidence": "04_testing/playwright/gradio_smoke.spec.ts + .github/workflows/ci.yml Layer M",
+      "head_commit": "b2134b30a63828d2f4dc0d3180f60902e519caa4",
+      "id": "CP5.1-D",
+      "merge_commit": "e6b80ae3b63fec14705948972e356959dbef6b2c",
+      "merge_commit_in_head": true,
+      "pr": "19",
+      "title": "Layer-D3 Gradio smoke + Layer-M matrix coverage gate",
+      "url": "https://github.com/Ghenghis/Hermes3D/pull/19"
+    }
+  ],
+  "ci": {
+    "develop_run": {
+      "conclusion": "success",
+      "head": "3bcf191d832b91852af86363bf06230d43ca3075",
+      "id": 25271637727,
+      "url": "https://github.com/Ghenghis/Hermes3D/actions/runs/25271637727"
+    }
+  },
+  "created_utc": "2026-05-03T06:09:46Z",
+  "git": {
+    "branch": "develop",
+    "head": "3bcf191d832b91852af86363bf06230d43ca3075",
+    "head_short": "3bcf191d832b"
+  },
+  "local_validation": [
+    {
+      "command": "cd 03_implementation && python -m pytest ../04_testing/pytest -q",
+      "result": "670 passed"
+    },
+    {
+      "command": "python -m ruff check 03_implementation/src 04_testing/pytest",
+      "result": "PASS"
+    },
+    {
+      "command": "python -m ruff format --check 03_implementation/src 04_testing/pytest",
+      "result": "PASS"
+    },
+    {
+      "command": "python scripts/scaffolding/_build_phase_proof.py --phase 5.1",
+      "result": "PASS"
+    },
+    {
+      "command": "python -m json.tool 00_overview/proofs/phase_5_1_proof.json",
+      "result": "PASS"
+    }
+  ],
+  "phase": "5.1",
+  "promoted_claims": [
+    {
+      "claim": "failure_predictor reads a real print_history ledger",
+      "evidence": "CP5.1-B integration test seeds print_history.jsonl and checks calibrated output"
+    },
+    {
+      "claim": "backup scheduler ticks under the supervisor daemon",
+      "evidence": "CP5.1-B integration test observes two scheduled archives and retention pruning"
+    },
+    {
+      "claim": "profile_generator consumes skill-store reader suggestions",
+      "evidence": "CP5.1-C integration test injects SkillStoreReader and verifies reinforced overrides"
+    },
+    {
+      "claim": "doctor scripts emit versioned JSON envelopes",
+      "evidence": "CP5.1-C unit tests fixture Windows, Linux, and macOS checks"
+    },
+    {
+      "claim": "CI matrix completeness is enforced",
+      "evidence": "CP5.1-D Layer M gate passed on develop run 25271637727"
+    }
+  ],
+  "proof_id": "phase5.1-3bcf191d832b",
+  "schema_version": "phase5.1-proof-1.0.0",
+  "version": "v5.1.0"
+}
