@@ -47,6 +47,52 @@ rules:
     references:
       - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
 
+  # Codex audit (2026-05-03) flagged that the keyword-based EXTRUDER-OVERTEMP
+  # pattern misses raw G-code like `M104 S500` because there's no `extruder`
+  # keyword adjacent to the parameter. These raw-parameter patterns close the
+  # gap.
+  - id: H3D-RAW-GCODE-HOTEND-OVERTEMP
+    severity: high
+    regex: "(?:^|[\\s;\\n])(?:M104|M109)\\b[^\\n]*?\\bS\\s*([4-9]\\d{2}|\\d{4,})"
+    description: Raw G-code setting hotend (M104/M109) to >=400°C — direct fire risk regardless of surrounding prose. Catches `M104 S500`, `M109 S420 T0` etc.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-RAW-GCODE-BED-OVERTEMP
+    severity: high
+    regex: "(?:^|[\\s;\\n])(?:M140|M190)\\b[^\\n]*?\\bS\\s*([2-9]\\d{2}|\\d{4,})"
+    description: Raw G-code setting heated bed (M140/M190) to >=200°C — bed surface delaminates above 130-150°C, risk of fume / fire above 200°C.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-MIN-TEMP-DISABLE
+    severity: high
+    regex: "(?:^|[\\s;\\n])M302\\b[^\\n]*?(?:\\bP1\\b|\\bS\\s*0\\b)"
+    description: M302 P1 (or S0) allows cold extrusion — bypasses Marlin/Klipper minimum-temp safety. Either form pre-fire condition.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-THERMISTOR-DISABLE
+    severity: high
+    regex: "(disable|bypass|skip|short.?circuit|fake) (the )?(thermistor|temp[\\s_-]?sensor|temperature[\\s_-]?probe)"
+    description: Disabling/short-circuiting the thermistor — direct path to thermal runaway because the firmware then trusts a stuck reading.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-MAX-TEMP-RAISE
+    severity: high
+    regex: "(HEATER_(?:0|1)_MAXTEMP|BED_MAXTEMP)\\s*[=:]\\s*([4-9]\\d{2}|\\d{4,})"
+    description: Modify Marlin firmware max-temp ceiling above safe range — disables the upper bound that protects against runaway.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-EXTRUDER-LOOP-FAULT
+    severity: medium
+    regex: "(?:^|[\\s;\\n])(?:M104|M109)\\b[^\\n]*?\\bS\\s*0\\b[\\s\\S]{0,200}(?:^|[\\s;\\n])(?:M104|M109)\\b[^\\n]*?\\bS\\s*([3-9]\\d{2}|\\d{4,})"
+    description: Set extruder to 0°C then immediately to 300+°C — thermal-shock pattern that can crack heater cartridges.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
   - id: H3D-GCODE-RAW-PRELUDE
     severity: medium
     regex: "(^|\\n)\\s*(M502|M500|M999|M81|G92 E0)"
