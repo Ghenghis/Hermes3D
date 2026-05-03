@@ -80,6 +80,17 @@ fleet-wide dashboarding Mainsail can't do.
 
 ---
 
+## Future / Pending Audits
+
+Third-party projects evaluated for adoption. Each row points to an ADR
+that records the verdict and evidence.
+
+| Item | Status | Date |
+|------|--------|------|
+| Blender MCP integration path (ADR-014) | Status: REJECT | 2026-05-03 |
+
+---
+
 ## v6 — Speculative (not yet committed)
 
 **Anything in this section may be reshaped or dropped.** It is listed so

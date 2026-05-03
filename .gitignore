@@ -81,3 +81,6 @@ node_modules/
 ## HermesProof MCP coordination state (created on first connect)
 .hermes3d_orchestrator/
 
+## Workspace-relative scratch (audit clones, throwaway scripts)
+tmp/
+
