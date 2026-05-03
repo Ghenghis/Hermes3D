@@ -84,3 +84,8 @@ node_modules/
 ## Workspace-relative scratch (audit clones, throwaway scripts)
 tmp/
 
+
+## Hermes3D-OS app installs (vendored, large) — local-only, NEVER committed.
+## All downloaded open-source apps land here; nothing under apps/ is tracked.
+apps/
+
