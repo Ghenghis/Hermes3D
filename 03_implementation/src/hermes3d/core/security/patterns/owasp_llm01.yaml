@@ -1,0 +1,162 @@
+# OWASP LLM-01:2025 Prompt Injection — pattern catalogue.
+#
+# Source: https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+# Schema:
+#   id          unique stable identifier (used in redaction tags + Finding.rule_id)
+#   severity    one of: low | medium | high
+#   regex       Python re-flavour pattern; case-insensitive matching is applied
+#               by the scanner unless the pattern uses (?-i:...). Patterns must
+#               be written to avoid catastrophic backtracking — bound quantifiers
+#               with explicit upper limits and avoid nested unbounded groups.
+#   description short human-readable rule rationale
+#   references  URL(s) — required to include the OWASP page
+#
+# Severity guidance:
+#   high   — direct safety override / role confusion / RCE-shaped command
+#   medium — prompt-leak attempts, jailbreak persona invocations
+#   low    — soft markers (e.g., bare "system prompt:" tag) that need corroboration
+
+rules:
+  # ----- INDIRECT INJECTION & ROLE CONFUSION -----
+  - id: LLM01-IGN-PREV
+    severity: high
+    regex: "ignore (the |all |any )?(previous|prior|above|preceding) (instructions?|prompts?|rules?|directives?)"
+    description: Classic indirect-injection lead-in; attacker tries to override the system prompt.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-DISREGARD
+    severity: high
+    regex: "(disregard|forget|override) (the |your |all )?(previous|prior|above|system) (instructions?|prompts?|rules?)"
+    description: Synonym for IGN-PREV — instruction-override phrasing.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-SYSPROMPT-TAG
+    severity: medium
+    regex: "(^|\\n)\\s*(system|assistant|user)\\s*(prompt)?\\s*[:>]"
+    description: Inline role tag impersonation in the body of an untrusted message.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-CHATML-START
+    severity: high
+    regex: "<\\|im_start\\|>(system|assistant|user)?"
+    description: ChatML control token — used to inject a forged role boundary.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-CHATML-END
+    severity: high
+    regex: "<\\|im_end\\|>"
+    description: ChatML end-of-turn token in untrusted content.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-USER-CLOSE
+    severity: high
+    regex: "</user>|</system>|</assistant>"
+    description: Attempts to close a synthetic role tag and inject a new one.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-INST-TOKEN
+    severity: high
+    regex: "\\[/?(INST|SYS|S)\\]"
+    description: Llama-2/3 instruction control tokens in untrusted content.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  # ----- TOOL-USE / RCE-SHAPED INJECTION -----
+  - id: LLM01-EXEC-FOLLOWING
+    severity: high
+    regex: "(execute|run|eval) the following (command|code|script|payload)"
+    description: Attempt to coerce the agent into executing attacker-supplied code.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-RM-RF-ROOT
+    severity: high
+    regex: "rm\\s+-rf\\s+/(?:\\s|$|\\*)"
+    description: Destructive shell command directed at filesystem root.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-CURL-PIPE-SH
+    severity: high
+    regex: "curl\\s+[^|\\n]{1,200}\\|\\s*(sh|bash|zsh)\\b"
+    description: curl-pipe-shell — remote-code-execution-as-a-service pattern.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-WGET-PIPE-SH
+    severity: high
+    regex: "wget\\s+[^|\\n]{1,200}\\|\\s*(sh|bash|zsh)\\b"
+    description: wget-pipe-shell variant.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-POWERSHELL-IEX
+    severity: high
+    regex: "(iex|invoke-expression)\\s*\\(?\\s*(new-object|iwr|invoke-webrequest)"
+    description: PowerShell download-and-execute pattern.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  # ----- PROMPT LEAK -----
+  - id: LLM01-LEAK-SYSPROMPT
+    severity: medium
+    regex: "(repeat|reveal|print|show|output|return|recite) (your |the )?(system|initial|original|hidden) (prompt|instructions|rules|directives)"
+    description: System-prompt exfiltration attempt.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-LEAK-INSTRUCTIONS
+    severity: medium
+    regex: "what (are|were) (your|the) (instructions|directives|rules|guidelines)"
+    description: Conversational prompt-leak probe.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-LEAK-VERBATIM
+    severity: medium
+    regex: "(verbatim|word.for.word|exactly as) (your|the) (prompt|instructions)"
+    description: Exfiltrate system prompt verbatim.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  # ----- JAILBREAK PERSONAS -----
+  - id: LLM01-JB-DAN
+    severity: medium
+    regex: "\\b(DAN|do anything now)\\b"
+    description: "DAN (Do Anything Now) jailbreak persona."
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-JB-DEVMODE
+    severity: medium
+    regex: "developer mode (enabled|on|activated|engaged)"
+    description: "Developer-mode jailbreak invocation."
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-JB-IGNORE-SAFETY
+    severity: high
+    regex: "ignore (all |any |the )?(safety|ethical|content) (guidelines|rules|filters|constraints)"
+    description: Direct instruction to bypass safety policy.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-JB-NO-RESTRICTIONS
+    severity: medium
+    regex: "(no|without|free of) (restrictions|limits|limitations|filters|censorship)"
+    description: Persona priming for jailbreak.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/
+
+  - id: LLM01-JB-PRETEND-AI
+    severity: low
+    regex: "pretend (you are|to be) (an? )?(unrestricted|uncensored|jailbroken) (ai|assistant|model)"
+    description: Roleplay-as-unrestricted-AI prompt.
+    references:
+      - https://genai.owasp.org/llmrisk/llm01-prompt-injection/

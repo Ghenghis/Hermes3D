@@ -1,0 +1,112 @@
+# Hermes3D-specific prompt-injection patterns.
+#
+# These are not generic LLM-01 markers — they target the Hermes3D system
+# surface specifically:
+#   - 3D-printing safety-critical commands (extruder temp, thermal_runaway,
+#     emergency_stop, raw G-code injection)
+#   - HermesProof / lock orchestrator manipulation (lock release, handoff
+#     forging, owner-string spoofing)
+#
+# Schema is identical to owasp_llm01.yaml. References point to internal docs
+# where they exist (ADRs, security playbooks).
+
+rules:
+  # ----- 3D-PRINTING SAFETY OVERRIDE -----
+  - id: H3D-EXTRUDER-OVERTEMP
+    severity: high
+    regex: "(set |M104 |M109 ).{0,40}(extruder|hotend|tool0?|t0).{0,40}(to |s)?\\s*[45]\\d{2}"
+    description: Setting hotend to dangerous temperature (>=400C). Plausible failure mode for melted-printer attacks.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-BED-OVERTEMP
+    severity: high
+    regex: "(set |M140 |M190 ).{0,40}(bed|heated.bed).{0,40}(to |s)?\\s*[2-9]\\d{2}"
+    description: Setting heated bed to dangerous temperature (>=200C).
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-DISABLE-THERMAL-RUNAWAY
+    severity: high
+    regex: "(skip|disable|bypass|turn off) (the )?thermal[\\s_-]?runaway"
+    description: Instruction to disable thermal-runaway protection — direct fire-risk amplifier.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-DISABLE-ENDSTOP
+    severity: medium
+    regex: "(skip|disable|bypass) (the )?(end[\\s_-]?stop|min[\\s_-]?endstop|max[\\s_-]?endstop|software[\\s_-]?endstop)"
+    description: Disabling endstops can drive the toolhead through the frame.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-EMERGENCY-DISABLE
+    severity: high
+    regex: "(M112|emergency[\\s_-]?stop)\\s*(off|disabled|removed)"
+    description: Disabling the emergency-stop command.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-GCODE-RAW-PRELUDE
+    severity: medium
+    regex: "(^|\\n)\\s*(M502|M500|M999|M81|G92 E0)"
+    description: G-code lines that would reset/clear EEPROM or zero the extruder counter — flagged for review when arriving from untrusted input.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-GCODE-FW-RESET
+    severity: medium
+    regex: "M502\\b.*M500\\b"
+    description: Factory-reset firmware then save-to-EEPROM combo.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-DISABLE-FAN
+    severity: low
+    regex: "(disable|stop|skip) (part[\\s_-]?cooling[\\s_-]?fan|cooling[\\s_-]?fan|hotend[\\s_-]?fan)"
+    description: Disabling the hotend cooling fan can melt the heatbreak (heat-creep).
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  # ----- HERMESPROOF / LOCK ORCHESTRATOR MANIPULATION -----
+  - id: H3D-LOCK-RELEASE-ALL
+    severity: high
+    regex: "release all (the )?(file )?locks|hermes_release_files\\([^)]*\\*[^)]*\\)"
+    description: Coerce the orchestrator to free every file lock — pre-condition for lock-bypass attacks.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-HANDOFF-FORGE
+    severity: high
+    regex: "approve handoff\\s+[a-z0-9_-]{3,64}|hermes_approve_handoff\\([^)]+\\)"
+    description: Forged handoff-approval directive in untrusted content.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-OWNER-SPOOF
+    severity: medium
+    regex: "(owner|claimed_by|agent_id)\\s*[:=]\\s*[\"']?(claude|codex|admin|root|hermes)[\"']?"
+    description: Forged owner string targeting orchestrator identity checks.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-PROOF-BYPASS
+    severity: high
+    regex: "(skip|bypass|disable|ignore) (the )?(truth[\\s_-]?gate|proof[\\s_-]?envelope|hermes[\\s_-]?proof|signature[\\s_-]?check)"
+    description: Bypass the proof system that signs Truth Gate evidence.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-MERGE-FORCE
+    severity: medium
+    regex: "(force[\\s_-]?merge|admin[\\s_-]?merge|bypass[\\s_-]?branch[\\s_-]?protection|--no-verify)\\b"
+    description: CI/branch-protection bypass directive — ADR-009 write-action boundary violation.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
+
+  - id: H3D-PROOF-KEY-LEAK
+    severity: high
+    regex: "HERMES3D_PROOF_KEY\\s*[:=]"
+    description: Attempt to set/leak the proof signing key.
+    references:
+      - 02_architecture/adr/ADR-016-injection-scanner-inhouse.md
