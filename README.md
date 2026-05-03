@@ -1,6 +1,10 @@
 <div align="center">
 
-<img src="./site/diagrams/pipeline-9-stage.svg" alt="Hermes3D-OS — nine-stage orchestration pipeline" width="100%"/>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./site/diagrams/pipeline-9-stage.svg"/>
+  <source media="(prefers-color-scheme: light)" srcset="./site/diagrams/pipeline-9-stage.svg"/>
+  <img src="./site/diagrams/pipeline-9-stage.svg" alt="Hermes3D-OS — nine-stage orchestration pipeline (theme-aware)" width="100%"/>
+</picture>
 
 <br/>
 
@@ -19,26 +23,19 @@
 [![Sigstore](https://img.shields.io/badge/sigstore-keyless%20OIDC-f59e0b?style=flat-square)](https://www.sigstore.dev/)
 [![Made with](https://img.shields.io/badge/made%20with-Gradio%20%7C%20FastAPI%20%7C%20React-06b6d4?style=flat-square)](#)
 
-**🌐 Live site → [ghenghis.github.io/Hermes3D](https://ghenghis.github.io/Hermes3D/)**
+**Live site → [ghenghis.github.io/Hermes3D](https://ghenghis.github.io/Hermes3D/)**
 
-[Quickstart](#-quickstart) · [Pipeline](#-the-pipeline) · [Truth Gate](#-truth-gate) · [Fleet](#-print-farm) · [MCP](#-mcp-coordination) · [Releases](#-releases) · [Self-host](#-self-host)
+[Quickstart](#-quickstart) · [Pipeline](#-the-pipeline) · [Truth Gate](#-truth-gate) · [Fleet](#-print-farm) · [MCP](#-mcp-coordination) · [Releases](#-releases) · [Self-host](#-self-host) · [Contributing](#-contributing)
 
 </div>
 
 ---
 
-## ✦ What is it
+## What it does — in 30 seconds
 
-Hermes3D-OS turns a pile of printers into a fleet you can trust. It's a single Python app that:
-
-- **Auto-orients and repairs** every mesh through a 9-stage orchestrator pipeline (deterministic dry-run + LangGraph-augmented full mode).
-- **Validates printability** through six independent verifications (manifold closure · wall thickness · overhang ratio · support estimate · bridge spans · first-layer area) and HMAC-signs the verdict.
-- **Dispatches jobs** across 15 slicer / printer adapters (PrusaSlicer · OrcaSlicer · Cura · FLSun · Moonraker · OctoPrint · Mainsail · Fluidd · Printrun · Blender) using 8 selection strategies (auto · fastest · quality · largest_bed · smallest_fit · least_busy · delta_prefer · cartesian_prefer).
-- **Predicts failures** before they cost you a 12-hour print, blending print history + material history + skill signals into a calibrated probability with citations.
-- **Signs every print** with a verifiable proof envelope so the verdict can be audited later — even by parties who don't trust the printer that ran the job.
-- **Coordinates with AI clients** — Claude · Codex · Cursor · Windsurf · VS Code Copilot · Kilo Code can all call the same 16-tool MCP server, governed end-to-end by HermesProof so they don't clobber each other.
-
-**77 of 79 user-visible features are real today.** The other two are conspicuously disabled with explanations — never "Coming Soon" buttons. We don't lie to you.
+- **Truth-gates every mesh** through six concurrent printability checks, then HMAC-signs the verdict so it can be audited later — even by someone who doesn't trust the printer that ran the job.
+- **Dispatches across your fleet** with per-file locks, atomic handoffs, and 8 selection strategies — Claude, Codex, Cursor, Windsurf, VS Code Copilot and Kilo Code can call the same 16-tool MCP surface without clobbering each other.
+- **Proves the system continuously.** 17 truth gates re-attest the codebase on every push to `main`, sign `PROOF/latest.json` with Sigstore (keyless OIDC), and commit the refreshed bundle back to the repo. **77 of 79 user-visible features are real today** — the other two are conspicuously disabled with explanations, never "Coming Soon" buttons.
 
 ---
 
@@ -49,6 +46,19 @@ Every print walks the same orchestrator state machine. Nine stages, one source o
 <div align="center">
 <img src="./site/diagrams/pipeline-9-stage.svg" alt="Animated 9-stage Hermes3D pipeline showing INIT, VISION, GENERATE, REPAIR, TRUTH GATE, SLICE, PRINT, REPORT, DONE with a flowing data pulse" width="100%"/>
 </div>
+
+```mermaid
+flowchart LR
+    INIT[01 INIT<br/>intent] --> VISION[02 VISION<br/>analyze]
+    VISION --> GENERATE[03 GENERATE<br/>mesh build]
+    GENERATE --> REPAIR[04 REPAIR<br/>auto-fix]
+    REPAIR --> TRUTH{05 TRUTH GATE<br/>6 checks}
+    TRUTH -->|pass| SLICE[06 SLICE<br/>profile + gcode]
+    TRUTH -->|fail| GENERATE
+    SLICE --> PRINT[07 PRINT<br/>dispatched]
+    PRINT --> REPORT[08 REPORT<br/>evidence]
+    REPORT --> DONE[09 DONE<br/>signed proof]
+```
 
 ```text
 01 INIT          intent captured (text prompt, STL upload, MCP tool call)
@@ -62,7 +72,7 @@ Every print walks the same orchestrator state machine. Nine stages, one source o
 09 DONE          job closed, lock released, proof signed
 ```
 
-Stage 04 may loop back to GENERATE up to N times when the truth gate fails — the iteration count is part of the evidence so silent regressions cannot hide.
+Stage 05 may loop back to GENERATE up to N times when the truth gate fails — the iteration count is part of the evidence so silent regressions cannot hide.
 
 ---
 
@@ -84,6 +94,37 @@ Drop an STL into the launcher. Hermes runs six concurrent printability checks an
 | `first_layer_area` | Bed adhesion is a top failure mode — Hermes computes it and gates on it |
 
 The HMAC envelope binds the verdict + check matrix + source mesh hash + run timestamp to a per-instance key. Tampering invalidates the seal.
+
+<details>
+<summary><strong>See the 17 truth gates that re-prove the system on every push</strong></summary>
+
+<br/>
+
+Hermes3D doesn't ask you to trust it. **17 truth gates** re-attest the system on every push to `main`, sign `PROOF/latest.json` with Sigstore (keyless OIDC), publish a build-provenance attestation, and commit the refreshed proof bundle back to the repo automatically.
+
+```text
+source.integrity_manifest          SHA-256 manifest of every source file
+deps.parity                        package.json declared deps match installed
+tests.unit                         pytest -q (670+ tests, all green)
+server.stdio_handshake             Real `node src/server.mjs` returns 24 tools
+doctor.hermes3d                    Cross-platform prereq check (json_schema_version: 1)
+e2e.multi_agent_flow               14-step real stdio probe (claim → lock → block → handoff → gate → release)
+workspace.integrity                No probe leaks; no unexpected tracked changes
+clients.config_presence            Claude Desktop / Code / Codex / Windsurf wired
+clients.claude_code_live           `claude mcp list` reports ✓ Connected
+server.tool_description_hygiene    Free of OWASP MCP tool-poisoning markers
+evidence.hash_chain_valid          Mid-chain tamper detected at right index
+docs.master_prompt_deliverables    All 10 master-prompt design docs present
+events.directory_present           `events/{outbox,handled,failed}` exist
+trigger.doctor_passes              Trigger bridge validates outbox + schema
+tasks.directory_present            `tasks/{pending,claimed,blocked,done}` exist
+queue.doctor_passes                Queue lifecycle validated end-to-end
+wizard.dry_run_passes              Universal setup wizard plans without writing
+```
+
+Every push to `main` re-proves the chain. The latest run lives at [`PROOF_E2E_REPORT.md`](./PROOF_E2E_REPORT.md).
+
+</details>
 
 ---
 
@@ -153,83 +194,6 @@ npm run wizard --prefix ../HermesProof
 
 ---
 
-## ✦ Releases
-
-Signed Windows binaries on every tag (PyInstaller + Velopack auto-update + Azure Artifact Signing), source bundle with Sigstore-signed proof envelope, and GitHub native build-provenance attestation.
-
-```bash
-# Verify the Sigstore signature on a release artifact
-cosign verify-blob \
-  --certificate-identity-regexp 'https://github.com/Ghenghis/Hermes3D' \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --bundle hermes3d-os.json.cosign.bundle hermes3d-os.json
-
-# Verify the GitHub build-provenance attestation
-gh attestation verify Hermes3D-Setup.exe --repo Ghenghis/Hermes3D
-
-# Or just `winget install` (Phase 2)
-winget install Hermes3D
-```
-
-Latest release: <https://github.com/Ghenghis/Hermes3D/releases>
-
-<details>
-<summary><strong>📜 See a passing truth-gate proof</strong></summary>
-
-Hermes3D doesn't ask you to trust it. **17 truth gates** re-attest the system on every push to `main`, sign `PROOF/latest.json` with Sigstore (keyless OIDC), publish a build-provenance attestation, and commit the refreshed proof bundle back to the repo automatically.
-
-```text
-source.integrity_manifest          SHA-256 manifest of every source file
-deps.parity                        package.json declared deps match installed
-tests.unit                         pytest -q (670+ tests, all green)
-server.stdio_handshake             Real `node src/server.mjs` returns 24 tools
-doctor.hermes3d                    Cross-platform prereq check (json_schema_version: 1)
-e2e.multi_agent_flow               14-step real stdio probe (claim → lock → block → handoff → gate → release)
-workspace.integrity                No probe leaks; no unexpected tracked changes
-clients.config_presence            Claude Desktop / Code / Codex / Windsurf wired
-clients.claude_code_live           `claude mcp list` reports ✓ Connected
-server.tool_description_hygiene    Free of OWASP MCP tool-poisoning markers
-evidence.hash_chain_valid          Mid-chain tamper detected at right index
-docs.master_prompt_deliverables    All 10 master-prompt design docs present
-events.directory_present           `events/{outbox,handled,failed}` exist
-trigger.doctor_passes              Trigger bridge validates outbox + schema
-tasks.directory_present            `tasks/{pending,claimed,blocked,done}` exist
-queue.doctor_passes                Queue lifecycle validated end-to-end
-wizard.dry_run_passes              Universal setup wizard plans without writing
-```
-
-Every push to `main` re-proves the chain. The latest run lives at [`PROOF_E2E_REPORT.md`](./PROOF_E2E_REPORT.md).
-
-</details>
-
----
-
-## ✦ Self-host
-
-Run Hermes3D's web UI on a Hostinger VPS while keeping inference on your local machine. No port forwarding, no public LLM endpoint, ~$8/month total.
-
-```text
-INTERNET → hermes.userdomain.com (A record)
-  ↓
-HOSTINGER KVM 2 (Ubuntu 24.04, ~$7/mo)
-  · Caddy 2.8 :443 (auto-SSL via Let's Encrypt)
-  · Gradio :7860 + FastAPI :8000
-  · Postgres 16 + Redis 7
-  · tailscaled (peer)
-  · restic → Backblaze B2 (nightly, ~$1/mo)
-  ↓ Tailscale (WireGuard, no public ports)
-GAMING PC (Windows 11)
-  · Ollama 0.5 :11434 (GPU, native /api/chat for streaming + tool calls)
-  · tailscaled (peer)
-  · Syncthing → NAS (.env, printer configs)
-  ↓ LAN
-PRINTER FLEET (Klipper · Moonraker · OctoPrint)
-```
-
-The full deploy bundle (Caddy config + Docker Compose + Tailscale ACL + Restic systemd timer) lands at [`06_release/deploy/vps/`](./06_release/deploy/vps/) — see [`06_release/deploy/README.md`](./06_release/deploy/README.md) once it ships.
-
----
-
 ## ✦ Customization
 
 <table>
@@ -266,16 +230,6 @@ Provider allowlist · cost caps · timeouts. API keys via env (`HERMES3D_*_API_K
 
 ---
 
-## ✦ Documentation
-
-- **Architecture** — [`02_architecture/`](./02_architecture/) (ADRs · diagrams · contracts)
-- **Phase reports** — [`00_overview/`](./00_overview/) (Phase 1 → 5.1, evidence-backed)
-- **Honesty ledger** — [`00_overview/contract/HONESTY_LEDGER.md`](./00_overview/contract/HONESTY_LEDGER.md) (every claim, with status)
-- **Roadmap** — [`00_overview/contract/ROADMAP.md`](./00_overview/contract/ROADMAP.md)
-- **Live proof** — [`PROOF_E2E_REPORT.md`](./PROOF_E2E_REPORT.md) (refreshed by CI on every push)
-
----
-
 ## ✦ Composes with
 
 Hermes3D is intentionally narrow at its core — it's the orchestration + truth-gate + fleet layer. It coexists with peer servers in your MCP graph:
@@ -289,20 +243,74 @@ Hermes3D is intentionally narrow at its core — it's the orchestration + truth-
 
 ---
 
+## ✦ Self-host
+
+Run Hermes3D's web UI on a Hostinger VPS while keeping inference on your local machine. No port forwarding, no public LLM endpoint, ~$8/month total.
+
+```text
+INTERNET → hermes.userdomain.com (A record)
+  ↓
+HOSTINGER KVM 2 (Ubuntu 24.04, ~$7/mo)
+  · Caddy 2.8 :443 (auto-SSL via Let's Encrypt)
+  · Gradio :7860 + FastAPI :8000
+  · Postgres 16 + Redis 7
+  · tailscaled (peer)
+  · restic → Backblaze B2 (nightly, ~$1/mo)
+  ↓ Tailscale (WireGuard, no public ports)
+GAMING PC (Windows 11)
+  · Ollama 0.5 :11434 (GPU, native /api/chat for streaming + tool calls)
+  · tailscaled (peer)
+  · Syncthing → NAS (.env, printer configs)
+  ↓ LAN
+PRINTER FLEET (Klipper · Moonraker · OctoPrint)
+```
+
+The full deploy bundle (Caddy config + Docker Compose + Tailscale ACL + Restic systemd timer) lands at [`06_release/deploy/vps/`](./06_release/deploy/vps/) — see [`06_release/deploy/README.md`](./06_release/deploy/README.md) once it ships.
+
+---
+
+## ✦ Releases
+
+Signed Windows binaries on every tag (PyInstaller + Velopack auto-update + Azure Artifact Signing), source bundle with Sigstore-signed proof envelope, and GitHub native build-provenance attestation.
+
+```bash
+# Verify the Sigstore signature on a release artifact
+cosign verify-blob \
+  --certificate-identity-regexp 'https://github.com/Ghenghis/Hermes3D' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --bundle hermes3d-os.json.cosign.bundle hermes3d-os.json
+
+# Verify the GitHub build-provenance attestation
+gh attestation verify Hermes3D-Setup.exe --repo Ghenghis/Hermes3D
+
+# Or just `winget install` (Phase 2)
+winget install Hermes3D
+```
+
+Latest release: <https://github.com/Ghenghis/Hermes3D/releases>
+
+---
+
+## ✦ Documentation
+
+- **Architecture** — [`02_architecture/`](./02_architecture/) (ADRs · diagrams · contracts)
+- **Phase reports** — [`00_overview/`](./00_overview/) (Phase 1 → 5.1, evidence-backed)
+- **Honesty ledger** — [`00_overview/contract/HONESTY_LEDGER.md`](./00_overview/contract/HONESTY_LEDGER.md) (every claim, with status)
+- **Roadmap** — [`00_overview/contract/ROADMAP.md`](./00_overview/contract/ROADMAP.md)
+- **Live proof** — [`PROOF_E2E_REPORT.md`](./PROOF_E2E_REPORT.md) (refreshed by CI on every push)
+
+---
+
 ## ✦ Contributing
 
-Direct pushes to `main` are blocked at three layers — local pre-push hook, `branch-guard` CI workflow, and branch-protection rules. Open a feature branch and PR into `develop`.
-
-The dev-internal docs (gitflow, branch model, CI gate map, contributor onboarding, phase status) live at:
-
-- [`AGENTS.md`](./AGENTS.md) — agent contract · dispatcher rubrics
-- [`00_overview/PHASE5_1_PLAN.md`](./00_overview/PHASE5_1_PLAN.md) — current sprint
-- [`handoffs/`](./handoffs/) — open architect → implementer briefs
+Direct pushes to `main` are blocked at three layers — local pre-push hook, `branch-guard` CI workflow, and branch-protection rules. Open a feature branch and PR into `develop`. Full contributor guide at [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 <details>
-<summary><strong>Branch model + CI gate map</strong></summary>
+<summary><strong>Branch model + 10-layer CI gate map (dev-internal)</strong></summary>
 
-```
+<br/>
+
+```text
 main         ← production. Protected. Only release/* and hotfix/* may merge.
 develop      ← integration. All feature branches merge here first.
 feat/<area>/<desc>   ← features. PR → develop.
@@ -322,6 +330,31 @@ CI layers (all must pass on every PR to develop):
 - **Layer M** — matrix coverage (silent-regression catch)
 - **Layer T** — unified truth gate (consolidated proof bundle)
 - **Layer W** — wizard E2E (recorded wizard run)
+
+</details>
+
+<details>
+<summary><strong>Phase status + repository layout (dev-internal)</strong></summary>
+
+<br/>
+
+**Current sprint:** Phase 5.1 (kit hardening) — see [`00_overview/PHASE5_1_PLAN.md`](./00_overview/PHASE5_1_PLAN.md).
+
+**Repository layout:**
+
+```text
+00_overview/        Phase plans, contracts, roadmap, honesty ledger
+01_research/        Research artifacts feeding architecture decisions
+02_architecture/    ADRs · diagrams · contracts · API surface
+03_implementation/  Source: hermes3d/ package, config/, ui/
+04_testing/         pytest suites · Playwright E2E · matrix fixtures
+05_proof/           PROOF/latest.json · proof verifier · gates
+06_release/         PyInstaller spec · Velopack · Hostinger VPS bundle
+handoffs/           Open architect → implementer briefs
+site/               Marketing landing page (GH Pages, ./site/)
+```
+
+**Open handoffs:** see [`handoffs/`](./handoffs/) — architect → implementer briefs.
 
 </details>
 
