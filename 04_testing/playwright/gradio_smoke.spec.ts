@@ -27,10 +27,10 @@ import { test, expect } from '@playwright/test';
  */
 
 const PANEL_NAMES = [
-  /Dashboard/i,
-  /Print[\s-]?Queue/i,
-  /Fleet/i,
-  /Proof/i,
+  /Truth Gate Validator/i,
+  /Generate Desk Organizer/i,
+  /Pipeline\s*\(Dry-Run\)/i,
+  /Full Autonomous Pipeline/i,
 ];
 
 test.describe('Gradio launcher — Layer D3 smoke', () => {
@@ -68,8 +68,8 @@ test.describe('Gradio launcher — Layer D3 smoke', () => {
     // Fallback to a generic text query if the role isn't yet attached.
     for (const name of PANEL_NAMES) {
       const tab = page.getByRole('tab', { name }).first();
-      const text = page.getByText(name).first();
-      await expect(tab.or(text), `panel "${name.source}" visible`).toBeVisible({
+      const target = (await tab.count()) > 0 ? tab : page.getByText(name).first();
+      await expect(target, `panel "${name.source}" visible`).toBeVisible({
         timeout: 10_000,
       });
     }
