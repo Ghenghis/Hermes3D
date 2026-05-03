@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="100%" role="img" aria-labelledby="tg-title tg-desc">
+  <title id="tg-title">Truth Gate verification flow</title>
+  <desc id="tg-desc">Animated diagram showing how an STL mesh enters the Hermes3D truth gate, gets analyzed across six independent printability checks (manifold closure, wall thickness, overhang ratio, support estimate, bridge spans, first-layer area), and produces a signed proof envelope. Each check flips from amber pending to green pass or red fail in sequence. The output is a signed JSON proof with HMAC-SHA256 binding the verdict to the source mesh hash. Honors prefers-reduced-motion.</desc>
+  <defs>
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; animation-duration: 0.001s !important; }
+      }
+      .h { font: 600 16px ui-sans-serif, system-ui, sans-serif; fill: #06b6d4; letter-spacing: 0.08em; }
+      .lbl { font: 600 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .sub { font: 400 11px ui-monospace, "Cascadia Mono", Menlo, monospace; fill: #64748b; }
+      .ok { font: 700 11px ui-monospace, monospace; fill: #22c55e; }
+      .pending { font: 700 11px ui-monospace, monospace; fill: #f59e0b; }
+      .fail { font: 700 11px ui-monospace, monospace; fill: #ef4444; }
+      .check { font: 500 12px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+    </style>
+    <linearGradient id="bg2" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#07091c"/>
+      <stop offset="1" stop-color="#0b0e25"/>
+    </linearGradient>
+    <linearGradient id="meshGrad" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#06b6d4" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#a855f7" stop-opacity="0.6"/>
+    </linearGradient>
+    <filter id="glow2"><feGaussianBlur stdDeviation="2"/></filter>
+  </defs>
+
+  <rect width="1200" height="420" fill="url(#bg2)" rx="14"/>
+  <text x="40" y="40" class="h">TRUTH GATE · 6 INDEPENDENT VERIFICATIONS</text>
+  <text x="40" y="58" class="sub">manifold geometry · printability physics · structural integrity · cryptographic seal</text>
+
+  <!-- Source mesh (left) -->
+  <g transform="translate(80,200)">
+    <text x="0" y="-90" text-anchor="middle" class="lbl">SOURCE MESH</text>
+    <text x="0" y="-74" text-anchor="middle" class="sub">.stl · sha256</text>
+    <!-- Stylized triangle mesh "object" -->
+    <g>
+      <polygon points="-40,-30 40,-30 50,30 -50,30" fill="url(#meshGrad)" stroke="#06b6d4" stroke-width="1.5" opacity="0.85"/>
+      <polygon points="-40,-30 40,-30 0,-50" fill="url(#meshGrad)" stroke="#06b6d4" stroke-width="1.2" opacity="0.7"/>
+      <polygon points="-50,30 50,30 0,55" fill="url(#meshGrad)" stroke="#06b6d4" stroke-width="1.2" opacity="0.7"/>
+      <line x1="-40" y1="-30" x2="40" y2="-30" stroke="#a855f7" stroke-width="1" opacity="0.6"/>
+      <line x1="40" y1="-30" x2="50" y2="30" stroke="#a855f7" stroke-width="1" opacity="0.6"/>
+      <line x1="-40" y1="-30" x2="-50" y2="30" stroke="#a855f7" stroke-width="1" opacity="0.6"/>
+    </g>
+    <text x="0" y="80" text-anchor="middle" class="sub">benchy.stl · 2.4 MB</text>
+  </g>
+
+  <!-- Connector line -->
+  <path d="M 150 200 L 220 200" stroke="#06b6d4" stroke-width="1.5" opacity="0.5" stroke-dasharray="4 4">
+    <animate attributeName="stroke-dashoffset" values="0;-16" dur="1s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Six checks arranged in a 2x3 grid -->
+  <g transform="translate(240,90)">
+    <!-- Check 1: manifold_closure -->
+    <g transform="translate(0,0)">
+      <rect x="0" y="0" width="220" height="46" rx="6" fill="#0b0e25" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="1.2"/>
+      <circle cx="20" cy="23" r="6" fill="#f59e0b">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.15;0.2;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="20" class="check">manifold_closure</text>
+      <text x="36" y="36" class="sub">watertight surface</text>
+      <text x="200" y="29" text-anchor="end" class="pending">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.15;0.2;1" dur="6s" repeatCount="indefinite"/>
+        <animate attributeName="textContent" values="...;PASS" begin="0.9s"/>
+        PASS
+      </text>
+    </g>
+    <!-- Check 2: wall_thickness -->
+    <g transform="translate(240,0)">
+      <rect x="0" y="0" width="220" height="46" rx="6" fill="#0b0e25" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="1.2"/>
+      <circle cx="20" cy="23" r="6" fill="#f59e0b">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.32;0.37;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="20" class="check">wall_thickness</text>
+      <text x="36" y="36" class="sub">min 0.8 mm vs nozzle</text>
+      <text x="200" y="29" text-anchor="end" class="ok">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.32;0.37;1" dur="6s" repeatCount="indefinite"/>
+        PASS
+      </text>
+    </g>
+    <!-- Check 3: overhang_ratio -->
+    <g transform="translate(480,0)">
+      <rect x="0" y="0" width="220" height="46" rx="6" fill="#0b0e25" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="1.2"/>
+      <circle cx="20" cy="23" r="6" fill="#f59e0b">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.49;0.54;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="20" class="check">overhang_ratio</text>
+      <text x="36" y="36" class="sub">slope above 45°</text>
+      <text x="200" y="29" text-anchor="end" class="ok">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.49;0.54;1" dur="6s" repeatCount="indefinite"/>
+        PASS
+      </text>
+    </g>
+    <!-- Check 4: support_estimate -->
+    <g transform="translate(0,80)">
+      <rect x="0" y="0" width="220" height="46" rx="6" fill="#0b0e25" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="1.2"/>
+      <circle cx="20" cy="23" r="6" fill="#f59e0b">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.6;0.65;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="20" class="check">support_estimate</text>
+      <text x="36" y="36" class="sub">cm³ predicted</text>
+      <text x="200" y="29" text-anchor="end" class="ok">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.6;0.65;1" dur="6s" repeatCount="indefinite"/>
+        PASS
+      </text>
+    </g>
+    <!-- Check 5: bridge_spans -->
+    <g transform="translate(240,80)">
+      <rect x="0" y="0" width="220" height="46" rx="6" fill="#0b0e25" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="1.2"/>
+      <circle cx="20" cy="23" r="6" fill="#f59e0b">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.72;0.77;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="20" class="check">bridge_spans</text>
+      <text x="36" y="36" class="sub">unsupported &gt; 25mm</text>
+      <text x="200" y="29" text-anchor="end" class="ok">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.72;0.77;1" dur="6s" repeatCount="indefinite"/>
+        PASS
+      </text>
+    </g>
+    <!-- Check 6: first_layer_area -->
+    <g transform="translate(480,80)">
+      <rect x="0" y="0" width="220" height="46" rx="6" fill="#0b0e25" stroke="#06b6d4" stroke-opacity="0.4" stroke-width="1.2"/>
+      <circle cx="20" cy="23" r="6" fill="#f59e0b">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.84;0.89;1" dur="6s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="20" class="check">first_layer_area</text>
+      <text x="36" y="36" class="sub">bed adhesion</text>
+      <text x="200" y="29" text-anchor="end" class="ok">
+        <animate attributeName="fill" values="#f59e0b;#f59e0b;#22c55e;#22c55e" keyTimes="0;0.84;0.89;1" dur="6s" repeatCount="indefinite"/>
+        PASS
+      </text>
+    </g>
+  </g>
+
+  <!-- Connector to verdict -->
+  <path d="M 950 200 L 1020 200" stroke="#22c55e" stroke-width="1.5" opacity="0.6" stroke-dasharray="4 4">
+    <animate attributeName="stroke-dashoffset" values="0;-16" dur="1s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Signed proof envelope (right) -->
+  <g transform="translate(1100,200)">
+    <text x="0" y="-90" text-anchor="middle" class="lbl">SIGNED PROOF</text>
+    <text x="0" y="-74" text-anchor="middle" class="sub">HMAC-SHA256</text>
+    <rect x="-50" y="-40" width="100" height="80" rx="6" fill="#0b0e25" stroke="#22c55e" stroke-width="2" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.9;0.95;1" dur="6s" repeatCount="indefinite"/>
+    </rect>
+    <text x="0" y="-15" text-anchor="middle" class="ok" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.9;0.95;1" dur="6s" repeatCount="indefinite"/>
+      VERIFIED
+    </text>
+    <text x="0" y="5" text-anchor="middle" class="sub" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.9;0.95;1" dur="6s" repeatCount="indefinite"/>
+      mesh.sha256
+    </text>
+    <text x="0" y="22" text-anchor="middle" class="sub" opacity="0">
+      <animate attributeName="opacity" values="0;0;1;1" keyTimes="0;0.9;0.95;1" dur="6s" repeatCount="indefinite"/>
+      6/6 checks
+    </text>
+    <text x="0" y="80" text-anchor="middle" class="sub">proof_envelope.json</text>
+  </g>
+
+  <text x="600" y="380" text-anchor="middle" class="sub">Each check is independent and deterministic. The envelope binds the verdict to the source mesh hash; tampering invalidates the HMAC.</text>
+</svg>

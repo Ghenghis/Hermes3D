@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 460" width="100%" role="img" aria-labelledby="farm-title farm-desc">
+  <title id="farm-title">Hermes3D print farm orchestration</title>
+  <desc id="farm-desc">Animated diagram showing how a queued print job flows through Hermes3D's dispatcher to a fleet of six printers. The dispatcher selects the best-fit printer based on bed size, material loadout, current load, and quality strategy. The chosen printer's status pill flips from idle blue to printing green, a progress bar fills, and on completion the printer reports back with structured evidence including filament consumed, print duration, and quality scores. Other printers continue working in parallel on independent jobs. Honors prefers-reduced-motion.</desc>
+  <defs>
+    <style>
+      @media (prefers-reduced-motion: reduce) {
+        * { animation: none !important; animation-duration: 0.001s !important; }
+      }
+      .h { font: 600 16px ui-sans-serif, system-ui, sans-serif; fill: #06b6d4; letter-spacing: 0.08em; }
+      .lbl { font: 600 13px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+      .sub { font: 400 11px ui-monospace, "Cascadia Mono", Menlo, monospace; fill: #64748b; }
+      .pid { font: 700 12px ui-monospace, monospace; fill: #06b6d4; }
+      .status-printing { font: 700 10px ui-monospace, monospace; fill: #22c55e; }
+      .status-idle { font: 700 10px ui-monospace, monospace; fill: #64748b; }
+      .job { font: 500 11px ui-sans-serif, system-ui, sans-serif; fill: #cbd5e1; }
+    </style>
+    <linearGradient id="bg3" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#07091c"/>
+      <stop offset="1" stop-color="#0b0e25"/>
+    </linearGradient>
+    <linearGradient id="prog" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#06b6d4"/>
+    </linearGradient>
+    <filter id="glow3"><feGaussianBlur stdDeviation="2.5"/></filter>
+  </defs>
+
+  <rect width="1200" height="460" fill="url(#bg3)" rx="14"/>
+  <text x="40" y="40" class="h">PRINT FARM · DISPATCH · LOCK · PRINT · REPORT</text>
+  <text x="40" y="58" class="sub">6-printer fleet · per-file locks · atomic handoffs · evidence-bound completion</text>
+
+  <!-- Job queue (left) -->
+  <g transform="translate(80,180)">
+    <text x="0" y="-90" text-anchor="middle" class="lbl">JOB QUEUE</text>
+    <text x="0" y="-74" text-anchor="middle" class="sub">priority · FIFO</text>
+    <rect x="-60" y="-50" width="120" height="120" rx="8" fill="#0b0e25" stroke="#a855f7" stroke-width="1.5" opacity="0.7"/>
+    <rect x="-50" y="-40" width="100" height="20" rx="3" fill="#a855f7" opacity="0.3"/>
+    <text x="0" y="-26" text-anchor="middle" class="job">benchy.stl</text>
+    <rect x="-50" y="-15" width="100" height="20" rx="3" fill="#a855f7" opacity="0.2"/>
+    <text x="0" y="-1" text-anchor="middle" class="job">organizer.stl</text>
+    <rect x="-50" y="10" width="100" height="20" rx="3" fill="#a855f7" opacity="0.15"/>
+    <text x="0" y="24" text-anchor="middle" class="job">bracket.stl</text>
+    <rect x="-50" y="35" width="100" height="20" rx="3" fill="#a855f7" opacity="0.1"/>
+    <text x="0" y="49" text-anchor="middle" class="job">+ 7 more</text>
+  </g>
+
+  <!-- Dispatcher (center) -->
+  <g transform="translate(360,180)">
+    <text x="0" y="-90" text-anchor="middle" class="lbl">DISPATCHER</text>
+    <text x="0" y="-74" text-anchor="middle" class="sub">strategy: auto · best-fit</text>
+    <circle r="48" fill="#0b0e25" stroke="#06b6d4" stroke-width="2"/>
+    <circle r="48" fill="none" stroke="#06b6d4" stroke-width="2" opacity="0.4">
+      <animate attributeName="r" values="48;58;48" dur="3s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.4;0;0.4" dur="3s" repeatCount="indefinite"/>
+    </circle>
+    <text x="0" y="-8" text-anchor="middle" class="pid">scoring</text>
+    <text x="0" y="8" text-anchor="middle" class="sub">bed × material</text>
+    <text x="0" y="22" text-anchor="middle" class="sub">× load × quality</text>
+  </g>
+
+  <!-- Connection from queue to dispatcher -->
+  <path d="M 140 180 L 312 180" stroke="#a855f7" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.6">
+    <animate attributeName="stroke-dashoffset" values="0;-16" dur="1.2s" repeatCount="indefinite"/>
+  </path>
+
+  <!-- Pulse from dispatcher to selected printer (printer 02) -->
+  <g filter="url(#glow3)">
+    <circle r="6" fill="#22c55e">
+      <animateMotion dur="4s" repeatCount="indefinite" keyPoints="0;0.5;1" keyTimes="0;0.4;1" calcMode="linear">
+        <mpath href="#dispatchPath"/>
+      </animateMotion>
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.4;0.5" dur="4s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+  <path id="dispatchPath" d="M 408 180 Q 540 100 700 100" fill="none" stroke="none"/>
+
+  <!-- Fleet of 6 printers (right side, 2x3 grid) -->
+  <g transform="translate(620,80)">
+    <!-- Printer 01: idle -->
+    <g transform="translate(0,0)">
+      <rect width="240" height="60" rx="8" fill="#0b0e25" stroke="#1e293b" stroke-width="1.2"/>
+      <circle cx="20" cy="30" r="6" fill="#64748b"/>
+      <text x="36" y="22" class="pid">prusa-mk4-01</text>
+      <text x="36" y="38" class="sub">PEI · PLA · 250×210×220</text>
+      <text x="220" y="22" text-anchor="end" class="status-idle">IDLE</text>
+    </g>
+    <!-- Printer 02: SELECTED — printing -->
+    <g transform="translate(260,0)">
+      <rect width="240" height="60" rx="8" fill="#0b0e25" stroke="#22c55e" stroke-width="2">
+        <animate attributeName="stroke-opacity" values="0.3;1;1" keyTimes="0;0.4;1" dur="4s" repeatCount="indefinite"/>
+      </rect>
+      <circle cx="20" cy="30" r="6" fill="#22c55e">
+        <animate attributeName="opacity" values="1;0.5;1" dur="1s" repeatCount="indefinite"/>
+      </circle>
+      <text x="36" y="22" class="pid">prusa-mk4-02</text>
+      <text x="36" y="38" class="sub">PEI · PLA · benchy.stl</text>
+      <text x="220" y="22" text-anchor="end" class="status-printing">PRINTING</text>
+      <!-- Progress bar -->
+      <rect x="36" y="44" width="180" height="4" rx="2" fill="#1e293b"/>
+      <rect x="36" y="44" width="0" height="4" rx="2" fill="url(#prog)">
+        <animate attributeName="width" values="0;180" keyTimes="0;1" dur="4s" begin="1.6s" repeatCount="indefinite"/>
+      </rect>
+    </g>
+    <!-- Printer 03: printing other job -->
+    <g transform="translate(0,80)">
+      <rect width="240" height="60" rx="8" fill="#0b0e25" stroke="#22c55e" stroke-width="1.2" opacity="0.6"/>
+      <circle cx="20" cy="30" r="6" fill="#22c55e" opacity="0.7"/>
+      <text x="36" y="22" class="pid">voron-2.4-03</text>
+      <text x="36" y="38" class="sub">garolite · ABS · part_A.stl</text>
+      <text x="220" y="22" text-anchor="end" class="status-printing">PRINTING</text>
+      <rect x="36" y="44" width="180" height="4" rx="2" fill="#1e293b"/>
+      <rect x="36" y="44" width="120" height="4" rx="2" fill="url(#prog)" opacity="0.6"/>
+    </g>
+    <!-- Printer 04: idle -->
+    <g transform="translate(260,80)">
+      <rect width="240" height="60" rx="8" fill="#0b0e25" stroke="#1e293b" stroke-width="1.2"/>
+      <circle cx="20" cy="30" r="6" fill="#64748b"/>
+      <text x="36" y="22" class="pid">flsun-t1-04</text>
+      <text x="36" y="38" class="sub">PEI · PETG · delta · 260</text>
+      <text x="220" y="22" text-anchor="end" class="status-idle">IDLE</text>
+    </g>
+    <!-- Printer 05: printing -->
+    <g transform="translate(0,160)">
+      <rect width="240" height="60" rx="8" fill="#0b0e25" stroke="#22c55e" stroke-width="1.2" opacity="0.5"/>
+      <circle cx="20" cy="30" r="6" fill="#22c55e" opacity="0.6"/>
+      <text x="36" y="22" class="pid">bambu-x1c-05</text>
+      <text x="36" y="38" class="sub">PEI · ASA · enclosed</text>
+      <text x="220" y="22" text-anchor="end" class="status-printing">PRINTING</text>
+      <rect x="36" y="44" width="180" height="4" rx="2" fill="#1e293b"/>
+      <rect x="36" y="44" width="60" height="4" rx="2" fill="url(#prog)" opacity="0.5"/>
+    </g>
+    <!-- Printer 06: idle -->
+    <g transform="translate(260,160)">
+      <rect width="240" height="60" rx="8" fill="#0b0e25" stroke="#1e293b" stroke-width="1.2"/>
+      <circle cx="20" cy="30" r="6" fill="#64748b"/>
+      <text x="36" y="22" class="pid">creality-k2-06</text>
+      <text x="36" y="38" class="sub">PEI · PLA · 350×350×350</text>
+      <text x="220" y="22" text-anchor="end" class="status-idle">IDLE</text>
+    </g>
+  </g>
+
+  <!-- Lock indicator on selected printer -->
+  <g transform="translate(880,108)">
+    <rect width="48" height="20" rx="4" fill="#a855f7" opacity="0">
+      <animate attributeName="opacity" values="0;0.85;0.85;0" keyTimes="0;0.4;0.95;1" dur="4s" repeatCount="indefinite"/>
+    </rect>
+    <text x="24" y="14" text-anchor="middle" class="status-printing" opacity="0">
+      <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.4;0.95;1" dur="4s" repeatCount="indefinite"/>
+      LOCK
+    </text>
+  </g>
+
+  <!-- Evidence ledger feedback (bottom-right) -->
+  <g transform="translate(1080,400)">
+    <text x="0" y="0" text-anchor="middle" class="lbl">EVIDENCE</text>
+    <text x="0" y="14" text-anchor="middle" class="sub">append-only ledger</text>
+  </g>
+
+  <text x="600" y="430" text-anchor="middle" class="sub">Locks are atomic per file. Multiple printers run independent jobs in parallel — no collisions, no clobber.</text>
+</svg>
