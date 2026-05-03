@@ -260,3 +260,156 @@ def test_live_probe_against_known_services():
     # We don't assert which services are up — just that the call succeeds and
     # at least one well-known port responds (LM Studio / Ollama / Hermes).
     assert isinstance(online, list)
+
+
+# -----------------------------------------------------------------------------
+# HTTP readiness check (Codex audit fix on PR #42, 2026-05-03)
+#
+# A bare TCP probe can return ONLINE for a Moonraker that's actually in
+# `shutdown` or `error` state — printer answers TCP but Klipper is dead.
+# These tests validate the HTTP-layer upgrade.
+# -----------------------------------------------------------------------------
+
+
+def _make_http_server(handler):
+    """Spin up a tiny HTTP server bound to 127.0.0.1 on an ephemeral port.
+
+    `handler` is a callable taking (path, headers) -> (status, body, content_type).
+    Returns (server, port, stop_fn).
+    """
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args, **kwargs):
+            pass  # silence default logging
+
+        def do_GET(self):
+            try:
+                status, body, ctype = handler(self.path, self.headers)
+            except Exception as exc:  # noqa: BLE001
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(str(exc).encode("utf-8"))
+                return
+            self.send_response(status)
+            self.send_header("Content-Type", ctype)
+            body_bytes = body.encode("utf-8") if isinstance(body, str) else body
+            self.send_header("Content-Length", str(len(body_bytes)))
+            self.end_headers()
+            self.wfile.write(body_bytes)
+
+    server = HTTPServer(("127.0.0.1", 0), _Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    def stop():
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+    return server, server.server_port, stop
+
+
+def test_moonraker_klippy_ready_is_ONLINE():
+    def handler(path, _h):
+        if path == "/server/info":
+            return 200, '{"result":{"klippy_state":"ready"}}', "application/json"
+        return 404, "", "text/plain"
+
+    _server, port, stop = _make_http_server(handler)
+    try:
+        spec = ServiceSpec(
+            "MoonRaker", "127.0.0.1", port, "printer", http_health_path="/server/info"
+        )
+        result = probe_one(spec, timeout_s=2.0)
+        assert result.status is Status.ONLINE
+        assert "Klipper ready" in result.detail
+    finally:
+        stop()
+
+
+def test_moonraker_klippy_shutdown_is_OFFLINE_even_when_TCP_open():
+    def handler(path, _h):
+        if path == "/server/info":
+            return 200, '{"result":{"klippy_state":"shutdown"}}', "application/json"
+        return 404, "", "text/plain"
+
+    _server, port, stop = _make_http_server(handler)
+    try:
+        spec = ServiceSpec(
+            "MoonRaker", "127.0.0.1", port, "printer", http_health_path="/server/info"
+        )
+        result = probe_one(spec, timeout_s=2.0)
+        # The bug pre-fix: TCP open → ONLINE without checking klippy_state.
+        # Post-fix: HTTP check downgrades to OFFLINE.
+        assert result.status is Status.OFFLINE
+        assert "shutdown" in result.detail
+    finally:
+        stop()
+
+
+def test_moonraker_klippy_startup_is_UNKNOWN():
+    def handler(path, _h):
+        if path == "/server/info":
+            return 200, '{"result":{"klippy_state":"startup"}}', "application/json"
+        return 404, "", "text/plain"
+
+    _server, port, stop = _make_http_server(handler)
+    try:
+        spec = ServiceSpec(
+            "MoonRaker", "127.0.0.1", port, "printer", http_health_path="/server/info"
+        )
+        result = probe_one(spec, timeout_s=2.0)
+        assert result.status is Status.UNKNOWN
+    finally:
+        stop()
+
+
+def test_lm_studio_models_endpoint_with_data_is_ONLINE():
+    def handler(path, _h):
+        if path == "/v1/models":
+            return (
+                200,
+                '{"data":[{"id":"qwen2.5-coder-14b"},{"id":"hermes-4-14b"}]}',
+                "application/json",
+            )
+        return 404, "", "text/plain"
+
+    _server, port, stop = _make_http_server(handler)
+    try:
+        spec = ServiceSpec("LM Studio", "127.0.0.1", port, "llm", http_health_path="/v1/models")
+        result = probe_one(spec, timeout_s=2.0)
+        assert result.status is Status.ONLINE
+        assert "2 models" in result.detail
+    finally:
+        stop()
+
+
+def test_http_401_becomes_AUTH_REQUIRED():
+    def handler(path, _h):
+        return 401, "Unauthorized", "text/plain"
+
+    _server, port, stop = _make_http_server(handler)
+    try:
+        spec = ServiceSpec("Some service", "127.0.0.1", port, "api", http_health_path="/health")
+        result = probe_one(spec, timeout_s=2.0)
+        assert result.status is Status.AUTH_REQUIRED
+        assert "401" in result.detail
+    finally:
+        stop()
+
+
+def test_http_check_false_falls_back_to_TCP_only():
+    """Escape hatch: caller can disable HTTP check explicitly."""
+
+    def handler(_path, _h):
+        return 500, "", "text/plain"
+
+    _server, port, stop = _make_http_server(handler)
+    try:
+        spec = ServiceSpec("Some service", "127.0.0.1", port, "api", http_health_path="/health")
+        result = probe_one(spec, timeout_s=2.0, http_check=False)
+        # TCP open → ONLINE; HTTP check skipped, so 500 doesn't downgrade.
+        assert result.status is Status.ONLINE
+    finally:
+        stop()

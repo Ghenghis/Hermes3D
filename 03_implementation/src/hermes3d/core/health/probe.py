@@ -108,12 +108,26 @@ KNOWN_SERVICES: tuple[ServiceSpec, ...] = (
 # -----------------------------------------------------------------------------
 
 
-def probe_one(spec: ServiceSpec, timeout_s: float = 2.0) -> ProbeResult:
-    """Probe a single service via TCP ``connect_ex``.
+def probe_one(
+    spec: ServiceSpec,
+    timeout_s: float = 2.0,
+    http_check: bool = True,
+) -> ProbeResult:
+    """Probe a single service via TCP ``connect_ex`` plus optional HTTP readiness.
 
     The default 2 s timeout matches the Service Health spec; callers can
     override it for faster batch probes (e.g. dashboards on a 30 s loop)
     or longer timeouts for lossy WAN links.
+
+    When ``http_check`` is True (the default) and the spec carries an
+    ``http_health_path``, a follow-up HTTP GET validates the service is
+    actually ready, not just accepting TCP connections. Codex audit on
+    PR #42 (2026-05-03) flagged TCP-only probes as a false-positive risk:
+    Moonraker can answer TCP while Klipper is in ``shutdown`` or ``error``
+    state, leaving the printer unusable but reported "online". The HTTP
+    layer reads ``/server/info`` for Moonraker (or ``/api/tags`` etc. for
+    LLM endpoints) and downgrades to AUTH_REQUIRED / OFFLINE when the
+    response disagrees with TCP-level reachability.
     """
     if not spec.enabled:
         return ProbeResult(spec, Status.DISABLED, "service disabled by config", 0.0)
@@ -131,23 +145,107 @@ def probe_one(spec: ServiceSpec, timeout_s: float = 2.0) -> ProbeResult:
             s.settimeout(timeout_s)
             rc = s.connect_ex((spec.host, spec.port))
         elapsed_ms = (time.perf_counter() - start) * 1000.0
-        if rc == 0:
+        if rc != 0:
             return ProbeResult(
                 spec,
-                Status.ONLINE,
-                f"TCP {spec.host}:{spec.port} accepted",
+                Status.OFFLINE,
+                f"TCP {spec.host}:{spec.port} refused (errno={rc})",
                 elapsed_ms,
             )
-        return ProbeResult(
-            spec,
-            Status.OFFLINE,
-            f"TCP {spec.host}:{spec.port} refused (errno={rc})",
-            elapsed_ms,
-        )
     except socket.gaierror as exc:
         return ProbeResult(spec, Status.UNREACHABLE, f"DNS/host error: {exc}", 0.0)
     except OSError as exc:
         return ProbeResult(spec, Status.UNREACHABLE, f"socket error: {exc}", 0.0)
+
+    # TCP open. Optionally upgrade with HTTP readiness check.
+    if http_check and spec.http_health_path:
+        http_status = _http_readiness_check(spec, timeout_s)
+        elapsed_ms = (time.perf_counter() - start) * 1000.0
+        if http_status is not None:
+            status, detail = http_status
+            return ProbeResult(spec, status, detail, elapsed_ms)
+
+    elapsed_ms = (time.perf_counter() - start) * 1000.0
+    return ProbeResult(
+        spec,
+        Status.ONLINE,
+        f"TCP {spec.host}:{spec.port} accepted",
+        elapsed_ms,
+    )
+
+
+def _http_readiness_check(spec: ServiceSpec, timeout_s: float) -> tuple[Status, str] | None:
+    """HTTP-level readiness check for services with ``http_health_path`` set.
+
+    Returns ``(Status, detail)`` if the HTTP layer adds information, or
+    ``None`` to fall through to the default ONLINE verdict (when HTTP
+    didn't disagree with TCP).
+
+    Service-specific semantics:
+      * Moonraker (``/server/info``): JSON with ``klippy_state``;
+        only ``ready`` is fully ONLINE; ``startup`` is UNKNOWN; ``shutdown``,
+        ``error``, or ``disconnected`` is OFFLINE.
+      * LM Studio (``/v1/models``): 200 + JSON ``data`` array → ONLINE.
+        401/403 → AUTH_REQUIRED. Other non-2xx → OFFLINE.
+      * Ollama (``/api/tags``): 200 → ONLINE. Non-2xx → OFFLINE.
+      * Generic: 2xx → ONLINE; 401/403 → AUTH_REQUIRED; other → OFFLINE.
+    """
+    import json
+    from urllib.error import HTTPError, URLError
+    from urllib.request import Request, urlopen
+
+    url = f"http://{spec.host}:{spec.port}{spec.http_health_path}"
+    req = Request(url, method="GET", headers={"User-Agent": "hermes3d-health/1.0"})
+    try:
+        with urlopen(req, timeout=timeout_s) as resp:
+            body = resp.read(8192)
+            ctype = resp.headers.get("Content-Type", "")
+    except HTTPError as exc:
+        if exc.code in (401, 403):
+            return (
+                Status.AUTH_REQUIRED,
+                f"HTTP {exc.code} {spec.http_health_path}",
+            )
+        return Status.OFFLINE, f"HTTP {exc.code} {spec.http_health_path}"
+    except URLError as exc:
+        return Status.OFFLINE, f"HTTP unreachable: {exc.reason}"
+    except (TimeoutError, OSError) as exc:
+        return Status.OFFLINE, f"HTTP error: {exc}"
+
+    # Moonraker readiness check
+    if spec.http_health_path == "/server/info":
+        try:
+            payload = json.loads(body.decode("utf-8", errors="replace"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return Status.OFFLINE, f"non-JSON {spec.http_health_path} response"
+        klippy_state = (
+            payload.get("result", {}).get("klippy_state") or payload.get("klippy_state") or ""
+        ).lower()
+        if klippy_state == "ready":
+            return Status.ONLINE, f"Klipper ready ({spec.http_health_path})"
+        if klippy_state == "startup":
+            return Status.UNKNOWN, f"Klipper starting ({klippy_state})"
+        if klippy_state in ("shutdown", "error", "disconnected"):
+            return Status.OFFLINE, f"Klipper {klippy_state}"
+        return Status.UNKNOWN, f"Klipper state '{klippy_state}' (unrecognized)"
+
+    # LM Studio readiness check
+    if spec.http_health_path == "/v1/models":
+        try:
+            payload = json.loads(body.decode("utf-8", errors="replace"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return Status.UNKNOWN, "non-JSON /v1/models response"
+        if isinstance(payload.get("data"), list):
+            return Status.ONLINE, f"{len(payload['data'])} models loaded"
+        return Status.UNKNOWN, "no data array in /v1/models"
+
+    # Ollama / generic
+    if "json" in ctype.lower() or spec.http_health_path == "/api/tags":
+        try:
+            json.loads(body.decode("utf-8", errors="replace"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            pass  # generic 2xx still acceptable
+    return None  # 2xx, no service-specific verdict to add — fall through to ONLINE
 
 
 def probe_all(extra: tuple[ServiceSpec, ...] = ()) -> list[ProbeResult]:
