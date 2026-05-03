@@ -253,3 +253,120 @@ jobs:
           path: |
             var/truth-gate/
           if-no-files-found: warn
+
+  # ----- Phase 5.1 (CP5.1-D) ---------------------------------------------
+  # Two new gates added by Phase 5.1 per ADR-013 §4 + §5:
+  #
+  #   - Layer M  Matrix coverage gate. A single step that depends on the
+  #              Layer-B job and asserts its aggregate result is success.
+  #              Cheap and prevents silent matrix-cell regressions during
+  #              future Phase 5.2+ work.
+  #
+  #   - Layer D3 Gradio launcher headless smoke. Complements the existing
+  #              Layer-D specs under 04_testing/playwright/specs/ with one
+  #              broad happy-path tour (gradio_smoke.spec.ts) gated by a
+  #              dedicated playwright.gradio.config.ts so Layer-D config
+  #              and report folder stay untouched. continue-on-error is
+  #              true on first runs to gather flake data; promotion to
+  #              required happens after stability proven (ADR-013 §4).
+  # -----------------------------------------------------------------------
+
+  layer_m_matrix_coverage:
+    name: Layer M — matrix coverage (windows/ubuntu × py3.11/3.12)
+    needs: layer_b_smoke_and_acceptance
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify all four Layer-B cells reported success
+        env:
+          LAYER_B_RESULT: ${{ needs.layer_b_smoke_and_acceptance.result }}
+        run: |
+          set -euo pipefail
+          echo "Layer-B aggregate result: ${LAYER_B_RESULT}"
+          if [ "${LAYER_B_RESULT}" != "success" ]; then
+            echo "::error::Layer M matrix coverage gate failed."
+            echo "::error::Layer-B aggregate result was '${LAYER_B_RESULT}'."
+            echo "::error::Expected 'success' from all 4 cells (ubuntu/windows × py3.11/3.12)."
+            echo "::error::A single cell failure or skip is a silent matrix regression."
+            exit 1
+          fi
+          echo "Layer-B matrix is intact: all 4 cells reported success."
+
+  layer_d3_gradio_smoke:
+    name: Layer D3 — Gradio launcher smoke (Linux × py3.11)
+    needs: [layer_a_static_gates, layer_b_smoke_and_acceptance]
+    runs-on: ubuntu-latest
+    # Per ADR-013 §4: non-blocking on first 5 runs to collect flake data,
+    # then promoted to a hard gate. Until then the job MAY fail without
+    # breaking PR merges; reviewers monitor the `Upload run artifacts`
+    # output to decide when to flip this to false.
+    continue-on-error: true
+    env:
+      HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          # Mirror Layer-D's Node version so toolchains match between the
+          # two Gradio gates and we don't multiply esbuild/jiti downloads.
+          node-version: "24"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Install Node dependencies
+        working-directory: 04_testing/playwright
+        run: npm install
+      - name: Install Playwright browsers
+        working-directory: 04_testing/playwright
+        run: npx playwright install --with-deps chromium
+      - name: Boot Gradio launcher in background
+        # Same launcher Layer-D uses, but we boot it inline here rather
+        # than via scripts/run-e2e.sh so we can scope playwright to the
+        # gradio_smoke.spec.ts file via a dedicated config.
+        run: |
+          python -m hermes3d.app.launcher --host 127.0.0.1 --port 7860 \
+            > /tmp/hermes3d-gradio.log 2>&1 &
+          echo $! > /tmp/hermes3d-gradio.pid
+          # Wait up to 60 s for the launcher to answer.
+          python - <<'PY'
+          import time
+          from urllib import request
+          for _ in range(60):
+              try:
+                  with request.urlopen("http://127.0.0.1:7860/", timeout=1) as r:
+                      if r.status == 200:
+                          raise SystemExit(0)
+              except Exception:
+                  time.sleep(1)
+          raise SystemExit("Gradio launcher did not answer on :7860")
+          PY
+      - name: Run Layer-D3 smoke (gradio_smoke.spec.ts only)
+        working-directory: 04_testing/playwright
+        env:
+          HERMES3D_UI_URL: "http://127.0.0.1:7860"
+        run: npx playwright test --config=playwright.gradio.config.ts
+      - name: Stop launcher
+        if: always()
+        run: |
+          if [ -f /tmp/hermes3d-gradio.pid ]; then
+            kill "$(cat /tmp/hermes3d-gradio.pid)" 2>/dev/null || true
+            rm -f /tmp/hermes3d-gradio.pid
+          fi
+      - name: Upload Layer-D3 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: layer-d3-gradio-smoke
+          path: |
+            04_testing/playwright/playwright-report-gradio-smoke/
+            04_testing/playwright/test-results/
+            /tmp/hermes3d-gradio.log
+          if-no-files-found: warn
+          retention-days: 14
