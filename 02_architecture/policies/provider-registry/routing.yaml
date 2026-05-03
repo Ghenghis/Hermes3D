@@ -1,0 +1,12 @@
+schema: hermes.routing.v1
+local_private:
+  default: lmstudio
+  fallback: ollama
+  cloud_allowed: false
+hybrid:
+  architect: anthropic/claude
+  implementation: minimax
+  budget_implementation: deepseek
+  fallback: siliconflow
+  local_default: lmstudio
+  local_fallback: ollama

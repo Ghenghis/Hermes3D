@@ -61,7 +61,26 @@ class ProviderConfig:
 
     @classmethod
     def from_env(cls) -> ProviderConfig:
-        provider = LLMProvider(os.getenv("HERMES3D_LLM_PROVIDER", "ollama").lower())
+        # When HERMES3D_LLM_PROVIDER is set explicitly, honour it. Otherwise
+        # consult the routing registry (HERMES3D_ROUTING_MODE +
+        # 02_architecture/policies/provider-registry/routing.yaml) so
+        # ``local_private`` mode picks LM Studio + Ollama by default and
+        # ``hybrid`` mode picks the configured implementation provider.
+        explicit = os.getenv("HERMES3D_LLM_PROVIDER")
+        if explicit:
+            provider = LLMProvider(explicit.lower())
+        else:
+            from hermes3d.core.llm.registry_loader import (
+                get_routing_config,
+                resolve_provider_enum_value,
+            )
+
+            routing = get_routing_config()
+            enum_value = resolve_provider_enum_value(routing.primary, default="ollama")
+            try:
+                provider = LLMProvider(enum_value)
+            except ValueError:
+                provider = LLMProvider.OLLAMA
         defaults = {
             LLMProvider.OLLAMA: ("http://127.0.0.1:11434", "qwen2.5-coder:7b"),
             LLMProvider.LMSTUDIO: ("http://127.0.0.1:1234/v1", "local-model"),
