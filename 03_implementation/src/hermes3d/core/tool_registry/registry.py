@@ -139,13 +139,9 @@ class CapabilityRegistry:
         shadowing-rejection rule.
         """
         if not name or not _valid_name(name):
-            raise ValueError(
-                f"invalid tool name {name!r}: must be alnum/_/-/. and non-empty"
-            )
+            raise ValueError(f"invalid tool name {name!r}: must be alnum/_/-/. and non-empty")
         radius = (
-            blast_radius
-            if isinstance(blast_radius, BlastRadius)
-            else BlastRadius(blast_radius)
+            blast_radius if isinstance(blast_radius, BlastRadius) else BlastRadius(blast_radius)
         )
         if not description and handler.__doc__:
             doc_lines = handler.__doc__.strip().splitlines()
@@ -161,9 +157,7 @@ class CapabilityRegistry:
         with self._lock:
             existing = self._tools.get(name)
             if existing is not None and not replace:
-                raise ValueError(
-                    f"tool {name!r} already registered (use replace=True to override)"
-                )
+                raise ValueError(f"tool {name!r} already registered (use replace=True to override)")
             self._tools[name] = spec
             self._generation += 1
         return spec
@@ -239,9 +233,9 @@ class CapabilityRegistry:
         accepts_var_kw = any(
             p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
         )
-        filtered = kwargs if accepts_var_kw else {
-            k: v for k, v in kwargs.items() if k in sig.parameters
-        }
+        filtered = (
+            kwargs if accepts_var_kw else {k: v for k, v in kwargs.items() if k in sig.parameters}
+        )
         return spec.handler(**filtered)
 
     # ------------------------------------------------------------------
@@ -337,9 +331,7 @@ def auto_discover(
         pkg = package
 
     if not hasattr(pkg, "__path__"):
-        raise TypeError(
-            f"auto_discover requires a package, got module {pkg.__name__!r}"
-        )
+        raise TypeError(f"auto_discover requires a package, got module {pkg.__name__!r}")
 
     imported: list[str] = []
     for mod_info in pkgutil.walk_packages(pkg.__path__, prefix=pkg.__name__ + "."):
