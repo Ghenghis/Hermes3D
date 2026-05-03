@@ -14,6 +14,7 @@ import { DockedAppsTab } from "./tabs/DockedApps";
 import { ProofTab } from "./tabs/Proof";
 import { SystemLogsTab } from "./tabs/SystemLogs";
 import { SettingsTab } from "./tabs/Settings";
+import { ServiceHealthPage } from "./components/health/ServiceHealthPage";
 
 /**
  * Phase 2 Tasks 27-38: every sidebar tab routes to its own mock-only
@@ -33,6 +34,7 @@ const TAB_COMPONENTS: Record<string, () => JSX.Element> = {
   docked: DockedAppsTab,
   proof: ProofTab,
   logs: SystemLogsTab,
+  service_health: ServiceHealthPage,
   settings: SettingsTab,
 };
 

@@ -1,8 +1,14 @@
 import { MOCK_PRINTERS } from "../data/mock/printers";
 import { MOCK_PLAN_DAG } from "../data/mock/dag";
+import { MOCK_SERVICE_HEALTH } from "../data/mock/serviceHealth";
 import type { TaskDAG, TaskEdge, TaskNode } from "../types/dag";
 import type { Printer, PrinterAdapter, PrinterDataSource, PrinterStatus } from "../types/printer";
 import type { ProviderHealth } from "../types/provider";
+import type {
+  ServiceCategory,
+  ServiceHealthEntry,
+  ServiceStatus,
+} from "../types/serviceHealth";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -16,6 +22,24 @@ const LIVE_BRIDGE_PORT =
 const LIVE_PRINTERS_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/printers`;
 const LIVE_PLAN_PREVIEW_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/plan/preview`;
 const LIVE_PROVIDER_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/providers/health`;
+const LIVE_SERVICE_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/health/services`;
+
+const SERVICE_STATUSES = new Set<ServiceStatus>([
+  "online",
+  "offline",
+  "unreachable",
+  "auth-required",
+  "disabled",
+  "unknown",
+]);
+const SERVICE_CATEGORIES = new Set<ServiceCategory>([
+  "mcp",
+  "llm",
+  "modeling",
+  "printer",
+  "api",
+  "tunnel",
+]);
 
 const MODELS = new Set<Printer["model"]>(["FLSUN T1", "FLSUN S1", "FLSUN V400", "Generic"]);
 const STATUSES = new Set<PrinterStatus>([
@@ -83,6 +107,70 @@ export async function getProviderHealthLive(): Promise<ProviderHealth[]> {
   } catch {
     return fallbackProviderHealth();
   }
+}
+
+export async function getServiceHealthLive(): Promise<ServiceHealthEntry[]> {
+  try {
+    const response = await fetch(LIVE_SERVICE_HEALTH_URL, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return MOCK_SERVICE_HEALTH;
+    }
+    const payload: unknown = await response.json();
+    return parseServiceHealthArray(payload) ?? MOCK_SERVICE_HEALTH;
+  } catch {
+    return MOCK_SERVICE_HEALTH;
+  }
+}
+
+function parseServiceHealthArray(payload: unknown): ServiceHealthEntry[] | null {
+  if (!isRecord(payload) || !Array.isArray(payload.results)) {
+    return null;
+  }
+  const parsed = payload.results.map(parseServiceHealthEntry);
+  if (parsed.some((entry) => entry == null)) {
+    return null;
+  }
+  return parsed as ServiceHealthEntry[];
+}
+
+function parseServiceHealthEntry(value: unknown): ServiceHealthEntry | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  if (
+    !isString(value.name) ||
+    !isServiceCategory(value.category) ||
+    !isString(value.host) ||
+    !isNumber(value.port) ||
+    !isServiceStatus(value.status) ||
+    !isString(value.detail) ||
+    !isNumber(value.latency_ms) ||
+    !isString(value.probed_at)
+  ) {
+    return null;
+  }
+  return {
+    name: value.name,
+    category: value.category,
+    host: value.host,
+    port: value.port,
+    status: value.status,
+    detail: value.detail,
+    latency_ms: value.latency_ms,
+    probed_at: value.probed_at,
+  };
+}
+
+function isServiceStatus(value: unknown): value is ServiceStatus {
+  return typeof value === "string" && SERVICE_STATUSES.has(value as ServiceStatus);
+}
+
+function isServiceCategory(value: unknown): value is ServiceCategory {
+  return typeof value === "string" && SERVICE_CATEGORIES.has(value as ServiceCategory);
 }
 
 function parsePrinterArray(payload: unknown): Printer[] | null {

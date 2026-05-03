@@ -1,8 +1,11 @@
 /**
- * 13 tabs per `hermes3d_gui_contract_kit_v4.1/01_requirements/TAB_SPECS.md`.
- * Order + labels MUST match the kit spec; icons sourced from lucide-react.
+ * 14 tabs: 13 from `hermes3d_gui_contract_kit_v4.1/01_requirements/TAB_SPECS.md`
+ * plus Service Health (Task 4c — operator topology view, see
+ * `handoffs/HANDOFF_TO_CODEX_HERMES3D_SERVICE_HEALTH.md`). Order + labels
+ * for the kit-spec tabs MUST match; icons sourced from lucide-react.
  */
 import {
+  Activity,
   Box,
   GitBranch,
   LayoutDashboard,
@@ -34,5 +37,6 @@ export const TABS: TabDef[] = [
   { id: "docked", label: "Docked Apps", icon: LayoutGrid },
   { id: "proof", label: "Proof & Reports", icon: ShieldCheck },
   { id: "logs", label: "System Logs", icon: ScrollText },
+  { id: "service_health", label: "Service Health", icon: Activity },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];

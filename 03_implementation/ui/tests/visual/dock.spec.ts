@@ -31,6 +31,7 @@ const TABS = [
   "Docked Apps",
   "Proof & Reports",
   "System Logs",
+  "Service Health",
   "Settings",
 ] as const;
 
