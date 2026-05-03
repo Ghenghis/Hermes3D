@@ -72,9 +72,9 @@ def check_bed_adhesion_precondition(
     """Validate bed-adhesion preconditions before homing or upload."""
     reasons: list[str] = []
 
-    if z_tolerance_mm < 0:
-        raise ValueError("z_tolerance_mm must be non-negative")
-    if not (0 < min_bed_fraction <= 1):
+    if not math.isfinite(z_tolerance_mm) or z_tolerance_mm < 0:
+        raise ValueError("z_tolerance_mm must be finite and non-negative")
+    if not math.isfinite(min_bed_fraction) or not (0 < min_bed_fraction <= 1):
         raise ValueError("min_bed_fraction must be in (0, 1]")
 
     inputs = {

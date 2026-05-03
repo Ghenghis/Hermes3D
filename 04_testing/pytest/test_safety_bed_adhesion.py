@@ -159,6 +159,14 @@ def test_invalid_thresholds_raise() -> None:
             bed_target_c=60.0,
             z_tolerance_mm=-0.01,
         )
+    with pytest.raises(ValueError, match="z_tolerance"):
+        check_bed_adhesion_precondition(
+            first_layer_z_offset_mm=0.20,
+            target_first_layer_z_offset_mm=0.20,
+            bed_actual_c=60.0,
+            bed_target_c=60.0,
+            z_tolerance_mm=math.nan,
+        )
     with pytest.raises(ValueError, match="min_bed_fraction"):
         check_bed_adhesion_precondition(
             first_layer_z_offset_mm=0.20,
@@ -166,6 +174,14 @@ def test_invalid_thresholds_raise() -> None:
             bed_actual_c=60.0,
             bed_target_c=60.0,
             min_bed_fraction=1.2,
+        )
+    with pytest.raises(ValueError, match="min_bed_fraction"):
+        check_bed_adhesion_precondition(
+            first_layer_z_offset_mm=0.20,
+            target_first_layer_z_offset_mm=0.20,
+            bed_actual_c=60.0,
+            bed_target_c=60.0,
+            min_bed_fraction=math.inf,
         )
 
 
