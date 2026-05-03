@@ -1,0 +1,89 @@
+name: Release — Windows
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  windows_binary:
+    name: Build Windows binary
+    runs-on: windows-latest
+    env:
+      HERMES3D_PROOF_KEY: hermes3d-default-proof-key-not-secret
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
+      - name: Install Velopack CLI
+        shell: pwsh
+        run: |
+          dotnet tool install -g vpk
+          Add-Content $env:GITHUB_PATH "$env:USERPROFILE\.dotnet\tools"
+      - name: Build PyInstaller + Velopack package
+        shell: pwsh
+        run: pwsh ./scripts/build/windows_pack.ps1
+      - name: Generate CycloneDX SBOM
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME -replace '^v', '' } else { '0.0.0-dev' }
+          $sbom = @{
+            bomFormat = 'CycloneDX'
+            specVersion = '1.5'
+            version = 1
+            metadata = @{
+              component = @{
+                type = 'application'
+                name = 'Hermes3D-OS'
+                version = $version
+              }
+            }
+            components = @()
+          }
+          New-Item -ItemType Directory -Force -Path dist/release-win | Out-Null
+          $sbom | ConvertTo-Json -Depth 8 | Set-Content -Encoding UTF8 dist/release-win/Hermes3D-OS.cyclonedx.json
+      - name: Attest SBOM
+        uses: actions/attest-sbom@v2
+        with:
+          subject-path: dist/release-win/*
+          sbom-path: dist/release-win/Hermes3D-OS.cyclonedx.json
+      - name: Install Sigstore
+        shell: pwsh
+        run: python -m pip install sigstore
+      - name: Sigstore sign release artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem dist/release-win -File |
+            Where-Object { $_.Name -notlike '*.sigstore.json' } |
+            ForEach-Object {
+              python -m sigstore sign --yes --bundle "$($_.FullName).sigstore.json" "$($_.FullName)"
+            }
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermes3d-windows-release
+          path: dist/release-win/**/*
+      - name: Publish GitHub Release artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/release-win/**/*

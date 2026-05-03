@@ -9,3 +9,5 @@ mypy>=1.10,<2
 gradio>=6,<7
 huggingface_hub>=0.30          # gradio 6.x compat; 4.x's HfFolder dependency dropped
 jsonschema>=4.0,<5             # Phase 1: adapter config schemas + env_report.schema.json validation
+pyinstaller>=6.10,<7
+velopack>=0.0.1052.dev0,<1; sys_platform == "win32"
