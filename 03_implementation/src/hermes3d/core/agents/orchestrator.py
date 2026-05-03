@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from hermes3d.core.memory import MnemosyneRecall
+    from hermes3d.core.memory import MnemosyneRecall  # noqa: F401  # forward-ref for future type hints
     from hermes3d.core.orchestration.agent_graph import (
         WorkflowState as _WorkflowState,
     )
