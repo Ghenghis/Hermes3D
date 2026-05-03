@@ -134,9 +134,11 @@
       "default": "template"
     },
     "providers": {
-      "description": "Per-provider config map. Optional; when absent, only the fixture provider is reachable. Phase 3.4 ships with minimax + deepseek; ADR-015 adds local on-box keys lm_studio and hipfire. additionalProperties is now true so future local backends (vllm, llamacpp, ollama mirrors) can be added without further schema migrations.",
+      "description": "Per-provider config map. Optional; when absent, only the fixture provider is reachable. Phase 3.4 ships with minimax + deepseek; ADR-015 adds local on-box keys lm_studio and hipfire. additionalProperties references providerConfig so future local backends (vllm, llamacpp, ollama mirrors) inherit the same URL/schema validation — no bypass via unknown provider names. (Codex audit 2026-05-03 fixed a security hole where `additionalProperties: true` allowed `providers.evil.base_url=http://api.example.com/v1` to slip past validation.)",
       "type": "object",
-      "additionalProperties": true,
+      "additionalProperties": {
+        "$ref": "#/definitions/providerConfig"
+      },
       "properties": {
         "minimax": {
           "$ref": "#/definitions/providerConfig"
