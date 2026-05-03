@@ -167,9 +167,7 @@ def _load_ruleset(paths: Iterable[Path]) -> list[_CompiledRule]:
             try:
                 pattern = re.compile(regex, flags=re.IGNORECASE)
             except re.error as exc:
-                raise InjectionScannerError(
-                    f"{path}[{rule_id}]: invalid regex: {exc}"
-                ) from exc
+                raise InjectionScannerError(f"{path}[{rule_id}]: invalid regex: {exc}") from exc
 
             compiled.append(
                 _CompiledRule(
@@ -244,9 +242,7 @@ class InjectionScanner:
         self._match_timeout_seconds: float | None = match_timeout_seconds
         # Capability flag: SIGALRM is POSIX-only.
         self._can_timeout: bool = (
-            match_timeout_seconds is not None
-            and sys.platform != "win32"
-            and _has_sigalrm()
+            match_timeout_seconds is not None and sys.platform != "win32" and _has_sigalrm()
         )
 
     @property
@@ -352,7 +348,9 @@ class InjectionScanner:
         if self._can_timeout:
             # POSIX path: wrap finditer in SIGALRM bound.
             yield from _iter_matches_with_timeout(
-                rule.pattern, text, self._match_timeout_seconds  # type: ignore[arg-type]
+                rule.pattern,
+                text,
+                self._match_timeout_seconds,  # type: ignore[arg-type]
             )
         else:
             yield from rule.pattern.finditer(text)
