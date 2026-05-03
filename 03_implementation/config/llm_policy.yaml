@@ -1,5 +1,8 @@
 default_mode: template
-provider_allowlist: [openai-fixture]
+# ADR-015: lm_studio + ollama are the local on-ramps; minimax / deepseek
+# remain on the allowlist for the paid-fallback path. hipfire only routes
+# traffic when HERMES3D_AMD_NODE=1 is set (HipfireProvider enforces this).
+provider_allowlist: [openai-fixture, lm_studio, ollama, hipfire]
 cost_cap_usd_per_run: 0.05
 cost_cap_usd_per_day: 1.00
 timeout_seconds: 30
@@ -26,6 +29,27 @@ providers:
     api_key_env: HERMES3D_DEEPSEEK_API_KEY
     cost_cap_usd_per_run: 0.05
     cost_cap_usd_per_day: 1.00
+  # ---- ADR-015 local providers --------------------------------------------
+  lm_studio:
+    base_url: http://127.0.0.1:1234/v1
+    probe_path: /models
+    completion_path: /chat/completions
+    # Local LM Studio doesn't require a key. HERMES3D_NULL_API_KEY is the
+    # conventional placeholder so the api_key_env pattern is satisfied
+    # without storing a real secret.
+    api_key_env: HERMES3D_NULL_API_KEY
+    cost_cap_usd_per_run: 0.001
+    cost_cap_usd_per_day: 0.01
+  hipfire:
+    # Optional AMD inference node. Only reachable when HERMES3D_AMD_NODE=1
+    # is set; HipfireProvider refuses to instantiate otherwise so a stray
+    # entry here does NOT silently route traffic on a non-AMD host.
+    base_url: http://127.0.0.1:11435/v1
+    probe_path: /models
+    completion_path: /chat/completions
+    api_key_env: HERMES3D_NULL_API_KEY
+    cost_cap_usd_per_run: 0.001
+    cost_cap_usd_per_day: 0.01
 probe_freshness_minutes: 15
 probe_budget_usd_per_day: 0.10
 probe_rate_per_minute: 1

@@ -73,6 +73,9 @@ pythonpath = ["03_implementation/src"]
 filterwarnings = [
   "ignore::DeprecationWarning",
 ]
+markers = [
+  "integration: live integration tests that hit local services (auto-skipped when the service is offline)",
+]
 
 [tool.ruff]
 line-length = 100

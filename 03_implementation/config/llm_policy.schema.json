@@ -14,7 +14,8 @@
         "base_url": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://"
+          "description": "Provider base URL. HTTPS required for non-LAN hosts. http:// is permitted only for loopback (127.0.0.1, localhost) and RFC1918 LAN ranges (10.*, 192.168.*, 172.16-31.*), so on-box providers like LM Studio + Hipfire can be configured per ADR-015.",
+          "pattern": "^(https://|http://(localhost|127\\.0\\.0\\.1|10\\.|192\\.168\\.|172\\.(1[6-9]|2[0-9]|3[0-1])\\.))"
         },
         "probe_path": {
           "type": "string",
@@ -26,6 +27,7 @@
         },
         "api_key_env": {
           "type": "string",
+          "description": "Name of env var holding the API key. Use HERMES3D_NULL_API_KEY for local providers that need no key (LM Studio, Hipfire, Ollama).",
           "pattern": "^HERMES3D_[A-Z0-9_]+_API_KEY$"
         },
         "cost_cap_usd_per_run": {
@@ -132,14 +134,20 @@
       "default": "template"
     },
     "providers": {
-      "description": "Per-provider config map. Optional; when absent, only the fixture provider is reachable. Phase 3.4 ships with minimax + deepseek as the only allowed keys.",
+      "description": "Per-provider config map. Optional; when absent, only the fixture provider is reachable. Phase 3.4 ships with minimax + deepseek; ADR-015 adds local on-box keys lm_studio and hipfire. additionalProperties is now true so future local backends (vllm, llamacpp, ollama mirrors) can be added without further schema migrations.",
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "minimax": {
           "$ref": "#/definitions/providerConfig"
         },
         "deepseek": {
+          "$ref": "#/definitions/providerConfig"
+        },
+        "lm_studio": {
+          "$ref": "#/definitions/providerConfig"
+        },
+        "hipfire": {
           "$ref": "#/definitions/providerConfig"
         }
       }

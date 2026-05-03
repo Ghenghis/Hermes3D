@@ -33,6 +33,7 @@ Commands:
 
     spool list / add / load / consume   Spool registry CRUD
     proof verify <proof.json>           Verify proof envelope HMAC + files
+    doctor [--strict]                   Probe local LLM providers (ADR-015)
 
 The CLI's exit code is 0 on success, 1 on a structured error, 2 on usage
 mistakes.
@@ -399,6 +400,97 @@ def cmd_proof_verify(args: argparse.Namespace) -> int:
     return 0
 
 
+# -- doctor (provider reachability) ------------------------------------------
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Probe local LLM providers and report reachability.
+
+    Per ADR-015, LM Studio is the default provider and Ollama is the
+    documented fallback. ``hermes3d doctor`` reports on both so the
+    operator can see which path will be taken before running an agent.
+
+    Exit code is 0 when at least one provider in the chain is reachable
+    (or when ``--strict`` is omitted), 1 when no provider can be found
+    AND ``--strict`` is set.
+    """
+    from hermes3d.core.llm.lmstudio_client import (
+        DEFAULT_BASE_URL as LM_STUDIO_BASE,
+    )
+    from hermes3d.core.llm.lmstudio_client import (
+        LMStudioClient,
+    )
+    from hermes3d.core.llm.ollama_client import (
+        DEFAULT_BASE_URL as OLLAMA_BASE,
+    )
+    from hermes3d.core.llm.ollama_client import (
+        OllamaClient,
+    )
+
+    print("hermes3d doctor - local LLM provider reachability")
+    print("-" * 60)
+
+    findings: list[tuple[str, bool, str]] = []
+
+    # ---- LM Studio (default) ----------------------------------------
+    lms = LMStudioClient()
+    print(f"[1] LM Studio (default per ADR-015) — {LM_STUDIO_BASE}")
+    if lms.available():
+        try:
+            models = lms.list_models()
+        except Exception as exc:  # noqa: BLE001 - any failure means partial-up
+            findings.append(("lm_studio", True, f"reachable; list_models error: {exc}"))
+            print("    reachable: yes")
+            print(f"    list_models: ERROR — {exc}")
+        else:
+            findings.append(("lm_studio", True, f"reachable; {len(models)} model(s) loaded"))
+            print("    reachable: yes")
+            print(
+                "    models loaded: "
+                + (", ".join(models) if models else "(none — load one in LM Studio's UI)")
+            )
+    else:
+        findings.append(("lm_studio", False, "unreachable — server not running on :1234"))
+        print("    reachable: no")
+        print("    hint: open LM Studio, click 'Local Server' → 'Start Server'")
+
+    print()
+
+    # ---- Ollama (fallback) ------------------------------------------
+    oll = OllamaClient()
+    print(f"[2] Ollama (fallback)            — {OLLAMA_BASE}")
+    if oll.available():
+        try:
+            models = oll.list_models()
+        except Exception as exc:  # noqa: BLE001
+            findings.append(("ollama", True, f"reachable; list_models error: {exc}"))
+            print("    reachable: yes")
+            print(f"    list_models: ERROR — {exc}")
+        else:
+            findings.append(("ollama", True, f"reachable; {len(models)} model(s) pulled"))
+            print("    reachable: yes")
+            print(
+                "    models pulled: "
+                + (", ".join(models) if models else "(none — run `ollama pull qwen2.5-coder:7b`)")
+            )
+    else:
+        findings.append(("ollama", False, "unreachable — server not running on :11434"))
+        print("    reachable: no")
+        print("    hint: install Ollama, then `ollama serve`")
+
+    print()
+    print("-" * 60)
+    reachable = [name for (name, ok, _) in findings if ok]
+    if reachable:
+        print(f"At least one provider is reachable: {', '.join(reachable)}")
+        return 0
+    print("No local LLM provider is reachable.")
+    if args.strict:
+        return 1
+    print("(non-strict mode — exit 0 anyway; agentic features will fall back)")
+    return 0
+
+
 # =============================================================================
 
 
@@ -531,6 +623,18 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("proof_path")
     pv.add_argument("--skip-files", action="store_true", help="Skip mesh/visual file re-hashing")
     pv.set_defaults(func=cmd_proof_verify)
+
+    # doctor ------------------------------------------------------------
+    doc = sub.add_parser(
+        "doctor",
+        help="Probe local LLM providers (LM Studio default + Ollama fallback) per ADR-015",
+    )
+    doc.add_argument(
+        "--strict",
+        action="store_true",
+        help="Exit non-zero when no provider is reachable (default: still exit 0)",
+    )
+    doc.set_defaults(func=cmd_doctor)
 
     return p
 

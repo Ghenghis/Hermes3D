@@ -22,9 +22,22 @@ def test_llm_provider_config_from_env_defaults(monkeypatch):
     ):
         monkeypatch.delenv(k, raising=False)
     cfg = ProviderConfig.from_env()
+    # ADR-015: LM Studio is the canonical local default; Ollama is the
+    # documented fallback (callers select_provider_with_fallback if needed).
+    assert cfg.provider == LLMProvider.LMSTUDIO
+    assert cfg.base_url.startswith("http://127.0.0.1:1234")
+    assert cfg.api_key is None
+
+
+def test_llm_provider_config_from_env_ollama_fallback(monkeypatch):
+    from hermes3d.core.llm.providers import LLMProvider, ProviderConfig
+
+    monkeypatch.setenv("HERMES3D_LLM_PROVIDER", "ollama")
+    for k in ("HERMES3D_LLM_BASE_URL", "HERMES3D_LLM_MODEL", "HERMES3D_LLM_API_KEY"):
+        monkeypatch.delenv(k, raising=False)
+    cfg = ProviderConfig.from_env()
     assert cfg.provider == LLMProvider.OLLAMA
     assert cfg.base_url.startswith("http://127.0.0.1:11434")
-    assert cfg.api_key is None
 
 
 def test_llm_provider_config_from_env_lmstudio(monkeypatch):
