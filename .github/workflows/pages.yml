@@ -31,7 +31,7 @@ jobs:
         uses: actions/configure-pages@1f0c5cde4bc74cd7e1254d0cb4de8d49e9068c7d   # v4.0.0
 
       - name: Upload site/ as Pages artifact
-        uses: actions/upload-pages-artifact@56afc609e74202658c3e2dfdb6e89dab97f2e3a3   # v3.0.1
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b   # v4.0.0
         with:
           path: ./site
 
