@@ -103,7 +103,7 @@ Phase 5.1 is complete as v5.1.0. The committed proof artifact is
 SHA-256:
 
 ```text
-ba385e98da2cb2b131ce32e52d615c95ddac81f5021f2a79cc92737163558afa
+775c660e5d17a6fbbf3d3b61474e5c4a33bf94f8e6835ae93575061e4d07f0c5
 ```
 
 The next planned product work is v5.2 multi-agent maturity. The immediate
