@@ -9,7 +9,7 @@ Implement Phase 5.1 Checkpoint C per [`PHASE5_1_PLAN.md`](../00_overview/PHASE5_
 Three concrete additions:
 1. `profile_generator.generate_profile()` accepts an optional `SkillStoreReader` for auto-derivation of (printer × material × quality) suggestions. Reader-protocol injection per ADR-013 §1.
 2. `skill_store` exposes the `SkillStoreReader` Protocol matching the four query shapes the generator needs.
-3. `scripts/doctor.{ps1,sh}` emit a versioned JSON envelope (`json_schema_version: 1`) per ADR-013 §3 — Windows + WSL prerequisites for `.ps1`, macOS + Linux for `.sh`.
+3. `scripts/scaffolding/doctor.{ps1,sh}` emit a versioned JSON envelope (`json_schema_version: 1`) per ADR-013 §3 — Windows + WSL prerequisites for `.ps1`, macOS + Linux for `.sh`.
 
 ## 2. Workspace + branch
 
@@ -48,8 +48,8 @@ hermes_lock_files
   files=[
     "03_implementation/src/hermes3d/core/slicer/profile_generator.py",
     "03_implementation/src/hermes3d/core/memory/skill_store.py",
-    "scripts/doctor.ps1",
-    "scripts/doctor.sh",
+    "scripts/scaffolding/doctor.ps1",
+    "scripts/scaffolding/doctor.sh",
     "04_testing/pytest/integration/test_profile_generator_skill_wired.py",
     "04_testing/pytest/unit/scripts/test_doctor_windows.py",
     "04_testing/pytest/unit/scripts/test_doctor_unix.py"
@@ -98,7 +98,7 @@ Default `skills=None` → existing deterministic path (the 6 existing unit tests
 
 ### §3 — Doctor JSON envelope (`json_schema_version: 1`)
 
-When invoked with `--json`, both `scripts/doctor.ps1` and `scripts/doctor.sh` MUST emit the exact envelope from ADR-013 §3:
+When invoked with `--json`, both `scripts/scaffolding/doctor.ps1` and `scripts/scaffolding/doctor.sh` MUST emit the exact envelope from ADR-013 §3:
 
 ```json
 {
@@ -132,8 +132,8 @@ Keep the existing default (non-`--json`) human-readable output — `--json` is a
 | Path | Asserts |
 |---|---|
 | `04_testing/pytest/integration/test_profile_generator_skill_wired.py` | seed `skill_store` with 2 reinforced rows; `generate_profile(skills=reader)` reflects the reinforced overrides; `generate_profile(skills=None)` returns the deterministic baseline; both return profiles with stable schema |
-| `04_testing/pytest/unit/scripts/test_doctor_windows.py` | parse `scripts/doctor.ps1 --json` against fixed transcripts (WSL present / WSL absent / kernel old). On non-Windows runners, mock the WSL probe; do not require real WSL |
-| `04_testing/pytest/unit/scripts/test_doctor_unix.py` | parse `scripts/doctor.sh --json` against fixed transcripts (macOS + Linux). Mock libGL + python version probes; do not require real environment |
+| `04_testing/pytest/unit/scripts/test_doctor_windows.py` | parse `scripts/scaffolding/doctor.ps1 --json` against fixed transcripts (WSL present / WSL absent / kernel old). On non-Windows runners, mock the WSL probe; do not require real WSL |
+| `04_testing/pytest/unit/scripts/test_doctor_unix.py` | parse `scripts/scaffolding/doctor.sh --json` against fixed transcripts (macOS + Linux). Mock libGL + python version probes; do not require real environment |
 
 The existing 6 unit tests under `04_testing/pytest/unit/slicer/test_profile_generator.py` MUST continue to pass — they pass `skills=None` and exercise the deterministic path.
 
@@ -149,7 +149,7 @@ Then locally:
 - `pytest 04_testing/pytest/integration/test_profile_generator_skill_wired.py -v` — green
 - `ruff format --check 03_implementation/src 04_testing/pytest`
 - `ruff check 03_implementation/src 04_testing/pytest`
-- `python scripts/doctor.{ps1,sh} --json | python -m json.tool` — emits valid JSON matching the envelope
+- `python scripts/scaffolding/doctor.{ps1,sh} --json | python -m json.tool` — emits valid JSON matching the envelope
 
 CI gates that will run on the PR (do not skip): Layer A, B, C, F (honesty gates).
 
@@ -175,8 +175,8 @@ feat(phase5.1): profile_generator + skill_store reader + doctor JSON envelope (C
 ==== Files ====
 03_implementation/src/hermes3d/core/slicer/profile_generator.py   (M)
 03_implementation/src/hermes3d/core/memory/skill_store.py         (M)
-scripts/doctor.ps1                                                 (M)
-scripts/doctor.sh                                                  (M)
+scripts/scaffolding/doctor.ps1                                                 (M)
+scripts/scaffolding/doctor.sh                                                  (M)
 04_testing/pytest/integration/test_profile_generator_skill_wired.py (A)
 04_testing/pytest/unit/scripts/test_doctor_windows.py              (A)
 04_testing/pytest/unit/scripts/test_doctor_unix.py                 (A)
