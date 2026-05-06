@@ -36,6 +36,12 @@
 - **Truth-gates every mesh** through six concurrent printability checks, then HMAC-signs the verdict so it can be audited later — even by someone who doesn't trust the printer that ran the job.
 - **Dispatches across your fleet** with per-file locks, atomic handoffs, and 8 selection strategies — Claude, Codex, Cursor, Windsurf, VS Code Copilot and Kilo Code can call the same 16-tool MCP surface without clobbering each other.
 - **Proves the system continuously.** 17 truth gates re-attest the codebase on every push to `main`, sign `PROOF/latest.json` with Sigstore (keyless OIDC), and commit the refreshed bundle back to the repo. **77 of 79 user-visible features are real today** — the other two are conspicuously disabled with explanations, never "Coming Soon" buttons.
+- **Treats Hermes Agents as user-authorized operator/admin delegates.**
+  Agents may use Hermes3D OS, the user's PC, local files/apps, web
+  services, VPS/remote hosts, source repositories, GitHub branches,
+  commits, pushes, and PRs when the user assigns that work. Missing
+  data means ask or block; never invent printer state, slicer output,
+  generated models, proof events, setup status, or remote-host state.
 
 ---
 

@@ -1,0 +1,334 @@
+# Hermes3D OS Tab Completion Roadmap
+
+Updated: 2026-05-06
+Owner: codex-master
+Task: H3D-HERMES3D7-GUI-WIRING-2026-05-04
+
+## Contract
+
+Every visible Hermes3D OS surface must be useful, dense, real, and responsive. A control may call a live backend/local/API path, show a verifiable blocked reason, or be disabled until the missing source is configured. It must not pretend success.
+
+Operator layout preference:
+- Compact font scale close to the Simple dashboard reference image.
+- Dashboard surfaces should fit the active app window without main-body scroll at normal desktop operator viewports.
+- Other tabs may scroll when their work naturally needs it, but cards and tables must use all available space without over-large type or decorative emptiness.
+- Hermes Agents chat remains accessible from the left rail on all tabs and must not cut off at resized browser heights; user-facing side rails must be draggable, shortenable, resettable, and persisted instead of fixed-width.
+
+Printer policy:
+- T1 #1: 192.168.0.10, Moonraker/Klipper, testable.
+- T1 #2: 192.168.0.11, Moonraker/Klipper, testable.
+- FLSUN S1: 192.168.0.12, camera/read-only allowed, printer actions locked until user changes status.
+- FLSUN V400: 192.168.0.34, Moonraker/Klipper, testable; USB webcam camera URL is configured and read through Observe.
+
+## Current Completion Ledger
+
+| Tab or surface | Status | Proof / remaining gap |
+| --- | --- | --- |
+| Dashboard | DONE | Live backend data, compact dashboard/simple mode, viewport proof in ACTIVE_UI_NO_FAKE_SWEEP.md. |
+| Simple GUI | DONE | Pixel-reference inspired compact dashboard is selectable, live-backed, and its left rail mirrors the canonical primary tabs while staying in Simple and embedding real tab components. |
+| Observe | DONE | Live camera cards for T1 #1, T1 #2, S1, and V400; Refresh visibly reconnects 4/4 configured feeds without leaving `#observe`; S1 90-degree default, resize/undock/feed controls, and plate-clear actions route through backend policy. |
+| Printers | IN_PROGRESS | Correct T1/S1/V400 IP policy, S1 locked, guarded T1 print proof recorded, onboarded-printer rows now appear after the fixed fleet; next gap is fuller profile/source-ref wizard polish. |
+| Source OS | IN_PROGRESS | Source registry truth audit currently proves 60/60 source-backed app rows. Runtime Readiness currently shows 30 verifier-backed ready apps and 30 source-ready runner gaps with explicit `ready/source/setup/install/blocked` badges, Verify All, Setup Queue, selected-app Verify, and selected-app Setup Plan write proof, and Backup/Check Update/Update/Rollback call live backend routes. The 30 SQLite-backed verifiers include 7 agent-usable CLI probes, 3 desktop launcher metadata probes, 13 read-only source-inventory probes, 4 package/import probes including the Blender MCP source-import verifier, and 3 read-only Moonraker/Klipper fleet probes, and loader launch-kind overrides reduce the vague `unknown` bucket to 0/60. The CLI-surface audit proves 33 local CLI/service hints still need verifier/runner work before Hermes Agents can execute them. |
+| Agents rail/chat | DONE | Browser mic, voice-note upload, file attachments, quick context prompts, Azure voice playback for agent replies, real runtime/SSE when configured, a bounded Hermes Agent Playwright proof runner, and the OS operator action catalog surface. |
+| Artifacts | DONE | Agent attachments and proof files are inspectable through live artifacts API. |
+| Settings | IN_PROGRESS | Hermes Agent/Desktop update failsafes exist; printer onboarding form probes live Moonraker before save; backend launchers load `G:/private/.env` server-side only; Environment now shows a live runtime readiness ledger plus the Source App Setup Queue; next gap is app-wide update execution and daily idle automation runner setup. |
+| Plugins | IN_PROGRESS | Plugin state is live-backed; source app update-readiness summary and runtime setup queue counts are visible; next gap is unified release watch and all-app update planning. |
+| Jobs | DONE | Live job list/detail exists; proof-gated pipeline renders backend transition state; cancel, repair proposal, repair apply/escalation, retry, and rollback routes append proof/job events and are UI-wired. |
+| Autopilot | IN_PROGRESS | Guardrails and readiness routes exist; next gap is idle safe-work queue plus evidence-gated execution. |
+| Learning | IN_PROGRESS | Idle mode selection persists, daily queue API/UI records reviewable candidates, runtime truth now reports Hermes Agent runtime and idle runner ready. Research reports are execution-ready; documentation, workflow, app update, and printer maintenance stay blocked while S1 policy and queued job blockers are active. |
+| Voice | IN_PROGRESS | Voice catalog/preview, chat mic, voice-note artifacts, Azure fast STT transcription, and per-agent Azure reply playback are backend-wired with proof; next gap is richer transcript review/history and Observe snapshot-to-agent voice workflows. |
+| Design | IN_PROGRESS | P0 executor MVP is live for the real parametric desk-organizer template: `/api/design/intake` writes an STL, proof envelope, job steps, artifacts, truth-gate row, and proof event. Remaining Design gap is broader OpenSCAD/CadQuery/Blender/prompt-to-CAD coverage. |
+| 3D Generation | IN_PROGRESS | P0 local generator MVP is live for the real calibration-cube template: `/api/generation/run` writes an STL, preview SVG, proof envelope, job steps, artifacts, truth-gate row, and proof event. Remaining Gen3D gap is broader ComfyUI/TRELLIS.2/Hunyuan3D/provider-backed generation coverage. |
+| Approvals | DONE | Pending/approved/rejected approval actions are live-backed. |
+| Roadmap | IN_PROGRESS | This file plus /api/roadmap/tab-completion track the current tab ledger. |
+
+## UX/UI Completion Position
+
+Overall status: about 78% complete toward the user's strict e2e GUI finish target.
+
+The roadmap is accurate enough to drive the next work, but it is not considered complete until every item in the finish queue below is either DONE with proof or explicitly blocked by a real missing dependency. The current app shell, Simple GUI routing, dashboard density, Observe cameras, agent rail/chat, artifacts, approvals, source registry proof, Source OS runtime-state verifier/setup queue, Design executor MVP, 3D Generation executor MVP, Jobs repair/rollback transitions, and many live backend adapters are in place. The remaining work is mostly execution depth: broader generation providers, all-app update/rollback orchestration, idle automation execution, safe source-app setup runners, and final tab-by-tab polish.
+
+Definition of roadmap completion:
+- Every primary tab has a live backend data path, a disabled/blocked reason, or a real operator action.
+- Simple mode and Main mode render the same real tab capabilities without silently switching modes.
+- Every source app shows installed/source state, runtime readiness, update readiness, backup target, rollback target, and gate result.
+- Every printer action is policy-gated, proof-recorded, and respects S1 locked/read-only status.
+- Every Hermes Agent action either reaches a configured runtime/tool path or returns a precise blocked reason.
+- Hermes Agent QA actions run through fixed proof scopes (`observe`, `smoke`, `full`) and store Playwright artifacts/proof events, rather than relying on agents self-reporting that the UI works.
+- Settings Environment shows a runtime readiness ledger for the missing-runtime question, with exact env keys/proof endpoints and no secret values. Current local state is 7 ready, 2 partial, 0 blocked after loading Hermes Agent runtime, idle learning runner, and proof signing from `G:/private/.env`.
+- Router hash synchronization keeps the URL and active mounted tab aligned, including Simple embedded live-tab mode, so buttons cannot appear unresponsive because another tab stayed mounted behind a changed hash.
+- GUI launch now selects open local ports for the UI, GUI API, and Desktop compatibility API, writes `03_implementation/var/runtime-ports.json`, and passes the selected API port into Vite so Hermes3D still loads when the default ports are occupied.
+- Printer fleet polling uses bounded parallel Moonraker probes; slow printers surface as `degraded` telemetry instead of falsely blocking the UI, while physical action routes still run strict live gates.
+- Final Playwright, TypeScript, no-fake scan, route probes, and targeted printer/camera checks are recorded in proof.
+
+## Full E2E Finish Queue
+
+| Priority | Work package | Status | Acceptance before DONE |
+| --- | --- | --- | --- |
+| P0 | Design executor MVP | DONE | Live proof job `2a5d92b42897401490962dfa0c13e4fe` generated `desk_organizer_150df888cd.stl`, `desk_organizer_150df888cd.proof.json`, and passed `design.parametric_mesh`. Unsupported prompts fail closed with supported-template guidance. |
+| P0 | 3D Generation executor and preview proof | DONE | Live proof job `56954aa084b94a71a3bea4cb38f72f55` generated `calibration_cube_c8f48130af.stl`, `calibration_cube_c8f48130af.preview.svg`, `calibration_cube_c8f48130af.proof.json`, inserted proof event `bff1c6b5608e4384ad2e9c3fe4e5e5b5`, and passed truth status `pass`. Unsupported arbitrary prompts fail closed with provider setup guidance. |
+| P0 | Jobs repair/rollback transitions | DONE | Live proof job `a936044cad8e4b07b378bd53c0ed1187` created REPAIR_APPROVAL `c998960a23e74b7ea1da4aca6390b5b9`, appended proposal proof `12f27d2e5eae4e0d95caaea28421b5c0`, apply/escalation proof `2421f6f2f80a4abd99b888e5d2eb9d82`, retry proof `cd752dcbed3c4add913c9d2901ed07ab`, and rollback proof `41583d82acb34f4db5df313c9e4b4e10`. UI controls call real routes and show blocked reasons. |
+| P0 | Source OS + Plugins update execution | PARTIAL | Source OS Verify All, Setup Queue, selected-app Verify, selected-app Setup Plan, Backup, Check Update, no-op/current Update, Rollback routing, and proof events are wired. Runtime proof: Verify All `521e8565cfaf4115b3cd66c4fef66cc6` / backend route proof `e07a6629533c4a4c9333ba657120cecc`, Setup Queue proof `96885b17bdaf47b590b57da4d4515ca1`, PrusaSlicer setup-plan proof `5bce091c12c44656a4f3f1209fc6522d`, Azure Speech SDK setup-plan proof `9a7bd64d01644e8fb81359a196288179`, PrusaSlicer CLI `84e425b7fe514d42896ad16083eed561`, FLSUN Slicer CLI `eb18f6c1b98b4f52b8f955aee4b2503c`, source-only Azure Speech SDK `ae75bb3c53d6418ab7c603c7d7747e90`. Update proof on `blender_mcp_candidates`: backup `20260505T225446Z_blender_mcp_candidates_7636d13bded8`, backup proof `fa26b7f476d24de4b74a46f06b182ae5`, check proof `c89d2ea4965d4d9182c53e8b71e086b9`, update proof `970908d222734767a55401644878fa4a`. Remaining: all-app release watch, registering safe setup runners, and richer post-update app-specific smoke gates for the 60-app registry. |
+| P0 | Hermes Agent full OS operator coverage | IN_PROGRESS | `/api/agents/action-catalog` exposes 45 cataloged OS actions with public ready/partial/blocked state, proof requirements, approval/rollback flags, payload requirements, and no leaked internal handler names. Current live proof: `39 ready / 3 partial / 3 blocked`, 40 callable catalog actions, 0 ready-but-not-callable rows, and `printers.upload_start` advertises required `printer_id,gcode_path` payload keys. A 25-action safe sweep returned 25/25 accepted/completed proofs, protected missing-payload probes failed closed 5/5, and non-physical artifact actions passed 3/3: generation proof `783d06b27087489a8914956a5df559dd`, design proof `1ad2e99d3f9541d58b4a38a0e1ff5b16`, T1 #1 camera evidence proof `4a6143a9ef6a47c993530539d31a0dd1`, Azure voice preview proof `e4bbebf265e34035b3e3f47ecb3c4238` / TTS proof `324cbb9c902643a388ef773d83613c61`, Azure catalog proof `cb64df49be2f4036b1945d88ce2cd861`, and Roadmap truth proof `19f7ecf90f8a4a1ba303bf7fd0ec3142`. Focused Playwright passed 10/10 and screenshot proof is `03_implementation/proof/screenshots/agents-operator-catalog-expanded-2026-05-06.png`. Remaining: complete safe registered runners for the 30 Source OS runner gaps, update-all backup/smoke/rollback orchestration, and blocked idle work kinds before calling Hermes Agents fully e2e complete. |
+| P0 | Hermes Agent programming ecosystem | NEW | Source inputs are required, not optional: `https://github.com/NousResearch/hermes-agent.git` and `https://github.com/AtomicBot-ai/atomic-hermes.git`, with local source at `G:/Github/hermes-agent-fresh` and `G:/Github/atomic-hermes`. Build only what Hermes3D Agents need to program, test, repair, and ship Hermes3D: true Hermes Agent runtime, two-provider coding lane using MiniMax + DeepSeek, repo-map/read tools, snapshot/diff/restore, patch tools, bounded command/test runner, Playwright proof runner, MCP/tool boundary, task queue, approvals, branch/commit/PR lane, rollback, and proof ledger. Acceptance: both Hermes agent teams can take real Hermes3D tasks, edit code through source-backed tools, run real tests/gates, produce proof artifacts, create branches/PRs, and restore any agent-touched file. |
+| P0 | Claude 20-agent completion contract kit | NEW | Create a no-conflict handoff kit for Claude Opus 4.7 Max and up to 20 Claude agents while Codex continues the Hermes Agent programming ecosystem. Acceptance: every Claude lane has exact files, locks, task id, branch/worktree rule, pass/fail gates, proof output, no-fake rule, S1 lock rule, and "fix until pass" instruction. Claude agents may complete Source OS runners, tab polish, tests, docs/proof, visual checks, and missing runtime integrations, but must not touch files owned by the current Codex code-operator lane. |
+| P0 | 60 source-app runtime completion | IN_PROGRESS | Keep the visible Source OS target at the proven 60 source-backed rows. Acceptance: `SOURCE_REGISTRY_TRUTH_AUDIT.json`, `/api/modules`, `/api/modules/runtime/verifiers`, `/api/modules/runtime/setup-queue`, `/api/modules/runtime/cli-surface`, `SOURCE_APP_60_COMPLETION_AUDIT.json`, `SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json`, `SOURCE_APP_CLI_SURFACE_AUDIT.json`, `SOURCE_APP_RUNTIME_ACTION_PLAN.md`, and Playwright Source OS/Plugins/Settings/Roadmap proof all agree; each row is either runtime-ready through a registered verifier or source-ready with an exact runner gap, every available CLI is exposed as an agent-usable verifier/runner before desktop fallback, and no row remains in an unclassified launch-kind bucket. |
+| P1 | Voice Azure STT pipeline | DONE | Backend `/api/voice/stt` reads Azure Speech secrets only from runtime/private env, returns transcript or exact blocker, appends proof, and chat mic inserts transcript while preserving the audio artifact. Live Azure TTS-to-STT proof event: `5d9b8a25a1ac454f85ea46e5a59866f4`. |
+| P1 | Hermes Agent Playwright proof runner | DONE | `/api/agents/{persona}/playwright-run` exposes fixed observe/smoke/full scopes, stores an `agent_playwright_run` artifact, appends proof events, and Agents UI can trigger the runner without arbitrary shell input. |
+| P1 | Settings app update center | PENDING | One-click check/update/rollback surface covers Hermes Agent/Desktop and source apps with failsafes and user approval policy. |
+| P1 | Printer onboarding/profile wizard polish | PENDING | New printers can be added with Moonraker probe, camera URL, profile refs, safety policy, and proof without editing TOML/source. |
+| P1 | Idle automation workbench execution | PARTIAL | Agents can create research/build/update candidates while idle, Run fails closed with proof until trusted runtime prerequisites exist, then reports/gates are recorded before user review/merge. |
+| P1 | Observe advanced view presets | DONE | Camera selection layouts for 1/2/3/all feeds, rotations 0/90/180/270, zoom/focus/color controls, undock, persisted presets, and Refresh reconnect proof work across the live Observe tab. |
+| P2 | Final density/responsive pass | IN_PROGRESS | Main navigation, Source OS project list, Settings sections, Voice agents, Plugins API panel, and Simple mode left rail now use persisted user-resizable panes with keyboard/Home/End control and double-click reset. Remaining: finish tab-by-tab density/polish after each feature surface is complete; dashboard stays non-scroll at operator viewport sizes. |
+| P2 | Final docs/proof sync | PENDING | README/roadmap/proof docs match live tab count, printer policy, source app count, and current proof event IDs. |
+
+## Primary Work Packages
+
+### 1. Source OS + Plugins: App Update Center
+
+Goal: every source-backed app shows installed version, upstream latest release/commit, health, backup target, update button, rollback target, and proof gates.
+
+Current status:
+- `/api/modules/update/readiness` exposes non-mutating source checkout readiness.
+- Source OS and Plugins render compact update-readiness summaries.
+- Deep Check is explicit and read-only.
+- `/api/modules/runtime/verifiers`, `/api/modules/{module_id}/runtime/verify`, and `/api/modules/runtime/verify-all` expose source/runtime verifiers so installed source checkouts no longer collapse into an `unknown` badge. Known safe local tools currently verify PrusaSlicer, FLSUN Slicer, OrcaSlicer, OpenSCAD, Blender, and CuraEngine as real agent-usable CLI probes; Bambu Studio, UltiMaker Cura, and Printrun are launcher metadata only until a safe CLI/API smoke is proven; 13 read-only reference/catalog rows are verified by source-inventory probes; `trimesh`, `manifold`, and `model_context_protocol` are verified by backend package/import probes; `moonraker`, `klipper`, and `firmware_klipper` are verified through read-only printer API probes; source-only runnable modules report `source_ready` plus concrete setup steps.
+- `/api/modules/runtime/setup-queue` and `/api/modules/{module_id}/runtime/setup-plan` give Hermes Agents a proof-backed queue of setup work without executing unregistered installers or pretending a source checkout is already a runnable app.
+- `/api/modules/runtime/gaps` groups the remaining 30 runner gaps by launch kind and section, with the next safe verifier family needed for each group.
+- `/api/modules/runtime/agent-cli-readiness` gives Hermes Agents a live 60-row execution-tier matrix: verified agent CLI, launcher metadata only, package/import ready, service/API ready, source-reference ready, or runner gap.
+- `/api/modules/runtime/cli-surface` exposes `SOURCE_APP_CLI_SURFACE_AUDIT.json`: 7 enabled agent CLIs, 33 local CLI/service signals that still need verifiers, 3 launcher-only rows, and 6 rows with no local CLI signal.
+- `/api/modules/runtime/setup-queue` is now also available as a read-only GET status for Plugins, Settings Environment, and Roadmap so the 30-runner gap is visible without creating proof spam; POST records a proof-backed plan.
+- Source OS selected-app actions now call `/update/backup`, `/update/check`, `/update/apply`, and `/rollback` with backup metadata and proof events.
+- Live no-op/current update proof exists for `blender_mcp_candidates`; all-app orchestration remains pending.
+
+Implementation notes:
+- Use GitHub latest-release API for public release-backed repos and local `git fetch --dry-run`/remote metadata for source checkouts.
+- Use cached backend polling and proof events, not frontend loops.
+- Add one-click "Check all apps" and "Update selected/all" with backup before update, post-update smoke check, and rollback if gates fail.
+- Keep source-app update state visible in Source OS and summarized in Plugins/Settings.
+- Track the corrected 60-app target as the active Source OS workstream. Current proof is 60 source-backed modules; the remaining work is runtime verifier/setup-runner coverage, not count expansion.
+- Use isolated staging worktrees for update tests. Do not mutate live source checkouts before gates pass.
+- Rollback must restore recorded backup data, not only checkout a branch/tag that may have moved.
+
+Acceptance:
+- No update action runs without backup metadata. Current Source OS Update button stays disabled until the readiness record reports a recorded backup.
+- Failed/skipped gates stop or rollback.
+- Every app row shows either latest release, latest commit, or a blocked reason.
+- Every app row shows either runtime ready, source ready, install ready, setup needed, or blocked.
+- Every app row with an available CLI must expose that CLI through a bounded verifier/runner path usable by Hermes Agents; if no CLI is installed or safe, the row must say `runner_not_registered` or launcher-metadata only.
+- Verify All records a batch proof summary and never fetches, pulls, builds, or installs.
+- Setup Queue records a batch proof summary and marks each source-only app as `runner_not_registered` until a safe app-specific setup runner and verifier exist.
+- Plugins, Settings Environment, and Roadmap show the same setup queue counts as Source OS so missing runners are not hidden behind app tiles.
+- Do not advertise any app row as runnable until a registered verifier, smoke gate, and proof artifact confirm the runtime.
+- Hermes Agents can request updates while user is away, but user-facing risky actions remain gated by policy.
+- Dirty checkouts fail the update gate until committed, backed up, or explicitly handled.
+
+#### 60 Source App Completion Plan
+
+The operator target is 60 useful source-backed apps. Current local truth is 60 proved modules, 30 verifier-backed ready rows, 7 agent-usable CLI probes, 33 CLI/service signals needing verifiers, and 30 source-ready rows without safe runners. The completion path is:
+
+1. Registry proof: keep the visible count at 60 and rerun `audit_source_registry_truth.py` after any source path or launch-kind change. Missing rows are blocked, not hidden or inflated.
+2. Runtime verifier registry: 29 safe probes now seed `module_runtime_verifiers` in SQLite and are exposed by `/api/modules/runtime/verifiers`; the next step is adding DB-backed runner rows and verifiers by app family.
+3. CLI-first agent runner lane: for every app that offers a CLI, add a bounded `--version`, `--help`, dry-run, import, or API smoke verifier first, then expose a Hermes Agent runner. Desktop launch metadata is allowed only as a fallback proof tier and must not be labeled as agent CLI-ready.
+4. Runner registration: for each app family, add a safe verifier first. Example lanes: slicer CLI, CAD/modeler CLI, web app health endpoint, Python worker import/version check, firmware/toolchain version check, GPU worker smoke check, and reference-only docs/source modules.
+5. App smoke gates: after a verifier passes, add a small non-destructive smoke gate: version/help output, local health endpoint, import check, or dry-run command. Printer-writing apps remain guarded by printer policy and approvals.
+6. Update/rollback lane: every app row must expose backup, check update, update, rollback, proof, and failure rollback state before it can be included in one-click update-all.
+7. UI proof lane: Source OS, Plugins, Settings, and Roadmap must show the same counts for proven apps, runtime-ready apps, runner gaps, install-ready apps, and blocked apps.
+8. Agent lane: Hermes Agents can consume `/api/modules/runtime/gaps`, plan the setup queue, and prepare PRs/config changes, but source installs/builds/updates execute only through registered runners and gates.
+
+Definition of done for the 60-app target: no visible row is a shell. Each row has real source, real local state, a real blocked reason or runtime verifier, and a recorded proof path.
+
+Current CLI readiness proof: `03_implementation/proof/SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json` and `/api/modules/runtime/agent-cli-readiness` classify all 60 rows. As of this pass, 7 apps are verified agent CLI (`hermes_agent`, `blender`, `openscad`, `curaengine`, `flsun_slicer`, `orcaslicer`, `prusaslicer`), 3 are launcher metadata only (`printrun`, `bambustudio`, `cura`), 4 are package/import ready (`model_context_protocol`, `blender_mcp_candidates`, `manifold`, `trimesh`), 3 are service/API ready, 13 are read-only source/reference ready, and 30 remain runner gaps needing a real CLI/API/import/service smoke before Hermes Agents can execute them. Separate CLI-surface proof lives at `03_implementation/proof/SOURCE_APP_CLI_SURFACE_AUDIT.json`; it records 33 local CLI/service hints that are candidates only until a safe verifier and proof gate exist.
+
+Generated no-forget action plan: `03_implementation/proof/SOURCE_APP_RUNTIME_ACTION_PLAN.md` lists every open runner gap, launcher-only row, and CLI/service signal that still needs a verifier. This file must be regenerated with `python 03_implementation\scripts\write_source_runtime_action_plan.py` after any Source OS runtime or verifier change.
+
+### 2. Printers + Settings: Fleet Onboarding
+
+Goal: add and validate new Moonraker/Klipper printers through Hermes Agents without hand-editing config.
+
+Current status:
+- The live operator fleet is fixed to T1 #1, T1 #2, S1, and V400.
+- T1 #1, T1 #2, and V400 are write-enabled through guarded paths.
+- S1 remains read-only/action-locked.
+- Settings can save camera URLs for configured printer IDs.
+- `/api/printers/onboard` adds persistent Moonraker printers after live `/server/info` and `/printer/objects/query` probes.
+- Settings exposes a compact Add Moonraker Printer form that reports the exact failed probe when onboarding is blocked.
+- New onboarded printers appear in the Printers tab after the fixed T1/S1/V400 operator fleet.
+- Onboarded printers default to read-only unless guarded writes are explicitly requested and the printer is idle.
+
+Implementation notes:
+- Probe `/server/info`, `/printer/objects/query`, webcam config, and safe printer status before accepting a printer.
+- Add printer profile, camera URL, source wiki/profile refs, and safety lock policy in one wizard.
+- Preserve the S1 read-only/locked default until user changes it.
+- Add persistent onboarded-printer storage instead of relying only on static TOML/config merges.
+- Do not let onboarding overwrite S1 into a write-enabled printer.
+
+Acceptance:
+- New printer creation records IP, adapter, camera endpoint, safety status, and proof event.
+- Any unavailable Moonraker endpoint gives the exact failed probe.
+- Existing four local printers stay correct.
+- Newly onboarded non-S1 printers appear in Printers and Settings without source-code or TOML edits.
+- All S1 aliases and `192.168.0.12` keep HTTP 423 behavior for test/move/upload/start.
+
+### 3. Jobs + Autopilot: Proof-Gated Job Pipeline
+
+Goal: jobs become an operator-grade workflow surface: model, slice, bounds, approval, upload, print, observe, complete, repair.
+
+Current status:
+- Jobs, Autopilot, and Approvals use live APIs.
+- Print-start has strong backend gates for job id, approval, truth gates, bounds, plate clearance, S1 lock, and Moonraker idle state.
+- Printers Upload + Start now requires an approved job ID in the UI and sends `job_id` to the backend upload/start route.
+- The Jobs UI renders a proof-gated pipeline from live job detail data, including current blocker, required gate, and backend transition state.
+- Server-side cancel, repair proposal, repair apply/escalation, retry, and rollback routes append `job_events` plus `proof_events`; rollback requires a recorded checkpoint artifact.
+- Apply repair uses the existing read-mostly `RepairAgent` and records escalation honestly when no executable repair handler is available; it does not pretend to mutate files or printers.
+
+Implementation notes:
+- Show active job stages, current blocker, required gate, attached files, printer target, and rollback/cancel options.
+- Use Moonraker upload/job queue only after approval and truth gates.
+- Include automatic repair suggestions for slicer/config/tooling failures, not silent retry loops.
+- Centralize print-start gates so orchestration code and printer API cannot diverge.
+- Add server-side proof events for every job transition, accepted or blocked.
+
+Acceptance:
+- Starting a print without job approval still fails closed.
+- Every implemented job transition appends proof.
+- Agents can propose repair actions with explicit approve/deny controls.
+- `uploadGcodeLive` and any workflow path must pass `job_id` for `start=true`.
+- Repair proposals rejected by the user do not mutate the print artifact selected for printing.
+
+### 4. Learning + Agents: Idle Workbench
+
+Goal: when Hermes3D is idle, agents research safe improvements, app updates, source app opportunities, printer maintenance, and daily tasks for user review.
+
+Current status:
+- Learning config/report shell exists.
+- Agents chat/attachments/actions/update controls exist.
+- Autonomous session routes exist.
+- `/api/learning/idle-workbench` now exposes persistent idle workbench candidates, live blockers, a daily prompt, proof event IDs, and server-side merge/build/install/update blocking.
+- `/api/learning/idle-workbench/candidates/{id}/run` now gives the UI a real execution boundary: it blocks with proof when idle learning or Hermes Agent runtime prerequisites are missing, and when ready it may only create a report artifact for review. It cannot install, merge, upload, move, print, or silently mutate source/printers.
+- Learning renders the idle workbench queue with candidate creation, review request, keep/remove decisions, and disabled merge until approval plus gates exist.
+- Agents renders the same idle workbench queue summary so the agent surface and Learning surface agree.
+- `/api/learning/idle-workbench` now also exposes automation readiness for research, documentation, workflow, app update, and printer maintenance. The Learning UI shows queue-only vs execution-ready status and names live blockers instead of implying risky agents are active.
+- `/api/agents/{persona}/playwright-run` gives trusted Hermes Agents a real QA tool boundary for Playwright observe/smoke/full checks. The runner stores redacted output artifacts and proof events; it is not a free-form command executor.
+- Current live state is partially ready: `HERMES3D_LEARNING_RUNNER_ENABLED` and `HERMES3D_AGENT_RUNTIME_URL` are configured through `G:/private/.env`, research reports are ready, and documentation/workflow/app-update/printer-maintenance remain blocked by S1 policy plus the queued `Pilot Calibration Cube` job.
+- GUI API launchers now load `G:/private/.env` into backend API processes only. The current private env provides Azure/provider keys, proof signing, Hermes Agent runtime, and idle runner flags without exposing secrets to the Vite frontend.
+
+Implementation notes:
+- Add daily "what should we improve today?" prompt.
+- Add idle queue: research candidate, build branch, run gates, summarize proof, ask user keep/remove/merge.
+- Use lightweight APIs first; avoid heavy downloads or builds while printers are active.
+- Add persistent queue/candidate state with branch/ref, gate statuses, proof event IDs, and blocked reasons.
+- Reuse Approvals for keep/remove/merge or install/merge decisions.
+
+Acceptance:
+- Idle work never moves printers.
+- Idle work never merges or installs without proof and policy approval.
+- User gets a short daily queue with actionable choices.
+- With active printers/jobs, build/download/install candidate actions are blocked server-side.
+- Learning and Agents show the same queue state from the live API.
+- Until live blockers clear and the specific work kind has gates/approval, idle work types stay queue-only and do not mutate code, apps, or printers.
+- Candidate Run returns a report artifact plus proof event when runtime execution is available, or a visible blocked reason plus proof event when prerequisites are missing.
+
+### 4A. Hermes Agent Codebase Operator
+
+Goal: Hermes Agents can help code Hermes3D OS itself with full user/admin access, but only through a professional safety layer: snapshots, approvals, proof, gates, rollback, and explicit scopes. This closes the user's definition of "work": agents can use any offered tab/button/feature and can also improve the codebase when the operator allows it.
+
+Atomic Hermes research findings to extract:
+- File time-travel is the essential trust layer: record before/after snapshots for every file an agent touches, list versions by file, diff snapshot vs current, and restore with a fresh pre-restore snapshot.
+- Code actions need a bounded terminal, not a free shell. Dangerous commands, sensitive paths, force pushes, destructive git, and env/config writes must route to an approval queue.
+- Local and external providers should be interchangeable behind an OpenAI-compatible runtime contract; Hermes3D already has the local/private runtime URL path, so the next step is surfacing model/provider readiness and failover in Agents/Settings.
+- Computer-use/browser testing should stay as an explicit proof runner. Hermes3D already exposes fixed Playwright scopes; expand them into tab-specific QA actions instead of giving agents arbitrary browser control first.
+- Agent skills, memory, recurring jobs, and profile isolation map directly to Hermes3D idle learning, app updates, printer maintenance, and source-app setup queues.
+
+Implementation plan:
+1. Add a backend `code_history` service under `src/hermes3d/services/` that stores snapshots in `03_implementation/.hermes_history/` or `03_implementation/var/code-history/`, not in app source folders by default. Each record stores workspace root, relative path, sha256, size, timestamp, action id, agent id, and proof event id.
+2. Add API routes for code history: list touched files, list snapshots for a file, read snapshot metadata, diff current vs snapshot, restore snapshot, and export a proof bundle. Restore must snapshot current content first.
+3. Add a code action policy: allowed roots, denied globs (`.env`, secrets, `.git`, node_modules, build outputs, printer config unless explicitly scoped), max file size, text/binary handling, and required approvals for high-risk paths.
+4. Add safe read-only code tools to `/api/agents/action-catalog`: repo status, roadmap gaps, grep/search, file read, dependency/runtime status, test list, and tab-to-file ownership map.
+5. Add safe write tools after history exists: propose patch, apply patch to allowed files, format allowed files, run targeted test, run no-fake scan, run Playwright scope, append proof. No write action is accepted without pre-snapshot proof.
+6. Add command runner lanes with fixed allowlists: `npm run lint`, `npm run typecheck`, selected Playwright specs, `python -m py_compile`, no-fake scanner, source-runtime verifier scripts, and read-only git status/diff/log. No arbitrary command text in the first implementation.
+7. Add git lanes after tests pass: create branch with `codex/` or `hermes-agent/` prefix, stage only files from the agent's snapshot ledger, commit with proof IDs, push, and open PR. Force push, reset hard, clean, and cross-worktree edits remain blocked.
+8. Add UI surfaces: Agents tab "Code Operator" panel, Roadmap "Agent coding readiness" panel, Proof file-history browser, and left-rail chat quick actions ("inspect current tab", "fix this tab", "run proof", "restore file").
+9. Add idle automation integration: when user is away, agents may create candidates and branches, but merge/install/update stays approval-gated. All while-away work must summarize changed files, snapshots, tests, proof IDs, and rollback options.
+10. Add acceptance proof: route probes for every code API, unit tests for path traversal/denied globs/restore snapshots, Playwright proof that a file history row can be viewed/restored, no-fake scan, and Hermes lock/evidence chain proof.
+
+Definition of done:
+- Hermes Agents can read repo context, plan work, patch files, run fixed gates, and prepare PRs from Hermes3D OS without Codex acting as the hidden executor.
+- Every agent-touched file has at least one pre-change snapshot and one post-change proof event.
+- The user can diff and restore any agent-touched file from the UI.
+- The code operator refuses secrets, S1 unsafe printer actions, destructive git, arbitrary shell, and paths outside the allowed Hermes3D workspace.
+- Failed tests/gates stop the coding lane and expose restore/repair choices.
+
+#### Required Source Inputs And First Working Slice
+
+Active source inputs:
+- `G:/Github/hermes-agent-fresh` from `https://github.com/NousResearch/hermes-agent.git`: primary runtime, tools, skills, MCP/delegation/terminal/code loop.
+- `G:/Github/atomic-hermes` from `https://github.com/AtomicBot-ai/atomic-hermes.git`: source patterns for file history, approval UX, bridge, local runtime, and file diff/restore UI.
+
+Minimum ecosystem for agents to program Hermes3D without bloat:
+1. Import/launch true Hermes Agent runtime with `HERMES_HOME`, `TERMINAL_CWD`, and `HERMES_WRITE_SAFE_ROOT` scoped to Hermes3D worktrees.
+2. Enable only the needed programming toolsets first: file read/write, patch, terminal, code execution, todo, memory, skills, MCP, delegate.
+3. Configure two coding provider lanes from backend/private env: MiniMax and DeepSeek. They should be usable simultaneously by separate agent teams and swappable per task.
+4. Add the source-backed programming readiness API: `/api/code-operator/programming-readiness`.
+5. Add snapshot/diff/restore APIs before write tools: `/api/code-operator/history/*`.
+6. Add bounded repo tools: tree, grep, file view, roadmap gaps, tab ownership map, test list.
+7. Add patch/apply tools only after snapshots pass.
+8. Add fixed command runner gates: lint, typecheck, no-fake scan, source verifier scripts, selected Playwright scopes, Python compile/pytest.
+9. Add branch/commit/PR lane after gates pass, staging only files from the snapshot ledger.
+10. Add task assignment flow so a MiniMax-backed Hermes team and a DeepSeek-backed Hermes team can receive real Hermes3D issues, coordinate through proof, ask each other for review, and fix failures until pass.
+
+First backend slice now tracks this directly:
+- `src/hermes3d/services/code_history.py`
+- `src/hermes3d/api/routes/code_operator.py`
+- `GET /api/code-operator/programming-readiness`
+- `POST /api/code-operator/history/snapshots`
+- `POST /api/code-operator/history/list`
+- `GET /api/code-operator/history/diff/{snapshot_id}`
+- `POST /api/code-operator/history/restore`
+- agent action catalog entries for programming readiness and code snapshots.
+
+The Claude 20-agent completion contract is `03_implementation/docs/handoffs/CLAUDE_20_AGENT_COMPLETION_CONTRACT.md`. It lets Claude work on app completion while Codex keeps this Hermes Agent programming lane isolated.
+
+### 5. Voice + Observe: Operator Assist
+
+Goal: make voice/camera useful during prints, not just a settings page.
+
+Current status:
+- Voice has Azure TTS catalog/preview via backend.
+- Agent chat can speak assistant replies with the selected agent's Azure voice assignment via backend-only TTS and proof events.
+- Agent chat has browser mic dictation, voice-note attachments, and backend Azure STT transcription insertion.
+- Observe has live camera cards for all four configured printers, snapshot/capture APIs, persisted view controls, S1 defaults, refresh/reconnect proof, and plate state.
+- `/api/voice/stt` uses Azure fast transcription via backend-only runtime secrets, appends proof events without transcript text leakage, and returns a transcript or exact blocked reason. Live proof: TTS preview audio transcribed back as `Hermes 3D speech-proof.` with proof `5d9b8a25a1ac454f85ea46e5a59866f4`.
+
+Implementation notes:
+- Extend transcript review/history so operators can inspect voice-note transcript proof from Voice, Agents, and Artifacts without opening raw audio.
+- Let the chat mic attach commands, voice notes, and printer observations to agents.
+- Use Observe snapshots/feed metadata for plate-clear checks, anomaly notes, and print-complete reminders.
+- Add "send snapshot to agent" flow from Observe: capture evidence, attach artifact id, printer id, plate state, and card link to chat context.
+- Treat browser dictation as convenience only; Azure STT is the real backend transcription path.
+
+Acceptance:
+- No speech key appears in frontend bundles or logs.
+- Voice transcription returns a real transcript or an honest blocked reason.
+- Camera/plate alerts link to the exact printer card and proof event.
+- S1 camera assist remains read-only and never unlocks printer actions.
+- V400 camera stays blocked until a real camera URL is configured.
+
+## Source Research Notes
+
+- Moonraker exposes `/server/info`, printer object queries, file upload, webcam config, and update manager endpoints; Hermes3D should keep printer and update work server-side and show live status in the UI.
+- Moonraker webcam config supports stream URL, snapshot URL, flips, rotation values of 0/90/180/270, and aspect ratio, matching the Observe controls requested by the user.
+- GitHub's latest-release endpoint can be used without auth for public repos and includes release assets/digests where available, matching Hermes3D's app update checks.
+- PrusaSlicer has a real CLI through `prusa-slicer-console.exe` on Windows and loads/overrides profiles from 3MF/AMF/command arguments.
+- OpenSCAD supports CLI exports via `-o` and command parameters, useful for Design/3D Generation workers.
+- OrcaSlicer is open source, release-backed, and includes printer/material/process/calibration docs; Hermes3D should treat its CLI as detected/local-source capability and block if the local executable cannot prove a slice.
+
+## References
+
+- Moonraker Web API: https://moonraker.readthedocs.io/en/stable/web_api/
+- Moonraker update manager: https://moonraker.readthedocs.io/en/latest/external_api/update_manager/
+- Moonraker webcam config: https://moonraker.readthedocs.io/en/latest/configuration/#webcam
+- GitHub latest release REST API: https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#get-the-latest-release
+- PrusaSlicer CLI wiki: https://github.com/prusa3d/PrusaSlicer/wiki/Command-Line-Interface
+- OpenSCAD CLI manual: https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Using_OpenSCAD_in_a_command_line_environment
+- OrcaSlicer repo/wiki: https://github.com/OrcaSlicer/OrcaSlicer

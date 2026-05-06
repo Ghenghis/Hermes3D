@@ -62,6 +62,11 @@ Forbidden patterns (in any file under `src/` or `scripts/`):
 - Top-level `print(` calls in non-CLI library code
 - UI handlers that do nothing — including button `onClick`/`Command`
   bindings that resolve to no-op methods
+- Runtime UX that fabricates visible data: invented printer telemetry,
+  generated meshes, slicer output, proof bundles, notifications, agent
+  activity, source modules, setup state, or remote-host state. If the
+  live backend has no data, render empty/unavailable and identify the
+  missing setup.
 
 ---
 
@@ -85,6 +90,10 @@ Forbidden patterns (in any file under `src/` or `scripts/`):
 When mocks are used, at least one separate test must exercise the same
 flow through the real implementation. Mock-only coverage of a public
 behaviour is a contract violation.
+
+For the React GUI, production code may not import a mock-data module or
+ship visible fake/sample/simulated strings. Test fixtures must stay in
+test files and must not be reachable from the active app graph.
 
 **Flake policy:** A test that flakes is a bug. It is fixed at the root
 cause, never quarantined or skipped silently. A `@pytest.mark.skip` is
@@ -186,6 +195,8 @@ The author of a change asserts, in the PR description:
 - [ ] Smoke run from `run-dev.ps1` succeeds
 - [ ] Acceptance runner is still 48/48 (or has been updated honestly)
 - [ ] Security scans clean (or new findings explained)
+- [ ] GUI changes pass the active no-fake scan and a Playwright pass
+      against the local backend
 
 This document is the contract. If a step here cannot be met, the change
 is not done — it does not ship, it does not get described as working,

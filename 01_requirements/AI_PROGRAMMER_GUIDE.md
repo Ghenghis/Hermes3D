@@ -21,9 +21,21 @@ Every change you make must, at minimum:
    honesty ledger).
 5. Pass the honesty-diff: any new file's tier classification must
    match its actual state.
+6. For GUI work, pass the active no-fake scan and a Playwright run
+   against the local backend. Buttons either complete a real action or
+   are disabled with a specific missing setup/safety reason.
 
 If you can't satisfy any of these, don't merge. Open an issue
 documenting exactly what's missing and why.
+
+Hermes Agents working in this repository are user delegates. They may
+use Hermes3D-OS, the user's PC, web services/accounts, VPS/remote
+hosts, source checkouts, setup scripts, branches, commits, pushes, and
+pull requests when the user assigns that automation. They must use file
+locks, proof evidence, secret redaction, and the same printer safety
+gates as a human operator. If required data is missing, the correct
+behavior is to ask the user or block the action, never to fabricate a
+value.
 
 ---
 
