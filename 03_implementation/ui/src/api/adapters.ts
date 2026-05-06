@@ -47,6 +47,9 @@ import {
   getSystemSnapshotLive,
   getVoiceAgentsLive,
   getVoiceCatalogLive,
+  getVoiceTranscriptsLive,
+  getVoiceProofEventsLive,
+  getVoiceRecordingUrlLive,
   planPreviewLive,
   planModuleRuntimeSetupQueueLive,
   onboardPrinterLive,
@@ -96,7 +99,7 @@ import type { AppSettings } from "../types/settings";
 import type { SourceModuleRuntimeSetupQueue, SourceModuleUpdateReadiness, SourceOSModule } from "../types/source-os";
 import type { RuntimeReadiness, SystemSnapshot } from "../types/system";
 import type { ToolchainStatus } from "../types/toolchain";
-import type { VoiceAgent, VoiceCatalog, VoicePreviewResult } from "../types/voice";
+import type { VoiceAgent, VoiceCatalog, VoicePreviewResult, VoiceTranscript, VoiceProofEvent } from "../types/voice";
 import type { Workflow } from "../types/workflow";
 export type {
   AgentConfigPayload,
@@ -161,6 +164,9 @@ export interface AdapterAPI {
   getVoiceCatalog(locale?: string): Promise<VoiceCatalog>;
   saveVoiceAgent(id: string, voice: string): Promise<void>;
   previewVoice(id: string, voice: string, text?: string, rate?: number, pitchPct?: number): Promise<VoicePreviewResult>;
+  getVoiceTranscripts(limit?: number): Promise<VoiceTranscript[]>;
+  getVoiceProofEvents(limit?: number): Promise<VoiceProofEvent[]>;
+  getVoiceRecordingUrl(recordingId: string): string;
   getPlugins(): Promise<Plugin[]>;
   activatePlugin(id: string): Promise<Plugin>;
   getAgentHealth(): Promise<AgentHealthResult>;
@@ -237,6 +243,9 @@ export const adapters: AdapterAPI = {
   getVoiceCatalog: getVoiceCatalogLive,
   saveVoiceAgent: saveVoiceAgentLive,
   previewVoice: previewVoiceLive,
+  getVoiceTranscripts: getVoiceTranscriptsLive,
+  getVoiceProofEvents: getVoiceProofEventsLive,
+  getVoiceRecordingUrl: getVoiceRecordingUrlLive,
   getPlugins: getPluginsLive,
   activatePlugin: activatePluginLive,
   getAgentHealth: getAgentHealthLive,
