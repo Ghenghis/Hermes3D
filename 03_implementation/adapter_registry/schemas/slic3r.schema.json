@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/slic3r.schema.json",
+  "title": "Slic3r CLI adapter config",
+  "description": "Configuration for original Slic3r (the upstream of PrusaSlicer/SuperSlicer). Safe probe uses --help only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exe_path"],
+  "properties": {
+    "exe_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to slic3r-console.exe, slic3r.exe, or slic3r binary."
+    },
+    "version": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Detected version string from --help output, e.g. '1.3.0'."
+    },
+    "profile_dir": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Directory holding Slic3r printer/filament/print profiles."
+    },
+    "cli_supported": {
+      "type": "boolean",
+      "default": true,
+      "description": "True when Slic3r supports --help and --export-gcode CLI flags."
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/bambu_studio_slicer.schema.json",
+  "title": "Bambu Studio slicer adapter config",
+  "description": "Configuration for Bambu Studio desktop slicer. CLI slicing not available; detection is filesystem-only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["exe_path"],
+  "properties": {
+    "exe_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to bambu-studio.exe or equivalent launcher."
+    },
+    "version": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Version string if available from file metadata or installer records."
+    },
+    "cli_supported": {
+      "type": "boolean",
+      "default": false,
+      "description": "False — BambuStudio does not expose a stable headless CLI version command."
+    },
+    "metadata_only": {
+      "type": "boolean",
+      "default": true,
+      "description": "When true, verification uses filesystem metadata only (no launch)."
+    },
+    "launch_mode": {
+      "type": "string",
+      "enum": ["desktop_app"],
+      "default": "desktop_app",
+      "description": "Always 'desktop_app'; never launched headlessly by Hermes3D."
+    }
+  }
+}
