@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/freecad_bridge.schema.json",
+  "title": "freecad bridge config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "endpoint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional local or service endpoint URL."
+    },
+    "executable_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional absolute executable path."
+    },
+    "config_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional config or profile path."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "default": 5000
+    }
+  }
+}

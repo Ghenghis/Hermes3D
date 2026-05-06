@@ -1,0 +1,221 @@
+{
+  "apps_root": "G:/Github/apps",
+  "generated_at_utc": "2026-05-06T14:57:53.610145+00:00",
+  "policy": {
+    "physical_printer_writes": "only via guarded Moonraker endpoint and never S1",
+    "serial_printer_commands": "not_run"
+  },
+  "tools": {
+    "bambustudio_windows": {
+      "capabilities": [
+        "desktop_slicer_launcher",
+        "project_workspace"
+      ],
+      "detected": true,
+      "executed": false,
+      "output_head": [],
+      "path": "C:\\Program Files\\Bambu Studio\\bambu-studio.exe",
+      "return_code": null
+    },
+    "blender_cli": {
+      "capabilities": [
+        "headless_blender_cli",
+        "python_scene_worker",
+        "mesh_convert"
+      ],
+      "detected": true,
+      "executed": true,
+      "output_head": [
+        "Blender 5.1.1",
+        "\tbuild date: 2026-04-14",
+        "\tbuild time: 01:37:22",
+        "\tbuild commit date: 2026-04-13",
+        "\tbuild commit time: 14:35",
+        "\tbuild hash: b70da489d7f4",
+        "\tbuild branch: blender-v5.1-release",
+        "\tbuild platform: Windows",
+        "\tbuild type: Release",
+        "\tbuild c flags:  -Wall -Werror=implicit-function-declaration -Werror=return-type -Wno-tautological-compare -Wno-unknown-pragmas -Wno-char-subscripts -Wstrict-prototypes -Wmissing-prototypes -Wunused-parameter -Wundef -Wundef-prefix -Werror=...",
+        "\tbuild c++ flags:  -Wall -Wno-tautological-compare -Wno-unknown-pragmas -Wno-char-subscripts -Wno-overloaded-virtual -Wno-sign-compare -Wno-invalid-offsetof -Wno-suggest-override -Wundef -Wundef-prefix -Wunused-parameter -Wmismatched-tags -...",
+        "\tbuild link flags: /MACHINE:X64  /SUBSYSTEM:CONSOLE /STACK:2097152 /ignore:4049 /ignore:4217 /ignore:4221",
+        "\tbuild system: CMake"
+      ],
+      "path": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "return_code": 0
+    },
+    "curaengine_cli": {
+      "capabilities": [
+        "slice_to_gcode",
+        "profile_engine",
+        "mesh_to_gcode_cli"
+      ],
+      "detected": true,
+      "executed": true,
+      "output_head": [
+        "",
+        "Cura_SteamEngine version 5.12.1",
+        "",
+        "Copyright (C) 2024 Ultimaker",
+        "",
+        "This program is free software: you can redistribute it and/or modify",
+        "it under the terms of the GNU Affero General Public License as published by",
+        "the Free Software Foundation, either version 3 of the License, or",
+        "(at your option) any later version.",
+        "",
+        "This program is distributed in the hope that it will be useful,",
+        "but WITHOUT ANY WARRANTY; without even the implied warranty of",
+        "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the",
+        "GNU Affero General Public License for more details.",
+        "",
+        "You should have received a copy of the GNU Affero General Public License",
+        "along with this program.  If not, see <http://www.gnu.org/licenses/>.",
+        "",
+        "usage:",
+        "CuraEngine help",
+        "\tShow this help message",
+        "",
+        "CuraEngine connect <host>[:<port>] [-j <settings.def.json>]",
+        "  --connect <host>[:<port>]",
+        "\tConnect to <host> via a command socket, "
+      ],
+      "path": "C:\\Program Files\\UltiMaker Cura 5.12.1\\CuraEngine.exe",
+      "return_code": 0
+    },
+    "flsun_slicer_cli": {
+      "capabilities": [
+        "slice",
+        "scale",
+        "rotate",
+        "load_settings",
+        "load_filaments"
+      ],
+      "detected": true,
+      "executed": true,
+      "output_head": [
+        "[2026-05-06 07:57:54.339696] [0x00005dbc] [trace]   Initializing StaticPrintConfigs",
+        "FlsunSlicer-2.0.4.0:",
+        "Usage: flusn-slicer [ OPTIONS ] [ file.3mf/file.stl ... ]",
+        "",
+        "OPTIONS:",
+        " --allow-multicolor-oneplate",
+        "                     If enabled, the arrange will allow multiple color on one plate",
+        " --allow-newer-file option",
+        "                     Allow 3mf with newer version to be sliced",
+        " --allow-rotations   If enabled, the arrange will allow rotations when place object",
+        " --avoid-extrusion-cali-region",
+        "                     If enabled, the arrange will avoid extrusion calibrate region when place object",
+        " --clone-objects \"1,3,1,10\"",
+        "                     Clone objects in the load list",
+        " --datadir           Load and store settings at the given directory. This is useful for maintaining",
+        "                     different profiles or including configurations from a network storage.",
+        " --debug level       Sets debug logging level. 0:fatal, 1:error, 2:warning, 3:info, 4:debug, 5:trace",
+        " --downward-check    if enabled, check whether current machine downward compatible with the machines",
+        "                     in the list",
+        " --downward-settings \"machine1.json;machine2.json;...\"",
+        "                     the machine settings list need to do downward checking",
+        " --enable-timelapse  If enabled, this slicing will be considered using timelapse",
+        " --load-assemble-list assemble_list.json",
+        "                     Load assemble object list from config file",
+        " --load-custom-gcodes custom_gcode_toolchange.json"
+      ],
+      "path": "C:\\FlsunSlicer2.0\\FlsunSlicer.exe",
+      "return_code": 0
+    },
+    "openscad_cli": {
+      "capabilities": [
+        "scad_to_stl",
+        "scad_to_3mf",
+        "render_png"
+      ],
+      "detected": true,
+      "executed": true,
+      "output_head": [
+        "OpenSCAD version 2021.01"
+      ],
+      "path": "C:\\Program Files\\OpenSCAD\\openscad.exe",
+      "return_code": 0
+    },
+    "orcaslicer_cli": {
+      "capabilities": [
+        "slice_to_gcode",
+        "export_3mf",
+        "export_stl"
+      ],
+      "detected": true,
+      "executed": true,
+      "output_head": [],
+      "path": "C:\\Program Files\\OrcaSlicer\\orca-slicer.exe",
+      "return_code": 0
+    },
+    "pronsole_windows": {
+      "capabilities": [
+        "serial_console_app"
+      ],
+      "detected": true,
+      "executed": false,
+      "output_head": [],
+      "path": "G:\\Github\\apps\\Pronsole.exe",
+      "return_code": null
+    },
+    "pronterface_windows": {
+      "capabilities": [
+        "serial_gui_app"
+      ],
+      "detected": true,
+      "executed": false,
+      "output_head": [],
+      "path": "G:\\Github\\apps\\Pronterface.exe",
+      "return_code": null
+    },
+    "prusaslicer_cli": {
+      "capabilities": [
+        "slice_to_gcode",
+        "export_3mf",
+        "export_stl",
+        "info"
+      ],
+      "detected": true,
+      "executed": true,
+      "output_head": [
+        "PrusaSlicer-2.9.5-beta2 based on Slic3r (with GUI support)",
+        "https://github.com/prusa3d/PrusaSlicer",
+        "",
+        "Usage: prusa-slicer [ INPUT ] [ OPTIONS ] [ ACTIONS ] [ TRANSFORM ] [ file.stl ... ]",
+        "",
+        "Input:",
+        " --load ABCD         Load configuration from the specified file. It can be used more than once to",
+        "                     load options from multiple files.",
+        " --material-profile ABCD",
+        "                     Name(s) of the material preset(s) used for slicing. Could be filaments or",
+        "                     sla_material preset name(s) depending on printer tochnology",
+        " --print-profile ABCD",
+        "                     Name of the print preset used for slicing.",
+        " --printer-profile ABCD",
+        "                     Name of the printer preset used for slicing.",
+        "",
+        "Note: To load configuration from profiles, you need to set whole banch of presets",
+        "",
+        "Actions:",
+        " --export-3mf        Export the model(s) as 3MF.",
+        " --export-gcode, --gcode, -g",
+        "                     Slice the model and export toolpaths as G-code.",
+        " --export-obj        Export the model(s) as OBJ.",
+        " --export-sla, --sla Slice the model and export SLA printing layers as PNG.",
+        " --export-stl        Export the model(s) as STL."
+      ],
+      "path": "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe",
+      "return_code": 0
+    },
+    "ultimaker_cura_windows": {
+      "capabilities": [
+        "desktop_slicer_launcher",
+        "profile_workspace"
+      ],
+      "detected": true,
+      "executed": false,
+      "output_head": [],
+      "path": "C:\\Program Files\\UltiMaker Cura 5.12.1\\UltiMaker-Cura.exe",
+      "return_code": null
+    }
+  }
+}
