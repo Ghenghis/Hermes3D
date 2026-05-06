@@ -35,6 +35,10 @@ IDLE_PRINT_STATES = {"standby", "complete", "ready"}
 REMOTE_SUBDIR_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 ONBOARD_ID_RE = re.compile(r"^[A-Za-z0-9._-]{2,64}$")
 
+# S1 is camera/read-only ONLY — it must never be added as a printable target.
+# Any attempt to add a printer whose IP is in this set returns 403.
+CAMERA_ONLY_IPS: frozenset[str] = frozenset({"192.168.0.12"})
+
 
 class UrlUpdate(BaseModel):
     url: str
@@ -63,6 +67,14 @@ class PrinterOnboardRequest(BaseModel):
     write_enabled: bool = False
 
 
+class PrinterProbeRequest(BaseModel):
+    ip: str
+
+
+class CameraValidateRequest(BaseModel):
+    camera_url: str
+
+
 def _printer(printer_id: str) -> dict[str, Any]:
     printer = local_printer(printer_id)
     if not printer:
@@ -73,6 +85,146 @@ def _printer(printer_id: str) -> dict[str, Any]:
 @router.get("/api/printers")
 def list_printers() -> list[dict[str, Any]]:
     return local_printers()
+
+
+@router.get("/api/printers/probe")
+def probe_printer_by_ip(ip: str) -> dict[str, Any]:
+    """Read-only Moonraker probe for the onboarding wizard.
+
+    Returns Moonraker server info (version, firmware, bed size) for the given
+    IP.  NEVER sends GCode or any printer command — only GET /server/info and
+    GET /printer/objects/query (read-only).  S1 (CAMERA_ONLY_IPS) is blocked.
+    """
+    try:
+        address = ipaddress.ip_address(ip.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="ip must be a valid IP address.") from exc
+
+    if str(address) in CAMERA_ONLY_IPS or is_s1_target(str(address)):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "CAMERA_ONLY_IP",
+                "ip": str(address),
+                "reason": "This IP is camera-only and cannot be added as a print target.",
+            },
+        )
+
+    if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
+        raise HTTPException(status_code=400, detail="IP address is not allowed.")
+
+    moonraker_url = f"http://{address}:7125"
+    client = MoonrakerClient(moonraker_url, timeout_s=4.0)
+
+    # Read-only: GET /server/info only — no GCode, no commands.
+    try:
+        info = client.server_info()
+    except (MoonrakerError, OSError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "error": "MOONRAKER_PROBE_FAILED",
+                "ip": str(address),
+                "moonraker_url": moonraker_url,
+                "reason": str(exc),
+            },
+        ) from exc
+
+    # Optionally read printer objects (read-only).
+    bed_info: dict[str, Any] = {}
+    try:
+        state = client.printer_state(("configfile", "toolhead"))
+        bed_info = {
+            "print_state": state.state,
+            "filename": state.filename or None,
+            "progress": state.progress,
+        }
+    except (MoonrakerError, OSError, ValueError):
+        pass  # optional — don't fail the probe if objects query fails
+
+    # Look up static fleet profile for bed size (read-only, no network call).
+    profile_info: dict[str, Any] = {}
+    try:
+        profile = get_profile(f"moonraker_{str(address).replace('.', '_')}")
+        profile_info = {
+            "bed_kind": profile.bed.kind,
+            "bed_diameter_mm": getattr(profile.bed, "diameter_mm", None),
+            "bed_x_mm": getattr(profile.bed, "x_mm", None),
+            "bed_y_mm": getattr(profile.bed, "y_mm", None),
+            "z_height_mm": profile.z_height_mm,
+        }
+    except KeyError:
+        pass  # unknown profile — not an error
+
+    return {
+        "ok": True,
+        "ip": str(address),
+        "moonraker_url": moonraker_url,
+        "klippy_connected": info.klippy_connected,
+        "klippy_state": info.klippy_state,
+        "moonraker_version": info.moonraker_version,
+        "api_version": info.api_version,
+        **bed_info,
+        **profile_info,
+    }
+
+
+@router.post("/api/printers/validate-camera")
+def validate_camera_url(body: CameraValidateRequest) -> dict[str, Any]:
+    """Read-only camera URL validation.
+
+    Sends a HEAD request to the camera URL and checks that the Content-Type
+    looks like an MJPEG stream.  Never sends print commands or writes.
+    """
+    raw_url = body.camera_url.strip()
+    if not raw_url:
+        raise HTTPException(status_code=400, detail="camera_url is required.")
+
+    parsed = urlparse(raw_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise HTTPException(status_code=400, detail="Camera URL must be http(s) with a host.")
+    if parsed.username or parsed.password:
+        raise HTTPException(status_code=400, detail="Camera URL must not include credentials.")
+
+    try:
+        address = ipaddress.ip_address(parsed.hostname)
+        if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
+            raise HTTPException(status_code=400, detail="Camera URL host is not allowed.")
+    except ValueError:
+        pass  # hostname — allowed for camera URLs
+
+    # Read-only HEAD request only — no GET body, no commands.
+    try:
+        request = urllib.request.Request(raw_url, method="HEAD", headers={"Accept": "*/*"})
+        with urllib.request.urlopen(request, timeout=3.0) as response:
+            content_type: str = response.headers.get("Content-Type", "")
+            http_status = int(response.status)
+    except urllib.error.HTTPError as exc:
+        return {
+            "ok": False,
+            "camera_url": raw_url,
+            "http_status": int(exc.code),
+            "content_type": None,
+            "reason": f"Camera returned HTTP {exc.code}.",
+        }
+    except OSError as exc:
+        return {
+            "ok": False,
+            "camera_url": raw_url,
+            "http_status": None,
+            "content_type": None,
+            "reason": str(exc),
+        }
+
+    is_mjpeg = "multipart/x-mixed-replace" in content_type or "image/jpeg" in content_type
+    return {
+        "ok": is_mjpeg or (200 <= http_status < 400),
+        "camera_url": raw_url,
+        "http_status": http_status,
+        "content_type": content_type or None,
+        "is_mjpeg": is_mjpeg,
+        "reason": None if (is_mjpeg or (200 <= http_status < 400)) else f"Unexpected content-type: {content_type!r}",
+    }
 
 
 @router.post("/api/printers/onboard", status_code=201)
@@ -360,14 +512,14 @@ def _validate_onboard_moonraker_url(raw_url: str) -> tuple[str, str]:
         address = ipaddress.ip_address(host)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail="Moonraker URL host must be a printer IP address.") from exc
-    if str(address) == "192.168.0.12" or is_s1_target(str(address)):
+    if str(address) in CAMERA_ONLY_IPS or is_s1_target(str(address)):
         raise HTTPException(
-            status_code=423,
+            status_code=403,
             detail={
-                "error": "S1_POLICY_LOCKED",
+                "error": "CAMERA_ONLY_IP",
                 "printer_id": "flsun_s1",
                 "ip": str(address),
-                "reason": "FLSUN S1 remains offline/locked/no-test by operator policy; onboarding cannot convert it into a write-enabled printer.",
+                "reason": "This IP is camera-only and cannot be added as a print target.",
             },
         )
     if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:

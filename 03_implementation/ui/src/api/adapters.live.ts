@@ -1087,6 +1087,104 @@ export function emitProofEventLive(type: string, payload: Record<string, unknown
   return postVoid("/api/proof/events", { type, payload });
 }
 
+export interface PrinterProbeResult {
+  ok: boolean;
+  ip: string;
+  moonraker_url: string;
+  klippy_connected: boolean;
+  klippy_state: string;
+  moonraker_version: string | null;
+  api_version: string[] | null;
+  print_state?: string;
+  filename?: string | null;
+  progress?: number;
+  bed_kind?: string;
+  bed_diameter_mm?: number | null;
+  bed_x_mm?: number | null;
+  bed_y_mm?: number | null;
+  z_height_mm?: number;
+  error?: string;
+  reason?: string;
+}
+
+export interface CameraValidateResult {
+  ok: boolean;
+  camera_url: string;
+  http_status: number | null;
+  content_type: string | null;
+  is_mjpeg?: boolean;
+  reason?: string | null;
+}
+
+/** Read-only probe of a Moonraker printer by IP — GET /server/info only, never sends GCode. */
+export async function probePrinterLive(ip: string): Promise<PrinterProbeResult> {
+  try {
+    const response = await fetch(`${LIVE_BASE_URL}/api/printers/probe?ip=${encodeURIComponent(ip)}`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = isRecord(payload) ? payload.detail : null;
+      const reason = isRecord(detail) && isString(detail.reason)
+        ? detail.reason
+        : isRecord(payload) && isString(payload.detail)
+          ? payload.detail
+          : `Probe failed with HTTP ${response.status}.`;
+      return { ok: false, ip, moonraker_url: `http://${ip}:7125`, klippy_connected: false, klippy_state: "unknown", moonraker_version: null, api_version: null, error: `HTTP ${response.status}`, reason };
+    }
+    if (!isRecord(payload)) {
+      return { ok: false, ip, moonraker_url: `http://${ip}:7125`, klippy_connected: false, klippy_state: "unknown", moonraker_version: null, api_version: null, reason: "Invalid probe response." };
+    }
+    return {
+      ok: payload.ok === true,
+      ip: isString(payload.ip) ? payload.ip : ip,
+      moonraker_url: isString(payload.moonraker_url) ? payload.moonraker_url : `http://${ip}:7125`,
+      klippy_connected: payload.klippy_connected === true,
+      klippy_state: isString(payload.klippy_state) ? payload.klippy_state : "unknown",
+      moonraker_version: isNullableString(payload.moonraker_version) ? payload.moonraker_version : null,
+      api_version: Array.isArray(payload.api_version) ? payload.api_version as string[] : null,
+      print_state: isString(payload.print_state) ? payload.print_state : undefined,
+      filename: isNullableString(payload.filename) ? payload.filename : undefined,
+      progress: isNumber(payload.progress) ? payload.progress : undefined,
+      bed_kind: isString(payload.bed_kind) ? payload.bed_kind : undefined,
+      bed_diameter_mm: isNullableNumber(payload.bed_diameter_mm) ? payload.bed_diameter_mm : undefined,
+      bed_x_mm: isNullableNumber(payload.bed_x_mm) ? payload.bed_x_mm : undefined,
+      bed_y_mm: isNullableNumber(payload.bed_y_mm) ? payload.bed_y_mm : undefined,
+      z_height_mm: isNumber(payload.z_height_mm) ? payload.z_height_mm : undefined,
+    };
+  } catch (error) {
+    return { ok: false, ip, moonraker_url: `http://${ip}:7125`, klippy_connected: false, klippy_state: "unknown", moonraker_version: null, api_version: null, reason: errorMessage(error) };
+  }
+}
+
+/** Read-only camera URL validation — HEAD request only, never sends print commands. */
+export async function validateCameraUrlLive(cameraUrl: string): Promise<CameraValidateResult> {
+  try {
+    const response = await fetch(`${LIVE_BASE_URL}/api/printers/validate-camera`, {
+      method: "POST",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({ camera_url: cameraUrl }),
+      cache: "no-store",
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok || !isRecord(payload)) {
+      return { ok: false, camera_url: cameraUrl, http_status: null, content_type: null, reason: `Camera validation failed with HTTP ${response.status}.` };
+    }
+    return {
+      ok: payload.ok === true,
+      camera_url: isString(payload.camera_url) ? payload.camera_url : cameraUrl,
+      http_status: isNullableNumber(payload.http_status) ? payload.http_status : null,
+      content_type: isNullableString(payload.content_type) ? payload.content_type : null,
+      is_mjpeg: payload.is_mjpeg === true,
+      reason: isNullableString(payload.reason) ? payload.reason : null,
+    };
+  } catch (error) {
+    return { ok: false, camera_url: cameraUrl, http_status: null, content_type: null, reason: errorMessage(error) };
+  }
+}
+
 export function getCameraObserverStatusLive(): Promise<{ status: string; reason: string }> {
   return fetchJson<{ state?: string; status?: string; reason?: string | null }>("/api/plugins/camera-observer/status").then((status) => {
     if (!status) {
