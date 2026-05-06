@@ -40,6 +40,57 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "verify": {
+      "type": "object",
+      "description": "Real probe metadata consumed by scripts/verify_modelers.py. No fake or simulated checks.",
+      "additionalProperties": false,
+      "required": ["modeler_id", "kind", "version_probe", "install_check", "runtime_check"],
+      "properties": {
+        "modeler_id": {"type": "string", "const": "openscad"},
+        "kind": {"type": "string", "enum": ["cli"], "default": "cli"},
+        "version_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "args"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["cli_args"]},
+            "args": {"type": "array", "items": {"type": "string"}, "default": ["--version"]},
+            "executable_candidates": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": [
+                "C:/Program Files/OpenSCAD/openscad.exe",
+                "C:/Program Files/OpenSCAD (Nightly)/openscad.exe",
+                "openscad"
+              ]
+            },
+            "version_regex": {"type": "string", "default": "OpenSCAD\\s+version\\s+([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 10}
+          }
+        },
+        "install_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executable_must_exist": {"type": "boolean", "default": true},
+            "required_capabilities": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["scad_to_stl", "scad_to_3mf"]
+            }
+          }
+        },
+        "runtime_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "help_args": {"type": "array", "items": {"type": "string"}, "default": ["--help"]},
+            "expected_help_substring": {"type": "string", "default": "Usage"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 10}
+          }
+        }
+      }
     }
   }
 }

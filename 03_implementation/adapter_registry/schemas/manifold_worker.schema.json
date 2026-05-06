@@ -40,6 +40,50 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "verify": {
+      "type": "object",
+      "description": "Real probe metadata consumed by scripts/verify_modelers.py. No fake or simulated checks.",
+      "additionalProperties": false,
+      "required": ["modeler_id", "kind", "version_probe", "install_check", "runtime_check"],
+      "properties": {
+        "modeler_id": {"type": "string", "const": "manifold"},
+        "kind": {"type": "string", "enum": ["python_import"], "default": "python_import"},
+        "version_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "import_module"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["python_import"]},
+            "import_module": {"type": "string", "default": "manifold3d"},
+            "version_attr": {"type": "string", "default": "__version__"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 10}
+          }
+        },
+        "install_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "import_must_succeed": {"type": "boolean", "default": true},
+            "required_capabilities": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["manifold_mesh_library", "boolean_geometry"]
+            }
+          }
+        },
+        "runtime_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "smoke_expression": {
+              "type": "string",
+              "default": "import manifold3d; manifold3d.Manifold.cube([1,1,1])"
+            },
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 15}
+          }
+        }
+      }
     }
   }
 }

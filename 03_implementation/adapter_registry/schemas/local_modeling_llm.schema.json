@@ -18,7 +18,7 @@
         "null"
       ],
       "default": null,
-      "description": "Optional local or service endpoint URL."
+      "description": "Optional local or service endpoint URL (e.g. http://127.0.0.1:11434 for Ollama)."
     },
     "executable_path": {
       "type": [
@@ -40,6 +40,60 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "verify": {
+      "type": "object",
+      "description": "Real probe metadata consumed by scripts/verify_modelers.py. No fake or simulated checks. Free/local-only — no paid services.",
+      "additionalProperties": false,
+      "required": ["modeler_id", "kind", "version_probe", "install_check", "runtime_check"],
+      "properties": {
+        "modeler_id": {"type": "string", "const": "local_modeling_llm"},
+        "kind": {"type": "string", "enum": ["cli", "python_import"], "default": "cli"},
+        "version_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["cli_args", "python_import"]},
+            "args": {"type": "array", "items": {"type": "string"}, "default": ["--version"]},
+            "executable_candidates": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": [
+                "C:/Users/Admin/AppData/Local/Programs/Ollama/ollama.exe",
+                "ollama",
+                "llama-cli",
+                "llama"
+              ]
+            },
+            "import_module": {"type": "string", "default": "ollama"},
+            "version_attr": {"type": "string", "default": "__version__"},
+            "version_regex": {"type": "string", "default": "ollama\\s+version\\s+is\\s+([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 10}
+          }
+        },
+        "install_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executable_or_import_required": {"type": "boolean", "default": true},
+            "required_capabilities": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["local_llm", "modeling_prompt_engine"]
+            }
+          }
+        },
+        "runtime_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "help_args": {"type": "array", "items": {"type": "string"}, "default": ["help"]},
+            "expected_help_substring": {"type": "string", "default": "Usage"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 15}
+          }
+        }
+      }
     }
   }
 }
