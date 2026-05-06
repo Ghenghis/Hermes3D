@@ -5,6 +5,26 @@ export type AnomalyStatus = "active" | "dismissed" | "resolved";
 export type AgentWatchMode = "off" | "monitor_agent" | AgentPersonaId;
 export type GridLayout = "1x1" | "2x2" | "3x3";
 
+/** Per-camera status returned by GET /api/observe/status */
+export interface CameraStatus {
+  printer_id: string;
+  printer_name: string;
+  camera_url: string | null;
+  health: CameraHealth;
+  http_status: number | null;
+  response_ms: number | null;
+  /** Estimated frames-per-second derived from MJPEG response time. null when offline. */
+  estimated_fps: number | null;
+  /** True for S1 (192.168.0.12): camera feed is read-only, no control commands allowed. */
+  read_only: boolean;
+}
+
+export interface ObserveStatusResponse {
+  cameras: CameraStatus[];
+  online: number;
+  total: number;
+}
+
 export interface CameraFeed {
   printer_id: string;
   printer_name: string;

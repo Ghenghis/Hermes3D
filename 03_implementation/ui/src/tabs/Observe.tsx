@@ -1,4 +1,5 @@
 import {
+  Activity,
   Camera,
   FlipHorizontal,
   FlipVertical,
@@ -9,7 +10,10 @@ import {
   RotateCcw,
   RotateCw,
   SlidersHorizontal,
+  Timer,
   VideoOff,
+  Wifi,
+  WifiOff,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -17,6 +21,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type Dispatch,
@@ -25,7 +30,21 @@ import {
 } from "react";
 import { adapters } from "../api/adapters";
 import { useStore } from "../app/store";
-import type { BuildPlateClearance, CameraFeed, CameraHealth, CameraViewSettings } from "../types/observe";
+import type {
+  BuildPlateClearance,
+  CameraFeed,
+  CameraHealth,
+  CameraStatus,
+  CameraViewSettings,
+  ObserveStatusResponse,
+} from "../types/observe";
+
+/** Configurable auto-refresh interval for camera status polling (ms). */
+const AUTO_REFRESH_INTERVAL_MS = 5_000;
+
+/** Exponential backoff for feed reconnect attempts. */
+const BACKOFF_BASE_MS = 1_000;
+const BACKOFF_MAX_MS = 30_000;
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -60,7 +79,10 @@ export function ObserveTab() {
     reason: "Checking Camera Observer status.",
   });
   const [cameras, setCameras] = useState<CameraFeed[]>([]);
-  const [feedState, setFeedState] = useState<Record<string, "loading" | "online" | "error">>({});
+  const [feedState, setFeedState] = useState<Record<string, "loading" | "online" | "error" | "reconnecting">>({});
+  /** Per-camera retry attempt count for exponential backoff. */
+  const retryCountRef = useRef<Record<string, number>>({});
+  const retryTimerRef = useRef<Record<string, ReturnType<typeof window.setTimeout>>>({});
   const [cameraMessage, setCameraMessage] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshNonce, setRefreshNonce] = useState(0);
@@ -68,6 +90,10 @@ export function ObserveTab() {
   const [controlsOpen, setControlsOpen] = useState<Record<string, boolean>>({});
   const [visibleCameraIds, setVisibleCameraIds] = useState<Record<string, boolean>>({});
   const [viewMode, setViewMode] = useState<"all" | "selected" | "one" | "two" | "three">("all");
+  /** Live status from /api/observe/status — fps estimates + online/offline per camera. */
+  const [cameraStatus, setCameraStatus] = useState<Record<string, CameraStatus>>({});
+  /** Auto-refresh interval in ms; user can adjust via UI. */
+  const [autoRefreshMs, setAutoRefreshMs] = useState(AUTO_REFRESH_INTERVAL_MS);
 
   const loadCameras = useCallback(async () => {
     let rows: CameraFeed[] = [];
@@ -90,12 +116,57 @@ export function ObserveTab() {
     return rows;
   }, []);
 
+  /** Fetch /api/observe/status and update cameraStatus map. */
+  const loadStatus = useCallback(async () => {
+    try {
+      const data = await fetchObserveStatus();
+      setCameraStatus(
+        Object.fromEntries(data.cameras.map((s) => [s.printer_id, s])),
+      );
+    } catch {
+      // Status is best-effort; don't surface errors here
+    }
+  }, []);
+
+  /**
+   * Handle a feed error for a specific camera with exponential backoff.
+   * Transitions: error → reconnecting → (retry) → loading → online | error.
+   * Never sends control commands — only updates UI state and resets refreshNonce.
+   */
+  const handleFeedError = useCallback((printerId: string) => {
+    setFeedState((current) => ({ ...current, [printerId]: "reconnecting" }));
+    const attempt = (retryCountRef.current[printerId] ?? 0) + 1;
+    retryCountRef.current[printerId] = attempt;
+    const delay = Math.min(BACKOFF_BASE_MS * Math.pow(2, attempt - 1), BACKOFF_MAX_MS);
+    // Clear any pending retry for this camera
+    const pending = retryTimerRef.current[printerId];
+    if (pending !== undefined) {
+      window.clearTimeout(pending);
+    }
+    retryTimerRef.current[printerId] = window.setTimeout(() => {
+      setFeedState((current) => ({ ...current, [printerId]: "loading" }));
+      setRefreshNonce((n) => n + 1);
+    }, delay);
+  }, []);
+
+  /** Reset retry counter when a feed comes online. */
+  const handleFeedOnline = useCallback((printerId: string) => {
+    retryCountRef.current[printerId] = 0;
+    const pending = retryTimerRef.current[printerId];
+    if (pending !== undefined) {
+      window.clearTimeout(pending);
+      delete retryTimerRef.current[printerId];
+    }
+    setFeedState((current) => ({ ...current, [printerId]: "online" }));
+  }, []);
+
   const handleRefresh = useCallback(async () => {
     const startedAt = window.performance.now();
     setIsRefreshing(true);
     setCameraMessage("Refreshing configured live camera feeds.");
     try {
       const rows = await loadCameras();
+      await loadStatus();
       const elapsed = window.performance.now() - startedAt;
       if (elapsed < 650) {
         await new Promise((resolve) => window.setTimeout(resolve, 650 - elapsed));
@@ -109,7 +180,7 @@ export function ObserveTab() {
     } finally {
       setIsRefreshing(false);
     }
-  }, [loadCameras]);
+  }, [loadCameras, loadStatus]);
 
   useEffect(() => {
     let mounted = true;
@@ -122,6 +193,8 @@ export function ObserveTab() {
         const rows = await loadCameras();
         if (mounted) {
           setCameras(rows);
+          // Initial status fetch for fps/online indicators
+          void loadStatus();
         }
       }
       await adapters.emitProofEvent(
@@ -132,7 +205,29 @@ export function ObserveTab() {
     return () => {
       mounted = false;
     };
-  }, [loadCameras]);
+  }, [loadCameras, loadStatus]);
+
+  /** Auto-refresh: poll /api/observe/status on configurable interval. */
+  useEffect(() => {
+    if (autoRefreshMs <= 0) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      void loadStatus();
+    }, autoRefreshMs);
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [loadStatus, autoRefreshMs]);
+
+  /** Cleanup retry timers on unmount. */
+  useEffect(() => {
+    return () => {
+      for (const timer of Object.values(retryTimerRef.current)) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, []);
 
   const undockedCamera = useMemo(
     () => cameras.find((camera) => camera.printer_id === undockedCameraId) ?? null,
@@ -158,26 +253,52 @@ export function ObserveTab() {
     );
   }
 
+  const onlineCount = Object.values(cameraStatus).filter((s) => s.health === "reachable").length;
+  const totalStatusCount = Object.keys(cameraStatus).length;
+
   return (
     <div data-testid="observe-root" className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2.5 rounded-card border border-border bg-surface p-3 text-fg">
-      <header className="flex items-center justify-between gap-3">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[13px] font-semibold">Camera Observer</h2>
           <p className="truncate text-[11px] text-muted">{pluginStatus.reason}</p>
         </div>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            void handleRefresh();
-          }}
-          disabled={isRefreshing}
-          className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-fg hover:border-accent-blue disabled:cursor-wait disabled:opacity-70"
-        >
-          <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
-          {isRefreshing ? "Refreshing" : "Refresh"}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {totalStatusCount > 0 && (
+            <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold ${onlineCount === totalStatusCount ? "bg-green-900/40 text-green-300" : "bg-amber-900/40 text-amber-300"}`}>
+              {onlineCount === totalStatusCount ? <Wifi size={11} /> : <WifiOff size={11} />}
+              {onlineCount}/{totalStatusCount} online
+            </span>
+          )}
+          <div className="flex items-center gap-1 text-[11px] text-muted">
+            <Timer size={11} />
+            <select
+              value={autoRefreshMs}
+              onChange={(e) => setAutoRefreshMs(Number(e.currentTarget.value))}
+              className="rounded border border-border bg-bg px-1 py-0.5 text-[10px] text-fg"
+              title="Auto-refresh interval for camera status"
+            >
+              <option value={0}>off</option>
+              <option value={3000}>3 s</option>
+              <option value={5000}>5 s</option>
+              <option value={10000}>10 s</option>
+              <option value={30000}>30 s</option>
+            </select>
+          </div>
+          <button
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              void handleRefresh();
+            }}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-fg hover:border-accent-blue disabled:cursor-wait disabled:opacity-70"
+          >
+            <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
+            {isRefreshing ? "Refreshing" : "Refresh all"}
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded border border-border bg-bg/30 p-1.5 text-[11px]">
@@ -215,11 +336,13 @@ export function ObserveTab() {
             key={camera.printer_id}
             camera={camera}
             feedState={feedState[camera.printer_id] ?? "loading"}
+            cameraStatus={cameraStatus[camera.printer_id] ?? null}
             refreshNonce={refreshNonce}
             controlsOpen={controlsOpen[camera.printer_id] === true}
             onToggleControls={() => setControlsOpen((current) => ({ ...current, [camera.printer_id]: current[camera.printer_id] !== true }))}
             onViewChange={(updates) => void updateCameraView(camera.printer_id, updates, setCameras, setCameraMessage)}
-            onFeedState={(next) => setFeedState((current) => ({ ...current, [camera.printer_id]: next }))}
+            onFeedOnline={() => handleFeedOnline(camera.printer_id)}
+            onFeedError={() => handleFeedError(camera.printer_id)}
             onProbe={(printerId) => void probeCamera(printerId, setCameraMessage)}
             onClearPlate={(printerId) => void markPlateClear(printerId, setCameras, setCameraMessage)}
             onUndock={(printerId) => setUndockedCameraId(printerId)}
@@ -245,6 +368,7 @@ export function ObserveTab() {
             <CameraCard
               camera={undockedCamera}
               feedState={feedState[undockedCamera.printer_id] ?? "loading"}
+              cameraStatus={cameraStatus[undockedCamera.printer_id] ?? null}
               refreshNonce={refreshNonce}
               controlsOpen={controlsOpen[undockedCamera.printer_id] !== false}
               undocked
@@ -253,7 +377,8 @@ export function ObserveTab() {
                 [undockedCamera.printer_id]: current[undockedCamera.printer_id] === false,
               }))}
               onViewChange={(updates) => void updateCameraView(undockedCamera.printer_id, updates, setCameras, setCameraMessage)}
-              onFeedState={(next) => setFeedState((current) => ({ ...current, [undockedCamera.printer_id]: next }))}
+              onFeedOnline={() => handleFeedOnline(undockedCamera.printer_id)}
+              onFeedError={() => handleFeedError(undockedCamera.printer_id)}
               onProbe={(printerId) => void probeCamera(printerId, setCameraMessage)}
               onClearPlate={(printerId) => void markPlateClear(printerId, setCameras, setCameraMessage)}
               onUndock={() => setUndockedCameraId(null)}
@@ -268,24 +393,28 @@ export function ObserveTab() {
 function CameraCard({
   camera,
   feedState,
+  cameraStatus,
   refreshNonce,
   controlsOpen,
   undocked = false,
   onToggleControls,
   onViewChange,
-  onFeedState,
+  onFeedOnline,
+  onFeedError,
   onProbe,
   onClearPlate,
   onUndock,
 }: {
   camera: CameraFeed;
-  feedState: "loading" | "online" | "error";
+  feedState: "loading" | "online" | "error" | "reconnecting";
+  cameraStatus: CameraStatus | null;
   refreshNonce: number;
   controlsOpen: boolean;
   undocked?: boolean;
   onToggleControls: () => void;
   onViewChange: (updates: Partial<CameraViewSettings>) => void;
-  onFeedState: (state: "online" | "error") => void;
+  onFeedOnline: () => void;
+  onFeedError: () => void;
   onProbe: (printerId: string) => void;
   onClearPlate: (printerId: string) => void;
   onUndock: (printerId: string) => void;
@@ -301,6 +430,11 @@ function CameraCard({
   const cardSizeClass = undocked ? "h-full" : cardSizeClassName(settings.card_size);
   const cardMinClass = undocked ? "min-h-0" : cardMinHeightClass(settings.card_size);
   const resizeStyle: CSSProperties = undocked ? {} : { resize: "both" };
+
+  // V400 fps indicator — show estimated fps from status probe
+  const estimatedFps = cameraStatus?.estimated_fps ?? null;
+  const isV400 = camera.camera_kind === "usb_webcam";
+
   return (
     <section
       className={`grid ${cardMinClass} min-w-[16rem] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-card border border-border bg-bg/45 ${cardSizeClass}`}
@@ -316,6 +450,23 @@ function CameraCard({
           <div className="mt-0.5 truncate font-mono text-[10px] text-muted">{camera.camera_url ?? camera.camera_note}</div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          {/* V400 online/offline status chip */}
+          {isV400 && cameraStatus && (
+            <span
+              className={`inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-semibold ${cameraStatus.health === "reachable" ? "bg-green-900/40 text-green-300" : "bg-surface2 text-muted"}`}
+              title={`V400 webcam: ${cameraStatus.health}`}
+            >
+              {cameraStatus.health === "reachable" ? <Wifi size={9} /> : <WifiOff size={9} />}
+              {cameraStatus.health === "reachable" ? "V400 LIVE" : "V400 OFFLINE"}
+            </span>
+          )}
+          {/* fps indicator for V400 */}
+          {isV400 && estimatedFps !== null && (
+            <span className="inline-flex items-center gap-0.5 rounded bg-surface2/80 px-1.5 py-0.5 text-[9px] font-mono text-muted" title="Estimated frame rate">
+              <Activity size={9} />
+              {estimatedFps} fps
+            </span>
+          )}
           <span className={statusClass(camera, feedState)}>{status}</span>
           <button type="button" onClick={onToggleControls} className="rounded border border-border p-1 text-muted hover:text-fg" title="Camera display controls">
             <SlidersHorizontal size={13} />
@@ -340,12 +491,15 @@ function CameraCard({
                 alt={`${camera.printer_name} live camera feed`}
                 className="h-full w-full"
                 style={cameraImageStyle(settings)}
-                onLoad={() => onFeedState("online")}
-                onError={() => onFeedState("error")}
+                onLoad={onFeedOnline}
+                onError={onFeedError}
               />
               <ReviewOverlay mode={settings.review_overlay} />
               {feedState === "loading" && (
                 <FeedOverlay icon={<Camera size={24} />} title="Connecting to live camera" detail={camera.camera_kind === "integrated" ? "Integrated camera feed" : "USB webcam feed"} />
+              )}
+              {feedState === "reconnecting" && (
+                <FeedOverlay icon={<RefreshCw size={24} className="animate-spin" />} title="Reconnecting..." detail="Connection lost. Retrying with backoff." />
               )}
               {feedState === "error" && (
                 <FeedOverlay icon={<VideoOff size={24} />} title="Camera feed unreachable" detail="The configured URL did not return a browser-readable stream." />
@@ -643,6 +797,53 @@ async function fetchCameras(): Promise<CameraFeed[]> {
   }
 }
 
+/** Fetch GET /api/observe/status — per-camera online/offline + fps estimate.
+ *  Read-only: no control commands are sent. S1 flag is backend-enforced.
+ */
+async function fetchObserveStatus(): Promise<ObserveStatusResponse> {
+  const response = await fetch(`${LIVE_BASE_URL}/api/observe/status`, {
+    method: "GET",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  const payload: unknown = await response.json().catch(() => ({ cameras: [], online: 0, total: 0 }));
+  if (!response.ok || !isRecord(payload)) {
+    return { cameras: [], online: 0, total: 0 };
+  }
+  const rawCameras = Array.isArray(payload.cameras) ? payload.cameras : [];
+  const cameras: CameraStatus[] = rawCameras
+    .filter(isRecord)
+    .map((c) => ({
+      printer_id: String(c.printer_id ?? ""),
+      printer_name: String(c.printer_name ?? ""),
+      camera_url: typeof c.camera_url === "string" ? c.camera_url : null,
+      health: parseHealthStatus(c.health),
+      http_status: typeof c.http_status === "number" ? c.http_status : null,
+      response_ms: typeof c.response_ms === "number" ? c.response_ms : null,
+      estimated_fps: typeof c.estimated_fps === "number" ? c.estimated_fps : null,
+      read_only: c.read_only === true,
+    }));
+  return {
+    cameras,
+    online: typeof payload.online === "number" ? payload.online : 0,
+    total: typeof payload.total === "number" ? payload.total : 0,
+  };
+}
+
+function parseHealthStatus(value: unknown): CameraStatus["health"] {
+  if (
+    value === "configured" ||
+    value === "locked" ||
+    value === "not_configured" ||
+    value === "reachable" ||
+    value === "unreachable" ||
+    value === "unknown"
+  ) {
+    return value;
+  }
+  return "unknown";
+}
+
 async function markPlateClear(
   printerId: string,
   setCameras: Dispatch<SetStateAction<CameraFeed[]>>,
@@ -854,9 +1055,12 @@ function parseCameraKind(value: unknown): CameraFeed["camera_kind"] {
   return "external";
 }
 
-function feedStateLabel(state: "loading" | "online" | "error", health: CameraHealth): string {
+function feedStateLabel(state: "loading" | "online" | "error" | "reconnecting", health: CameraHealth): string {
   if (state === "online") {
     return "LIVE";
+  }
+  if (state === "reconnecting") {
+    return "RECONNECTING";
   }
   if (state === "error" || health === "unreachable") {
     return "UNREACHABLE";
@@ -890,13 +1094,16 @@ function plateLabel(plate: BuildPlateClearance): string {
   return "plate state unknown";
 }
 
-function statusClass(camera: CameraFeed, feedState: "loading" | "online" | "error"): string {
+function statusClass(camera: CameraFeed, feedState: "loading" | "online" | "error" | "reconnecting"): string {
   const base = "shrink-0 rounded px-2 py-0.5 text-[10px] font-semibold";
   if (!camera.camera_url || feedState === "error") {
     return `${base} bg-surface2 text-muted`;
   }
   if (feedState === "online") {
     return `${base} bg-green-900/40 text-green-300`;
+  }
+  if (feedState === "reconnecting") {
+    return `${base} bg-amber-900/40 text-amber-300`;
   }
   return `${base} bg-cyan-900/40 text-cyan-300`;
 }

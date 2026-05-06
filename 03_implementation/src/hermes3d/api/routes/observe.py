@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import urllib.error
 import urllib.request
 
@@ -46,6 +47,43 @@ class CameraViewUpdate(BaseModel):
     feed_mode: str | None = None
     card_size: str | None = None
     review_overlay: str | None = None
+
+
+@router.get("/api/observe/status")
+def observe_status() -> dict:
+    """Return per-camera online/offline status with response-time-based fps estimate.
+
+    This endpoint is read-only: it only probes MJPEG endpoints, never sends
+    control commands. S1 (192.168.0.12) is probed for connectivity only.
+    """
+    printers = local_printers(live=False)
+    statuses: list[dict] = []
+    for printer in printers:
+        camera_url = printer.get("camera_url")
+        printer_id = str(printer.get("id") or "")
+        health, http_status, response_ms = _probe_camera_timed(camera_url)
+        # Estimate fps from MJPEG response time (crude but useful for UI indicator)
+        estimated_fps: float | None = None
+        if health == "reachable" and response_ms is not None and response_ms > 0:
+            # A single-frame response time gives a floor estimate for fps
+            estimated_fps = round(min(30.0, 1000.0 / response_ms), 1)
+        statuses.append({
+            "printer_id": printer_id,
+            "printer_name": printer.get("name", printer_id),
+            "camera_url": camera_url,
+            "health": health,
+            "http_status": http_status,
+            "response_ms": response_ms,
+            "estimated_fps": estimated_fps,
+            # S1 is camera/read-only; flag it so the UI never offers controls
+            "read_only": is_s1_target(printer_id),
+        })
+    online = sum(1 for s in statuses if s["health"] == "reachable")
+    return {
+        "cameras": statuses,
+        "online": online,
+        "total": len(statuses),
+    }
 
 
 @router.get("/api/observe/cameras")
@@ -152,16 +190,26 @@ def capture_evidence(printer_id: str) -> dict:
 
 @router.get("/api/observe/cameras/{printer_id}/health")
 def camera_health(printer_id: str) -> dict:
-    camera = next((c for c in cameras() if c["printer_id"] == (local_printer(printer_id) or {}).get("id", printer_id)), None)
+    camera_list = cameras()
+    printer = local_printer(printer_id, live=False)
+    canonical_id = (printer or {}).get("id", printer_id)
+    camera = next((c for c in camera_list if c["printer_id"] == canonical_id), None)
     if not camera:
         raise HTTPException(status_code=404, detail="camera not found")
-    health, http_status = _probe_camera(camera["camera_url"])
+    health, http_status, response_ms = _probe_camera_timed(camera["camera_url"])
+    estimated_fps: float | None = None
+    if health == "reachable" and response_ms is not None and response_ms > 0:
+        estimated_fps = round(min(30.0, 1000.0 / response_ms), 1)
     return {
         "printer_id": camera["printer_id"],
         "health": health,
         "http_status": http_status,
+        "response_ms": response_ms,
+        "estimated_fps": estimated_fps,
         "is_locked": camera["printer_locked"],
         "printer_locked": camera["printer_locked"],
+        # S1 is camera/read-only — never a control target
+        "read_only": is_s1_target(str(camera["printer_id"])),
     }
 
 
@@ -234,14 +282,29 @@ def _snapshot_url(camera_url: str) -> str:
 
 
 def _probe_camera(camera_url: str | None) -> tuple[str, int | None]:
+    health, http_status, _ = _probe_camera_timed(camera_url)
+    return health, http_status
+
+
+def _probe_camera_timed(camera_url: str | None) -> tuple[str, int | None, int | None]:
+    """Probe a camera URL and return (health, http_status, response_ms).
+
+    Read-only: sends HEAD/GET to the MJPEG endpoint, never a control command.
+    S1 (192.168.0.12) is allowed here because this is camera-only access.
+    """
     if not camera_url:
-        return "not_configured", None
+        return "not_configured", None, None
+    t0 = time.monotonic()
     try:
         request = urllib.request.Request(camera_url, headers={"Accept": "image/*,*/*"})
         with urllib.request.urlopen(request, timeout=1.5) as response:
             status = int(response.status)
-            return ("reachable" if 200 <= status < 400 else "unreachable", status)
+            elapsed_ms = int((time.monotonic() - t0) * 1000)
+            health = "reachable" if 200 <= status < 400 else "unreachable"
+            return health, status, elapsed_ms
     except urllib.error.HTTPError as exc:
-        return "unreachable", int(exc.code)
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        return "unreachable", int(exc.code), elapsed_ms
     except OSError:
-        return "unreachable", None
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        return "unreachable", None, elapsed_ms
