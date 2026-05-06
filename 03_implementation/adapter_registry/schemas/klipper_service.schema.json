@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermes3d://adapter_registry/schemas/klipper_service/v1",
+  "title": "KlipperServiceSchema",
+  "description": "Read-only Klipper system-service adapter schema for Hermes3D (H3D-CLAUDE-SOURCE-PRINTFARM). Klipper exposes no direct HTTP API; this adapter describes systemd/system-level status probing only. No G-code commands, no printer movement.",
+  "type": "object",
+  "properties": {
+    "adapter": {
+      "type": "string",
+      "const": "klipper_service",
+      "description": "Adapter identifier"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "read_only": { "type": "boolean", "const": true },
+        "no_gcode": { "type": "boolean", "const": true, "description": "Never send G-code commands" },
+        "no_movement": { "type": "boolean", "const": true, "description": "Never issue move, home, or probe commands" },
+        "probe_method": {
+          "type": "string",
+          "enum": ["systemctl_status", "moonraker_proxy", "not_applicable"],
+          "description": "How Klipper status is probed. On Windows: not_applicable. On Linux: systemctl_status or via Moonraker HTTP proxy."
+        }
+      },
+      "required": ["read_only", "no_gcode", "no_movement", "probe_method"],
+      "additionalProperties": false
+    },
+    "platform": {
+      "type": "object",
+      "description": "Platform-specific detection metadata",
+      "properties": {
+        "os": {
+          "type": "string",
+          "enum": ["linux", "win32", "darwin"],
+          "description": "Host OS where probe runs"
+        },
+        "applicable": {
+          "type": "boolean",
+          "description": "Whether Klipper service detection applies on this OS. Klipper is Linux-only; on Windows this is false and the probe is skipped."
+        },
+        "service_name": {
+          "type": "string",
+          "default": "klipper",
+          "description": "systemd service unit name (Linux only)"
+        }
+      },
+      "required": ["os", "applicable"],
+      "additionalProperties": false
+    },
+    "status_fields": {
+      "type": "array",
+      "description": "Fields read from systemctl status output or Moonraker /printer/info proxy",
+      "items": {
+        "type": "object",
+        "properties": {
+          "field": { "type": "string" },
+          "source": { "type": "string", "enum": ["systemctl", "moonraker_proxy"] },
+          "description": { "type": "string" }
+        },
+        "required": ["field", "source"],
+        "additionalProperties": false
+      },
+      "examples": [
+        [
+          { "field": "ActiveState", "source": "systemctl", "description": "Service active state: active, inactive, failed" },
+          { "field": "SubState", "source": "systemctl", "description": "Service sub-state: running, exited, etc." },
+          { "field": "version", "source": "moonraker_proxy", "description": "Klipper version string via GET /printer/info" },
+          { "field": "hostname", "source": "moonraker_proxy", "description": "Host MCU name via GET /printer/info" }
+        ]
+      ]
+    }
+  },
+  "required": ["adapter", "version", "policy", "platform"],
+  "additionalProperties": false
+}

@@ -1,0 +1,145 @@
+{
+  "generated_at": "2026-05-06T22:29:21Z",
+  "lane": "H3D-CLAUDE-SOURCE-PRINTFARM",
+  "policy": {
+    "no_gcode_upload": true,
+    "no_post": true,
+    "read_only": true,
+    "s1_camera_skipped": true,
+    "timeout_seconds": 2.0
+  },
+  "printers": [
+    {
+      "elapsed_ms": 0,
+      "error": null,
+      "ip": "192.168.0.12",
+      "method": null,
+      "name": "flsun_s1_camera",
+      "note": "S1 camera \u2014 lane policy: never probe.",
+      "policy": "camera-read-only-skipped",
+      "port": null,
+      "reachable": null,
+      "service": "flsun_s1_camera",
+      "skipped": true,
+      "url": null,
+      "version": null
+    },
+    {
+      "elapsed_ms": 98,
+      "error": null,
+      "ip": "192.168.0.10",
+      "method": "GET",
+      "name": "flsun_t1_a",
+      "policy": "read-only-moonraker-get-only",
+      "port": 7125,
+      "reachable": true,
+      "service": "moonraker",
+      "skipped": false,
+      "url": "http://192.168.0.10:7125/server/info",
+      "version": "?"
+    },
+    {
+      "elapsed_ms": 171,
+      "error": null,
+      "ip": "192.168.0.11",
+      "method": "GET",
+      "name": "flsun_t1_b",
+      "policy": "read-only-moonraker-get-only",
+      "port": 7125,
+      "reachable": true,
+      "service": "moonraker",
+      "skipped": false,
+      "url": "http://192.168.0.11:7125/server/info",
+      "version": "?"
+    },
+    {
+      "elapsed_ms": 211,
+      "error": null,
+      "ip": "192.168.0.34",
+      "method": "GET",
+      "name": "flsun_v400",
+      "policy": "read-only-moonraker-get-only",
+      "port": 7125,
+      "reachable": true,
+      "service": "moonraker",
+      "skipped": false,
+      "url": "http://192.168.0.34:7125/server/info",
+      "version": "v0.7.1-586-gbb526e0-dirty"
+    }
+  ],
+  "schema": "hermes3d://proof/printfarm_verify/v1",
+  "services": [
+    {
+      "elapsed_ms": 1026,
+      "error": "url_error:[WinError 10061] No connection could be made because the target machine actively refused it",
+      "method": "GET",
+      "policy": "read-only-static-ui-probe",
+      "reachable": false,
+      "service": "fluidd",
+      "url": "http://127.0.0.1:80/",
+      "version": null
+    },
+    {
+      "elapsed_ms": 1024,
+      "error": "url_error:[WinError 10061] No connection could be made because the target machine actively refused it",
+      "method": "GET",
+      "policy": "read-only-static-ui-probe",
+      "reachable": false,
+      "service": "mainsail",
+      "url": "http://127.0.0.1:80/",
+      "version": null
+    },
+    {
+      "elapsed_ms": 1015,
+      "error": "url_error:[WinError 10061] No connection could be made because the target machine actively refused it",
+      "method": "GET",
+      "policy": "read-only-version-endpoint",
+      "reachable": false,
+      "service": "octoprint",
+      "url": "http://127.0.0.1:5000/api/version",
+      "version": null
+    },
+    {
+      "elapsed_ms": 1026,
+      "error": "url_error:[WinError 10061] No connection could be made because the target machine actively refused it",
+      "method": "GET",
+      "policy": "read-only-settings-probe",
+      "reachable": false,
+      "service": "fdm_monster",
+      "url": "http://127.0.0.1:4000/api/settings",
+      "version": null
+    },
+    {
+      "binary_on_path": null,
+      "elapsed_ms": 0,
+      "error": "no_network_api_and_binary_not_on_path",
+      "method": null,
+      "policy": "no-network-tft-gui-runtime-only",
+      "reachable": false,
+      "service": "klipperscreen",
+      "url": null,
+      "version": null
+    },
+    {
+      "binary_on_path": null,
+      "elapsed_ms": 0,
+      "error": "no_network_api_and_binary_not_on_path",
+      "method": null,
+      "policy": "no-network-usb-cli-runtime-only",
+      "reachable": false,
+      "service": "printrun",
+      "url": null,
+      "version": null
+    }
+  ],
+  "summary": {
+    "printers_reachable": 3,
+    "printers_skipped": 1,
+    "printers_total": 4,
+    "printers_unreachable": 0,
+    "services_reachable": 0,
+    "services_total": 6,
+    "services_unreachable": 6
+  },
+  "tool": "verify_printfarm.py"
+}
