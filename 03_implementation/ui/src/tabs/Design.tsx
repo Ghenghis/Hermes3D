@@ -19,6 +19,41 @@ const DEFAULT_TOOLCHAIN: ToolchainStatus = {
   stages: [],
 };
 
+// ---------------------------------------------------------------------------
+// Types for real provider health + template data from backend
+// ---------------------------------------------------------------------------
+
+interface CadProvider {
+  id: string;
+  name: string;
+  kind: string;
+  status: "ready" | "detected" | "not_installed";
+  detected: boolean;
+  path: string | null;
+  version: string | null;
+  version_detail: string | null;
+  capabilities: string[];
+  docs_url: string;
+  detail: string;
+  probed_at: string;
+}
+
+interface CadTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  executor_module?: string;
+  executor_available?: boolean;
+  executor_detail?: string;
+  outputs?: string[];
+  parameters?: string[];
+  requires?: string[];
+  missing_deps?: string[];
+  deps_ok?: boolean;
+  preview_available?: boolean;
+  preview_note?: string;
+}
+
 export function DesignTab() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -35,6 +70,10 @@ export function DesignTab() {
   const [toolchain, setToolchain] = useState<ToolchainStatus>(DEFAULT_TOOLCHAIN);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
   const [logsMessage, setLogsMessage] = useState<string | null>(null);
+  const [cadProviders, setCadProviders] = useState<CadProvider[]>([]);
+  const [cadTemplates, setCadTemplates] = useState<CadTemplate[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(true);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
   const unlockedPrinters = useMemo(
     () => printers.filter((printer) => !printer.maintenance_flag && printer.status !== "maintenance"),
     [printers],
@@ -74,6 +113,45 @@ export function DesignTab() {
       mounted = false;
       window.clearInterval(timer);
     };
+  }, []);
+
+  // Fetch real CAD provider health from backend
+  useEffect(() => {
+    let mounted = true;
+    const load = () => {
+      setProvidersLoading(true);
+      fetch(`${LIVE_BASE_URL}/api/design/providers`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data: unknown) => {
+          if (mounted && Array.isArray(data)) {
+            setCadProviders(data as CadProvider[]);
+          }
+        })
+        .catch(() => { /* backend unreachable — providers stay empty */ })
+        .finally(() => { if (mounted) setProvidersLoading(false); });
+    };
+    load();
+    const timer = window.setInterval(load, 30_000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, []);
+
+  // Fetch real CAD template list from backend
+  useEffect(() => {
+    let mounted = true;
+    setTemplatesLoading(true);
+    fetch(`${LIVE_BASE_URL}/api/design/templates`, { cache: "no-store" })
+      .then((r) => r.json())
+      .then((data: unknown) => {
+        if (mounted && Array.isArray(data)) {
+          setCadTemplates(data as CadTemplate[]);
+          // Keep the select pre-populated with the first available template
+          const first = (data as CadTemplate[]).find((t) => t.executor_available !== false);
+          if (first && mounted) setTemplate(first.id);
+        }
+      })
+      .catch(() => { /* backend unreachable — templates stay empty */ })
+      .finally(() => { if (mounted) setTemplatesLoading(false); });
+    return () => { mounted = false; };
   }, []);
 
   const submit = async () => {
@@ -127,9 +205,20 @@ export function DesignTab() {
       <section id="design.intake" className="flex min-h-0 flex-col rounded border border-border bg-surface p-4 lg:col-span-5">
         <h2 className="text-base font-semibold text-fg">Design Intake</h2>
         <div className="mt-3 grid min-h-0 flex-1 gap-3">
-          <select className="rounded border border-border bg-bg px-3 py-2 text-sm text-fg" aria-label="Design template" value={template} onChange={(event) => setTemplate(event.target.value)}>
-            {(toolchain.supported_templates?.length ? toolchain.supported_templates : [{ id: "desk_organizer", name: "Parametric Desk Organizer" }]).map((item) => (
-              <option key={item.id} value={item.id}>{item.name}</option>
+          <select
+            className="rounded border border-border bg-bg px-3 py-2 text-sm text-fg"
+            aria-label="Design template"
+            value={template}
+            onChange={(event) => setTemplate(event.target.value)}
+          >
+            {templatesLoading && <option value="">Loading templates…</option>}
+            {!templatesLoading && cadTemplates.length === 0 && (
+              <option value="desk_organizer">Parametric Desk Organizer</option>
+            )}
+            {cadTemplates.map((item) => (
+              <option key={item.id} value={item.id} disabled={item.executor_available === false}>
+                {item.name}{item.executor_available === false ? " (unavailable)" : ""}
+              </option>
             ))}
           </select>
           <input className="rounded border border-border bg-bg px-3 py-2 text-sm text-fg" required aria-label="Design name" value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -222,6 +311,143 @@ export function DesignTab() {
         </div>
         {logsMessage && <pre className="mt-3 max-h-40 overflow-auto whitespace-pre-wrap rounded border border-border bg-bg/60 p-2 text-xs text-muted">{logsMessage}</pre>}
       </section>
+
+      {/* CAD Provider Health — real probes from backend, no fake stubs */}
+      <section id="design.providers" className="flex min-h-0 flex-col rounded border border-border bg-surface p-4 lg:col-span-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold text-fg">CAD Provider Health</h2>
+            <p className="text-xs text-muted">Live probe results — shutil.which + importlib. No cached stubs.</p>
+          </div>
+          {providersLoading && <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">Probing…</span>}
+          {!providersLoading && <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">{cadProviders.length} providers</span>}
+        </div>
+        <div className="mt-4 grid min-h-0 flex-1 content-start gap-2 overflow-auto">
+          {cadProviders.length === 0 && !providersLoading && (
+            <div className="rounded border border-border bg-bg/40 p-3 text-xs text-muted">
+              Backend provider probe endpoint unreachable. Start the Hermes3D backend to see real provider status.
+            </div>
+          )}
+          {cadProviders.map((provider) => (
+            <ProviderCard key={provider.id} provider={provider} />
+          ))}
+        </div>
+      </section>
+
+      {/* CAD Template Gallery — from backend, with preview-not-available when no renderer */}
+      <section id="design.templates" className="flex min-h-0 flex-col rounded border border-border bg-surface p-4 lg:col-span-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold text-fg">Template Gallery</h2>
+            <p className="text-xs text-muted">Real executor modules discovered from the backend at runtime.</p>
+          </div>
+          {templatesLoading && <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">Loading…</span>}
+          {!templatesLoading && <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">{cadTemplates.length} templates</span>}
+        </div>
+        <div className="mt-4 grid min-h-0 flex-1 content-start gap-3 overflow-auto">
+          {cadTemplates.length === 0 && !templatesLoading && (
+            <div className="rounded border border-border bg-bg/40 p-3 text-xs text-muted">
+              Backend template list endpoint unreachable. Start the Hermes3D backend to see available templates.
+            </div>
+          )}
+          {cadTemplates.map((tmpl) => (
+            <TemplateCard key={tmpl.id} tmpl={tmpl} selected={template === tmpl.id} onSelect={() => setTemplate(tmpl.id)} />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Provider health card — shows real probed status
+// ---------------------------------------------------------------------------
+
+function ProviderCard({ provider }: { provider: CadProvider }) {
+  const tone = provider.status === "ready"
+    ? "bg-accent-green/15 text-accent-green"
+    : provider.status === "detected"
+    ? "bg-accent-cyan/15 text-accent-cyan"
+    : "bg-surface2 text-muted";
+  return (
+    <div className="grid grid-cols-[1fr_auto] items-start gap-2 rounded border border-border bg-bg/50 p-3 text-xs">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-fg">{provider.name}</span>
+          <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted">{provider.kind}</span>
+        </div>
+        <div className="mt-1 truncate font-mono text-[11px] text-muted">{provider.path ?? "not on PATH"}</div>
+        {provider.version_detail && (
+          <div className="mt-0.5 truncate text-[11px] text-muted">{provider.version_detail}</div>
+        )}
+        <div className="mt-1.5 line-clamp-2 text-muted">{provider.detail}</div>
+        {provider.capabilities.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {provider.capabilities.slice(0, 5).map((cap) => (
+              <span key={cap} className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted">{cap}</span>
+            ))}
+          </div>
+        )}
+      </div>
+      <span className={["shrink-0 rounded px-2 py-1 text-[11px] uppercase", tone].join(" ")}>
+        {provider.status.replace(/_/g, " ")}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Template card — shows real executor status, never fake preview
+// ---------------------------------------------------------------------------
+
+function TemplateCard({ tmpl, selected, onSelect }: { tmpl: CadTemplate; selected: boolean; onSelect: () => void }) {
+  const available = tmpl.executor_available !== false;
+  return (
+    <div
+      className={[
+        "rounded border p-3 text-xs transition-colors",
+        selected ? "border-accent-blue bg-accent-blue/10" : "border-border bg-bg/50",
+        available ? "cursor-pointer" : "cursor-not-allowed opacity-60",
+      ].join(" ")}
+      role="button"
+      tabIndex={available ? 0 : -1}
+      aria-disabled={!available}
+      onClick={available ? onSelect : undefined}
+      onKeyDown={(e) => { if (available && (e.key === "Enter" || e.key === " ")) onSelect(); }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="font-semibold text-fg">{tmpl.name}</div>
+          {tmpl.description && <div className="mt-0.5 line-clamp-2 text-muted">{tmpl.description}</div>}
+        </div>
+        <span className={[
+          "shrink-0 rounded px-2 py-1 text-[11px] uppercase",
+          available ? "bg-accent-green/15 text-accent-green" : "bg-surface2 text-muted",
+        ].join(" ")}>
+          {available ? "ready" : "unavailable"}
+        </span>
+      </div>
+      {tmpl.executor_detail && (
+        <div className="mt-2 text-[11px] text-muted">{tmpl.executor_detail}</div>
+      )}
+      {/* Preview: always show preview-not-available when no renderer is detected */}
+      <div className="mt-2 rounded border border-border bg-surface/50 p-2 text-[11px] text-muted">
+        {tmpl.preview_available
+          ? "Preview available."
+          : tmpl.preview_note ?? "Preview not available — no 3D renderer detected."}
+      </div>
+      {(tmpl.missing_deps ?? []).length > 0 && (
+        <div className="mt-1.5 rounded border border-amber-700/50 bg-amber-950/20 p-1.5 text-[11px] text-amber-200">
+          Missing deps: {(tmpl.missing_deps ?? []).join(", ")}
+        </div>
+      )}
+      {tmpl.outputs && tmpl.outputs.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {tmpl.outputs.map((out) => (
+            <span key={out} className="rounded border border-border px-1.5 py-0.5 text-[10px] text-muted">{out}</span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
