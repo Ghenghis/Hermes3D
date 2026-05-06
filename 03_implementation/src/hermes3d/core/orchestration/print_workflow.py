@@ -532,6 +532,16 @@ def _node_upload(state: WorkflowState) -> NodeResult:
             ended_unix=_now(),
             notes=["dry_run=True — no upload"],
         )
+    from hermes3d.api.safety import is_s1_target
+
+    if is_s1_target(str(state.data.get("selected_printer_id", ""))):
+        return NodeResult(
+            node_name="upload",
+            outcome=NodeOutcome.FAIL,
+            started_unix=_now(),
+            ended_unix=_now(),
+            error="FLSUN S1 is offline/locked/no upload by backend safety policy.",
+        )
     from hermes3d.core.printers import get_profile
     from hermes3d.core.printers.moonraker_client import MoonrakerClient
 
@@ -543,7 +553,7 @@ def _node_upload(state: WorkflowState) -> NodeResult:
         timeout_s=float(state.data.get("upload_timeout_s", 60.0)),
     )
     try:
-        item_path = client.upload_gcode(state.data["sliced_gcode_path"])
+        upload = client.upload_gcode(state.data["sliced_gcode_path"])
     except Exception as exc:
         return NodeResult(
             node_name="upload",
@@ -557,7 +567,7 @@ def _node_upload(state: WorkflowState) -> NodeResult:
         outcome=NodeOutcome.PASS,
         started_unix=started,
         ended_unix=_now(),
-        state_patch={"moonraker_item_path": item_path},
+        state_patch={"moonraker_item_path": upload.item_path},
     )
 
 
@@ -569,6 +579,16 @@ def _node_start_print(state: WorkflowState) -> NodeResult:
             started_unix=_now(),
             ended_unix=_now(),
             notes=["dry_run=True — no start"],
+        )
+    from hermes3d.api.safety import is_s1_target
+
+    if is_s1_target(str(state.data.get("selected_printer_id", ""))):
+        return NodeResult(
+            node_name="start_print",
+            outcome=NodeOutcome.FAIL,
+            started_unix=_now(),
+            ended_unix=_now(),
+            error="FLSUN S1 is offline/locked/no print start by backend safety policy.",
         )
     from hermes3d.core.printers import get_profile
     from hermes3d.core.printers.moonraker_client import MoonrakerClient
