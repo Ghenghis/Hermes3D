@@ -21,8 +21,49 @@ export interface SystemSnapshot {
   cpu_pct: number;
   ram_pct: number;
   gpu_util_pct: number;
-  /** Primary disk usage percent (0-100). Phase-2 mock; Phase 4 wires real telemetry. */
+  /** Primary disk usage percent (0-100). */
   disk_pct: number;
   /** Recent network throughput sparkline samples (kbps), oldest → newest. */
   network_kbps: number[];
+}
+
+/** Per-service URL overrides and global settings, used by the Settings tab. */
+export interface AppSettings {
+  theme: "midnight" | "alloy" | "ember" | "forest";
+  ports: Record<string, number>;
+  printerUrls: Record<string, string>;
+  serviceUrls: Record<string, string>;
+}
+
+/** Readiness check entry for the Autopilot / Dashboard readiness panel. */
+export interface ReadinessCheck {
+  id: string;
+  label: string;
+  status: "pass" | "fail" | "pending" | "skipped";
+  detail: string | null;
+}
+
+export type RuntimeReadinessStatus = "ready" | "partial" | "blocked" | "locked" | string;
+
+export interface RuntimeReadinessRow {
+  id: string;
+  label: string;
+  category: string;
+  status: RuntimeReadinessStatus;
+  source: string;
+  reason: string;
+  required_env: string[];
+  proof: string;
+}
+
+export interface RuntimeReadiness {
+  updated_at: string;
+  summary: {
+    total: number;
+    ready: number;
+    partial: number;
+    blocked: number;
+    locked: number;
+  };
+  runtimes: RuntimeReadinessRow[];
 }

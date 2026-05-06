@@ -3,7 +3,6 @@ import { Activity, Pause, Play, RefreshCw } from "lucide-react";
 import { Panel } from "../layout/Panel";
 import { StatusBadge, type StatusTone } from "../badges/StatusBadge";
 import { adapters } from "../../api/adapters";
-import { MOCK_SERVICE_HEALTH } from "../../data/mock/serviceHealth";
 import type {
   ServiceCategory,
   ServiceHealthEntry,
@@ -12,14 +11,9 @@ import type {
 import { ServiceCard } from "./ServiceCard";
 
 /**
- * Top-level Service Health page. Replaces the broken stub PR #37 left
- * behind (which imported a non-existent ``ServiceCard`` and passed Panel
- * props that did not exist). The page:
- *
- *   - fetches `GET /api/health/services` on mount via the adapters layer
- *     (mock-mode by default; ``?adapter=live`` switches to the real fetch);
- *   - auto-refreshes every 30 s, with a Pause toggle;
- *   - groups results by category with a header summary pill row.
+ * Top-level Service Health page. It reads `GET /api/health/services`,
+ * refreshes every 30 seconds, and renders an empty state if no service rows
+ * are returned by the backend.
  */
 
 const REFRESH_INTERVAL_MS = 30_000;
@@ -52,7 +46,7 @@ const STATUS_TONE: Record<ServiceStatus, StatusTone> = {
 };
 
 export function ServiceHealthPage() {
-  const [entries, setEntries] = useState<ServiceHealthEntry[]>(MOCK_SERVICE_HEALTH);
+  const [entries, setEntries] = useState<ServiceHealthEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [paused, setPaused] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);

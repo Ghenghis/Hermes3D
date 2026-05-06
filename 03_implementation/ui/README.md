@@ -2,7 +2,26 @@
 
 Faithful React + Tailwind recreation of [`06_release/UI_FINAL_VISUAL_CONTRACT.png`](../../06_release/UI_FINAL_VISUAL_CONTRACT.png).
 
-**Phase 2 status:** scaffolding (bootstrap + design tokens). Tabs, mock data layer, and Playwright screenshot gate land in subsequent tasks per [`00_overview/PHASE2_PLAN.md`](../../00_overview/PHASE2_PLAN.md).
+**Current status:** the React shell is wired to the local Hermes3D GUI API. Empty states mean the backend returned no rows or the corresponding bridge is unavailable.
+
+## USER strict runtime rules
+
+- Production UI never imports mock data and never renders invented
+  printer telemetry, slicer state, generated models, proof bundles,
+  notifications, agent activity, setup state, or remote-host state.
+- Buttons either call a real backend endpoint or are disabled with a
+  specific reason such as missing setup, unavailable bridge, or printer
+  safety lock.
+- Hermes Agents are user-authorized operator/admin delegates. They may
+  use Hermes3D-OS, the user's PC, local files, installed apps, web
+  services/accounts, VPS or remote hosts, source repositories, GitHub
+  branches, commits, pushes, and PRs when the user assigns that work.
+- Missing source paths, repository URLs, credentials, model files,
+  remote hosts, material choices, or printer/user preferences must be
+  requested from the user or shown as blocked. They must not be guessed.
+- FLSUN S1 at `192.168.0.12` is offline/locked/no-test for now. Status
+  metadata can be edited, but movement, upload, capture, and test
+  actions remain blocked until the user clears the lock.
 
 ## Quick start
 
@@ -30,9 +49,8 @@ src/
 │   └── tokens.ts         token constants for raw-value consumers
 ├── app/                  AppShell, routes, zustand store    [Task 6+]
 ├── components/           shared primitives (Card, Panel, etc.) [Task 9-12]
-├── tabs/                 13 tab components                  [Task 19-38]
-├── data/mock/            mock data layer                    [Task 13-18]
-├── api/                  adapter interface (mock-only)      [Task 18]
+├── tabs/                 16 routed tab components
+├── api/                  live/local backend adapter interface
 └── types/                TypeScript mirror of hermes3d.adapters.types
 ```
 
@@ -40,23 +58,27 @@ src/
 
 Per [`feedback_no_ui_design.md`](https://github.com/Ghenghis/Hermes3D/blob/develop/00_overview/PHASE0_BASELINE_REPORT.md):
 - **No design freedom.** Every component sourced from the visual contract or kit specs.
-- **No real adapter calls.** Mock data only; the swap point for Phase 3 is `src/api/adapters.ts`.
-- **No printer command writes.** Phase 6 implements those behind the dry-run-token + Confirmation gate.
+- **No invented UI data.** Production tabs must use the local GUI API or render a truthful empty/unavailable state.
+- **Printer command writes go through the backend.** The frontend must call
+  Hermes3D API routes that enforce dry-run/confirmation gates and printer
+  locks; it must not bypass them from browser code.
 - **Gradio launcher untouched.** This UI is additive; the legacy Gradio app at `03_implementation/src/hermes3d/app/launcher.py` stays as stabilization scaffolding.
 
-### Phase 2 safety boundary — no external app launches
+### Runtime safety boundary
 
-The Dashboard, all panels, and the Playwright visual gate are forbidden from launching external applications during Phase 2:
+The browser UI and Playwright visual gate do not launch external
+applications directly. Hermes Agents may use external apps, web
+services, source checkouts, VPS/remote hosts, and local PC tools through
+Hermes3D backend adapters and user-authorized automation flows.
 
 - **No** `child_process` / `spawn` / `exec` / `execSync` / `execFile` from any UI module.
-- **No** Electron-style `shell.openPath` / `shell.openExternal` (this is a pure web app — no Electron in Phase 2).
+- **No** Electron-style `shell.openPath` / `shell.openExternal` from browser UI code.
 - **No** `<a href="file://…">`, `download` attributes, or `target="_blank"` to OS-handled file extensions.
 - **No** `Start-Process` / `os.startfile` / `cmd /c start` from any test or build script.
-- Slicer UIs (FLSUN Slicer, PrusaSlicer, OrcaSlicer, Cura), printer hosts (Moonraker, OctoPrint, Printrun, Klipper), and Blender are referenced **as strings only** — adapter unions, mock-data filenames, agent provider tags, log messages. They render as plain text in the DOM; the OS never sees them as a launch instruction.
+- Slicer UIs (FLSUN Slicer, PrusaSlicer, OrcaSlicer, Cura), printer hosts (Moonraker, OctoPrint, Printrun, Klipper), and Blender must be surfaced through source-backed modules or explicit unavailable states.
 
-The actual launch code lives in `03_implementation/src/hermes3d/adapters/*` (Phase 1 skeletons) and is gated by Phase 6's dry-run-token + Confirmation flow. Phase 2 does not touch that path.
-
-If OrcaSlicer (or any slicer / printer host) opens during Phase 2 work, it is **not** caused by this UI or the visual test — investigate manual user action, OS file association, or the slicer's own auto-updater.
+External launches and remote setup belong in `03_implementation/src/hermes3d/adapters/*`
+or explicit agent automation code, with proof events and safety gates.
 
 ## Stack
 

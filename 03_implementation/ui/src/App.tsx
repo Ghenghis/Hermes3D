@@ -1,47 +1,79 @@
 import { AppShell } from "./app/AppShell";
 import { TABS } from "./app/routes";
-import { useStore } from "./app/store";
+import { TAB_TO_HASH, tabIdFromHash, useStore } from "./app/store";
+import { SimpleHermesDashboard } from "./components/simple/SimpleHermesDashboard";
+import { SourceOSTab } from "./tabs/SourceOS";
 import { Dashboard } from "./tabs/Dashboard";
-import { AgentsTab } from "./tabs/Agents";
-import { WorkflowsTab } from "./tabs/Workflows";
+import { AutopilotTab } from "./tabs/Autopilot";
+import { DesignTab } from "./tabs/Design";
 import { Gen3DTab } from "./tabs/Gen3D";
-import { BlenderMCPTab } from "./tabs/BlenderMCP";
-import { SlicingTab } from "./tabs/Slicing";
-import { FleetTab } from "./tabs/Fleet";
-import { PrintQueueTab } from "./tabs/PrintQueue";
-import { PrinterControlTab } from "./tabs/PrinterControl";
-import { DockedAppsTab } from "./tabs/DockedApps";
-import { ProofTab } from "./tabs/Proof";
-import { SystemLogsTab } from "./tabs/SystemLogs";
+import { JobsTab } from "./tabs/Jobs";
+import { PrintersTab } from "./tabs/Printers";
+import { ObserveTab } from "./tabs/Observe";
+import { VoiceTab } from "./tabs/Voice";
+import { AgentsTab } from "./tabs/Agents";
+import { LearningTab } from "./tabs/Learning";
+import { ArtifactsTab } from "./tabs/Artifacts";
+import { ApprovalsTab } from "./tabs/Approvals";
+import { PluginsTab } from "./tabs/Plugins";
 import { SettingsTab } from "./tabs/Settings";
-import { ServiceHealthPage } from "./components/health/ServiceHealthPage";
+import { RoadmapTab } from "./tabs/Roadmap";
+import { useEffect } from "react";
 
-/**
- * Phase 2 Tasks 27-38: every sidebar tab routes to its own mock-only
- * component. No real adapter calls, no external launches — every panel
- * pulls from `src/data/mock/*` and dangerous actions render `LockedAction`.
- */
 const TAB_COMPONENTS: Record<string, () => JSX.Element> = {
+  source_os: SourceOSTab,
   dashboard: Dashboard,
-  agents: AgentsTab,
-  workflows: WorkflowsTab,
+  autopilot: AutopilotTab,
+  design: DesignTab,
   gen3d: Gen3DTab,
-  blender_mcp: BlenderMCPTab,
-  slicing: SlicingTab,
-  fleet: FleetTab,
-  queue: PrintQueueTab,
-  control: PrinterControlTab,
-  docked: DockedAppsTab,
-  proof: ProofTab,
-  logs: SystemLogsTab,
-  service_health: ServiceHealthPage,
+  jobs: JobsTab,
+  printers: PrintersTab,
+  observe: ObserveTab,
+  voice: VoiceTab,
+  agents: AgentsTab,
+  learning: LearningTab,
+  artifacts: ArtifactsTab,
+  approvals: ApprovalsTab,
+  plugins: PluginsTab,
   settings: SettingsTab,
+  roadmap: RoadmapTab,
 };
 
 export default function App() {
   const activeTabId = useStore((s) => s.activeTabId);
+  const setActiveTabId = useStore((s) => s.setActiveTabId);
+  const uiMode = useStore((s) => s.uiMode);
   const tab = TABS.find((t) => t.id === activeTabId) ?? TABS[0];
-  const Component = TAB_COMPONENTS[tab.id] ?? FallbackPlaceholder;
+  const Component = TAB_COMPONENTS[tab.id] ?? UnavailableTab;
+
+  useEffect(() => {
+    const syncFromHash = () => {
+      const nextTabId = tabIdFromHash(window.location.hash);
+      if (nextTabId && nextTabId !== useStore.getState().activeTabId) {
+        setActiveTabId(nextTabId);
+      }
+    };
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    window.addEventListener("popstate", syncFromHash);
+    const syncTimer = window.setInterval(syncFromHash, 500);
+    return () => {
+      window.removeEventListener("hashchange", syncFromHash);
+      window.removeEventListener("popstate", syncFromHash);
+      window.clearInterval(syncTimer);
+    };
+  }, [setActiveTabId]);
+
+  useEffect(() => {
+    const nextHash = `#${TAB_TO_HASH[activeTabId] ?? activeTabId}`;
+    if (window.location.hash !== nextHash) {
+      window.history.replaceState(null, "", nextHash);
+    }
+  }, [activeTabId]);
+
+  if (uiMode === "simple") {
+    return <SimpleHermesDashboard activeTabId={tab.id} activeLabel={tab.label} Content={Component} />;
+  }
 
   return (
     <AppShell>
@@ -50,12 +82,12 @@ export default function App() {
   );
 }
 
-function FallbackPlaceholder() {
+function UnavailableTab() {
   return (
     <div className="h-full flex items-center justify-center">
       <div className="text-center">
-        <div className="text-muted text-sm uppercase tracking-wide">Tab not found</div>
-        <div className="text-fg text-2xl font-bold mt-1">unknown</div>
+        <div className="text-muted text-sm uppercase tracking-wide">Route unavailable</div>
+        <div className="mt-1 text-sm font-semibold text-fg">The selected tab is not registered in the live router.</div>
       </div>
     </div>
   );

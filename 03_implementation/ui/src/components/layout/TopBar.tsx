@@ -1,45 +1,82 @@
 import { Bell, CircleDot, Clock, Cpu, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 import { EditionBadge } from "../badges/EditionBadge";
 import { ProofChip } from "../badges/ProofChip";
-import { MOCK_SYSTEM_SNAPSHOT } from "../../data/mock/system";
-import { MOCK_NOTIFICATIONS } from "../../data/mock/notifications";
+import { adapters } from "../../api/adapters";
+import type { Notification } from "../../types/notification";
+import type { ProofBundle } from "../../types/proof";
+import type { SystemSnapshot } from "../../types/system";
+import { useEffect, useState } from "react";
+import { useStore } from "../../app/store";
 
 /**
  * Top header per visual contract. Right cluster grouped as:
  *   [edition · system status · gpu · security · proof]   |   [time · bell · gear · avatar]
  *
  * Time pill renders the snapshot's `ts_utc` (NOT `Date.now()`) so the topbar
- * is visually deterministic for the Playwright screenshot gate. Bell badge
- * counts unread notifications. Gear is visual-only in Phase 2 (the left
- * sidebar's Settings tab is the real entry point).
+ * is visually deterministic for the Playwright screenshot gate. Bell opens the
+ * dashboard notification center; Gear routes to the live Settings tab.
  */
 export function TopBar({ activeLabel }: { activeLabel: string }) {
-  const sys = MOCK_SYSTEM_SNAPSHOT;
-  const unread = MOCK_NOTIFICATIONS.filter((n) => !n.read).length;
-  const time = formatClock(sys.ts_utc);
+  const setUiMode = useStore((s) => s.setUiMode);
+  const setActiveTabId = useStore((s) => s.setActiveTabId);
+  const [sys, setSys] = useState<SystemSnapshot | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [latestProof, setLatestProof] = useState<ProofBundle | null>(null);
+  const unread = notifications.filter((n) => !n.read).length;
+  const time = sys ? formatClock(sys.ts_utc) : "--:--";
+
+  useEffect(() => {
+    let mounted = true;
+    void adapters.getSystemSnapshot().then((snapshot) => {
+      if (mounted) setSys(snapshot);
+    });
+    void adapters.getNotifications().then((items) => {
+      if (mounted) setNotifications(items);
+    });
+    void adapters.getLatestProofBundle().then((bundle) => {
+      if (mounted) setLatestProof(bundle);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
-    <header className="h-14 flex items-center justify-between border-b border-border bg-surface px-6 shrink-0">
-      <div className="flex items-baseline gap-3 min-w-0">
+    <header className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2 md:flex-nowrap md:px-6">
+      <div className="flex min-w-0 items-baseline gap-2 md:gap-3">
         <span className="text-fg font-semibold text-base truncate">
           AI-DRIVEN 3D PRINTING OS
         </span>
-        <span className="text-muted text-xs truncate">
+        <span className="hidden text-muted text-xs truncate sm:inline">
           Design · Verify · Slice · Print · Monitor
         </span>
-        <span className="text-muted text-xs">·</span>
+        <span className="hidden text-muted text-xs sm:inline">·</span>
         <span className="text-muted text-xs truncate">{activeLabel}</span>
       </div>
-      <div className="flex items-center gap-2.5">
-        <EditionBadge edition={sys.edition} />
-        <StatusPill icon={<CircleDot size={13} />} label="System" value={sys.system_status} tone="green" />
-        <StatusPill icon={<Cpu size={13} />} label="GPU" value={`${sys.gpu_detected_pct}%`} tone="cyan" />
-        <StatusPill icon={<ShieldCheck size={13} />} label="Security" value={sys.security_status} tone="green" />
-        <ProofChip status="verified" />
+      <div className="flex min-w-0 flex-wrap items-center justify-end gap-1.5 md:flex-nowrap md:gap-2.5">
+        {sys ? (
+          <>
+            <span className="hidden lg:inline-flex"><EditionBadge edition={sys.edition} /></span>
+            <StatusPill icon={<CircleDot size={13} />} label="System" value={sys.system_status} tone={systemTone(sys.system_status)} />
+            <span className="hidden sm:inline-flex"><StatusPill icon={<Cpu size={13} />} label="GPU" value={`${sys.gpu_detected_pct}%`} tone="cyan" /></span>
+            <span className="hidden xl:inline-flex"><StatusPill icon={<ShieldCheck size={13} />} label="Security" value={sys.security_status} tone={sys.security_status === "Locked" ? "green" : "amber"} /></span>
+            {latestProof && <ProofChip status={latestProof.verdict === "verified" ? "verified" : "pending"} />}
+          </>
+        ) : (
+          <StatusPill icon={<CircleDot size={13} />} label="Backend" value="unavailable" tone="amber" />
+        )}
         <span className="h-6 w-px bg-border mx-1.5" aria-hidden />
+        <button
+          type="button"
+          onClick={() => setUiMode("simple")}
+          className="rounded-md border border-accent-blue/50 bg-accent-blue/10 px-2 py-1 text-xs font-semibold text-accent-blue hover:bg-accent-blue/20"
+          title="Switch to the live Simple Version"
+        >
+          Simple
+        </button>
         <TimePill time={time} />
-        <BellButton unread={unread} />
-        <GearButton />
+        <BellButton unread={unread} onClick={() => setActiveTabId("dashboard")} />
+        <GearButton onClick={() => setActiveTabId("settings")} />
         <Avatar initials="FN" />
       </div>
     </header>
@@ -82,11 +119,13 @@ function TimePill({ time }: { time: string }) {
   );
 }
 
-function BellButton({ unread }: { unread: number }) {
+function BellButton({ unread, onClick }: { unread: number; onClick: () => void }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       aria-label={`Notifications (${unread} unread)`}
+      title="Open dashboard notification center"
       className="relative p-1.5 rounded-md text-muted hover:text-fg hover:bg-surface2 transition-colors"
     >
       <Bell size={16} />
@@ -102,11 +141,13 @@ function BellButton({ unread }: { unread: number }) {
   );
 }
 
-function GearButton() {
+function GearButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       type="button"
-      aria-label="Settings"
+      onClick={onClick}
+      aria-label="Open settings panel"
+      title="Open settings"
       className="p-1.5 rounded-md text-muted hover:text-fg hover:bg-surface2 transition-colors"
     >
       <SettingsIcon size={16} />
@@ -126,8 +167,12 @@ function Avatar({ initials }: { initials: string }) {
 }
 
 function formatClock(iso: string): string {
-  // Deterministic HH:MM extraction from the mock ts_utc — no Date.now() so
-  // screenshots are reproducible across runs.
   const t = iso.split("T")[1] ?? "";
   return t.slice(0, 5); // HH:MM
+}
+
+function systemTone(status: SystemSnapshot["system_status"]): "green" | "amber" | "red" {
+  if (status === "OK") return "green";
+  if (status === "DEGRADED") return "amber";
+  return "red";
 }

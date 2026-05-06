@@ -78,7 +78,7 @@ export function AboutSubtab() {
       </section>
 
       <footer className="text-muted text-[10px] pt-2 border-t border-border">
-        Hermes3D-OS — local-first 3D printing orchestrator. Phase 2 ships a mock-only React frontend.
+        Hermes3D-OS — local-first 3D printing orchestrator backed by the local GUI API.
       </footer>
     </div>
   );

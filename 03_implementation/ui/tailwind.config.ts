@@ -33,7 +33,7 @@ const config: Config = {
         },
       },
       borderRadius: {
-        card: "20px",
+        card: "8px",
         chip: "999px",
       },
       fontFamily: {

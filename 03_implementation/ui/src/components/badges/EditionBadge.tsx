@@ -7,7 +7,7 @@ const LABELS: Record<Edition, { label: string; tone: string }> = {
 };
 
 export function EditionBadge({ edition }: { edition: Edition }) {
-  const e = LABELS[edition];
+  const e = LABELS[edition] ?? LABELS.blocked_no_gpu;
   return (
     <span
       className={[

@@ -3,14 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Hermes3D-OS UI-Final dashboard — faithful recreation of UI_FINAL_VISUAL_CONTRACT.png. Phase 2 ships React + Tailwind shell with mock data only; no real adapter calls.",
+  "description": "Hermes3D-OS local-first dashboard backed by the Hermes3D GUI API.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 4173",
     "lint": "tsc --noEmit",
-    "test:visual": "playwright test",
-    "test:visual:update": "playwright test --update-snapshots"
+    "test:visual": "playwright test --config=playwright.e2e.config.ts",
+    "test:visual:update": "playwright test --config=playwright.e2e.config.ts"
   },
   "dependencies": {
     "react": "18.3.1",

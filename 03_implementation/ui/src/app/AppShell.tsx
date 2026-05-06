@@ -14,13 +14,16 @@ import { useStore } from "./store";
 export function AppShell({ children }: { children?: ReactNode }) {
   const activeTabId = useStore((s) => s.activeTabId);
   const activeTab = TABS.find((t) => t.id === activeTabId) ?? TABS[0];
+  const dashboard = activeTab.id === "dashboard";
 
   return (
-    <div className="min-h-screen flex bg-bg text-fg">
+    <div className="flex h-screen overflow-hidden bg-bg text-fg">
       <Sidebar />
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex min-h-0 flex-1 flex-col">
         <TopBar activeLabel={activeTab.label} />
-        <main className="flex-1 p-4 overflow-auto">{children}</main>
+        <main className={dashboard ? "min-h-0 flex-1 overflow-auto p-2.5 lg:overflow-hidden" : "min-h-0 flex-1 overflow-auto p-2.5"}>
+          {children}
+        </main>
       </div>
     </div>
   );

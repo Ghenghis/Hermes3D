@@ -11,7 +11,7 @@ import { StatusBadge, type StatusTone } from "../badges/StatusBadge";
  *
  * Phase 2 dock state machine (see `app/store.ts` DockMode):
  *   - docked      → standard inline panel (default)
- *   - undocked    → CSS-only floating mock overlay
+ *   - undocked    → CSS-only floating overlay
  *   - fullscreen  → CSS-only `fixed inset-4 z-40 shadow-glow` overlay
  *
  * Collapse state is independent and stored in `panelCollapsed`. Collapsed
@@ -52,7 +52,7 @@ export function Panel({
   const isUndocked = dock === "undocked";
 
   const headerCls = dense ? "h-8 px-3" : "h-10 px-4";
-  const bodyCls = dense ? "flex-1 p-2.5 overflow-auto" : "flex-1 p-4 overflow-auto";
+  const bodyCls = dense ? "min-h-0 flex-1 overflow-hidden p-2.5" : "min-h-0 flex-1 overflow-auto p-4";
 
   const ChevronIcon = collapsed ? ChevronUp : ChevronDown;
 
@@ -129,7 +129,7 @@ export function Panel({
                   title="Locked in Phase 2"
                   className="w-full rounded px-2 py-1 text-left text-muted opacity-70 cursor-not-allowed"
                 >
-                  Refresh mock data
+                  Refresh unavailable
                 </button>
                 <button
                   type="button"

@@ -1,9 +1,8 @@
 /**
  * Dimensional Truth Engine UI-standards types.
  *
- * Phase 2 reserves these shapes per the addendum in PHASE2_PLAN.md so Phase
- * 4-6 can populate them without renegotiating the visual contract. Phase 2
- * ships placeholders only — no real measurement logic, no CAD libraries.
+ * Live dimensional reports returned by the local backend. Empty arrays mean
+ * no report has been written yet.
  */
 
 export type Unit = "mm" | "in";
@@ -11,7 +10,7 @@ export type Unit = "mm" | "in";
 export interface ScaleConfirmation {
   unit: Unit;
   scale_factor: number;
-  /** Mock: "operator" | null — Phase 6 wires the operator-confirmation flow. */
+  /** Actor that confirmed the scale, or null if it is not confirmed yet. */
   confirmed_by: string | null;
   confirmed_at_utc: string | null;
 }

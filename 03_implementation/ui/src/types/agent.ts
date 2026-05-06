@@ -5,17 +5,7 @@
 
 export type AgentStatus = "idle" | "active" | "paused" | "error";
 
-export type AgentRole =
-  | "Planner"
-  | "Implementer"
-  | "BlenderModeler"
-  | "MeshQA"
-  | "SlicerQA"
-  | "PrinterControl"
-  | "Repair"
-  | "Reviewer"
-  | "Releaser"
-  | "Auditor";
+export type AgentRole = string;
 
 export interface Agent {
   id: string;
