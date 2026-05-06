@@ -1,7 +1,16 @@
-import { Clock3, Gauge, ShieldAlert, Zap } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { LockedAction } from "../badges/LockedAction";
 import { StatusBadge } from "../badges/StatusBadge";
 import { Panel } from "../layout/Panel";
+
+/**
+ * AutopilotConsole — display widget for autopilot runbook and guardrails.
+ *
+ * This component is a pure display widget. All live readiness data comes
+ * from the AutopilotTab (which calls /api/autopilot/readiness and
+ * /api/autopilot/guardrails). Do NOT add hardcoded fake status values here;
+ * if no props are passed the component shows "not connected" state honestly.
+ */
 
 const RUNBOOK = [
   { id: "observe", label: "Observe printer and queue state", status: "ready" },
@@ -17,7 +26,19 @@ const GUARDS = [
   "Loopback-only live bridge policy",
 ];
 
-export function AutopilotConsole() {
+export interface AutopilotConsoleProps {
+  /** Live readiness check count from /api/autopilot/readiness. Omit = not connected. */
+  readyCount?: number;
+  /** Total expected checks from /api/autopilot/readiness. Omit = not connected. */
+  totalChecks?: number;
+}
+
+export function AutopilotConsole({ readyCount, totalChecks }: AutopilotConsoleProps = {}) {
+  const connected = readyCount !== undefined && totalChecks !== undefined;
+  const allReady = connected && readyCount === totalChecks && totalChecks > 0;
+  const loopStatus = allReady ? "ready" : "not configured";
+  const riskStatus = connected ? (allReady ? "low" : "blocked") : "unknown";
+
   return (
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min">
       <div className="col-span-12 lg:col-span-7">
@@ -47,13 +68,13 @@ export function AutopilotConsole() {
           id="autopilot.readiness"
           title="READINESS"
           dense
-          status={{ tone: "green", label: "armed" }}
+          status={{ tone: allReady ? "green" : "amber", label: connected ? `${readyCount}/${totalChecks} ready` : "not connected" }}
           className="h-[165px]"
         >
           <div className="grid grid-cols-3 gap-2 text-xs">
-            <Readiness icon={<Zap size={15} />} label="Loop" value="on" />
-            <Readiness icon={<Clock3 size={15} />} label="Window" value="8h" />
-            <Readiness icon={<Gauge size={15} />} label="Risk" value="low" />
+            <ReadinessCell label="Loop" value={loopStatus} ready={allReady} />
+            <ReadinessCell label="Risk" value={riskStatus} ready={allReady} />
+            <ReadinessCell label="Data" value={connected ? "live" : "unavailable"} ready={connected} />
           </div>
           <div className="mt-3 flex flex-wrap gap-1.5">
             <LockedAction label="Start writes" hint="Requires explicit operator approval" />
@@ -82,14 +103,11 @@ export function AutopilotConsole() {
   );
 }
 
-function Readiness({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function ReadinessCell({ label, value, ready }: { label: string; value: string; ready: boolean }) {
   return (
     <div className="rounded border border-border bg-surface2/40 p-2">
-      <div className="flex items-center gap-1.5 text-muted">
-        {icon}
-        <span className="truncate text-[10px] uppercase">{label}</span>
-      </div>
-      <div className="mt-1 font-semibold text-fg">{value}</div>
+      <div className="text-[10px] uppercase text-muted">{label}</div>
+      <div className={`mt-1 font-semibold ${ready ? "text-fg" : "text-accent-amber"}`}>{value}</div>
     </div>
   );
 }
