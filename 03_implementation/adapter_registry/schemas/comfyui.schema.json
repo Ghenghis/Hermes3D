@@ -40,6 +40,33 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "source_repo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "https://github.com/comfyanonymous/ComfyUI.git",
+      "description": "Upstream git repo (used by verify_gen3d.py via git ls-remote, no clone)."
+    },
+    "pip_package": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional pip package name to probe via 'pip show' (no install)."
+    },
+    "weights_cache_dirs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "~/comfy/models",
+        "~/ComfyUI/models"
+      ],
+      "description": "Boolean-presence weight cache locations. Verifier never downloads."
     }
   }
 }

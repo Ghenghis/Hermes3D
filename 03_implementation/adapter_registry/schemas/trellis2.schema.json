@@ -40,6 +40,33 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "source_repo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "https://github.com/microsoft/TRELLIS.git",
+      "description": "Upstream git repo (used by verify_gen3d.py via git ls-remote, no clone)."
+    },
+    "pip_package": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "trellis",
+      "description": "Optional pip package name to probe via 'pip show' (no install)."
+    },
+    "weights_cache_dirs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "~/.cache/huggingface/hub/models--microsoft--TRELLIS-image-large",
+        "~/.cache/trellis"
+      ],
+      "description": "Boolean-presence weight cache locations. Verifier never downloads."
     }
   }
 }
