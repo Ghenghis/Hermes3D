@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/firmware_klipper.schema.json",
+  "title": "Klipper firmware source descriptor",
+  "description": "Source-only descriptor for Klipper firmware. Lane H3D-CLAUDE-SOURCE-FIRMWARE never flashes; only verifies remote source presence and toolchain compile-readiness.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "source_url", "install_check", "version_pattern"],
+  "properties": {
+    "name": {"type": "string", "const": "klipper"},
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "default": "https://github.com/Klipper3d/klipper.git",
+      "description": "Public Git remote. Verifier uses git ls-remote (no clone)."
+    },
+    "default_branch": {"type": "string", "default": "master"},
+    "install_check": {
+      "type": "string",
+      "default": "git ls-remote --heads https://github.com/Klipper3d/klipper.git",
+      "description": "Read-only remote probe. NEVER a flash command."
+    },
+    "version_pattern": {
+      "type": "string",
+      "default": "^[0-9a-f]{40}\\s+refs/heads/.+$",
+      "description": "Regex applied to git ls-remote output line."
+    },
+    "toolchain_required": {"type": "string", "const": "toolchain_arm_none_eabi"},
+    "no_flash": {"type": "boolean", "const": true}
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "firmwares": [
+    {
+      "install_check": "git ls-remote --heads https://github.com/Klipper3d/klipper.git",
+      "name": "klipper",
+      "no_flash": true,
+      "probe": {
+        "head_count": 6,
+        "ok": true,
+        "returncode": 0,
+        "stderr_tail": "",
+        "stdout_first_line": "1d365f6a37333ccf847e09ef5b858cc57f7c6230\trefs/heads/gh-pages"
+      },
+      "schema": "firmware_klipper.schema.json",
+      "source_url": "https://github.com/Klipper3d/klipper.git"
+    },
+    {
+      "install_check": "git ls-remote --heads https://github.com/MarlinFirmware/Marlin.git",
+      "name": "marlin",
+      "no_flash": true,
+      "probe": {
+        "head_count": 25,
+        "ok": true,
+        "returncode": 0,
+        "stderr_tail": "",
+        "stdout_first_line": "d9c04498203b6e67cb543eb8a02344b3f70b1a33\trefs/heads/1.0.x"
+      },
+      "schema": "firmware_marlin.schema.json",
+      "source_url": "https://github.com/MarlinFirmware/Marlin.git"
+    },
+    {
+      "install_check": "git ls-remote --heads https://github.com/Duet3D/RepRapFirmware.git",
+      "name": "reprapfirmware",
+      "no_flash": true,
+      "probe": {
+        "head_count": 40,
+        "ok": true,
+        "returncode": 0,
+        "stderr_tail": "",
+        "stdout_first_line": "c7ef2b9b0afa951633bc8ae6dbb96be9af44c14b\trefs/heads/3.3-dev"
+      },
+      "schema": "firmware_reprap.schema.json",
+      "source_url": "https://github.com/Duet3D/RepRapFirmware.git"
+    },
+    {
+      "install_check": "git ls-remote --heads https://github.com/prusa3d/Prusa-Firmware.git",
+      "name": "prusa_firmware",
+      "no_flash": true,
+      "probe": {
+        "head_count": 31,
+        "ok": true,
+        "returncode": 0,
+        "stderr_tail": "",
+        "stdout_first_line": "61161b705e9a7a6f5ef5af4e52382987816e7995\trefs/heads/MK2"
+      },
+      "schema": "firmware_prusa.schema.json",
+      "source_url": "https://github.com/prusa3d/Prusa-Firmware.git"
+    }
+  ],
+  "generated_utc": "2026-05-06T22:29:58Z",
+  "lane": "H3D-CLAUDE-SOURCE-FIRMWARE",
+  "owner": "claude-source-firmware-05",
+  "policy": {
+    "forbidden_flash_tokens": [
+      "flash",
+      "upload",
+      "avrdude",
+      "st-flash",
+      "dfu-util",
+      "bossac",
+      "openocd",
+      "stm32flash",
+      "pio run -t upload",
+      "platformio run -t upload",
+      "make program"
+    ],
+    "no_flash": true,
+    "no_serial_to_printer": true,
+    "no_usb_to_printer": true,
+    "probe_timeout_seconds": 5
+  },
+  "summary": {
+    "firmware_sources_reachable": [
+      "klipper",
+      "marlin",
+      "reprapfirmware",
+      "prusa_firmware"
+    ],
+    "firmware_sources_unreachable": [],
+    "toolchains_absent": [
+      "avr_gcc",
+      "arm_none_eabi_gcc"
+    ],
+    "toolchains_present": []
+  },
+  "toolchains": [
+    {
+      "compile_only": true,
+      "install_check": "avr-gcc --version",
+      "name": "avr_gcc",
+      "no_flash": true,
+      "probe": {
+        "ok": false,
+        "raw_first_line": "",
+        "reason": "not_installed",
+        "version": null
+      },
+      "schema": "toolchain_avr_gcc.schema.json",
+      "version_pattern": "avr-gcc \\(.*\\) ([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
+    },
+    {
+      "compile_only": true,
+      "install_check": "arm-none-eabi-gcc --version",
+      "name": "arm_none_eabi_gcc",
+      "no_flash": true,
+      "probe": {
+        "ok": false,
+        "raw_first_line": "",
+        "reason": "not_installed",
+        "version": null
+      },
+      "schema": "toolchain_arm_none_eabi.schema.json",
+      "version_pattern": "arm-none-eabi-gcc \\(.*\\) ([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"
+    }
+  ]
+}
