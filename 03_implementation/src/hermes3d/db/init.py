@@ -8,6 +8,23 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parents[3] / "var" / "hermes3d.db"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+MODULE_PROVIDER_TARGETS = {
+    "blender_mcp_candidates": (
+        "blender_mcp_candidates",
+        "Blender MCP Candidates",
+        "agents",
+        "reference",
+        "unknown",
+        "https://github.com/ahujasid/blender-mcp.git",
+        None,
+        "source_available",
+        0,
+        None,
+        "unknown",
+        "python_worker",
+        "[]",
+    ),
+}
 
 
 def connect() -> sqlite3.Connection:
@@ -239,6 +256,7 @@ def _seed_module_providers(conn: sqlite3.Connection) -> None:
             "Production-oriented add-on path; switchable but not claimed open-source until user installs and validates terms.",
         ),
     ]
+    _seed_module_provider_targets(conn, providers)
     conn.executemany(
         """
         INSERT OR IGNORE INTO module_providers
@@ -253,6 +271,23 @@ def _seed_module_providers(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "INSERT OR IGNORE INTO settings (key, value) VALUES ('source_os.blender_mcp_candidates.active_provider', 'official_blender')"
+    )
+
+
+def _seed_module_provider_targets(conn: sqlite3.Connection, providers: list[tuple]) -> None:
+    module_ids = sorted({str(provider[1]) for provider in providers})
+    missing_metadata = [module_id for module_id in module_ids if module_id not in MODULE_PROVIDER_TARGETS]
+    if missing_metadata:
+        raise ValueError(f"module provider target metadata missing for: {', '.join(missing_metadata)}")
+    conn.executemany(
+        """
+        INSERT OR IGNORE INTO modules
+            (id, display_name, section, priority, license, repo_url, local_path,
+             install_state, install_progress, detected_version, health, launch_kind,
+             bridge_tasks)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        [MODULE_PROVIDER_TARGETS[module_id] for module_id in module_ids],
     )
 
 
