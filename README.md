@@ -304,6 +304,8 @@ Latest release: <https://github.com/Ghenghis/Hermes3D/releases>
 - **Release notes** — [`00_overview/V5_3_0_RELEASE_NOTES.md`](./00_overview/V5_3_0_RELEASE_NOTES.md) (v5.3.0 RC — draft for review)
 - **Honesty ledger** — [`00_overview/contract/HONESTY_LEDGER.md`](./00_overview/contract/HONESTY_LEDGER.md) (every claim, with status)
 - **Roadmap** — [`00_overview/contract/ROADMAP.md`](./00_overview/contract/ROADMAP.md)
+- **Operator GUI roadmap** — [`03_implementation/ROADMAP.md`](./03_implementation/ROADMAP.md) (16 tabs · live ledger · printer policy)
+- **20-agent completion contract** — [`03_implementation/docs/handoffs/CLAUDE_20_AGENT_COMPLETION_CONTRACT.md`](./03_implementation/docs/handoffs/CLAUDE_20_AGENT_COMPLETION_CONTRACT.md)
 - **Live proof** — [`PROOF_E2E_REPORT.md`](./PROOF_E2E_REPORT.md) (refreshed by CI on every push)
 
 ---

@@ -1,0 +1,118 @@
+{
+  "lane": "H3D-CLAUDE-DOCS-PROOF",
+  "owner": "claude-docs-proof",
+  "date": "2026-05-06",
+  "branch": "claude/docs-proof",
+  "base_branch": "feat/hermes3d-7-complete-gui-repo-wiring",
+  "purpose": "Sync user-facing docs with the live Hermes3D OS baseline that landed in the 5-commit 20-agent contract baseline.",
+  "commits_baseline": [
+    "be753d9e1704759bd57cb64a083a0e98e996e029",
+    "e38b38c91567e8cc776e00d4c2aa67aff12df26d",
+    "a13fd44293fcd422cf582ad206770fb459c09ea4",
+    "3b9235bae3d43c2bd05a6647dfd54612ad6d68fa",
+    "c9b1afdadf7053e2847d29faf5e34a0da7fdf316"
+  ],
+  "tabs_present": [
+    "source_os",
+    "dashboard",
+    "autopilot",
+    "design",
+    "gen3d",
+    "jobs",
+    "printers",
+    "observe",
+    "voice",
+    "agents",
+    "learning",
+    "artifacts",
+    "approvals",
+    "plugins",
+    "settings",
+    "roadmap"
+  ],
+  "tab_count": 16,
+  "primary_tab_count": 15,
+  "tab_files_on_disk": [
+    "03_implementation/ui/src/tabs/Agents.tsx",
+    "03_implementation/ui/src/tabs/Approvals.tsx",
+    "03_implementation/ui/src/tabs/Artifacts.tsx",
+    "03_implementation/ui/src/tabs/Autopilot.tsx",
+    "03_implementation/ui/src/tabs/Dashboard.tsx",
+    "03_implementation/ui/src/tabs/Design.tsx",
+    "03_implementation/ui/src/tabs/Gen3D.tsx",
+    "03_implementation/ui/src/tabs/Jobs.tsx",
+    "03_implementation/ui/src/tabs/Learning.tsx",
+    "03_implementation/ui/src/tabs/Observe.tsx",
+    "03_implementation/ui/src/tabs/Plugins.tsx",
+    "03_implementation/ui/src/tabs/Printers.tsx",
+    "03_implementation/ui/src/tabs/Roadmap.tsx",
+    "03_implementation/ui/src/tabs/Settings.tsx",
+    "03_implementation/ui/src/tabs/SourceOS.tsx",
+    "03_implementation/ui/src/tabs/Voice.tsx"
+  ],
+  "tab_registry_source": "03_implementation/ui/src/app/routes.tsx",
+  "printer_policy": {
+    "S1": {
+      "ip": "192.168.0.12",
+      "mode": "camera_read_only",
+      "actions_locked": true,
+      "notes": "No move, upload, print, or test. UI must show locked status until user changes it."
+    },
+    "T1_1": {
+      "ip": "192.168.0.10",
+      "mode": "moonraker_klipper",
+      "actions_locked": false,
+      "notes": "Testable only through policy-gated backend routes."
+    },
+    "T1_2": {
+      "ip": "192.168.0.11",
+      "mode": "moonraker_klipper",
+      "actions_locked": false,
+      "notes": "Testable only through policy-gated backend routes."
+    },
+    "V400": {
+      "ip": "192.168.0.34",
+      "mode": "moonraker_klipper",
+      "actions_locked": false,
+      "notes": "Testable only through policy-gated backend routes; USB webcam URL configured for Observe."
+    }
+  },
+  "printer_policy_quoted": true,
+  "e2e_specs_present": [
+    "03_implementation/ui/tests/e2e/live-gui.spec.ts"
+  ],
+  "proof_artifacts_present_in_proof_dir": [
+    "03_implementation/proof/ACTIVE_UI_NO_FAKE_SWEEP.md",
+    "03_implementation/proof/FLSUN_PROFILE_SOURCE_AUDIT.json",
+    "03_implementation/proof/LOCAL_TOOLING_AUDIT.json",
+    "03_implementation/proof/PDF_CONTRACT_EXTRACT.txt",
+    "03_implementation/proof/SOURCE_APP_60_COMPLETION_AUDIT.json",
+    "03_implementation/proof/SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json",
+    "03_implementation/proof/SOURCE_APP_CLI_SURFACE_AUDIT.json",
+    "03_implementation/proof/SOURCE_APP_RUNTIME_ACTION_PLAN.md",
+    "03_implementation/proof/SOURCE_REGISTRY_TRUTH_AUDIT.json",
+    "03_implementation/proof/T1_DELTA_CALIBRATION_PRINT_PROOF.json",
+    "03_implementation/proof/TESTS_PROOF_READINESS.md"
+  ],
+  "files_changed": [
+    "03_implementation/proof/DOCS_SYNC_2026-05-06.json",
+    "03_implementation/docs/CLAUDE_DOCS_SYNC_2026-05-06.md",
+    "README.md"
+  ],
+  "files_not_touched_codex_owned": [
+    "00_overview/contract/MASTER_CONTRACT.md",
+    "00_overview/contract/DEFINITION_OF_DONE.md",
+    "03_implementation/ROADMAP.md",
+    "03_implementation/docs/handoffs/CLAUDE_20_AGENT_COMPLETION_CONTRACT.md",
+    "03_implementation/docs/handoffs/GITHUB_SYNC_PLAN_2026-05-06.md",
+    "03_implementation/src/hermes3d/services/code_history.py",
+    "03_implementation/src/hermes3d/api/routes/code_operator.py"
+  ],
+  "rationale_for_skipping_roadmap": "03_implementation/ROADMAP.md is held by an active hermes lock from owner=codex-master under task H3D-HERMES3D7-GUI-WIRING-2026-05-04. Per the lane rules a Claude lane must not edit files held by another agent's active lock. ROADMAP.md is current as of 2026-05-06 with the live tab status, printer policy, and proof event ids. This lane therefore adds a Claude-authored docs sync companion at 03_implementation/docs/CLAUDE_DOCS_SYNC_2026-05-06.md and updates README.md only.",
+  "hermes_task_id": "H3D-CLAUDE-DOCS-PROOF",
+  "hermes_locks_acquired": [
+    "03_implementation/proof/DOCS_SYNC_2026-05-06.json",
+    "03_implementation/docs/CLAUDE_DOCS_SYNC_2026-05-06.md",
+    "README.md"
+  ]
+}
