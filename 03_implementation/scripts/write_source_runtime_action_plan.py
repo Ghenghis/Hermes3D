@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,6 +13,12 @@ READINESS_JSON = PROOF_DIR / "SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json"
 CLI_SURFACE_JSON = PROOF_DIR / "SOURCE_APP_CLI_SURFACE_AUDIT.json"
 COMPLETION_JSON = PROOF_DIR / "SOURCE_APP_60_COMPLETION_AUDIT.json"
 OUTPUT = PROOF_DIR / "SOURCE_APP_RUNTIME_ACTION_PLAN.md"
+sys.path.insert(0, str(IMPLEMENTATION_ROOT / "src"))
+try:
+    from hermes3d.services.module_runtime import BUILTIN_RUNTIME_PROBES, SERVICE_START_RUNNERS
+except Exception:
+    BUILTIN_RUNTIME_PROBES = {}
+    SERVICE_START_RUNNERS = {}
 
 GAP_TIERS = {
     "cli_preferred_gap",
@@ -31,19 +38,38 @@ def main() -> int:
     completion = read_json(COMPLETION_JSON)
     readiness_rows = list(readiness.get("rows") or [])
     surface_rows = list(cli_surface.get("records") or [])
-    surface_by_id = {str(row.get("module_id")): row for row in surface_rows if isinstance(row, dict)}
-    gaps = [row for row in readiness_rows if isinstance(row, dict) and str(row.get("agent_execution_tier")) in GAP_TIERS]
-    verified = [row for row in readiness_rows if isinstance(row, dict) and row.get("agent_execution_tier") == "verified_agent_cli"]
-    launcher_only = [row for row in readiness_rows if isinstance(row, dict) and row.get("agent_execution_tier") == "launcher_metadata_only"]
+    surface_by_id = {
+        str(row.get("module_id")): row for row in surface_rows if isinstance(row, dict)
+    }
+    gaps = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and str(row.get("agent_execution_tier")) in GAP_TIERS
+    ]
+    verified = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and row.get("agent_execution_tier") == "verified_agent_cli"
+    ]
+    launcher_only = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and row.get("agent_execution_tier") == "launcher_metadata_only"
+    ]
     candidate_rows = [
         row
         for row in surface_rows
-        if isinstance(row, dict) and str(row.get("cli_surface_status", "")).endswith("_needs_verifier")
+        if isinstance(row, dict)
+        and str(row.get("cli_surface_status", "")).endswith("_needs_verifier")
     ]
 
     gap_counts = Counter(str(row.get("agent_execution_tier")) for row in gaps)
     candidate_counts = Counter(str(row.get("cli_surface_status")) for row in candidate_rows)
-    completion_counts = completion.get("runtime_setup_queue", {}).get("counts", {}) if isinstance(completion.get("runtime_setup_queue"), dict) else {}
+    completion_counts = (
+        completion.get("runtime_setup_queue", {}).get("counts", {})
+        if isinstance(completion.get("runtime_setup_queue"), dict)
+        else {}
+    )
     runner_not_registered = completion_counts.get("runner_not_registered")
     runtime_repair_required = completion_counts.get("runtime_repair_required", 0)
     source_install_available = completion_counts.get("source_install_available", 0)
@@ -77,12 +103,22 @@ def main() -> int:
         "- Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.",
         "- S1 remains camera/read-only and action-locked until the user changes printer policy.",
         "",
+        "## Safe Service Start Runner Contracts",
+        "",
+        "These rows now have a registered setup/start preflight contract at `/api/modules/{module_id}/runtime/start-runner`. The contract checks the configured local/private URL key, local checkout, command family, and port state, writes proof, and still does not launch a process until a sandbox/process supervisor gate is enabled. Runtime-ready status still requires the health/version verifier to pass after startup.",
+        "",
+        "| App | Env key | Default URL | Command family | Start command preview | Current execution mode |",
+        "| --- | --- | --- | --- | --- | --- |",
+        *service_start_runner_rows(),
+        "",
         "## Verified Agent CLI Rows",
         "",
         "| App | Section | Verifier | Proof gate | Next safe work |",
         "| --- | --- | --- | --- | --- |",
     ]
-    for row in sorted(verified, key=lambda item: (str(item.get("section")), str(item.get("display")))):
+    for row in sorted(
+        verified, key=lambda item: (str(item.get("section")), str(item.get("display")))
+    ):
         lines.append(
             "| "
             + " | ".join(
@@ -159,7 +195,9 @@ def main() -> int:
             "| --- | --- | --- | --- | --- |",
         ]
     )
-    for row in sorted(candidate_rows, key=lambda item: (str(item.get("section")), str(item.get("display")))):
+    for row in sorted(
+        candidate_rows, key=lambda item: (str(item.get("section")), str(item.get("display")))
+    ):
         lines.append(
             "| "
             + " | ".join(
@@ -185,7 +223,9 @@ def main() -> int:
             "| --- | --- | --- | --- |",
         ]
     )
-    for row in sorted(launcher_only, key=lambda item: (str(item.get("section")), str(item.get("display")))):
+    for row in sorted(
+        launcher_only, key=lambda item: (str(item.get("section")), str(item.get("display")))
+    ):
         lines.append(
             "| "
             + " | ".join(
@@ -223,14 +263,19 @@ def main() -> int:
             "python 03_implementation\\scripts\\audit_source_app_completion.py",
             "python 03_implementation\\scripts\\write_source_runtime_action_plan.py",
             "python 03_implementation\\scripts\\scan_active_ui_no_fake.py",
-            "cd 03_implementation\\ui; npm run lint; npx.cmd playwright test --config=playwright.e2e.config.ts --grep \"Source OS|Plugins|Roadmap|Settings Environment\"",
+            'cd 03_implementation\\ui; npm run lint; npx.cmd playwright test --config=playwright.e2e.config.ts --grep "Source OS|Plugins|Roadmap|Settings Environment"',
             "```",
             "",
         ]
     )
 
     OUTPUT.write_text("\n".join(lines), encoding="utf-8")
-    print(json.dumps({"path": str(OUTPUT), "runner_gaps": len(gaps), "cli_candidates": len(candidate_rows)}, indent=2))
+    print(
+        json.dumps(
+            {"path": str(OUTPUT), "runner_gaps": len(gaps), "cli_candidates": len(candidate_rows)},
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -242,12 +287,44 @@ def read_json(path: Path) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def service_start_runner_rows() -> list[str]:
+    rows: list[str] = []
+    for module_id, runner in sorted(SERVICE_START_RUNNERS.items()):
+        probe = (
+            BUILTIN_RUNTIME_PROBES.get(module_id, {})
+            if isinstance(BUILTIN_RUNTIME_PROBES, dict)
+            else {}
+        )
+        args = probe.get("args") if isinstance(probe, dict) else []
+        env_name = str(args[0]) if isinstance(args, list) and args else ""
+        command = (
+            " ".join(str(item) for item in runner.get("command") or []) or "wrapper inside ComfyUI"
+        )
+        rows.append(
+            "| "
+            + " | ".join(
+                [
+                    cell(probe.get("label") or module_id),
+                    cell(env_name),
+                    cell(probe.get("default_url")),
+                    cell(runner.get("command_family")),
+                    cell(command),
+                    "preflight/proof only; no process launch until supervisor gate",
+                ]
+            )
+            + " |"
+        )
+    return rows or ["| none | none | none | none | none | no registered service start contracts |"]
+
+
 def grouped(rows: list[dict[str, Any]], key: str) -> dict[str, list[dict[str, Any]]]:
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         groups[str(row.get(key) or "unknown")].append(row)
     return {
-        group_key: sorted(group_rows, key=lambda item: (str(item.get("section")), str(item.get("display"))))
+        group_key: sorted(
+            group_rows, key=lambda item: (str(item.get("section")), str(item.get("display")))
+        )
         for group_key, group_rows in sorted(groups.items())
     }
 
@@ -256,15 +333,30 @@ def required_correction(row: dict[str, Any], surface: dict[str, Any]) -> str:
     tier = str(row.get("agent_execution_tier") or "")
     launch_kind = str(row.get("launch_kind") or "")
     if tier == "cli_preferred_gap":
-        return row.get("required_verifier_family") or "Locate or install the real CLI, then register a bounded version/help/dry-run verifier."
+        return (
+            row.get("required_verifier_family")
+            or "Locate or install the real CLI, then register a bounded version/help/dry-run verifier."
+        )
     if tier == "python_worker_gap":
-        return row.get("required_verifier_family") or "Create an isolated Python env/import or module --help verifier before runner exposure."
+        return (
+            row.get("required_verifier_family")
+            or "Create an isolated Python env/import or module --help verifier before runner exposure."
+        )
     if tier == "npm_package_gap":
-        return row.get("required_verifier_family") or "Run a package metadata/build verifier without secrets, then add a safe node runner."
+        return (
+            row.get("required_verifier_family")
+            or "Run a package metadata/build verifier without secrets, then add a safe node runner."
+        )
     if tier in {"service_gap", "web_app_gap"}:
-        return row.get("required_verifier_family") or "Add a non-mutating local health/version endpoint smoke before start/stop controls."
+        return (
+            row.get("required_verifier_family")
+            or "Add a non-mutating local health/version endpoint smoke before start/stop controls."
+        )
     if tier == "gpu_worker_gap":
-        return row.get("required_verifier_family") or "Add a lightweight dependency/model-cache verifier before any GPU job launch."
+        return (
+            row.get("required_verifier_family")
+            or "Add a lightweight dependency/model-cache verifier before any GPU job launch."
+        )
     if tier == "desktop_app_gap":
         return "Find a safe CLI/headless mode or add an explicit desktop bridge smoke."
     if launch_kind == "firmware_source":
@@ -280,7 +372,9 @@ def acceptance_gate(row: dict[str, Any], surface: dict[str, Any]) -> str:
     if tier in {"python_worker_gap", "service_gap", "web_app_gap", "gpu_worker_gap"}:
         return "Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason."
     if str(row.get("launch_kind") or "") == "firmware_source":
-        return "Document no-runtime/reference-only or register safe version/build metadata verifier."
+        return (
+            "Document no-runtime/reference-only or register safe version/build metadata verifier."
+        )
     return cell(surface.get("next_action") or row.get("next_action"))
 
 

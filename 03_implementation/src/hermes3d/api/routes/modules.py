@@ -24,6 +24,7 @@ from hermes3d.services.module_runtime import (
     module_runner_contract,
     module_runner_contracts,
     module_runtime_probe,
+    module_service_start_runner_contract,
     module_setup_steps,
     registered_runtime_probe_ids,
 )
@@ -33,7 +34,9 @@ IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[4]
 SOURCE_UPDATE_BACKUP_ROOT = IMPLEMENTATION_ROOT / "var" / "source_module_backups"
 SOURCE_CLI_SURFACE_AUDIT_PATH = IMPLEMENTATION_ROOT / "proof" / "SOURCE_APP_CLI_SURFACE_AUDIT.json"
 _MODULES_SYNCED = False
-SECRET_RE = re.compile(r"(?i)(https?://)([^/@\s]+@)|([?&](?:token|key|api_key|access_token)=)[^&\s]+")
+SECRET_RE = re.compile(
+    r"(?i)(https?://)([^/@\s]+@)|([?&](?:token|key|api_key|access_token)=)[^&\s]+"
+)
 BACKUP_ID_RE = re.compile(r"^[A-Za-z0-9._-]{8,180}$")
 GIT_REF_RE = re.compile(r"^[A-Za-z0-9._/-]{1,180}$")
 RUNNER_RECOMMENDATIONS = {
@@ -57,7 +60,14 @@ RUNNER_RECOMMENDATIONS = {
     "web_app_reference": "Register reference route/build metadata proof before exposing a runnable web app.",
 }
 CLI_PREFERRED_LAUNCH_KINDS = {"cli_worker", "cli_or_python_worker", "desktop_or_cli"}
-CLI_POSSIBLE_LAUNCH_KINDS = {"desktop_app", "python_worker", "gpu_worker", "service", "web_app", "npm_package"}
+CLI_POSSIBLE_LAUNCH_KINDS = {
+    "desktop_app",
+    "python_worker",
+    "gpu_worker",
+    "service",
+    "web_app",
+    "npm_package",
+}
 
 
 class ModuleBackupRequest(BaseModel):
@@ -75,6 +85,11 @@ class ModuleRollbackRequest(BaseModel):
     actor: str = "operator"
     backup_id: str | None = None
     reason: str | None = None
+
+
+class ModuleRuntimeStartRunnerRequest(BaseModel):
+    actor: str = "operator"
+    execute: bool = False
 
 
 def _sync_registry_once() -> None:
@@ -155,9 +170,13 @@ def _module_response(mod: dict[str, Any]) -> dict[str, Any]:
             {
                 "id": task["id"],
                 "name": task["name"],
-                "status": task["status"] if bridge_runner_ready and task["status"] in {"pending", "running", "pass", "fail"} else "skipped",
+                "status": task["status"]
+                if bridge_runner_ready and task["status"] in {"pending", "running", "pass", "fail"}
+                else "skipped",
                 "last_run_at": task["last_run_at"],
-                "last_run_log": task["last_result"] if bridge_runner_ready else "No real bridge runner is configured for this source module yet.",
+                "last_run_log": task["last_result"]
+                if bridge_runner_ready
+                else "No real bridge runner is configured for this source module yet.",
                 "duration_ms": None,
             }
             for task in tasks
@@ -171,7 +190,9 @@ def _module_response(mod: dict[str, Any]) -> dict[str, Any]:
 
 
 def _module_providers(module_id: str) -> list[dict[str, Any]]:
-    provider_rows = rows("SELECT * FROM module_providers WHERE module_id = ? ORDER BY display_name", (module_id,))
+    provider_rows = rows(
+        "SELECT * FROM module_providers WHERE module_id = ? ORDER BY display_name", (module_id,)
+    )
     return [_provider_response(provider) for provider in provider_rows]
 
 
@@ -235,7 +256,8 @@ def _runtime_setup_plan_record(mod: dict[str, Any]) -> dict[str, Any]:
         "verifier": runtime.get("verifier"),
         "runner_status": runner_status,
         "next_action": next_action,
-        "source_install_supported": status == "not_installed" and bool(synced.get("repo_url") and synced.get("local_path")),
+        "source_install_supported": status == "not_installed"
+        and bool(synced.get("repo_url") and synced.get("local_path")),
         "runtime_ready": status == "ready",
         "agent_can_execute_setup_now": False,
         "agent_setup_gate": "No source module setup runner executes until it is registered with a safe verifier and proof gate.",
@@ -333,15 +355,43 @@ def _module_update_record(mod: dict[str, Any], *, deep: bool = False) -> dict[st
     path = Path(str(local_path)) if local_path else None
     exists = bool(path and path.exists())
     git_ready = bool(path and exists and (path / ".git").exists())
-    commit = _run_git_optional(path, ["rev-parse", "--short=12", "HEAD"]) if git_ready and deep else None
-    branch = _run_git_optional(path, ["rev-parse", "--abbrev-ref", "HEAD"]) if git_ready and deep else None
-    exact_tag = _run_git_optional(path, ["describe", "--tags", "--exact-match"]) if git_ready and deep else None
-    nearest_tag = _run_git_optional(path, ["describe", "--tags", "--abbrev=0"]) if git_ready and deep else None
-    dirty_entries = (_run_git_optional(path, ["status", "--porcelain=v1"]) or "").splitlines() if git_ready and deep else []
-    upstream = _run_git_optional(path, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]) if git_ready and deep else None
-    behind_text = _run_git_optional(path, ["rev-list", "--count", "HEAD..@{u}"]) if git_ready and upstream and deep else None
+    commit = (
+        _run_git_optional(path, ["rev-parse", "--short=12", "HEAD"]) if git_ready and deep else None
+    )
+    branch = (
+        _run_git_optional(path, ["rev-parse", "--abbrev-ref", "HEAD"])
+        if git_ready and deep
+        else None
+    )
+    exact_tag = (
+        _run_git_optional(path, ["describe", "--tags", "--exact-match"])
+        if git_ready and deep
+        else None
+    )
+    nearest_tag = (
+        _run_git_optional(path, ["describe", "--tags", "--abbrev=0"])
+        if git_ready and deep
+        else None
+    )
+    dirty_entries = (
+        (_run_git_optional(path, ["status", "--porcelain=v1"]) or "").splitlines()
+        if git_ready and deep
+        else []
+    )
+    upstream = (
+        _run_git_optional(path, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+        if git_ready and deep
+        else None
+    )
+    behind_text = (
+        _run_git_optional(path, ["rev-list", "--count", "HEAD..@{u}"])
+        if git_ready and upstream and deep
+        else None
+    )
     behind_count = int(behind_text) if behind_text and behind_text.isdigit() else None
-    remote_url = _run_git_optional(path, ["remote", "get-url", "origin"]) if git_ready and deep else None
+    remote_url = (
+        _run_git_optional(path, ["remote", "get-url", "origin"]) if git_ready and deep else None
+    )
     latest_backup = _latest_source_backup(mod["id"])
     latest_check = _latest_source_update_check(mod["id"])
     source_update_supported = bool(git_ready and (not deep or (remote_url and not dirty_entries)))
@@ -382,7 +432,11 @@ def _module_update_record(mod: dict[str, Any], *, deep: bool = False) -> dict[st
         "backup_available": latest_backup is not None,
         "latest_check": latest_check,
         "deep_checked": deep,
-        "update_action": "blocked" if reason else "deep_check_required" if not deep else "check_ready",
+        "update_action": "blocked"
+        if reason
+        else "deep_check_required"
+        if not deep
+        else "check_ready",
         "safety": "readiness only; no fetch, checkout, pull, install, or build runs from this endpoint",
     }
 
@@ -409,7 +463,12 @@ def _run_git_optional(path: Path | None, args: list[str], *, timeout: int = 5) -
 def _redact_url(value: str | None) -> str | None:
     if not value:
         return None
-    return SECRET_RE.sub(lambda match: f"{match.group(1)}[REDACTED]@" if match.group(1) else f"{match.group(3)}[REDACTED]", value)
+    return SECRET_RE.sub(
+        lambda match: f"{match.group(1)}[REDACTED]@"
+        if match.group(1)
+        else f"{match.group(3)}[REDACTED]",
+        value,
+    )
 
 
 @router.get("/api/modules")
@@ -436,7 +495,10 @@ def module_update_readiness(section: str | None = None, deep: bool = False) -> d
         "SELECT * FROM modules WHERE (? IS NULL OR section = ?) ORDER BY section, display_name",
         (section, section),
     )
-    records = [_module_update_record(_sync_module_status(mod) if deep else mod, deep=deep) for mod in result]
+    records = [
+        _module_update_record(_sync_module_status(mod) if deep else mod, deep=deep)
+        for mod in result
+    ]
     return {
         "status": "ready",
         "strategy": "server_side_lightweight_readiness_by_default; deep=true adds local git preflight only; update execution requires backup, proof gates, and rollback route",
@@ -445,7 +507,11 @@ def module_update_readiness(section: str | None = None, deep: bool = False) -> d
         "count": len(records),
         "ready_for_update_check": sum(1 for record in records if record["source_update_supported"]),
         "blocked": sum(1 for record in records if not record["source_update_supported"]),
-        "outdated_cached": sum(1 for record in records if record["cached_behind_count"] and record["cached_behind_count"] > 0),
+        "outdated_cached": sum(
+            1
+            for record in records
+            if record["cached_behind_count"] and record["cached_behind_count"] > 0
+        ),
         "dirty": sum(1 for record in records if record["dirty"]),
         "records": records,
     }
@@ -614,7 +680,10 @@ def module_runtime_gaps(section: str | None = None) -> dict[str, Any]:
             {
                 "launch_kind": launch_kind,
                 "count": count,
-                "next_verifier": RUNNER_RECOMMENDATIONS.get(launch_kind, "Register a safe module-specific verifier before enabling runtime actions."),
+                "next_verifier": RUNNER_RECOMMENDATIONS.get(
+                    launch_kind,
+                    "Register a safe module-specific verifier before enabling runtime actions.",
+                ),
             }
             for launch_kind, count in sorted(by_launch_kind.items())
         ],
@@ -707,9 +776,19 @@ def module_agent_cli_readiness() -> dict[str, Any]:
     )
     records = [_agent_cli_readiness_record(_sync_module_status(mod)) for mod in module_rows]
     tier_counts = Counter(record["agent_execution_tier"] for record in records)
-    verified_cli = [record["module_id"] for record in records if record["agent_execution_tier"] == "verified_agent_cli"]
-    launcher_only = [record["module_id"] for record in records if record["agent_execution_tier"] == "launcher_metadata_only"]
-    runner_gaps = [record["module_id"] for record in records if record["agent_execution_tier"].endswith("_gap")]
+    verified_cli = [
+        record["module_id"]
+        for record in records
+        if record["agent_execution_tier"] == "verified_agent_cli"
+    ]
+    launcher_only = [
+        record["module_id"]
+        for record in records
+        if record["agent_execution_tier"] == "launcher_metadata_only"
+    ]
+    runner_gaps = [
+        record["module_id"] for record in records if record["agent_execution_tier"].endswith("_gap")
+    ]
     return {
         "status": "ready",
         "count": len(records),
@@ -734,9 +813,15 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
     execution_tier = "runner_gap"
     if runtime_status == "ready" and kind in {"cli", "python_module_cli"} and executed:
         execution_tier = "verified_agent_cli"
-    elif runtime_status == "ready" and (proof_gate == "desktop-launcher-metadata-v1" or (kind == "desktop_app" and not executed)):
+    elif runtime_status == "ready" and (
+        proof_gate == "desktop-launcher-metadata-v1" or (kind == "desktop_app" and not executed)
+    ):
         execution_tier = "launcher_metadata_only"
-    elif runtime_status == "ready" and kind in {"python_import", "python_source_import", "node_package"}:
+    elif runtime_status == "ready" and kind in {
+        "python_import",
+        "python_source_import",
+        "node_package",
+    }:
         execution_tier = "package_or_import_ready"
     elif runtime_status == "ready" and kind == "moonraker_fleet":
         execution_tier = "service_api_ready"
@@ -761,7 +846,9 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
         "return_code": runtime.get("return_code"),
         "capabilities": list(runtime.get("capabilities") or []),
         "reason": runtime.get("reason"),
-        "next_action": _agent_cli_next_action(execution_tier, launch_kind, str(runtime.get("verifier") or "")),
+        "next_action": _agent_cli_next_action(
+            execution_tier, launch_kind, str(runtime.get("verifier") or "")
+        ),
     }
 
 
@@ -794,9 +881,13 @@ def module_cli_surface_audit() -> dict[str, Any]:
     try:
         payload = json.loads(SOURCE_CLI_SURFACE_AUDIT_PATH.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=500, detail="CLI surface audit proof is malformed.") from exc
+        raise HTTPException(
+            status_code=500, detail="CLI surface audit proof is malformed."
+        ) from exc
     if not isinstance(payload, dict):
-        raise HTTPException(status_code=500, detail="CLI surface audit proof did not contain an object.")
+        raise HTTPException(
+            status_code=500, detail="CLI surface audit proof did not contain an object."
+        )
     return {
         **payload,
         "status": "ready",
@@ -816,11 +907,7 @@ def verify_module_runtime(module_id: str, body: dict[str, Any] | None = None) ->
         {
             "module_id": module_id,
             "display": mod.get("display_name"),
-            "runtime": {
-                key: value
-                for key, value in runtime.items()
-                if key not in {"output_head"}
-            },
+            "runtime": {key: value for key, value in runtime.items() if key not in {"output_head"}},
             "output_head_sha256": _sha256_text("\n".join(runtime.get("output_head") or [])),
         },
     )
@@ -845,7 +932,9 @@ def get_module_runtime_runner_contract(module_id: str) -> dict[str, Any]:
 
 
 @router.post("/api/modules/{module_id}/runtime/setup-plan")
-def create_module_runtime_setup_plan(module_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+def create_module_runtime_setup_plan(
+    module_id: str, body: dict[str, Any] | None = None
+) -> dict[str, Any]:
     mod = _sync_module_status(_module_or_404(module_id))
     actor = _safe_actor(str((body or {}).get("actor") or "operator"))
     record = _runtime_setup_plan_record(mod)
@@ -866,6 +955,49 @@ def create_module_runtime_setup_plan(module_id: str, body: dict[str, Any] | None
     }
 
 
+@router.post("/api/modules/{module_id}/runtime/start-runner")
+def create_module_runtime_start_runner(
+    module_id: str,
+    body: ModuleRuntimeStartRunnerRequest | None = None,
+) -> dict[str, Any]:
+    mod = _sync_module_status(_module_or_404(module_id))
+    actor = _safe_actor(body.actor if body else "operator")
+    execute_requested = bool(body.execute) if body else False
+    contract = module_service_start_runner_contract(mod, live_probe=True)
+    if execute_requested:
+        contract = {
+            **contract,
+            "status": "blocked",
+            "start_preflight_passed": False,
+            "agent_can_execute_start_now": False,
+            "blocked_reason": (
+                "Process launch is not enabled from this endpoint yet; this route writes a safe "
+                "preflight/proof contract only. A process supervisor/sandbox gate must be enabled before start."
+            ),
+            "blocked_reasons": [
+                *[str(item) for item in contract.get("blocked_reasons") or []],
+                "process_supervisor_not_enabled",
+            ],
+        }
+    proof_event_id = _append_module_proof(
+        "source_module.runtime_start_runner.preflighted",
+        actor,
+        {
+            "module_id": module_id,
+            "execute_requested": execute_requested,
+            "contract": contract,
+        },
+    )
+    return {
+        "module_id": module_id,
+        "accepted": bool(contract.get("start_preflight_passed")),
+        "status": contract["status"],
+        "execution_mode": contract["execution_mode"],
+        "contract": contract,
+        "proof_event_id": proof_event_id,
+    }
+
+
 @router.post("/api/modules/{module_id}/install")
 async def install_module(module_id: str) -> dict[str, Any]:
     check_s1_lock(module_id)
@@ -873,9 +1005,14 @@ async def install_module(module_id: str) -> dict[str, Any]:
     repo_url = mod.get("repo_url")
     local_path = mod.get("local_path")
     if not repo_url:
-        raise HTTPException(status_code=409, detail="No verified source repository URL is available for this module.")
+        raise HTTPException(
+            status_code=409,
+            detail="No verified source repository URL is available for this module.",
+        )
     if not local_path:
-        raise HTTPException(status_code=409, detail="No local source checkout path is configured for this module.")
+        raise HTTPException(
+            status_code=409, detail="No local source checkout path is configured for this module."
+        )
 
     target = Path(str(local_path))
     if target.exists():
@@ -898,12 +1035,22 @@ async def install_module(module_id: str) -> dict[str, Any]:
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, check=False)
     except (OSError, subprocess.SubprocessError) as exc:
-        status = {"install_state": "failed", "install_progress": 0, "detected_version": None, "health": "failed"}
+        status = {
+            "install_state": "failed",
+            "install_progress": 0,
+            "detected_version": None,
+            "health": "failed",
+        }
         _write_source_status(module_id, status)
         raise HTTPException(status_code=502, detail=f"git clone failed to start: {exc}") from exc
 
     if proc.returncode != 0:
-        status = {"install_state": "failed", "install_progress": 0, "detected_version": None, "health": "failed"}
+        status = {
+            "install_state": "failed",
+            "install_progress": 0,
+            "detected_version": None,
+            "health": "failed",
+        }
         _write_source_status(module_id, status)
         detail = (proc.stderr or proc.stdout or f"git clone exited {proc.returncode}")[-1200:]
         raise HTTPException(status_code=502, detail=detail)
@@ -939,7 +1086,9 @@ def detect_module(module_id: str) -> dict[str, Any]:
     mod = _sync_module_status(_module_or_404(module_id))
     local_path = mod.get("local_path")
     status = inspect_source_path(local_path, mod.get("repo_url"))
-    _write_source_status(module_id, status, synced=bool(local_path and Path(str(local_path)).exists()))
+    _write_source_status(
+        module_id, status, synced=bool(local_path and Path(str(local_path)).exists())
+    )
     found = status["install_state"] in {"installed", "detected", "healthy"}
     return {
         "module_id": module_id,
@@ -965,7 +1114,12 @@ def launch_module(module_id: str) -> dict[str, Any]:
             "pid": result.pid,
             "notes": result.detail,
         }
-    return {"module_id": module_id, "success": False, "status": "not_configured", "notes": "No real launch bridge is configured for this module."}
+    return {
+        "module_id": module_id,
+        "success": False,
+        "status": "not_configured",
+        "notes": "No real launch bridge is configured for this module.",
+    }
 
 
 @router.post("/api/modules/{module_id}/stop")
@@ -980,14 +1134,23 @@ def stop_module(module_id: str) -> dict[str, Any]:
             "pid": result.pid,
             "reason": result.detail,
         }
-    return {"module_id": module_id, "stopped": False, "status": "not_configured", "reason": "No launch bridge is configured."}
+    return {
+        "module_id": module_id,
+        "stopped": False,
+        "status": "not_configured",
+        "reason": "No launch bridge is configured.",
+    }
 
 
 @router.post("/api/modules/{module_id}/update/backup", status_code=201)
 def backup_module_source(module_id: str, body: ModuleBackupRequest | None = None) -> dict[str, Any]:
     mod = _sync_module_status(_module_or_404(module_id))
     actor = _safe_actor(body.actor if body else "operator")
-    backup = _create_source_backup(mod, actor=actor, note=(body.note if body else None) or "manual source app pre-update backup")
+    backup = _create_source_backup(
+        mod,
+        actor=actor,
+        note=(body.note if body else None) or "manual source app pre-update backup",
+    )
     proof_event_id = _append_module_proof(
         "source_module.backup.created",
         actor,
@@ -1019,9 +1182,20 @@ def check_module_update(module_id: str, body: ModuleUpdateRequest | None = None)
         proof_event_id = _append_module_proof(
             "source_module.update_check.blocked",
             actor,
-            {"module_id": module_id, "status": "blocked", "reason": "dirty_checkout", "dirty_entries": state["dirty_entries"][:20]},
+            {
+                "module_id": module_id,
+                "status": "blocked",
+                "reason": "dirty_checkout",
+                "dirty_entries": state["dirty_entries"][:20],
+            },
         )
-        raise HTTPException(status_code=409, detail={"reason": "Source checkout has uncommitted changes; create a backup and clean/commit changes before update check.", "proof_event_id": proof_event_id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Source checkout has uncommitted changes; create a backup and clean/commit changes before update check.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     remote = _remote_target(path, state)
     status = "current"
     if remote["commit"] and remote["commit"] != state["commit"]:
@@ -1055,29 +1229,77 @@ def apply_module_update(module_id: str, body: ModuleUpdateRequest) -> dict[str, 
         proof_event_id = _append_module_proof(
             "source_module.update.blocked",
             actor,
-            {"module_id": module_id, "status": "blocked", "reason": "dirty_checkout", "dirty_entries": state["dirty_entries"][:20]},
+            {
+                "module_id": module_id,
+                "status": "blocked",
+                "reason": "dirty_checkout",
+                "dirty_entries": state["dirty_entries"][:20],
+            },
         )
-        raise HTTPException(status_code=409, detail={"reason": "Source checkout has uncommitted changes; update blocked before mutation.", "proof_event_id": proof_event_id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Source checkout has uncommitted changes; update blocked before mutation.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     backup = _select_source_backup(module_id, body.backup_id)
     if not backup:
-        proof_event_id = _append_module_proof("source_module.update.blocked", actor, {"module_id": module_id, "status": "blocked", "reason": "backup_required"})
-        raise HTTPException(status_code=409, detail={"reason": "Create a source backup before applying an update.", "proof_event_id": proof_event_id})
+        proof_event_id = _append_module_proof(
+            "source_module.update.blocked",
+            actor,
+            {"module_id": module_id, "status": "blocked", "reason": "backup_required"},
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Create a source backup before applying an update.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     if backup.get("commit") != state["commit"]:
         proof_event_id = _append_module_proof(
             "source_module.update.blocked",
             actor,
-            {"module_id": module_id, "status": "blocked", "reason": "stale_backup", "backup_commit": backup.get("commit"), "current_commit": state["commit"]},
+            {
+                "module_id": module_id,
+                "status": "blocked",
+                "reason": "stale_backup",
+                "backup_commit": backup.get("commit"),
+                "current_commit": state["commit"],
+            },
         )
-        raise HTTPException(status_code=409, detail={"reason": "Latest backup does not match the current checkout commit; create a fresh backup.", "proof_event_id": proof_event_id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Latest backup does not match the current checkout commit; create a fresh backup.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     remote = _remote_target(path, state)
     if not remote["commit"]:
-        proof_event_id = _append_module_proof("source_module.update.blocked", actor, {"module_id": module_id, "status": "blocked", "reason": "remote_unavailable"})
-        raise HTTPException(status_code=409, detail={"reason": "Could not resolve a remote update target for this checkout.", "proof_event_id": proof_event_id})
+        proof_event_id = _append_module_proof(
+            "source_module.update.blocked",
+            actor,
+            {"module_id": module_id, "status": "blocked", "reason": "remote_unavailable"},
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Could not resolve a remote update target for this checkout.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     if remote["commit"] == state["commit"]:
         proof_event_id = _append_module_proof(
             "source_module.update.noop",
             actor,
-            {"module_id": module_id, "status": "current", "commit": state["commit"], "backup_id": backup["backup_id"]},
+            {
+                "module_id": module_id,
+                "status": "current",
+                "commit": state["commit"],
+                "backup_id": backup["backup_id"],
+            },
         )
         return {
             "accepted": True,
@@ -1093,17 +1315,39 @@ def apply_module_update(module_id: str, body: ModuleUpdateRequest) -> dict[str, 
         proof_event_id = _append_module_proof(
             "source_module.update.failed",
             actor,
-            {"module_id": module_id, "status": "fetch_failed", "backup_id": backup["backup_id"], "stderr": _redact_text(fetch.stderr)[-1200:]},
+            {
+                "module_id": module_id,
+                "status": "fetch_failed",
+                "backup_id": backup["backup_id"],
+                "stderr": _redact_text(fetch.stderr)[-1200:],
+            },
         )
-        raise HTTPException(status_code=502, detail={"reason": "git fetch failed; checkout was not updated.", "proof_event_id": proof_event_id})
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "reason": "git fetch failed; checkout was not updated.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     merge = _run_git(path, ["merge", "--ff-only", "FETCH_HEAD"], timeout=180)
     if merge.returncode != 0:
         proof_event_id = _append_module_proof(
             "source_module.update.failed",
             actor,
-            {"module_id": module_id, "status": "fast_forward_failed", "backup_id": backup["backup_id"], "stderr": _redact_text(merge.stderr)[-1200:]},
+            {
+                "module_id": module_id,
+                "status": "fast_forward_failed",
+                "backup_id": backup["backup_id"],
+                "stderr": _redact_text(merge.stderr)[-1200:],
+            },
         )
-        raise HTTPException(status_code=409, detail={"reason": "Fast-forward update failed; manual review is required before rollback.", "proof_event_id": proof_event_id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Fast-forward update failed; manual review is required before rollback.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     final_state = _git_state(path)
     gates = _source_update_gates(path, mod, before=state, after=final_state)
     passed = all(gate["status"] == "pass" for gate in gates)
@@ -1112,9 +1356,23 @@ def apply_module_update(module_id: str, body: ModuleUpdateRequest) -> dict[str, 
         proof_event_id = _append_module_proof(
             "source_module.update.rolled_back_after_gate_failure",
             actor,
-            {"module_id": module_id, "status": "rolled_back", "backup_id": backup["backup_id"], "gates": gates, "rollback": rollback},
+            {
+                "module_id": module_id,
+                "status": "rolled_back",
+                "backup_id": backup["backup_id"],
+                "gates": gates,
+                "rollback": rollback,
+            },
         )
-        raise HTTPException(status_code=409, detail={"reason": "Post-update gates failed; rollback attempted.", "gates": gates, "rollback": rollback, "proof_event_id": proof_event_id})
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Post-update gates failed; rollback attempted.",
+                "gates": gates,
+                "rollback": rollback,
+                "proof_event_id": proof_event_id,
+            },
+        )
     status = inspect_source_path(mod.get("local_path"), mod.get("repo_url"))
     _write_source_status(module_id, status, synced=True)
     proof_event_id = _append_module_proof(
@@ -1150,9 +1408,21 @@ def rollback_module(module_id: str, body: ModuleRollbackRequest | None = None) -
     path = _module_git_path(mod)
     backup = _select_source_backup(module_id, body.backup_id if body else None)
     if not backup:
-        proof_event_id = _append_module_proof("source_module.rollback.blocked", actor, {"module_id": module_id, "status": "blocked", "reason": "backup_required"})
-        raise HTTPException(status_code=409, detail={"reason": "Rollback requires a recorded source module backup.", "proof_event_id": proof_event_id})
-    current_backup = _create_source_backup(mod, actor=actor, note=f"automatic backup before rollback to {backup['backup_id']}")
+        proof_event_id = _append_module_proof(
+            "source_module.rollback.blocked",
+            actor,
+            {"module_id": module_id, "status": "blocked", "reason": "backup_required"},
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Rollback requires a recorded source module backup.",
+                "proof_event_id": proof_event_id,
+            },
+        )
+    current_backup = _create_source_backup(
+        mod, actor=actor, note=f"automatic backup before rollback to {backup['backup_id']}"
+    )
     result = _rollback_to_backup(path, backup)
     status = inspect_source_path(mod.get("local_path"), mod.get("repo_url"))
     _write_source_status(module_id, status, synced=True)
@@ -1180,12 +1450,17 @@ def rollback_module(module_id: str, body: ModuleRollbackRequest | None = None) -
 def _module_git_path(mod: dict[str, Any]) -> Path:
     local_path = mod.get("local_path")
     if not local_path:
-        raise HTTPException(status_code=409, detail="No local source checkout path is configured for this module.")
+        raise HTTPException(
+            status_code=409, detail="No local source checkout path is configured for this module."
+        )
     path = Path(str(local_path)).resolve()
     if not path.exists():
         raise HTTPException(status_code=409, detail="Local source checkout path is missing.")
     if not (path / ".git").exists():
-        raise HTTPException(status_code=409, detail="Local source path is not a git checkout; update requires .git metadata.")
+        raise HTTPException(
+            status_code=409,
+            detail="Local source path is not a git checkout; update requires .git metadata.",
+        )
     return path
 
 
@@ -1200,10 +1475,15 @@ def _create_source_backup(mod: dict[str, Any], *, actor: str, note: str) -> dict
     meta_path = module_dir / f"{backup_id}.json"
     bundle = _run_git(path, ["bundle", "create", str(bundle_path), "--all"], timeout=300)
     if bundle.returncode != 0 or not bundle_path.exists():
-        raise HTTPException(status_code=502, detail=f"git bundle backup failed: {_redact_text(bundle.stderr or bundle.stdout)[-1000:]}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"git bundle backup failed: {_redact_text(bundle.stderr or bundle.stdout)[-1000:]}",
+        )
     dirty_zip_path = None
     if state["dirty_entries"]:
-        dirty_zip_path = str(_zip_dirty_files(path, module_dir / f"{backup_id}.dirty.zip", state["dirty_entries"]))
+        dirty_zip_path = str(
+            _zip_dirty_files(path, module_dir / f"{backup_id}.dirty.zip", state["dirty_entries"])
+        )
     metadata = {
         "backup_id": backup_id,
         "module_id": mod["id"],
@@ -1293,13 +1573,29 @@ def _remote_target(path: Path, state: dict[str, Any]) -> dict[str, str | None]:
     return {"ref": ref, "commit": commit}
 
 
-def _source_update_gates(path: Path, mod: dict[str, Any], *, before: dict[str, Any], after: dict[str, Any]) -> list[dict[str, Any]]:
+def _source_update_gates(
+    path: Path, mod: dict[str, Any], *, before: dict[str, Any], after: dict[str, Any]
+) -> list[dict[str, Any]]:
     dirty_after = _git_state(path)["dirty_entries"]
     inspected = inspect_source_path(mod.get("local_path"), mod.get("repo_url"))
     return [
-        {"name": "git_checkout_clean", "status": "pass" if not dirty_after else "fail", "detail": dirty_after[:20]},
-        {"name": "commit_changed", "status": "pass" if before["commit"] != after["commit"] else "fail", "detail": {"before": before["commit"], "after": after["commit"]}},
-        {"name": "source_detected", "status": "pass" if inspected["install_state"] in {"installed", "detected", "healthy"} else "fail", "detail": inspected["install_state"]},
+        {
+            "name": "git_checkout_clean",
+            "status": "pass" if not dirty_after else "fail",
+            "detail": dirty_after[:20],
+        },
+        {
+            "name": "commit_changed",
+            "status": "pass" if before["commit"] != after["commit"] else "fail",
+            "detail": {"before": before["commit"], "after": after["commit"]},
+        },
+        {
+            "name": "source_detected",
+            "status": "pass"
+            if inspected["install_state"] in {"installed", "detected", "healthy"}
+            else "fail",
+            "detail": inspected["install_state"],
+        },
     ]
 
 
@@ -1312,7 +1608,11 @@ def _rollback_to_backup(path: Path, backup: dict[str, Any]) -> dict[str, Any]:
     if isinstance(branch, str) and _safe_git_ref(branch):
         checkout = _run_git(path, ["checkout", branch], timeout=60)
         if checkout.returncode != 0:
-            return {"ok": False, "reason": "Could not checkout recorded backup branch.", "stderr": _redact_text(checkout.stderr)[-800:]}
+            return {
+                "ok": False,
+                "reason": "Could not checkout recorded backup branch.",
+                "stderr": _redact_text(checkout.stderr)[-800:],
+            }
     reset = _run_git(path, ["reset", "--hard", commit], timeout=120)
     post = _run_git(path, ["rev-parse", "HEAD"], timeout=10)
     return {
@@ -1324,7 +1624,9 @@ def _rollback_to_backup(path: Path, backup: dict[str, Any]) -> dict[str, Any]:
 
 
 def _select_source_backup(module_id: str, backup_id: str | None) -> dict[str, Any] | None:
-    return _find_source_backup(module_id, backup_id) if backup_id else _latest_source_backup(module_id)
+    return (
+        _find_source_backup(module_id, backup_id) if backup_id else _latest_source_backup(module_id)
+    )
 
 
 def _latest_source_backup(module_id: str) -> dict[str, Any] | None:
@@ -1359,7 +1661,10 @@ def _find_source_backup(module_id: str, backup_id: str | None) -> dict[str, Any]
 
 
 def _latest_source_update_check(module_id: str) -> dict[str, Any] | None:
-    setting = row("SELECT value FROM settings WHERE key = ?", (f"source_module.{module_id}.latest_update_check",))
+    setting = row(
+        "SELECT value FROM settings WHERE key = ?",
+        (f"source_module.{module_id}.latest_update_check",),
+    )
     if not setting:
         return None
     try:
@@ -1386,7 +1691,16 @@ def _public_backup(backup: dict[str, Any] | None) -> dict[str, Any] | None:
     }
 
 
-def _record_artifact(artifact_id: str, evidence_type: str, agent: str, stage: str, gate: str, label: str, file_path: str, notes: dict[str, Any]) -> None:
+def _record_artifact(
+    artifact_id: str,
+    evidence_type: str,
+    agent: str,
+    stage: str,
+    gate: str,
+    label: str,
+    file_path: str,
+    notes: dict[str, Any],
+) -> None:
     target = Path(file_path)
     execute(
         """
@@ -1419,9 +1733,13 @@ def _append_module_proof(event_type: str, actor: str, payload: dict[str, Any]) -
 def _run_git(path: Path, args: list[str], *, timeout: int = 30) -> subprocess.CompletedProcess[str]:
     cmd = ["git", *args]
     try:
-        return subprocess.run(cmd, cwd=path, capture_output=True, text=True, timeout=timeout, check=False)
+        return subprocess.run(
+            cmd, cwd=path, capture_output=True, text=True, timeout=timeout, check=False
+        )
     except subprocess.TimeoutExpired as exc:
-        return subprocess.CompletedProcess(cmd, 124, stdout=str(exc.stdout or ""), stderr=f"git timed out after {timeout}s")
+        return subprocess.CompletedProcess(
+            cmd, 124, stdout=str(exc.stdout or ""), stderr=f"git timed out after {timeout}s"
+        )
     except OSError as exc:
         return subprocess.CompletedProcess(cmd, 127, stdout="", stderr=str(exc))
 
@@ -1434,7 +1752,12 @@ def _git_text(path: Path, args: list[str]) -> str | None:
 
 
 def _safe_git_ref(ref: str) -> bool:
-    return bool(GIT_REF_RE.match(ref)) and ".." not in ref and not ref.startswith("/") and not ref.endswith("/")
+    return (
+        bool(GIT_REF_RE.match(ref))
+        and ".." not in ref
+        and not ref.startswith("/")
+        and not ref.endswith("/")
+    )
 
 
 def _safe_actor(value: str | None) -> str:
@@ -1451,7 +1774,9 @@ def _utc_stamp() -> str:
 
 
 def _redact_text(value: str | None) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1) or match.group(3) or ''}[REDACTED]", value or "")
+    return SECRET_RE.sub(
+        lambda match: f"{match.group(1) or match.group(3) or ''}[REDACTED]", value or ""
+    )
 
 
 def _sha256_text(value: str) -> str:
@@ -1470,7 +1795,9 @@ def install_plan(module_id: str) -> dict[str, Any]:
     if local_path:
         steps.append("verify checkout path exists on disk")
     steps.extend(runtime.get("setup_steps") or [])
-    steps.append("report detected git revision; do not claim health until a real runner/proof exists")
+    steps.append(
+        "report detected git revision; do not claim health until a real runner/proof exists"
+    )
     return {
         "module_id": module_id,
         "repo": repo_url,

@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import urllib.error
@@ -25,7 +26,9 @@ from typing import Any
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 LOCAL_TOOLING_AUDIT_PATH = IMPLEMENTATION_ROOT / "proof" / "LOCAL_TOOLING_AUDIT.json"
 SOURCE_REGISTRY_AUDIT_PATH = Path("03_implementation/proof/SOURCE_REGISTRY_TRUTH_AUDIT.json")
-SECRET_RE = re.compile(r"(?i)(https?://)([^/@\s]+@)|([?&](?:token|key|api_key|access_token)=)[^&\s]+")
+SECRET_RE = re.compile(
+    r"(?i)(https?://)([^/@\s]+@)|([?&](?:token|key|api_key|access_token)=)[^&\s]+"
+)
 
 BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     "prusaslicer": {
@@ -143,7 +146,11 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "label": "Strec3D source inventory",
         "path": "",
         "args": ["README.md", "CMakeLists.txt"],
-        "capabilities": ["structural_infill_reference", "desktop_preprocessor_source", "cmake_build_reference"],
+        "capabilities": [
+            "structural_infill_reference",
+            "desktop_preprocessor_source",
+            "cmake_build_reference",
+        ],
         "kind": "source_inventory",
         "execute": False,
         "timeout_s": 1,
@@ -164,7 +171,9 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     "blender_mcp_candidates": {
         "tool_key": "python_source_import",
         "label": "Blender MCP source import",
-        "path": str(IMPLEMENTATION_ROOT / "source-lab" / "sources" / "orchestration" / "blender-mcp"),
+        "path": str(
+            IMPLEMENTATION_ROOT / "source-lab" / "sources" / "orchestration" / "blender-mcp"
+        ),
         "args": ["blender_mcp.server", "src"],
         "capabilities": ["mcp_server_source", "blender_python_bridge", "provider_candidate"],
         "kind": "python_source_import",
@@ -624,8 +633,79 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
 }
 
 CLI_PREFERRED_LAUNCH_KINDS = {"cli_worker", "cli_or_python_worker", "desktop_or_cli"}
-CLI_POSSIBLE_LAUNCH_KINDS = {"desktop_app", "python_worker", "gpu_worker", "service", "web_app", "npm_package"}
+CLI_POSSIBLE_LAUNCH_KINDS = {
+    "desktop_app",
+    "python_worker",
+    "gpu_worker",
+    "service",
+    "web_app",
+    "npm_package",
+}
 AGENT_EXECUTABLE_VERIFIER_KINDS = {"cli", "python_module_cli"}
+SERVICE_START_RUNNERS: dict[str, dict[str, Any]] = {
+    "fdm_monster": {
+        "command": ["npm", "run", "start"],
+        "command_family": "node_service",
+        "port": 4000,
+        "notes": "Start only after dependencies are installed and the app is bound to the configured local/private URL.",
+    },
+    "fluidd": {
+        "command": ["npm", "run", "serve", "--", "--host", "127.0.0.1", "--port", "8083"],
+        "command_family": "node_web_preview",
+        "port": 8083,
+        "notes": "Use a dedicated local preview port so Fluidd does not collide with other local apps.",
+    },
+    "mainsail": {
+        "command": ["npm", "run", "serve", "--", "--host", "127.0.0.1", "--port", "4173"],
+        "command_family": "node_web_preview",
+        "port": 4173,
+        "notes": "Start a local-only preview before the read-only health proof can pass.",
+    },
+    "octofarm": {
+        "command": ["npm", "run", "start"],
+        "command_family": "node_service",
+        "port": 4001,
+        "env": {"OCTOFARM_PORT": "4001"},
+        "notes": "OctoFarm can need backing services; this runner only preflights the local service boundary.",
+    },
+    "octoprint": {
+        "command": ["octoprint", "serve", "--host=127.0.0.1", "--port=5000"],
+        "command_family": "python_service_cli",
+        "port": 5000,
+        "notes": "Requires a configured OctoPrint Python environment; no printer upload/print commands are exposed.",
+    },
+    "manyfold": {
+        "command": ["bin/dev"],
+        "command_family": "rails_service",
+        "port": 3214,
+        "notes": "Manyfold's app setup may run database migrations; this contract does not execute those steps automatically.",
+    },
+    "open_filament_database": {
+        "command": ["ofd.bat", "webui", "--port", "3000"],
+        "command_family": "material_database_service",
+        "port": 3000,
+        "notes": "Use the local web UI only; material record writes require a separate approval/proof gate.",
+    },
+    "kirimoto_gridspace": {
+        "command": ["docker", "compose", "up", "--no-build"],
+        "command_family": "container_web_app",
+        "port": 8081,
+        "notes": "Requires a host-port remap such as 8081:8080; the runner does not build images.",
+    },
+    "comfyui": {
+        "command": [sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188"],
+        "command_family": "python_gpu_service",
+        "port": 8188,
+        "notes": "GPU/model-cache startup is high cost; generation queues remain separate from health startup.",
+    },
+    "comfyui_trellis_wrapper": {
+        "command": [],
+        "command_family": "comfyui_extension",
+        "port": 8188,
+        "blocked_reason": "The TRELLIS wrapper is not a standalone service; install/enable it inside a verified ComfyUI runtime.",
+        "notes": "Verify through the running ComfyUI instance before any TRELLIS wrapper action is exposed.",
+    },
+}
 
 
 def module_runtime_probe(mod: dict[str, Any], *, live: bool = False) -> dict[str, Any]:
@@ -663,7 +743,16 @@ def module_setup_steps(mod: dict[str, Any]) -> list[str]:
             "Register a read-only version/build verifier before any firmware work is considered ready.",
             "Keep firmware flashing locked behind explicit user approval and printer-specific proof gates.",
         ]
-    if launch_kind in {"catalog_reference", "hardware_reference", "source_reference", "service_reference", "web_app_reference", "reference", "rust_library_reference", "touch_ui_reference"}:
+    if launch_kind in {
+        "catalog_reference",
+        "hardware_reference",
+        "source_reference",
+        "service_reference",
+        "web_app_reference",
+        "reference",
+        "rust_library_reference",
+        "touch_ui_reference",
+    }:
         return [
             f"Open the source/reference checkout at {local_path}.",
             "Register a read-only index, documentation, or health verifier for this module family.",
@@ -696,10 +785,14 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
     runtime_status = str(runtime.get("status") or "blocked")
     verifier_kind = str(runtime.get("kind") or launch_kind)
     executed = bool(runtime.get("executed"))
-    agent_executable = runtime_status == "ready" and verifier_kind in AGENT_EXECUTABLE_VERIFIER_KINDS and executed
+    agent_executable = (
+        runtime_status == "ready" and verifier_kind in AGENT_EXECUTABLE_VERIFIER_KINDS and executed
+    )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
-    blocked_reason = _runner_blocked_reason(runtime=runtime, runner_status=runner_status, required_family=required_family)
+    blocked_reason = _runner_blocked_reason(
+        runtime=runtime, runner_status=runner_status, required_family=required_family
+    )
     return {
         "module_id": str(mod.get("id") or ""),
         "display": str(mod.get("display_name") or mod.get("id") or ""),
@@ -719,9 +812,13 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "capabilities": list(runtime.get("capabilities") or []),
         "safe_actions": _safe_runner_actions(runtime, agent_executable=agent_executable),
         "required_verifier_family": required_family,
-        "acceptance_gate": _runner_acceptance_gate(str(mod.get("id") or "module"), runner_status, required_family),
+        "acceptance_gate": _runner_acceptance_gate(
+            str(mod.get("id") or "module"), runner_status, required_family
+        ),
         "blocked_reason": blocked_reason,
-        "setup_steps": [] if agent_executable else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
+        "setup_steps": []
+        if agent_executable
+        else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
         "proof_required": True,
         "mutation_allowed": False,
         "policy": "Hermes Agents may run only registered non-destructive verifiers here; setup/install/update remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
@@ -742,11 +839,136 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "status": "ready",
         "count": len(contracts),
         "agent_executable": sum(1 for contract in contracts if contract["agent_executable"]),
-        "runner_gaps": sum(1 for contract in contracts if contract["runner_status"].endswith("_gap") or contract["runner_status"] in {"runner_not_registered", "runtime_repair_required", "source_install_available", "blocked"}),
+        "runner_gaps": sum(
+            1
+            for contract in contracts
+            if contract["runner_status"].endswith("_gap")
+            or contract["runner_status"]
+            in {
+                "runner_not_registered",
+                "runtime_repair_required",
+                "source_install_available",
+                "blocked",
+            }
+        ),
         "by_runner_status": dict(sorted(by_status.items())),
         "by_gap_section": dict(sorted(by_section.items())),
         "contracts": contracts,
         "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate.",
+    }
+
+
+def module_service_start_runner_contract(
+    mod: dict[str, Any], *, live_probe: bool = False
+) -> dict[str, Any]:
+    """Return the bounded setup/start contract for a service/web Source OS row.
+
+    This is a preflight contract, not an arbitrary command launcher. It records
+    the known start family, local URL guard, checkout presence, command
+    availability, and port state so Hermes Agents can plan safely without
+    falsely marking a service ready.
+    """
+
+    module_id = str(mod.get("id") or "")
+    probe = runtime_probe_config(module_id)
+    runner = SERVICE_START_RUNNERS.get(module_id)
+    if not runner or not probe or probe.get("kind") != "local_http_health":
+        return {
+            "module_id": module_id,
+            "display": str(mod.get("display_name") or module_id),
+            "status": "unsupported",
+            "start_preflight_passed": False,
+            "runtime_ready": False,
+            "agent_can_execute_start_now": False,
+            "mutation_allowed": False,
+            "blocked_reason": "No safe local service/web start runner is registered for this Source OS row.",
+            "execution_mode": "unsupported",
+        }
+
+    args = [str(item) for item in probe.get("args") or []]
+    env_name = args[0].strip() if args else ""
+    default_url = str(probe.get("default_url") or "").strip()
+    private_values = _private_runtime_env()
+    configured_url = (os.environ.get(env_name) or private_values.get(env_name) or "").strip()
+    local_path_value = str(mod.get("local_path") or "")
+    local_path = Path(local_path_value) if local_path_value else None
+    source_checkout_present = bool(local_path and local_path.is_dir())
+    runtime = (
+        module_runtime_probe(mod, live=False)
+        if live_probe
+        else {
+            "status": "unchecked",
+            "reason": None,
+            "return_code": None,
+            "proof_gate_version": probe.get("proof_gate_version")
+            or "local-http-health-verifier-v1",
+        }
+    )
+    runtime_status = str(runtime.get("status") or "blocked")
+    port_state = _local_service_port_state(configured_url or default_url)
+    command = [str(item) for item in runner.get("command") or []]
+    command_available = _service_start_command_available(command, local_path)
+    blockers: list[str] = []
+    if not env_name:
+        blockers.append("The verifier metadata has no local/private URL environment binding.")
+    if not configured_url:
+        blockers.append(f"{env_name} is not configured in process env or G:/private/.env.")
+    elif not _is_local_private_url(configured_url):
+        blockers.append(
+            f"{env_name} must point to localhost, a private LAN address, or a .local host."
+        )
+    if not source_checkout_present:
+        blockers.append("The configured local source checkout path is missing.")
+    if runner.get("blocked_reason"):
+        blockers.append(str(runner["blocked_reason"]))
+    if command and not command_available:
+        blockers.append(f"Start command executable is not available yet: {command[0]}.")
+    if port_state["status"] == "listening" and runtime_status != "ready":
+        blockers.append(
+            "The configured port is already in use, but the read-only health verifier did not pass."
+        )
+
+    runtime_ready = runtime_status == "ready"
+    preflight_passed = not blockers and not runtime_ready
+    status = (
+        "already_running_verified"
+        if runtime_ready
+        else "ready_to_start"
+        if preflight_passed
+        else "setup_required"
+    )
+    return {
+        "module_id": module_id,
+        "display": str(mod.get("display_name") or module_id),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": str(mod.get("launch_kind") or ""),
+        "status": status,
+        "runtime_ready": runtime_ready,
+        "runtime_status": runtime_status,
+        "runtime_reason": runtime.get("reason"),
+        "start_preflight_passed": preflight_passed,
+        "agent_can_execute_start_now": False,
+        "mutation_allowed": False,
+        "execution_mode": "preflight_and_proof_only_until_process_supervisor_is_enabled",
+        "env_name": env_name,
+        "configured_url": _redact_text(configured_url) if configured_url else "",
+        "default_url": default_url,
+        "url_guard": "local_private_only",
+        "local_path": local_path_value,
+        "source_checkout_present": source_checkout_present,
+        "runner": {
+            "command_family": runner.get("command_family"),
+            "command_preview": command,
+            "command_available": command_available,
+            "port": runner.get("port"),
+            "env": dict(runner.get("env") or {}),
+            "notes": runner.get("notes"),
+        },
+        "port_state": port_state,
+        "safe_actions": ["verify", "setup_plan", "start_runner_preflight"],
+        "blocked_reasons": blockers,
+        "blocked_reason": "; ".join(blockers) if blockers else None,
+        "acceptance_gate": f"`/api/modules/{module_id}/runtime/verify` must return ready after startup before this service is marked runtime-ready.",
     }
 
 
@@ -758,7 +980,9 @@ def runtime_probe_config(module_id: str) -> dict[str, Any] | None:
     return {**probe, "registry_source": "builtin"} if probe else None
 
 
-def _safe_runtime_probe(probe: dict[str, Any], mod: dict[str, Any], *, live: bool) -> dict[str, Any]:
+def _safe_runtime_probe(
+    probe: dict[str, Any], mod: dict[str, Any], *, live: bool
+) -> dict[str, Any]:
     if probe.get("kind") == "source_inventory":
         return _source_inventory_probe(probe, mod)
     if probe.get("kind") == "python_import":
@@ -781,14 +1005,36 @@ def _safe_runtime_probe(probe: dict[str, Any], mod: dict[str, Any], *, live: boo
     return_code = audit.get("return_code")
     output_head = _head_lines([str(item) for item in audit.get("output_head") or []])
     if live and detected and probe.get("execute"):
-        proc = _run_runtime_command(path, [str(arg) for arg in probe.get("args") or []], timeout=int(probe.get("timeout_s") or 12))
+        proc = _run_runtime_command(
+            path,
+            [str(arg) for arg in probe.get("args") or []],
+            timeout=int(probe.get("timeout_s") or 12),
+        )
         executed = True
         return_code = proc.returncode
-        output_head = _head_lines(_redact_text((proc.stdout or "") + ("\n" if proc.stdout and proc.stderr else "") + (proc.stderr or "")))
+        output_head = _head_lines(
+            _redact_text(
+                (proc.stdout or "")
+                + ("\n" if proc.stdout and proc.stderr else "")
+                + (proc.stderr or "")
+            )
+        )
     elif audit:
         executed = bool(audit.get("executed"))
-    status = "ready" if detected and (not probe.get("execute") or return_code == 0) else "blocked" if not detected else "setup_required"
-    label = "Runtime ready" if status == "ready" else "Runtime setup needed" if status == "setup_required" else "Runtime missing"
+    status = (
+        "ready"
+        if detected and (not probe.get("execute") or return_code == 0)
+        else "blocked"
+        if not detected
+        else "setup_required"
+    )
+    label = (
+        "Runtime ready"
+        if status == "ready"
+        else "Runtime setup needed"
+        if status == "setup_required"
+        else "Runtime missing"
+    )
     return {
         "status": status,
         "label": label,
@@ -799,9 +1045,20 @@ def _safe_runtime_probe(probe: dict[str, Any], mod: dict[str, Any], *, live: boo
         "executed": executed,
         "return_code": return_code,
         "capabilities": list(probe.get("capabilities") or []),
-        "reason": None if status == "ready" else f"{probe.get('label')} was not verified at {path_value}.",
-        "setup_steps": [] if status == "ready" else [f"Install or repair {probe.get('label')} at {path_value}.", "Run Verify again from Source OS."],
-        "proof_source": str(LOCAL_TOOLING_AUDIT_PATH) if audit else "local filesystem executable metadata" if detected else None,
+        "reason": None
+        if status == "ready"
+        else f"{probe.get('label')} was not verified at {path_value}.",
+        "setup_steps": []
+        if status == "ready"
+        else [
+            f"Install or repair {probe.get('label')} at {path_value}.",
+            "Run Verify again from Source OS.",
+        ],
+        "proof_source": str(LOCAL_TOOLING_AUDIT_PATH)
+        if audit
+        else "local filesystem executable metadata"
+        if detected
+        else None,
         "output_head": output_head,
         "registry_source": probe.get("registry_source") or "builtin",
         "proof_gate_version": probe.get("proof_gate_version") or "runtime-verifier-v1",
@@ -843,7 +1100,9 @@ def _source_inventory_probe(probe: dict[str, Any], mod: dict[str, Any]) -> dict[
         "executed": False,
         "return_code": 0 if ready else None,
         "capabilities": list(probe.get("capabilities") or []),
-        "reason": None if ready else f"{probe.get('label')} is missing required source files: {', '.join(missing)}.",
+        "reason": None
+        if ready
+        else f"{probe.get('label')} is missing required source files: {', '.join(missing)}.",
         "setup_steps": setup_steps,
         "proof_source": str(SOURCE_REGISTRY_AUDIT_PATH),
         "output_head": [
@@ -872,7 +1131,11 @@ def _python_import_probe(probe: dict[str, Any]) -> dict[str, Any]:
         detected=True,
         path_value=sys.executable,
         return_code=proc.returncode,
-        output=_redact_text((proc.stdout or "") + ("\n" if proc.stdout and proc.stderr else "") + (proc.stderr or "")),
+        output=_redact_text(
+            (proc.stdout or "")
+            + ("\n" if proc.stdout and proc.stderr else "")
+            + (proc.stderr or "")
+        ),
         missing_reason=f"Python module {module_name} is not importable in the Hermes3D backend runtime.",
         repair_steps=[
             f"Install or select a Hermes3D Python runtime that can import {module_name}.",
@@ -918,7 +1181,11 @@ def _python_source_import_probe(probe: dict[str, Any]) -> dict[str, Any]:
         detected=True,
         path_value=str(root),
         return_code=proc.returncode,
-        output=_redact_text((proc.stdout or "") + ("\n" if proc.stdout and proc.stderr else "") + (proc.stderr or "")),
+        output=_redact_text(
+            (proc.stdout or "")
+            + ("\n" if proc.stdout and proc.stderr else "")
+            + (proc.stderr or "")
+        ),
         missing_reason=f"Python source module {module_name} is not importable from {root}.",
         repair_steps=[
             f"Install or repair dependencies needed to import {module_name} from {root}.",
@@ -955,7 +1222,12 @@ def _python_module_cli_probe(probe: dict[str, Any]) -> dict[str, Any]:
         path_entries.append(src_path)
     env = os.environ.copy()
     existing_pythonpath = env.get("PYTHONPATH")
-    env["PYTHONPATH"] = os.pathsep.join([*(str(path) for path in path_entries), *([existing_pythonpath] if existing_pythonpath else [])])
+    env["PYTHONPATH"] = os.pathsep.join(
+        [
+            *(str(path) for path in path_entries),
+            *([existing_pythonpath] if existing_pythonpath else []),
+        ]
+    )
     proc = _run_checked_command(
         [sys.executable, "-m", module_name, *cli_args],
         timeout=timeout,
@@ -967,7 +1239,11 @@ def _python_module_cli_probe(probe: dict[str, Any]) -> dict[str, Any]:
         detected=True,
         path_value=str(root),
         return_code=proc.returncode,
-        output=_redact_text((proc.stdout or "") + ("\n" if proc.stdout and proc.stderr else "") + (proc.stderr or "")),
+        output=_redact_text(
+            (proc.stdout or "")
+            + ("\n" if proc.stdout and proc.stderr else "")
+            + (proc.stderr or "")
+        ),
         missing_reason=f"Python module CLI {module_name} did not pass the bounded smoke command.",
         repair_steps=[
             f"Install or repair dependencies needed to run python -m {module_name} {' '.join(cli_args)} from {root}.",
@@ -1008,7 +1284,11 @@ def _node_package_probe(probe: dict[str, Any]) -> dict[str, Any]:
         detected=True,
         path_value=node_path,
         return_code=proc.returncode,
-        output=_redact_text((proc.stdout or "") + ("\n" if proc.stdout and proc.stderr else "") + (proc.stderr or "")),
+        output=_redact_text(
+            (proc.stdout or "")
+            + ("\n" if proc.stdout and proc.stderr else "")
+            + (proc.stderr or "")
+        ),
         missing_reason=f"Node package {package_name} is not resolvable in the Hermes3D backend Node runtime.",
         repair_steps=[
             f"Install or expose {package_name} to the Hermes3D backend Node runtime.",
@@ -1076,8 +1356,12 @@ def _moonraker_fleet_probe(probe: dict[str, Any]) -> dict[str, Any]:
         "executed": True,
         "return_code": 0 if ready else 1,
         "capabilities": list(probe.get("capabilities") or []),
-        "reason": None if ready else f"{probe.get('label')} needs {min_success} read-only printer API responses; got {len(successes)}.",
-        "setup_steps": [] if ready else [
+        "reason": None
+        if ready
+        else f"{probe.get('label')} needs {min_success} read-only printer API responses; got {len(successes)}.",
+        "setup_steps": []
+        if ready
+        else [
             "Confirm T1 #1, T1 #2, and V400 are powered on and reachable over Moonraker.",
             "Keep S1 read-only/locked; it is not required for this fleet runtime gate.",
             "Run Verify again from Source OS.",
@@ -1099,7 +1383,9 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
         str(step).strip() for step in (probe.get("setup_steps") or []) if str(step).strip()
     ]
     private_values = _private_runtime_env()
-    base_url = (os.environ.get(env_name) or private_values.get(env_name) or str(probe.get("path") or "")).strip()
+    base_url = (
+        os.environ.get(env_name) or private_values.get(env_name) or str(probe.get("path") or "")
+    ).strip()
     timeout = int(probe.get("timeout_s") or 3)
     if not env_name:
         return _local_http_health_response(
@@ -1141,7 +1427,9 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
                 ]
                 + (
                     probe_setup_steps
-                    or ["Start the service outside the verifier; this probe never launches or mutates it."]
+                    or [
+                        "Start the service outside the verifier; this probe never launches or mutates it."
+                    ]
                 )
                 + ["Run Verify again from Source OS."]
             )[:6],
@@ -1172,7 +1460,9 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
         )
     health_url = urllib.parse.urljoin(base_url.rstrip("/") + "/", endpoint.lstrip("/"))
     try:
-        request = urllib.request.Request(health_url, method="GET", headers={"Accept": "application/json,text/html,*/*"})
+        request = urllib.request.Request(
+            health_url, method="GET", headers={"Accept": "application/json,text/html,*/*"}
+        )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             status_code = int(getattr(response, "status", 0) or 0)
             body = response.read(8192).decode("utf-8", errors="replace")
@@ -1209,7 +1499,9 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
         detected=ready,
         executed=True,
         return_code=0 if ready else 1,
-        reason=None if ready else f"{probe.get('label')} responded but did not satisfy the expected read-only health/version proof.",
+        reason=None
+        if ready
+        else f"{probe.get('label')} responded but did not satisfy the expected read-only health/version proof.",
         output=[
             f"env={env_name}",
             f"url={_redact_text(health_url)}",
@@ -1218,7 +1510,9 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
             f"token_match={'true' if token_ok else 'false'}",
             f"body_head={body_head}",
         ],
-        setup_steps=[] if ready else [
+        setup_steps=[]
+        if ready
+        else [
             f"Confirm {env_name} points at the correct local/private app endpoint.",
             "If the app is healthy but this endpoint is wrong, update the bounded verifier endpoint.",
             "Run Verify again from Source OS.",
@@ -1285,6 +1579,41 @@ def _is_local_private_url(value: str) -> bool:
     return address.is_loopback or address.is_private or address.is_link_local
 
 
+def _local_service_port_state(url_value: str) -> dict[str, Any]:
+    if not url_value:
+        return {"status": "unknown", "reason": "no_url"}
+    try:
+        parsed = urllib.parse.urlparse(url_value)
+    except ValueError:
+        return {"status": "unknown", "reason": "invalid_url"}
+    if not parsed.hostname:
+        return {"status": "unknown", "reason": "missing_host"}
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    host = parsed.hostname
+    if not _is_local_private_url(url_value):
+        return {"status": "blocked", "host": host, "port": port, "reason": "non_local_url"}
+    try:
+        with socket.create_connection((host, port), timeout=0.25):
+            return {"status": "listening", "host": host, "port": port}
+    except OSError:
+        return {"status": "free", "host": host, "port": port}
+
+
+def _service_start_command_available(command: list[str], local_path: Path | None) -> bool:
+    if not command:
+        return False
+    executable = command[0]
+    if shutil.which(executable):
+        return True
+    if local_path:
+        local_candidate = local_path / executable
+        if local_candidate.exists():
+            return True
+        if executable.endswith(".bat") and (local_path / executable).exists():
+            return True
+    return False
+
+
 def _configured_moonraker_printers() -> list[dict[str, str]]:
     try:
         from hermes3d.services.local_state import local_printers
@@ -1304,20 +1633,31 @@ def _configured_moonraker_printers() -> list[dict[str, str]]:
             {"id": "flsun_t1_a", "name": "T1 #1", "url": "http://192.168.0.10", "locked": "false"},
             {"id": "flsun_t1_b", "name": "T1 #2", "url": "http://192.168.0.11", "locked": "false"},
             {"id": "flsun_s1", "name": "FLSUN S1", "url": "http://192.168.0.12", "locked": "true"},
-            {"id": "flsun_v400", "name": "FLSUN V400", "url": "http://192.168.0.34", "locked": "false"},
+            {
+                "id": "flsun_v400",
+                "name": "FLSUN V400",
+                "url": "http://192.168.0.34",
+                "locked": "false",
+            },
         ]
 
 
-def _probe_moonraker_endpoint(printers: list[dict[str, str]], *, endpoint: str, timeout: int) -> list[dict[str, Any]]:
+def _probe_moonraker_endpoint(
+    printers: list[dict[str, str]], *, endpoint: str, timeout: int
+) -> list[dict[str, Any]]:
     with ThreadPoolExecutor(max_workers=min(4, max(1, len(printers)))) as pool:
         futures = {
-            pool.submit(_read_moonraker_endpoint, printer, endpoint=endpoint, timeout=timeout): printer
+            pool.submit(
+                _read_moonraker_endpoint, printer, endpoint=endpoint, timeout=timeout
+            ): printer
             for printer in printers
         }
         return [future.result() for future in as_completed(futures)]
 
 
-def _read_moonraker_endpoint(printer: dict[str, str], *, endpoint: str, timeout: int) -> dict[str, Any]:
+def _read_moonraker_endpoint(
+    printer: dict[str, str], *, endpoint: str, timeout: int
+) -> dict[str, Any]:
     url = f"{str(printer['url']).rstrip('/')}/{endpoint.lstrip('/')}"
     try:
         request = urllib.request.Request(url, method="GET", headers={"Accept": "application/json"})
@@ -1464,7 +1804,10 @@ def _source_runtime_state(mod: dict[str, Any]) -> dict[str, Any]:
             "return_code": None,
             "capabilities": [],
             "reason": "Source repository is known, but the configured local checkout is not present.",
-            "setup_steps": ["Run Install from Source OS to clone the configured repository.", "Run Verify after install."],
+            "setup_steps": [
+                "Run Install from Source OS to clone the configured repository.",
+                "Run Verify after install.",
+            ],
             "proof_source": None,
             "output_head": [],
         }
@@ -1479,7 +1822,9 @@ def _source_runtime_state(mod: dict[str, Any]) -> dict[str, Any]:
         "return_code": None,
         "capabilities": [],
         "reason": "No verified source repository or local checkout is available for this module.",
-        "setup_steps": ["Add a verified source repository and local checkout path before install or runtime verification."],
+        "setup_steps": [
+            "Add a verified source repository and local checkout path before install or runtime verification."
+        ],
         "proof_source": None,
         "output_head": [],
     }
@@ -1492,9 +1837,15 @@ def _runner_status(*, runtime: dict[str, Any], mod: dict[str, Any], agent_execut
     verifier_kind = str(runtime.get("kind") or mod.get("launch_kind") or "unknown")
     proof_gate = str(runtime.get("proof_gate_version") or "")
     launch_kind = str(mod.get("launch_kind") or "unknown")
-    if runtime_status == "ready" and (proof_gate == "desktop-launcher-metadata-v1" or verifier_kind == "desktop_app"):
+    if runtime_status == "ready" and (
+        proof_gate == "desktop-launcher-metadata-v1" or verifier_kind == "desktop_app"
+    ):
         return "launcher_metadata_only"
-    if runtime_status == "ready" and verifier_kind in {"python_import", "python_source_import", "node_package"}:
+    if runtime_status == "ready" and verifier_kind in {
+        "python_import",
+        "python_source_import",
+        "node_package",
+    }:
         return "metadata_ready_needs_runner"
     if runtime_status == "ready" and verifier_kind in {"local_http_health", "moonraker_fleet"}:
         return "readonly_api_ready"
@@ -1543,7 +1894,9 @@ def _required_verifier_family(launch_kind: str, verifier_kind: str, runner_statu
     return "module_specific_safe_verifier"
 
 
-def _runner_blocked_reason(*, runtime: dict[str, Any], runner_status: str, required_family: str) -> str | None:
+def _runner_blocked_reason(
+    *, runtime: dict[str, Any], runner_status: str, required_family: str
+) -> str | None:
     if runner_status == "agent_cli_ready":
         return None
     reason = str(runtime.get("reason") or "").strip()
@@ -1579,29 +1932,49 @@ def _local_tooling_record(tool_key: str) -> dict[str, Any]:
     return record if isinstance(record, dict) else {}
 
 
-def _run_runtime_command(path: Path | None, args: list[str], *, timeout: int = 12) -> subprocess.CompletedProcess[str]:
+def _run_runtime_command(
+    path: Path | None, args: list[str], *, timeout: int = 12
+) -> subprocess.CompletedProcess[str]:
     if path is None:
-        return subprocess.CompletedProcess([], 127, stdout="", stderr="runtime verifier path is not configured")
+        return subprocess.CompletedProcess(
+            [], 127, stdout="", stderr="runtime verifier path is not configured"
+        )
     cmd = [str(path), *args]
     try:
         return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False)
     except subprocess.TimeoutExpired as exc:
-        return subprocess.CompletedProcess(cmd, 124, stdout=str(exc.stdout or ""), stderr=f"runtime probe timed out after {timeout}s")
+        return subprocess.CompletedProcess(
+            cmd,
+            124,
+            stdout=str(exc.stdout or ""),
+            stderr=f"runtime probe timed out after {timeout}s",
+        )
     except OSError as exc:
         return subprocess.CompletedProcess(cmd, 127, stdout="", stderr=str(exc))
 
 
-def _run_checked_command(cmd: list[str], *, timeout: int, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+def _run_checked_command(
+    cmd: list[str], *, timeout: int, env: dict[str, str] | None = None
+) -> subprocess.CompletedProcess[str]:
     try:
-        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False, env=env)
+        return subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, check=False, env=env
+        )
     except subprocess.TimeoutExpired as exc:
-        return subprocess.CompletedProcess(cmd, 124, stdout=str(exc.stdout or ""), stderr=f"runtime probe timed out after {timeout}s")
+        return subprocess.CompletedProcess(
+            cmd,
+            124,
+            stdout=str(exc.stdout or ""),
+            stderr=f"runtime probe timed out after {timeout}s",
+        )
     except OSError as exc:
         return subprocess.CompletedProcess(cmd, 127, stdout="", stderr=str(exc))
 
 
 def _redact_text(value: str | None) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1) or match.group(3) or ''}[REDACTED]", value or "")
+    return SECRET_RE.sub(
+        lambda match: f"{match.group(1) or match.group(3) or ''}[REDACTED]", value or ""
+    )
 
 
 def _head_lines(value: str | list[str], *, max_lines: int = 25, max_chars: int = 240) -> list[str]:

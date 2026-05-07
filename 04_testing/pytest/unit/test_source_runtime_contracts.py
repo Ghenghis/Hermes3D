@@ -87,8 +87,18 @@ def test_runner_contract_summary_counts_executable_and_gaps(monkeypatch) -> None
     monkeypatch.setattr(module_runtime, "module_runtime_probe", _probe)
     summary = module_runtime.module_runner_contracts(
         [
-            {"id": "ready_cli", "display_name": "Ready CLI", "section": "utilities", "launch_kind": "cli_worker"},
-            {"id": "gap_cli", "display_name": "Gap CLI", "section": "slicers", "launch_kind": "cli_worker"},
+            {
+                "id": "ready_cli",
+                "display_name": "Ready CLI",
+                "section": "utilities",
+                "launch_kind": "cli_worker",
+            },
+            {
+                "id": "gap_cli",
+                "display_name": "Gap CLI",
+                "section": "slicers",
+                "launch_kind": "cli_worker",
+            },
         ]
     )
 
@@ -147,7 +157,9 @@ def test_setup_required_python_import_stays_in_repair_queue(monkeypatch) -> None
             "return_code": 1,
             "capabilities": ["parametric_cad_worker"],
             "reason": "Python module cadquery is not importable in the Hermes3D backend runtime.",
-            "setup_steps": ["Install or select a Hermes3D Python runtime that can import cadquery."],
+            "setup_steps": [
+                "Install or select a Hermes3D Python runtime that can import cadquery."
+            ],
         }
 
     monkeypatch.setattr(module_runtime, "module_runtime_probe", _missing_import)
@@ -368,6 +380,123 @@ def test_local_http_health_probes_declare_default_urls_and_setup_steps() -> None
         assert probe.get("setup_steps")
 
 
+@pytest.mark.parametrize(
+    ("module_id", "display_name", "section", "launch_kind", "env_name"),
+    [
+        ("fdm_monster", "FDM Monster", "print_farm", "service", "HERMES3D_SOURCE_FDM_MONSTER_URL"),
+        ("fluidd", "Fluidd", "print_farm", "web_app", "HERMES3D_SOURCE_FLUIDD_URL"),
+        ("mainsail", "Mainsail", "print_farm", "web_app", "HERMES3D_SOURCE_MAINSAIL_URL"),
+        ("octofarm", "OctoFarm", "print_farm", "service", "HERMES3D_SOURCE_OCTOFARM_URL"),
+        ("octoprint", "OctoPrint", "print_farm", "service", "HERMES3D_SOURCE_OCTOPRINT_URL"),
+        ("manyfold", "Manyfold", "library", "service", "HERMES3D_SOURCE_MANYFOLD_URL"),
+        (
+            "open_filament_database",
+            "Open Filament Database",
+            "materials",
+            "service",
+            "HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL",
+        ),
+        (
+            "kirimoto_gridspace",
+            "Kiri:Moto / GridSpace",
+            "slicers",
+            "web_app",
+            "HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL",
+        ),
+        ("comfyui", "ComfyUI", "three_d_generation", "service", "HERMES3D_SOURCE_COMFYUI_URL"),
+        (
+            "comfyui_trellis_wrapper",
+            "ComfyUI TRELLIS.2 Wrapper",
+            "three_d_generation",
+            "service",
+            "HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL",
+        ),
+    ],
+)
+def test_service_start_runner_contracts_are_safe_preflight_only(
+    monkeypatch,
+    tmp_path,
+    module_id: str,
+    display_name: str,
+    section: str,
+    launch_kind: str,
+    env_name: str,
+) -> None:
+    probe = module_runtime.BUILTIN_RUNTIME_PROBES[module_id]
+    monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
+    monkeypatch.setenv(env_name, str(probe["default_url"]))
+    monkeypatch.setattr(
+        module_runtime,
+        "_local_service_port_state",
+        lambda _url: {"status": "free", "host": "127.0.0.1", "port": 1234},
+    )
+    monkeypatch.setattr(
+        module_runtime, "_service_start_command_available", lambda _cmd, _path: True
+    )
+
+    contract = module_runtime.module_service_start_runner_contract(
+        {
+            "id": module_id,
+            "display_name": display_name,
+            "section": section,
+            "launch_kind": launch_kind,
+            "install_state": "installed",
+            "local_path": str(tmp_path),
+        }
+    )
+
+    assert (
+        contract["execution_mode"] == "preflight_and_proof_only_until_process_supervisor_is_enabled"
+    )
+    assert contract["mutation_allowed"] is False
+    assert contract["agent_can_execute_start_now"] is False
+    assert contract["env_name"] == env_name
+    assert contract["url_guard"] == "local_private_only"
+    assert contract["safe_actions"] == ["verify", "setup_plan", "start_runner_preflight"]
+    if module_id == "comfyui_trellis_wrapper":
+        assert contract["status"] == "setup_required"
+        assert "not a standalone service" in contract["blocked_reason"]
+    else:
+        assert contract["status"] == "ready_to_start"
+        assert contract["start_preflight_passed"] is True
+
+
+def test_service_start_runner_rejects_public_url(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
+    monkeypatch.setenv("HERMES3D_SOURCE_FLUIDD_URL", "https://example.com")
+
+    contract = module_runtime.module_service_start_runner_contract(
+        {
+            "id": "fluidd",
+            "display_name": "Fluidd",
+            "section": "print_farm",
+            "launch_kind": "web_app",
+            "install_state": "installed",
+            "local_path": str(tmp_path),
+        }
+    )
+
+    assert contract["status"] == "setup_required"
+    assert contract["start_preflight_passed"] is False
+    assert "localhost, a private LAN address, or a .local host" in contract["blocked_reason"]
+
+
+def test_service_start_runner_unsupported_for_cli_row() -> None:
+    contract = module_runtime.module_service_start_runner_contract(
+        {
+            "id": "prusaslicer",
+            "display_name": "PrusaSlicer",
+            "section": "slicers",
+            "launch_kind": "cli_worker",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/PrusaSlicer",
+        }
+    )
+
+    assert contract["status"] == "unsupported"
+    assert contract["start_preflight_passed"] is False
+
+
 def test_runner_contract_routes_are_registered() -> None:
     from fastapi import FastAPI
 
@@ -377,3 +506,4 @@ def test_runner_contract_routes_are_registered() -> None:
 
     assert "/api/modules/runtime/runner-contracts" in paths
     assert "/api/modules/{module_id}/runtime/runner-contract" in paths
+    assert "/api/modules/{module_id}/runtime/start-runner" in paths
