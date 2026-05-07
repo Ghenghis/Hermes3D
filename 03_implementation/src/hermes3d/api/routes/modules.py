@@ -28,6 +28,10 @@ from hermes3d.services.module_runtime import (
     module_setup_steps,
     registered_runtime_probe_ids,
 )
+from hermes3d.services.source_service_supervisor import (
+    start_source_service_runner,
+    stop_source_service_runner,
+)
 
 router = APIRouter()
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[4]
@@ -964,36 +968,63 @@ def create_module_runtime_start_runner(
     actor = _safe_actor(body.actor if body else "operator")
     execute_requested = bool(body.execute) if body else False
     contract = module_service_start_runner_contract(mod, live_probe=True)
-    if execute_requested:
-        contract = {
-            **contract,
-            "status": "blocked",
-            "start_preflight_passed": False,
-            "agent_can_execute_start_now": False,
-            "blocked_reason": (
-                "Process launch is not enabled from this endpoint yet; this route writes a safe "
-                "preflight/proof contract only. A process supervisor/sandbox gate must be enabled before start."
+    start_result = (
+        start_source_service_runner(mod, contract, actor=actor)
+        if execute_requested
+        else {
+            "status": contract["status"],
+            "accepted": bool(
+                contract.get("start_preflight_passed") or contract.get("runtime_ready")
             ),
-            "blocked_reasons": [
-                *[str(item) for item in contract.get("blocked_reasons") or []],
-                "process_supervisor_not_enabled",
-            ],
+            "runtime_ready": bool(contract.get("runtime_ready")),
+            "execution_mode": contract["execution_mode"],
         }
+    )
     proof_event_id = _append_module_proof(
-        "source_module.runtime_start_runner.preflighted",
+        "source_module.runtime_start_runner.started"
+        if execute_requested
+        else "source_module.runtime_start_runner.preflighted",
         actor,
         {
             "module_id": module_id,
             "execute_requested": execute_requested,
             "contract": contract,
+            "start_result": start_result,
         },
     )
     return {
         "module_id": module_id,
-        "accepted": bool(contract.get("start_preflight_passed")),
-        "status": contract["status"],
-        "execution_mode": contract["execution_mode"],
+        "accepted": bool(start_result.get("accepted")),
+        "status": str(start_result.get("status") or contract["status"]),
+        "runtime_ready": bool(start_result.get("runtime_ready")),
+        "execution_mode": str(start_result.get("execution_mode") or contract["execution_mode"]),
         "contract": contract,
+        "start_result": start_result,
+        "proof_event_id": proof_event_id,
+    }
+
+
+@router.post("/api/modules/{module_id}/runtime/stop-runner")
+def stop_module_runtime_runner(
+    module_id: str,
+    body: ModuleRuntimeStartRunnerRequest | None = None,
+) -> dict[str, Any]:
+    _sync_module_status(_module_or_404(module_id))
+    actor = _safe_actor(body.actor if body else "operator")
+    stop_result = stop_source_service_runner(module_id, actor=actor)
+    proof_event_id = _append_module_proof(
+        "source_module.runtime_start_runner.stopped",
+        actor,
+        {
+            "module_id": module_id,
+            "stop_result": stop_result,
+        },
+    )
+    return {
+        "module_id": module_id,
+        "accepted": bool(stop_result.get("accepted")),
+        "status": str(stop_result.get("status") or "unknown"),
+        "stop_result": stop_result,
         "proof_event_id": proof_event_id,
     }
 

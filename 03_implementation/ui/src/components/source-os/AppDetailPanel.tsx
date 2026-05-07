@@ -26,6 +26,7 @@ const ACTIONS = [
   "Launch",
   "Stop",
   "Setup",
+  "Start Runner",
   "Bridge",
   "Repo",
   "Settings",
@@ -334,7 +335,16 @@ function getDisabledReason(
   if ((action === "Launch" || action === "Stop" || action === "Update") && !installed) {
     return "Install first to launch";
   }
-  if ((action === "Launch" || action === "Stop") && !moduleHasLaunchBridge(module)) {
+  if (action === "Start Runner" && !installed) {
+    return "Install or source-ready checkout is required before starting a service runner.";
+  }
+  if (action === "Start Runner" && !moduleHasServiceRunner(module)) {
+    return "No supervised local service runner is registered for this module.";
+  }
+  if (action === "Launch" && !moduleHasLaunchBridge(module)) {
+    return "No real launch/stop bridge is configured for this module";
+  }
+  if (action === "Stop" && !moduleHasLaunchBridge(module) && !moduleHasServiceRunner(module)) {
     return "No real launch/stop bridge is configured for this module";
   }
   if (action === "Backup") {
@@ -389,6 +399,10 @@ function moduleHasLaunchBridge(module: SourceOSModule): boolean {
   return module.id === "printrun";
 }
 
+function moduleHasServiceRunner(module: SourceOSModule): boolean {
+  return module.runtime.kind === "local_http_health" || module.launchKind === "service" || module.launchKind === "web_app";
+}
+
 async function runAction(
   action: (typeof ACTIONS)[number],
   module: SourceOSModule,
@@ -401,7 +415,7 @@ async function runAction(
     return;
   }
 
-  const endpoint = actionEndpoint(action, module.id);
+  const endpoint = actionEndpoint(action, module);
   if (!endpoint) {
     onResult(`${action} is unavailable; no backend endpoint is exposed.`);
     return;
@@ -424,7 +438,8 @@ async function runAction(
   }
 }
 
-function actionEndpoint(action: (typeof ACTIONS)[number], moduleId: string): { method: "GET" | "POST"; url: string; body?: Record<string, unknown> } | null {
+function actionEndpoint(action: (typeof ACTIONS)[number], module: SourceOSModule): { method: "GET" | "POST"; url: string; body?: Record<string, unknown> } | null {
+  const moduleId = module.id;
   const encoded = encodeURIComponent(moduleId);
   if (action === "Install") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/install` };
   if (action === "Verify") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/runtime/verify`, body: { actor: "operator" } };
@@ -432,8 +447,13 @@ function actionEndpoint(action: (typeof ACTIONS)[number], moduleId: string): { m
   if (action === "Check Update") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/update/check`, body: { actor: "operator", reason: "manual source app update check from Source OS" } };
   if (action === "Update") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/update/apply`, body: { actor: "operator", reason: "manual source app update from Source OS" } };
   if (action === "Launch") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/launch` };
-  if (action === "Stop") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/stop` };
+  if (action === "Stop") {
+    return moduleHasServiceRunner(module)
+      ? { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/runtime/stop-runner`, body: { actor: "operator" } }
+      : { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/stop` };
+  }
   if (action === "Setup") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/runtime/setup-plan`, body: { actor: "operator" } };
+  if (action === "Start Runner") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/runtime/start-runner`, body: { actor: "operator", execute: true } };
   if (action === "Rollback") return { method: "POST", url: `${LIVE_BASE_URL}/api/modules/${encoded}/rollback`, body: { actor: "operator", reason: "manual source app rollback from Source OS" } };
   return null;
 }
@@ -512,6 +532,19 @@ function blockedStatusValue(value: unknown): boolean {
 }
 
 function summaryFromRecord(record: Record<string, unknown>, fallback: string): string {
+  if (isRecord(record.start_result)) {
+    const status = record.start_result.status;
+    const runtimeReady = record.start_result.runtime_ready === true ? "runtime ready" : "health proof pending";
+    const reason = record.start_result.blocked_reason;
+    const proof = record.proof_event_id;
+    return formatActionText(`${String(status ?? fallback)} · ${runtimeReady}${typeof reason === "string" ? ` · ${reason}` : ""}${typeof proof === "string" ? ` · proof ${proof}` : ""}`);
+  }
+  if (isRecord(record.stop_result)) {
+    const status = record.stop_result.status;
+    const reason = record.stop_result.reason;
+    const proof = record.proof_event_id;
+    return formatActionText(`${String(status ?? fallback)}${typeof reason === "string" ? ` · ${reason}` : ""}${typeof proof === "string" ? ` · proof ${proof}` : ""}`);
+  }
   if (isRecord(record.record)) {
     const runner = record.record.runner_status;
     const nextAction = record.record.next_action;
