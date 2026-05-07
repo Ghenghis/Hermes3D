@@ -20,7 +20,11 @@ def main() -> int:
     sys.path.insert(0, str(IMPLEMENTATION_ROOT / "src"))
     from hermes3d.db.init import connect, init_db
     from hermes3d.db.load_modules import load_modules
-    from hermes3d.services.module_runtime import module_runtime_probe, registered_runtime_probe_ids
+    from hermes3d.services.module_runtime import (
+        module_runner_contract,
+        module_runtime_probe,
+        registered_runtime_probe_ids,
+    )
 
     init_db()
     load_modules()
@@ -39,9 +43,11 @@ def main() -> int:
     finally:
         conn.close()
 
-    rows = [classify_module(module_runtime_probe(module, live=False), module) for module in modules]
+    rows = [classify_module(module_runtime_probe(module, live=False), module, module_runner_contract(module)) for module in modules]
     counts = Counter(row["agent_execution_tier"] for row in rows)
+    contract_counts = Counter(row["runner_contract_status"] for row in rows)
     cli_rows = [row for row in rows if row["agent_execution_tier"] == "verified_agent_cli"]
+    executable_rows = [row for row in rows if row["agent_executable"]]
     launcher_rows = [row for row in rows if row["agent_execution_tier"] == "launcher_metadata_only"]
     gap_rows = [row for row in rows if row["agent_execution_tier"].endswith("_gap")]
     audit = {
@@ -53,15 +59,19 @@ def main() -> int:
         },
         "summary": {
             "by_agent_execution_tier": dict(sorted(counts.items())),
+            "by_runner_contract_status": dict(sorted(contract_counts.items())),
             "verified_agent_cli": len(cli_rows),
+            "agent_executable": len(executable_rows),
             "launcher_metadata_only": len(launcher_rows),
             "runner_gaps": len(gap_rows),
             "verified_agent_cli_modules": [row["module_id"] for row in cli_rows],
+            "agent_executable_modules": [row["module_id"] for row in executable_rows],
             "launcher_metadata_only_modules": [row["module_id"] for row in launcher_rows],
         },
         "rows": rows,
         "next_actions": [
             "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
+            "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
             "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
             "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
             "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -74,7 +84,7 @@ def main() -> int:
     return 0
 
 
-def classify_module(runtime: dict[str, Any], module: dict[str, Any]) -> dict[str, Any]:
+def classify_module(runtime: dict[str, Any], module: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
     runtime_status = str(runtime.get("status") or "blocked")
     kind = str(runtime.get("kind") or module.get("launch_kind") or "unknown")
     proof_gate = str(runtime.get("proof_gate_version") or "")
@@ -111,6 +121,11 @@ def classify_module(runtime: dict[str, Any], module: dict[str, Any]) -> dict[str
         "return_code": runtime.get("return_code"),
         "capabilities": list(runtime.get("capabilities") or []),
         "reason": runtime.get("reason"),
+        "agent_executable": bool(contract.get("agent_executable")),
+        "runner_contract_status": str(contract.get("runner_status") or "blocked"),
+        "required_verifier_family": str(contract.get("required_verifier_family") or ""),
+        "acceptance_gate": str(contract.get("acceptance_gate") or ""),
+        "safe_actions": list(contract.get("safe_actions") or []),
         "next_action": next_action_for(execution_tier, launch_kind, verifier),
     }
 

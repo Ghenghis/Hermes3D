@@ -24,6 +24,8 @@ def test_action_catalog_hides_internal_handlers_and_exposes_code_actions() -> No
     assert "code.teams.request_review" in by_id
     assert "code.teams.run_coding_pass" in by_id
     assert "code.teams.run_review_pass" in by_id
+    assert "source.runner_contracts.refresh" in by_id
+    assert "source.runner_contract.refresh" in by_id
     assert all("handler" not in contract for contract in contracts)
     assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {"files", "task_id"}
 
@@ -91,3 +93,24 @@ def test_code_team_actions_declare_assignment_and_review_contracts() -> None:
     assert review_pass["risk"] == "medium"
     assert set(review_pass["payload_schema"]["required"]) == {"task_id", "summary", "files", "proof_ids"}
     assert "proof ids" in review_pass["payload_schema"]["safety"]
+
+
+def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> None:
+    _reset_action_catalog_cache()
+
+    by_id = {contract["id"]: contract for contract in agents.action_catalog()["contracts"]}
+    matrix = by_id["source.runner_contracts.refresh"]
+    single = by_id["source.runner_contract.refresh"]
+
+    assert matrix["kind"] == "read"
+    assert matrix["risk"] == "low"
+    assert matrix["approval_required"] is False
+    assert matrix["rollback_required"] is False
+    assert matrix["proof_required"] is True
+    assert matrix["payload_schema"]["required"] == []
+    assert "does not run setup, install, update, or launch" in matrix["payload_schema"]["safety"]
+
+    assert single["kind"] == "read"
+    assert single["risk"] == "low"
+    assert set(single["payload_schema"]["required"]) == {"module_id"}
+    assert "no source or runtime mutation" in single["payload_schema"]["safety"]

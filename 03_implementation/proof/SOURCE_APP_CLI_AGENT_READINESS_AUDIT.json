@@ -1,7 +1,8 @@
 {
-  "generated_at_utc": "2026-05-06T18:24:20.499141+00:00",
+  "generated_at_utc": "2026-05-07T10:25:04.835714+00:00",
   "next_actions": [
     "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
+    "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
     "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
     "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
     "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -9,6 +10,8 @@
   ],
   "rows": [
     {
+      "acceptance_gate": "Register node_package_metadata_or_script_help; then `/api/modules/azure_speech_sdk_js/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "npm_package_gap",
       "capabilities": [],
       "display": "Azure Speech SDK JS",
@@ -19,13 +22,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\orchestration\\Azure-Speech-SDK-JS",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "node_package_metadata_or_script_help",
       "return_code": null,
+      "runner_contract_status": "npm_package_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "agents",
       "verifier": "source checkout",
       "verifier_kind": "npm_package"
     },
     {
+      "acceptance_gate": "Register dry_run_worker_smoke; then `/api/modules/blender_mcp_candidates/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "package_or_import_ready",
       "capabilities": [
         "mcp_server_source",
@@ -40,13 +51,22 @@
       "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\orchestration\\blender-mcp",
       "proof_gate_version": "python-source-import-verifier-v1",
       "reason": null,
+      "required_verifier_family": "dry_run_worker_smoke",
       "return_code": 0,
+      "runner_contract_status": "metadata_ready_needs_runner",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "agents",
       "verifier": "Blender MCP source import",
       "verifier_kind": "python_source_import"
     },
     {
+      "acceptance_gate": "`/api/modules/hermes_agent/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "agent_cli",
@@ -62,13 +82,23 @@
       "path": "G:\\Github\\hermes-agent-fresh",
       "proof_gate_version": "python-module-cli-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "agents",
       "verifier": "Hermes Agent source CLI",
       "verifier_kind": "python_module_cli"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/kiln/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "web_app_reference",
@@ -82,13 +112,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\orchestration\\Kiln",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "agents",
       "verifier": "Kiln source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/langchain/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "agent_orchestration_reference",
@@ -102,13 +141,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\orchestration\\LangChain",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "agents",
       "verifier": "LangChain source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/langgraph/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "agent_orchestration_reference",
@@ -122,13 +170,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\orchestration\\LangGraph",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "agents",
       "verifier": "LangGraph source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register dry_run_worker_smoke; then `/api/modules/model_context_protocol/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "package_or_import_ready",
       "capabilities": [
         "mcp_sdk",
@@ -142,13 +199,22 @@
       "path": "C:\\Program Files\\nodejs\\node.EXE",
       "proof_gate_version": "node-package-verifier-v1",
       "reason": null,
+      "required_verifier_family": "dry_run_worker_smoke",
       "return_code": 0,
+      "runner_contract_status": "metadata_ready_needs_runner",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "agents",
       "verifier": "Model Context Protocol SDK package",
       "verifier_kind": "node_package"
     },
     {
+      "acceptance_gate": "Register read_only_api_runner_contract; then `/api/modules/firmware_klipper/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_api_ready",
       "capabilities": [
         "klipper_firmware_readonly_state",
@@ -162,13 +228,22 @@
       "path": "configured Moonraker printer URLs",
       "proof_gate_version": "moonraker-fleet-verifier-v1",
       "reason": null,
+      "required_verifier_family": "read_only_api_runner_contract",
       "return_code": 0,
+      "runner_contract_status": "readonly_api_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "firmware",
       "verifier": "Klipper firmware fleet read-only API",
       "verifier_kind": "moonraker_fleet"
     },
     {
+      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/marlin/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "runner_gap",
       "capabilities": [],
       "display": "Marlin",
@@ -179,13 +254,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Marlin",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "read_only_firmware_source_inventory",
       "return_code": null,
+      "runner_contract_status": "runner_not_registered",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "firmware",
       "verifier": "source checkout",
       "verifier_kind": "firmware_source"
     },
     {
+      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/prusa_firmware/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "runner_gap",
       "capabilities": [],
       "display": "Prusa Firmware",
@@ -196,13 +279,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Prusa-Firmware",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "read_only_firmware_source_inventory",
       "return_code": null,
+      "runner_contract_status": "runner_not_registered",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "firmware",
       "verifier": "source checkout",
       "verifier_kind": "firmware_source"
     },
     {
+      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/reprapfirmware/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "runner_gap",
       "capabilities": [],
       "display": "RepRapFirmware",
@@ -213,13 +304,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\RepRapFirmware",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "read_only_firmware_source_inventory",
       "return_code": null,
+      "runner_contract_status": "runner_not_registered",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "firmware",
       "verifier": "source checkout",
       "verifier_kind": "firmware_source"
     },
     {
+      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/repetier_firmware/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "runner_gap",
       "capabilities": [],
       "display": "Repetier Firmware",
@@ -230,13 +329,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Repetier-Firmware",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "read_only_firmware_source_inventory",
       "return_code": null,
+      "runner_contract_status": "runner_not_registered",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "firmware",
       "verifier": "source checkout",
       "verifier_kind": "firmware_source"
     },
     {
+      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/smoothieware/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "runner_gap",
       "capabilities": [],
       "display": "Smoothieware",
@@ -247,13 +354,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Smoothieware",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "read_only_firmware_source_inventory",
       "return_code": null,
+      "runner_contract_status": "runner_not_registered",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "firmware",
       "verifier": "source checkout",
       "verifier_kind": "firmware_source"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/awesome_extruders/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "catalog_index",
@@ -267,13 +382,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\hardware\\Awesome-Extruders",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "hardware",
       "verifier": "Awesome Extruders source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/boxturtle/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "hardware_reference",
@@ -287,13 +411,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\hardware\\BoxTurtle",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "hardware",
       "verifier": "BoxTurtle source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/enraged_rabbit_project/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "hardware_reference",
@@ -307,13 +440,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\hardware\\EnragedRabbitProject",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "hardware",
       "verifier": "EnragedRabbitProject source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/manyfold/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_gap",
       "capabilities": [],
       "display": "Manyfold",
@@ -324,13 +466,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\libraries\\Manyfold",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
+      "runner_contract_status": "service_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "library",
       "verifier": "source checkout",
       "verifier_kind": "service"
     },
     {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/open_filament_database/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_gap",
       "capabilities": [],
       "display": "Open Filament Database",
@@ -341,13 +491,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\materials\\Open-Filament-Database",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
+      "runner_contract_status": "service_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "materials",
       "verifier": "source checkout",
       "verifier_kind": "service"
     },
     {
+      "acceptance_gate": "`/api/modules/blender/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "headless_blender_cli",
@@ -362,13 +520,23 @@
       "path": "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe",
       "proof_gate_version": "agent-cli-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "modelers",
       "verifier": "Blender CLI",
       "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "Register python_import_or_module_cli; then `/api/modules/cadquery/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "python_worker_gap",
       "capabilities": [],
       "display": "CadQuery",
@@ -379,13 +547,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\CadQuery",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "python_import_or_module_cli",
       "return_code": null,
+      "runner_contract_status": "python_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "python_worker"
     },
     {
+      "acceptance_gate": "Register module_specific_safe_verifier; then `/api/modules/freecad/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
       "display": "FreeCAD",
@@ -396,13 +572,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\FreeCAD",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "module_specific_safe_verifier",
       "return_code": null,
+      "runner_contract_status": "desktop_app_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "desktop_app"
     },
     {
+      "acceptance_gate": "Register dry_run_worker_smoke; then `/api/modules/manifold/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "package_or_import_ready",
       "capabilities": [
         "manifold_mesh_library",
@@ -416,13 +600,22 @@
       "path": "C:\\Python314\\python.exe",
       "proof_gate_version": "python-import-verifier-v1",
       "reason": null,
+      "required_verifier_family": "dry_run_worker_smoke",
       "return_code": 0,
+      "runner_contract_status": "metadata_ready_needs_runner",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "modelers",
       "verifier": "Manifold Python import",
       "verifier_kind": "python_import"
     },
     {
+      "acceptance_gate": "Register cli_version_help_or_dry_run; then `/api/modules/meshlab/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "cli_preferred_gap",
       "capabilities": [],
       "display": "MeshLab",
@@ -433,13 +626,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\MeshLab",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "cli_version_help_or_dry_run",
       "return_code": null,
+      "runner_contract_status": "cli_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "desktop_or_cli"
     },
     {
+      "acceptance_gate": "Register python_import_or_module_cli; then `/api/modules/open3d/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "python_worker_gap",
       "capabilities": [],
       "display": "Open3D",
@@ -450,13 +651,21 @@
       "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\modelers\\Open3D",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "python_import_or_module_cli",
       "return_code": null,
+      "runner_contract_status": "python_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "python_worker"
     },
     {
+      "acceptance_gate": "`/api/modules/openscad/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "scad_to_stl",
@@ -471,13 +680,23 @@
       "path": "C:/Program Files/OpenSCAD/openscad.exe",
       "proof_gate_version": "runtime-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "modelers",
       "verifier": "OpenSCAD CLI",
       "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "Register module_specific_safe_verifier; then `/api/modules/solvespace/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
       "display": "SolveSpace",
@@ -488,13 +707,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\SolveSpace",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "module_specific_safe_verifier",
       "return_code": null,
+      "runner_contract_status": "desktop_app_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "desktop_app"
     },
     {
+      "acceptance_gate": "Register python_import_or_module_cli; then `/api/modules/build123d/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "python_worker_gap",
       "capabilities": [],
       "display": "build123d",
@@ -505,13 +732,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\build123d",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "python_import_or_module_cli",
       "return_code": null,
+      "runner_contract_status": "python_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "python_worker"
     },
     {
+      "acceptance_gate": "Register python_import_or_module_cli; then `/api/modules/numpy_stl/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "python_worker_gap",
       "capabilities": [],
       "display": "numpy-stl",
@@ -522,13 +757,21 @@
       "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\modelers\\numpy-stl",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "python_import_or_module_cli",
       "return_code": null,
+      "runner_contract_status": "python_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "python_worker"
     },
     {
+      "acceptance_gate": "Register python_import_or_module_cli; then `/api/modules/pymesh/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "python_worker_gap",
       "capabilities": [],
       "display": "pymesh",
@@ -539,13 +782,21 @@
       "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\modelers\\pymeshfix",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "python_import_or_module_cli",
       "return_code": null,
+      "runner_contract_status": "python_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "modelers",
       "verifier": "source checkout",
       "verifier_kind": "python_worker"
     },
     {
+      "acceptance_gate": "Register dry_run_worker_smoke; then `/api/modules/trimesh/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "package_or_import_ready",
       "capabilities": [
         "mesh_load",
@@ -560,13 +811,22 @@
       "path": "C:\\Python314\\python.exe",
       "proof_gate_version": "python-import-verifier-v1",
       "reason": null,
+      "required_verifier_family": "dry_run_worker_smoke",
       "return_code": 0,
+      "runner_contract_status": "metadata_ready_needs_runner",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "modelers",
       "verifier": "Trimesh Python import",
       "verifier_kind": "python_import"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/truck/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "rust_cad_reference",
@@ -580,13 +840,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\Truck",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "modelers",
       "verifier": "Truck source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/botqueue/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "service_reference",
@@ -600,13 +869,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\BotQueue",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "print_farm",
       "verifier": "BotQueue source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/fdm_monster/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_gap",
       "capabilities": [],
       "display": "FDM Monster",
@@ -617,13 +895,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\FDM-Monster",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
+      "runner_contract_status": "service_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "print_farm",
       "verifier": "source checkout",
       "verifier_kind": "service"
     },
     {
+      "acceptance_gate": "Register local_http_health_or_route_smoke; then `/api/modules/fluidd/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "web_app_gap",
       "capabilities": [],
       "display": "Fluidd",
@@ -634,13 +920,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\Fluidd",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_http_health_or_route_smoke",
       "return_code": null,
+      "runner_contract_status": "web_app_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "print_farm",
       "verifier": "source checkout",
       "verifier_kind": "web_app"
     },
     {
+      "acceptance_gate": "Register read_only_api_runner_contract; then `/api/modules/klipper/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_api_ready",
       "capabilities": [
         "klipper_readonly_state",
@@ -654,13 +948,22 @@
       "path": "configured Moonraker printer URLs",
       "proof_gate_version": "moonraker-fleet-verifier-v1",
       "reason": null,
+      "required_verifier_family": "read_only_api_runner_contract",
       "return_code": 0,
+      "runner_contract_status": "readonly_api_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "print_farm",
       "verifier": "Klipper fleet read-only API",
       "verifier_kind": "moonraker_fleet"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/klipperscreen/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "touch_ui_reference",
@@ -674,13 +977,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\KlipperScreen",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "print_farm",
       "verifier": "KlipperScreen source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register local_http_health_or_route_smoke; then `/api/modules/mainsail/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "web_app_gap",
       "capabilities": [],
       "display": "Mainsail",
@@ -691,13 +1003,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\Mainsail",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_http_health_or_route_smoke",
       "return_code": null,
+      "runner_contract_status": "web_app_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "print_farm",
       "verifier": "source checkout",
       "verifier_kind": "web_app"
     },
     {
+      "acceptance_gate": "Register read_only_api_runner_contract; then `/api/modules/moonraker/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_api_ready",
       "capabilities": [
         "moonraker_readonly_api",
@@ -711,13 +1031,22 @@
       "path": "configured Moonraker printer URLs",
       "proof_gate_version": "moonraker-fleet-verifier-v1",
       "reason": null,
+      "required_verifier_family": "read_only_api_runner_contract",
       "return_code": 0,
+      "runner_contract_status": "readonly_api_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "print_farm",
       "verifier": "Moonraker fleet read-only API",
       "verifier_kind": "moonraker_fleet"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/octofarm/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "service_reference",
@@ -731,13 +1060,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\OctoFarm",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "print_farm",
       "verifier": "OctoFarm source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/octoprint/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_gap",
       "capabilities": [],
       "display": "OctoPrint",
@@ -748,13 +1086,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\OctoPrint",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
+      "runner_contract_status": "service_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "print_farm",
       "verifier": "source checkout",
       "verifier_kind": "service"
     },
     {
+      "acceptance_gate": "Register cli_api_or_desktop_bridge_smoke; then `/api/modules/printrun/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "launcher_metadata_only",
       "capabilities": [
         "serial_gui_app"
@@ -767,13 +1113,22 @@
       "path": "G:/Github/apps/Pronterface.exe",
       "proof_gate_version": "runtime-verifier-v1",
       "reason": null,
+      "required_verifier_family": "cli_api_or_desktop_bridge_smoke",
       "return_code": null,
+      "runner_contract_status": "launcher_metadata_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "print_farm",
       "verifier": "Printrun Windows launcher",
       "verifier_kind": "desktop_app"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/awesome_3d_printing/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "catalog_index",
@@ -787,13 +1142,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\research\\Awesome-3D-Printing",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "research",
       "verifier": "Awesome 3D Printing source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register cli_api_or_desktop_bridge_smoke; then `/api/modules/bambustudio/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "launcher_metadata_only",
       "capabilities": [
         "desktop_slicer_launcher",
@@ -807,13 +1171,22 @@
       "path": "C:/Program Files/Bambu Studio/bambu-studio.exe",
       "proof_gate_version": "desktop-launcher-metadata-v1",
       "reason": null,
+      "required_verifier_family": "cli_api_or_desktop_bridge_smoke",
       "return_code": null,
+      "runner_contract_status": "launcher_metadata_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "slicers",
       "verifier": "Bambu Studio Windows launcher",
       "verifier_kind": "desktop_app"
     },
     {
+      "acceptance_gate": "`/api/modules/curaengine/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "slice_to_gcode",
@@ -828,13 +1201,23 @@
       "path": "C:/Program Files/UltiMaker Cura 5.12.1/CuraEngine.exe",
       "proof_gate_version": "agent-cli-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "slicers",
       "verifier": "CuraEngine CLI",
       "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "`/api/modules/flsun_slicer/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "slice",
@@ -851,13 +1234,23 @@
       "path": "C:/FlsunSlicer2.0/FlsunSlicer.exe",
       "proof_gate_version": "runtime-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "slicers",
       "verifier": "FLSUN Slicer CLI",
       "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "Register local_http_health_or_route_smoke; then `/api/modules/kirimoto_gridspace/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "web_app_gap",
       "capabilities": [],
       "display": "Kiri:Moto / GridSpace",
@@ -868,13 +1261,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Kiri-Moto",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_http_health_or_route_smoke",
       "return_code": null,
+      "runner_contract_status": "web_app_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "slicers",
       "verifier": "source checkout",
       "verifier_kind": "web_app"
     },
     {
+      "acceptance_gate": "Register module_specific_safe_verifier; then `/api/modules/mattercontrol/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
       "display": "MatterControl",
@@ -885,13 +1286,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\MatterControl",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "module_specific_safe_verifier",
       "return_code": null,
+      "runner_contract_status": "desktop_app_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "slicers",
       "verifier": "source checkout",
       "verifier_kind": "desktop_app"
     },
     {
+      "acceptance_gate": "`/api/modules/orcaslicer/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "slice_to_gcode",
@@ -906,13 +1315,23 @@
       "path": "C:/Program Files/OrcaSlicer/orca-slicer.exe",
       "proof_gate_version": "runtime-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "slicers",
       "verifier": "OrcaSlicer CLI",
       "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "`/api/modules/prusaslicer/runtime/verify` returns ready with executed=true and a registered proof gate.",
+      "agent_executable": true,
       "agent_execution_tier": "verified_agent_cli",
       "capabilities": [
         "slice_to_gcode",
@@ -928,30 +1347,52 @@
       "path": "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
       "proof_gate_version": "runtime-verifier-v1",
       "reason": null,
+      "required_verifier_family": "registered_agent_cli",
       "return_code": 0,
+      "runner_contract_status": "agent_cli_ready",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "version_or_help",
+        "dry_run_smoke_plan"
+      ],
       "section": "slicers",
       "verifier": "PrusaSlicer CLI",
       "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "Register cli_version_help_or_dry_run; then `/api/modules/slic3r/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "cli_preferred_gap",
-      "capabilities": [],
+      "capabilities": [
+        "slice_to_gcode",
+        "export_stl",
+        "info"
+      ],
       "display": "Slic3r",
       "executed": false,
       "launch_kind": "desktop_or_cli",
       "module_id": "slic3r",
       "next_action": "Locate/install the CLI executable or document no local CLI with proof; keep agent actions disabled.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Slic3r",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "path": "C:/Program Files/Slic3r/slic3r-console.exe",
+      "proof_gate_version": "runtime-verifier-v1",
+      "reason": "Slic3r CLI was not verified at C:/Program Files/Slic3r/slic3r-console.exe.",
+      "required_verifier_family": "cli_version_help_or_dry_run",
       "return_code": null,
-      "runtime_status": "source_ready",
+      "runner_contract_status": "blocked",
+      "runtime_status": "blocked",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "slicers",
-      "verifier": "source checkout",
-      "verifier_kind": "desktop_or_cli"
+      "verifier": "Slic3r CLI",
+      "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "Register cli_version_help_or_dry_run; then `/api/modules/strec3d/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "cli_preferred_gap",
       "capabilities": [],
       "display": "Strec3D",
@@ -962,30 +1403,51 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Strecs3D",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "cli_version_help_or_dry_run",
       "return_code": null,
+      "runner_contract_status": "cli_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "slicers",
       "verifier": "source checkout",
       "verifier_kind": "cli_worker"
     },
     {
+      "acceptance_gate": "Register cli_version_help_or_dry_run; then `/api/modules/superslicer/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "cli_preferred_gap",
-      "capabilities": [],
+      "capabilities": [
+        "slice_to_gcode",
+        "export_3mf",
+        "export_stl",
+        "info"
+      ],
       "display": "SuperSlicer",
       "executed": false,
       "launch_kind": "desktop_or_cli",
       "module_id": "superslicer",
       "next_action": "Locate/install the CLI executable or document no local CLI with proof; keep agent actions disabled.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\SuperSlicer",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "path": "C:/Program Files/SuperSlicer/superslicer-console.exe",
+      "proof_gate_version": "runtime-verifier-v1",
+      "reason": "SuperSlicer CLI was not verified at C:/Program Files/SuperSlicer/superslicer-console.exe.",
+      "required_verifier_family": "cli_version_help_or_dry_run",
       "return_code": null,
-      "runtime_status": "source_ready",
+      "runner_contract_status": "blocked",
+      "runtime_status": "blocked",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "slicers",
-      "verifier": "source checkout",
-      "verifier_kind": "desktop_or_cli"
+      "verifier": "SuperSlicer CLI",
+      "verifier_kind": "cli"
     },
     {
+      "acceptance_gate": "Register cli_api_or_desktop_bridge_smoke; then `/api/modules/cura/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "launcher_metadata_only",
       "capabilities": [
         "desktop_slicer_launcher",
@@ -999,13 +1461,22 @@
       "path": "C:/Program Files/UltiMaker Cura 5.12.1/UltiMaker-Cura.exe",
       "proof_gate_version": "desktop-launcher-metadata-v1",
       "reason": null,
+      "required_verifier_family": "cli_api_or_desktop_bridge_smoke",
       "return_code": null,
+      "runner_contract_status": "launcher_metadata_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "slicers",
       "verifier": "UltiMaker Cura Windows launcher",
       "verifier_kind": "desktop_app"
     },
     {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/comfyui/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_gap",
       "capabilities": [],
       "display": "ComfyUI",
@@ -1016,13 +1487,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\ComfyUI",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
+      "runner_contract_status": "service_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "three_d_generation",
       "verifier": "source checkout",
       "verifier_kind": "service"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/comfyui_frontend/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "web_app_reference",
@@ -1036,13 +1515,22 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\ComfyUI-Frontend",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "three_d_generation",
       "verifier": "ComfyUI Frontend source inventory",
       "verifier_kind": "source_inventory"
     },
     {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/comfyui_trellis_wrapper/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "service_gap",
       "capabilities": [],
       "display": "ComfyUI TRELLIS.2 Wrapper",
@@ -1053,13 +1541,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\ComfyUI-Trellis2",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
+      "runner_contract_status": "service_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "three_d_generation",
       "verifier": "source checkout",
       "verifier_kind": "service"
     },
     {
+      "acceptance_gate": "Register dependency_model_cache_gpu_probe; then `/api/modules/trellis/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
       "display": "Microsoft TRELLIS.2",
@@ -1070,13 +1566,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\TRELLIS.2",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "dependency_model_cache_gpu_probe",
       "return_code": null,
+      "runner_contract_status": "gpu_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "three_d_generation",
       "verifier": "source checkout",
       "verifier_kind": "gpu_worker"
     },
     {
+      "acceptance_gate": "Register dependency_model_cache_gpu_probe; then `/api/modules/hunyuan3d_2_1/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
       "display": "Tencent Hunyuan3D 2.1",
@@ -1087,13 +1591,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\Hunyuan3D-2.1",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "dependency_model_cache_gpu_probe",
       "return_code": null,
+      "runner_contract_status": "gpu_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "three_d_generation",
       "verifier": "source checkout",
       "verifier_kind": "gpu_worker"
     },
     {
+      "acceptance_gate": "Register dependency_model_cache_gpu_probe; then `/api/modules/triposr/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
       "display": "TripoSR",
@@ -1104,13 +1616,21 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\TripoSR",
       "proof_gate_version": "",
       "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "required_verifier_family": "dependency_model_cache_gpu_probe",
       "return_code": null,
+      "runner_contract_status": "gpu_worker_runner_gap",
       "runtime_status": "source_ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
       "section": "three_d_generation",
       "verifier": "source checkout",
       "verifier_kind": "gpu_worker"
     },
     {
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/box_stl_generator/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
       "agent_execution_tier": "source_reference_ready",
       "capabilities": [
         "web_app_reference",
@@ -1124,14 +1644,31 @@
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\utilities\\Box-STL-Generator",
       "proof_gate_version": "source-inventory-v1",
       "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
       "return_code": 0,
+      "runner_contract_status": "source_reference_only",
       "runtime_status": "ready",
+      "safe_actions": [
+        "verify",
+        "setup_plan",
+        "read_metadata"
+      ],
       "section": "utilities",
       "verifier": "3D Box Generator source inventory",
       "verifier_kind": "source_inventory"
     }
   ],
   "summary": {
+    "agent_executable": 7,
+    "agent_executable_modules": [
+      "hermes_agent",
+      "blender",
+      "openscad",
+      "curaengine",
+      "flsun_slicer",
+      "orcaslicer",
+      "prusaslicer"
+    ],
     "by_agent_execution_tier": {
       "cli_preferred_gap": 4,
       "desktop_app_gap": 3,
@@ -1146,6 +1683,22 @@
       "source_reference_ready": 13,
       "verified_agent_cli": 7,
       "web_app_gap": 3
+    },
+    "by_runner_contract_status": {
+      "agent_cli_ready": 7,
+      "blocked": 2,
+      "cli_runner_gap": 2,
+      "desktop_app_runner_gap": 3,
+      "gpu_worker_runner_gap": 3,
+      "launcher_metadata_only": 3,
+      "metadata_ready_needs_runner": 4,
+      "npm_package_runner_gap": 1,
+      "python_worker_runner_gap": 5,
+      "readonly_api_ready": 3,
+      "runner_not_registered": 5,
+      "service_runner_gap": 6,
+      "source_reference_only": 13,
+      "web_app_runner_gap": 3
     },
     "launcher_metadata_only": 3,
     "launcher_metadata_only_modules": [
@@ -1166,7 +1719,7 @@
     ]
   },
   "target": {
-    "registered_verifiers": 30,
+    "registered_verifiers": 32,
     "rule": "If an app offers a CLI, Hermes3D must prefer a bounded CLI verifier and Hermes Agent runner; desktop launcher metadata is not agent CLI readiness.",
     "source_backed_apps": 60
   }
