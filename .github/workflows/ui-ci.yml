@@ -37,7 +37,7 @@ on:
       - "04_testing/pytest/integration/test_fleet_poll_roundtrip.py"
       - ".github/workflows/ui-ci.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, "feat/**"]
     paths:
       - "03_implementation/ui/**"
       - "03_implementation/src/hermes3d/orchestration/**"
