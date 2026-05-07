@@ -426,13 +426,13 @@ function CliReadinessPanel({
   return (
     <div className="border-b border-border bg-bg" data-testid="source-cli-readiness-panel">
       {/* Collapsed header row */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-surface/60"
-        aria-expanded={expanded}
-      >
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full items-center justify-between gap-2 px-3 py-2 text-xs hover:bg-surface/60">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-left"
+          aria-expanded={expanded}
+        >
           <span className="font-semibold text-fg">CLI Readiness</span>
           {summary && (
             <>
@@ -445,7 +445,7 @@ function CliReadinessPanel({
           {!readiness && !loading && (
             <span className="text-[11px] text-amber-400">backend unavailable — {baseUrl}/api/sources/readiness</span>
           )}
-        </div>
+        </button>
         <div className="flex items-center gap-2">
           {readiness?.generated_at_utc && (
             <span className="text-[10px] text-muted" title={readiness.generated_at_utc}>
@@ -460,9 +460,17 @@ function CliReadinessPanel({
           >
             {loading ? "Loading" : "Refresh"}
           </button>
-          <span className="text-[11px] text-muted">{expanded ? "▲" : "▼"}</span>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="rounded border border-transparent px-1 text-[11px] text-muted hover:border-border hover:text-fg"
+            aria-label={expanded ? "Collapse CLI readiness panel" : "Expand CLI readiness panel"}
+            aria-expanded={expanded}
+          >
+            {expanded ? "▲" : "▼"}
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Expanded body */}
       {expanded && readiness && (

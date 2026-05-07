@@ -23,6 +23,7 @@ router = APIRouter()
 
 DEFAULT_MODEL = "hermes3d-desktop-bridge"
 DESKTOP_CONTRACT = "fathah/hermes-desktop@v0.3.4"
+DEFAULT_CHAT_TIMEOUT_SECONDS = 12.0
 SECRET_RE = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+")
 
 
@@ -248,7 +249,7 @@ def _proxy_runtime_non_stream(runtime_url: str, body: ChatCompletionRequest) -> 
         headers={"Content-Type": "application/json", "User-Agent": "Hermes3D-Desktop-Compat/1.0"},
     )
     try:
-        with urllib.request.urlopen(request, timeout=120) as upstream:
+        with urllib.request.urlopen(request, timeout=_chat_timeout_seconds()) as upstream:
             payload = json.loads(upstream.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
         detail = _redact(exc.read().decode("utf-8", errors="replace"))[:400]
@@ -260,6 +261,16 @@ def _proxy_runtime_non_stream(runtime_url: str, body: ChatCompletionRequest) -> 
     if isinstance(error, str):
         return error
     return "Hermes Agent runtime returned no assistant content."
+
+
+def _chat_timeout_seconds() -> float:
+    raw = os.environ.get("HERMES3D_AGENT_RUNTIME_CHAT_TIMEOUT_SECONDS", "").strip()
+    if not raw:
+        return DEFAULT_CHAT_TIMEOUT_SECONDS
+    try:
+        return min(max(float(raw), 1.0), 120.0)
+    except ValueError:
+        return DEFAULT_CHAT_TIMEOUT_SECONDS
 
 
 def _redact(value: str) -> str:

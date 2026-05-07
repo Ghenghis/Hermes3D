@@ -136,7 +136,6 @@ export function ResizablePane({
         aria-valuemin={minWidth}
         aria-valuemax={maxWidth}
         aria-valuenow={width}
-        role="separator"
         title={`Drag to resize ${label}. Double-click to reset.`}
         onPointerDown={(event) => {
           event.preventDefault();
