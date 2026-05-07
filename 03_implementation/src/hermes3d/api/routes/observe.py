@@ -5,16 +5,17 @@ import urllib.error
 import urllib.request
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import execute, new_id, row, rows
 from hermes3d.api.safety import is_s1_target
 from hermes3d.db.init import DB_PATH
-from hermes3d.services.local_state import local_printer, local_printers
 from hermes3d.services.local_state import (
     build_plate_clearance_rows,
     camera_view_settings,
+    local_printer,
+    local_printers,
     mark_build_plate_clear,
     set_camera_view_settings,
 )

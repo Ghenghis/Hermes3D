@@ -10,14 +10,20 @@ import urllib.error
 import urllib.request
 from collections.abc import AsyncIterator
 from typing import Any
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from urllib.parse import urlparse, urlunparse
 
 from hermes3d.api.routes._common import as_json, execute, new_id, utc_now
-from hermes3d.services.agent_runtime import chat_completions_url, configured_runtime_model, runtime_probe, runtime_request_body, trusted_runtime_url
+from hermes3d.services.agent_runtime import (
+    chat_completions_url,
+    configured_runtime_model,
+    runtime_probe,
+    runtime_request_body,
+    trusted_runtime_url,
+)
 
 router = APIRouter()
 

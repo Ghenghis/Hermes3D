@@ -20,7 +20,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 LOCAL_TOOLING_AUDIT_PATH = IMPLEMENTATION_ROOT / "proof" / "LOCAL_TOOLING_AUDIT.json"
 SOURCE_REGISTRY_AUDIT_PATH = Path("03_implementation/proof/SOURCE_REGISTRY_TRUTH_AUDIT.json")

@@ -28,9 +28,7 @@ import importlib
 import inspect
 
 import pytest
-
 from hermes3d.core.security import InjectionScanner
-
 
 # --------------------------------------------------------------------------- #
 # A. Printer write actions are gated

@@ -6,12 +6,12 @@ import hmac
 import os
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from hermes3d.api.routes import (
-    agents,
     agent_updates,
+    agents,
     approvals,
     artifacts,
     autonomous,

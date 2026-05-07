@@ -11,25 +11,18 @@ Claude's 20-agent implementation wave produced a large set of green lane PRs. Be
 
 Do not use this pass to add speculative features. Use it to prove, polish, and correct what exists.
 
-## Current PR Landscape From Claude Wave
+## Current PR Landscape After Merge
 
-Lanes completed with PRs:
+Post-merge GitHub truth supersedes the original pre-merge instructions:
 
-- PRs `#53` through `#72` were reported as open and CI passing.
-- Reported conflict clusters:
-  - `03_implementation/src/hermes3d/api/app.py`: PR `#66` Source OS router plus PR `#69` update center router. Merge `#66` first, then resolve `#69` keeping both routers.
-  - `03_implementation/ui/src/api/adapters.ts` and `03_implementation/ui/src/api/adapters.live.ts`: PR `#64` voice methods plus PR `#71` printer methods. Merge `#64` first, then resolve `#71` keeping every voice and printer method.
-- Reported high blocker:
-  - Pre-existing TypeScript JSX/type regression in many `03_implementation/ui/src/*.tsx` files. Create a dedicated fix PR if this still reproduces. Do not hide it under an unrelated lane.
+- PRs `#53` through `#72` were merged into `feat/hermes3d-7-complete-gui-repo-wiring`.
+- Audit PRs `#74` through `#79` were merged and recorded clean/pass verdicts.
+- PR `#80` fixed the CI trigger for `feat/**` targets and was merged.
+- PR `#81` added the final Claude-to-Codex takeover bundle and was merged.
+- PR `#82` fixed post-merge UI audit issues and npm audit vulnerabilities and was merged.
+- PR `#73` remains the only open draft on this feature branch: `codex/hermes-agent-mcp-code-operator`.
 
-Recommended merge order after this audit:
-
-1. Tier 1 no-conflict PRs: `#53`, `#54`, `#55`, `#56`, `#57`, `#58`, `#59`, `#60`, `#61`, `#62`, `#63`, `#65`, `#67`, `#68`, `#70`.
-2. Tier 2 app router sequence: `#66`, then `#69`, preserving both routers.
-3. Tier 3 adapter sequence: `#64`, then `#71`, preserving all voice and printer adapter methods.
-4. Final integration report: `#72`.
-
-If current GitHub state differs, use current GitHub truth and update this document or the integration report before merging.
+The old merge tiers are historical record only. Codex should now continue from the current feature-branch head, finish PR `#73`, and avoid reopening resolved merge-order work unless GitHub reports a fresh conflict.
 
 ## Non-Negotiable Rules
 

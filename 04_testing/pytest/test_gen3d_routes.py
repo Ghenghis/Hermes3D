@@ -56,7 +56,6 @@ def app_client(tmp_path, monkeypatch):
     during seed to avoid the inter-table dependency issue in init_db). All
     _common queries and ensure_db() are redirected to the test db.
     """
-    import hermes3d.db.init as db_init_mod
     import hermes3d.api.routes._common as common_mod
 
     db_file = tmp_path / "gen3d_test.db"
@@ -338,7 +337,6 @@ class TestGen3DTemplates:
         import hermes3d.api.routes.generation as gen_mod
 
         # Point to a directory that has no schema files
-        import tempfile
         with tempfile.TemporaryDirectory() as empty_dir:
             monkeypatch.setattr(gen_mod, "_SCHEMAS_DIR", Path(empty_dir))
             res = app_client.get("/api/gen3d/templates")

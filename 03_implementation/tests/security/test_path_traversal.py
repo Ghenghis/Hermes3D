@@ -26,7 +26,6 @@ from pathlib import Path
 
 import pytest
 
-
 CODE_HISTORY = importlib.import_module("hermes3d.services.code_history")
 
 
@@ -59,19 +58,11 @@ REJECTED_PATHS: list[str] = [
     "C:/Windows/System32/cmd.exe",
     "C:\\Windows\\System32\\cmd.exe",
     "D:\\private\\.env",
-    "file\x00../../etc/passwd",  # null-byte injection
-    "",  # empty
-]
-
-
-# Paths the validator does NOT raise on but coerces back inside PROJECT_ROOT.
-# These are SAFE (they cannot escape) but the contract is *coercive*, not
-# *rejective*. The auditor flagged this in SECURITY_AUDIT_2026-05-06.json
-# (FINDING-PATH-1, severity=low, owner=Codex/code_history lane).
-COERCED_TO_PROJECT_ROOT: list[str] = [
     "/etc/passwd",
     "\\\\attacker.example\\share\\evil.bat",  # UNC
     "//attacker.example/share/evil.bat",  # forward-slash UNC variant
+    "file\x00../../etc/passwd",  # null-byte injection
+    "",  # empty
 ]
 
 
@@ -92,26 +83,6 @@ def test_resolve_project_path_rejects_traversal(malicious: str) -> None:
     """Same set against the write-capable validator (must always reject)."""
     with pytest.raises((ValueError, FileNotFoundError, OSError)):
         CODE_HISTORY._resolve_project_path(malicious, write=False)
-
-
-@pytest.mark.parametrize("coerced", COERCED_TO_PROJECT_ROOT)
-def test_resolve_project_subpath_coerces_absolute_to_project_root(coerced: str) -> None:
-    """The validator strips leading slashes (Unix absolute, UNC) and re-roots
-    the path inside PROJECT_ROOT.
-
-    This is SAFE (the resolved path never escapes the project root) but
-    the API surface is COERCIVE rather than REJECTIVE. Recorded in
-    SECURITY_AUDIT_2026-05-06.json as FINDING-PATH-1 (severity=low,
-    informational; owner = Codex/code_history lane).
-
-    This test pins the current behaviour; if the validator is hardened
-    later to *reject* these inputs, this test must be inverted.
-    """
-    project_root: Path = CODE_HISTORY.PROJECT_ROOT  # type: ignore[attr-defined]
-    resolved = CODE_HISTORY._resolve_project_subpath(coerced, must_exist=False)
-    # MUST be inside the project root (no escape possible).
-    resolved.relative_to(project_root)
-
 
 # --------------------------------------------------------------------------- #
 # Acceptance: a known-safe project-relative path must validate

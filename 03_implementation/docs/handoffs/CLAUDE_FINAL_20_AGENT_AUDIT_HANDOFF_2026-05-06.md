@@ -19,18 +19,14 @@ After this handoff, Codex owns remaining implementation.
 
 ## Current Known Status
 
-As of this handoff:
+Post-merge status as of the Codex PR `#73` hardening pass:
 
-- Audit 1 Merge Integrity: PR `#75`, clean.
-- Audit 3 Runtime Truth: PR `#74`, clean.
-- Audit 4 Printer Safety: PR `#77`, safety verified, zero violations.
-- Audit 5 Security/MCP: PR `#76`, clean.
-- Audit 6 Docs/Release: PR `#78`, pass with low/medium doc gaps, zero code blockers.
-- Audit 2 No-Fake UI: still running. Finish it and open the audit PR.
-- Codex code-operator PR: `#73`, draft, branch `codex/hermes-agent-mcp-code-operator`.
-- Claude implementation PRs from the 20-lane wave: `#53` through `#72`.
+- Claude implementation PRs `#53` through `#72` are merged.
+- Audit PRs `#74` through `#79` are merged. Audit 2 No-Fake UI is no longer running; PR `#79` landed with a clean verdict.
+- PR `#80` CI trigger fix, PR `#81` final takeover bundle, and PR `#82` post-merge UI/dependency fix are merged.
+- Codex code-operator PR `#73` is the remaining draft on branch `codex/hermes-agent-mcp-code-operator`.
 
-Do not assume this list is still current. Re-check GitHub before writing the final summary.
+Historical instructions below describe what Claude was asked to produce before the final merge. Codex should use the merged handoff bundle as evidence, not as an active merge queue.
 
 ## Non-Negotiable Final Rules
 
@@ -55,14 +51,9 @@ Create these markdown files under:
    - Exact next command/branch Codex should start from.
 
 2. `01_PR_MERGE_MATRIX.md`
-   - Table for PRs `#53-#78` and any final Audit 2 PR.
-   - Columns: PR, title, branch, base, mergeability, CI/checks, audit verdict, known conflicts, merge tier, action.
-   - Include the confirmed order:
-     - Tier 1: no-conflict PRs.
-     - Tier 2: `#66` then `#69`, preserving both routers in `api/app.py`.
-     - Tier 3: `#64` then `#71`, preserving all voice and printer adapter methods.
-     - Tier 4: `#72` final integration report.
-     - Audit PRs after their relevant implementation PRs unless they only add docs.
+   - Completed in PR `#81`.
+   - Historical scope covered PRs `#53-#79`; follow-up PRs `#80`, `#81`, and `#82` are now merged too.
+   - The old Tier 1/Tier 2/Tier 3/Tier 4 ordering has been consumed. Future handoffs should mark those PRs as merged and focus on the remaining draft PR `#73`.
 
 3. `02_OPEN_BLOCKERS_AND_FIX_QUEUE.md`
    - Every blocker/gap found by the six audit agents.

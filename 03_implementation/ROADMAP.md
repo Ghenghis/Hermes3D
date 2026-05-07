@@ -308,8 +308,8 @@ First backend slice now tracks this directly:
 - `POST /api/code-operator/history/restore`
 - agent action catalog entries for programming readiness, MCP lock readiness/state/claim/lock/heartbeat/evidence/release, write readiness, repo status/tree/search, bounded file read, patch proposal/apply, MCP gate list/run, and code snapshots.
 
-The Claude 20-agent completion contract is `03_implementation/docs/handoffs/CLAUDE_20_AGENT_COMPLETION_CONTRACT.md`. It lets Claude work on app completion while Codex keeps this Hermes Agent programming lane isolated.
-The six-agent polish/audit follow-up is `03_implementation/docs/handoffs/CLAUDE_6_AGENT_POLISH_AUDIT_2026-05-06.md` and is the current strict merge-quality contract.
+The Claude 20-agent completion contract is `03_implementation/docs/handoffs/CLAUDE_20_AGENT_COMPLETION_CONTRACT.md`; its implementation and audit PRs have landed through PR `#82`.
+The current active completion lane is Codex PR `#73`, which hardens Hermes Agent code-operator access with MCP locks, source-only patch policy, time-travel snapshots, proof gates, and rollback.
 
 ### 5. Voice + Observe: Operator Assist
 

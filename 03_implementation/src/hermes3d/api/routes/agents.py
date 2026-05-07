@@ -770,7 +770,7 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         return code_history.lock_mcp_files(
             owner=actor,
             files=files,
-            task_id=str(payload.get("task_id") or ""),
+            task_id=_required_payload_text(payload, "task_id"),
             reason=str(payload.get("reason") or "Hermes Agent locked files for code work"),
             role=str(payload.get("role") or "agent"),
             ttl_minutes=int(payload.get("ttl_minutes") or 90),
@@ -778,7 +778,7 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
     if handler == "code.mcp_locks.heartbeat":
         from hermes3d.services import code_history
 
-        return code_history.heartbeat_mcp_task(owner=actor, task_id=str(payload.get("task_id") or ""))
+        return code_history.heartbeat_mcp_task(owner=actor, task_id=_required_payload_text(payload, "task_id"))
     if handler == "code.mcp_locks.release_files":
         from hermes3d.services import code_history
 
@@ -804,7 +804,7 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         data = payload.get("data")
         return code_history.append_mcp_evidence(
             owner=actor,
-            task_id=str(payload.get("task_id") or ""),
+            task_id=_required_payload_text(payload, "task_id"),
             kind=str(payload.get("kind") or "proof"),
             summary=_required_payload_text(payload, "summary"),
             data=data if isinstance(data, dict) else {},
@@ -1132,7 +1132,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("code.repo.search", "Search Hermes3D source text", "agents", "ready", "read", "low", "POST /api/code-operator/repo/search", "code.repo.search", "Runs bounded ripgrep against allowed project paths and returns path, line, column, and excerpt for agent planning."),
         _contract("code.file.read", "Read bounded Hermes3D source slice", "agents", "ready", "read", "low", "POST /api/code-operator/files/read", "code.file.read", "Reads a bounded line slice from an allowed project text file with a content hash for proof."),
         _contract("code.patch.propose", "Propose a Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/patch/proposals", "code.patch.propose", "Creates a pre-snapshot, hash-checks the target, writes a reviewable patch proposal artifact, and appends proof without mutating source files.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch proposals.")),
-        _contract("code.patch.apply", "Apply MCP-locked Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply", "code.patch.apply", "Applies an existing patch proposal only when the same agent owns an active Hermes MCP file lock for the target, records pre/post snapshots, and appends chained MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch apply.")),
+        _contract("code.patch.apply", "Apply MCP-locked Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply", "code.patch.apply", "Applies an existing patch proposal only with a same-owner Hermes MCP file lock for the target, records pre/post snapshots, and appends chained MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch apply.")),
         _contract("code.gates.list.refresh", "List Hermes MCP code gates", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/gates", "code.gates.list", "Lists gates exposed by the exact-worktree hermes3d-locks MCP server; no arbitrary shell is exposed.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
         _contract("code.gate.run", "Run Hermes MCP allowlisted gate", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/gates/run", "code.gate.run", "Runs one allowlisted hermes3d-locks MCP gate in the exact edit worktree and stores the gate result in the MCP evidence ledger.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
         _contract("code.mcp_locks.state.refresh", "Refresh Hermes MCP lock state", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/mcp-locks/state", "code.mcp_locks.state", "Reads exact-worktree Hermes lock/task/evidence state before coding work.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
@@ -1260,9 +1260,9 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "code.patch.apply": {"required": ["proposal_id", "task_id"], "optional": {"reason": "why this proposal is being applied"}, "safety": "Requires matching base sha256, active same-owner Hermes MCP file lock, pre/post snapshots, proof event, and chained MCP evidence."},
         "code.gate.run": {"required": ["gate_id"], "optional": {"cwd": "project-relative directory; defaults to repository root"}, "safety": "Calls hermes3d-locks hermes_run_gate only. Arbitrary commands and cwd outside the edit workspace are blocked."},
         "code.mcp_locks.claim_task": {"required": ["task_id"], "optional": {"title": "short task title", "files": "project-relative paths", "reason": "why the task is claimed"}, "safety": "Uses hermes_claim_task in the exact edit workspace."},
-        "code.mcp_locks.lock_files": {"required": ["files"], "optional": {"task_id": "claimed task id", "ttl_minutes": "5-720", "reason": "why files are locked"}, "safety": "Uses hermes_lock_files only; secrets, denied paths, and outside-workspace paths fail closed."},
-        "code.mcp_locks.heartbeat": {"required": [], "optional": {"task_id": "claimed task id"}, "safety": "Uses hermes_heartbeat only."},
-        "code.mcp_locks.evidence": {"required": ["summary"], "optional": {"task_id": "claimed task id", "kind": "proof", "data": "JSON object"}, "safety": "Uses hermes_append_evidence with bounded summary/kind."},
+        "code.mcp_locks.lock_files": {"required": ["files", "task_id"], "optional": {"ttl_minutes": "5-720", "reason": "why files are locked"}, "safety": "Uses hermes_lock_files only after a claimed task id is provided; secrets, denied paths, and outside-workspace paths fail closed."},
+        "code.mcp_locks.heartbeat": {"required": ["task_id"], "optional": {}, "safety": "Uses hermes_heartbeat only for the server-side actor that owns the claimed task."},
+        "code.mcp_locks.evidence": {"required": ["task_id", "summary"], "optional": {"kind": "proof", "data": "JSON object"}, "safety": "Uses hermes_append_evidence with bounded summary/kind for the server-side actor that owns the claimed task."},
         "code.mcp_locks.release_files": {"required": ["files"], "optional": {"note": "release note"}, "safety": "Uses hermes_release_files only."},
         "code.mcp_locks.release_task": {"required": ["task_id"], "optional": {"note": "release note"}, "safety": "Uses hermes_release_task only."},
     }

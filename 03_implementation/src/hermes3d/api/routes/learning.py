@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import json
-import os
 import hashlib
+import json
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -14,8 +13,13 @@ from pydantic import BaseModel
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows, utc_now
 from hermes3d.api.routes.agents import _trusted_runtime_url
 from hermes3d.db.init import DB_PATH
+from hermes3d.services.agent_runtime import (
+    chat_completions_url,
+    env_value,
+    runtime_probe,
+    runtime_request_body,
+)
 from hermes3d.services.local_state import local_printers
-from hermes3d.services.agent_runtime import chat_completions_url, env_value, runtime_probe, runtime_request_body
 
 router = APIRouter()
 

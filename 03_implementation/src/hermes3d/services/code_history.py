@@ -40,8 +40,79 @@ DENIED_PARTS = {
     ".venv",
     "venv",
 }
+DENIED_ROOT_PREFIXES = {
+    ("03_implementation", "proof"),
+    ("03_implementation", "var"),
+    ("03_implementation", "ui", "coverage"),
+    ("03_implementation", "ui", "dist"),
+    ("03_implementation", "ui", "playwright-report"),
+    ("03_implementation", "ui", "test-results"),
+    ("04_testing", "playwright-report"),
+    ("04_testing", "test-results"),
+}
+EDITABLE_ROOT_PREFIXES = {
+    (".github", "workflows"),
+    ("00_overview",),
+    ("01_requirements",),
+    ("02_architecture",),
+    ("03_implementation",),
+    ("04_testing", "pytest"),
+    ("06_release",),
+    ("docs",),
+    ("handoffs",),
+    ("scripts",),
+}
+EDITABLE_ROOT_FILES = {
+    "README.md",
+    "CONTRIBUTING.md",
+    "HERMES3D_DELIVERY_README.md",
+    "Hermes3D-OS.md",
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements-dev.txt",
+}
+EDITABLE_SUFFIXES = {
+    ".cfg",
+    ".conf",
+    ".css",
+    ".csv",
+    ".html",
+    ".ini",
+    ".js",
+    ".json",
+    ".md",
+    ".mjs",
+    ".py",
+    ".ps1",
+    ".sh",
+    ".sql",
+    ".svg",
+    ".toml",
+    ".ts",
+    ".tsx",
+    ".txt",
+    ".yaml",
+    ".yml",
+}
+DENIED_NAMES = {
+    ".env",
+    ".envrc",
+    ".netrc",
+    ".npmrc",
+    ".pypirc",
+    ".yarnrc",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+    "known_hosts",
+}
+DENIED_NAME_PREFIXES = (
+    ".env.",
+)
 DENIED_SUFFIXES = {
     ".env",
+    ".env.local",
     ".pem",
     ".key",
     ".pfx",
@@ -161,23 +232,20 @@ def mcp_lock_readiness(private_values: dict[str, str] | None = None) -> dict[str
         or env_value("HERMES3D_WORKSPACE", values)
         or env_value("HERMES_LOCK_WORKSPACE", values)
     )
-    configured_server = (
-        env_value("MCP_LOCK_SERVER", values)
-        or env_value("HERMES3D_MCP_SERVER", values)
-        or str(LOCK_SERVER_ENTRY)
-    )
+    configured_server = env_value("MCP_LOCK_SERVER", values) or env_value("HERMES3D_MCP_SERVER", values)
+    trusted_server = _trusted_lock_server_entry()
     workspace_matches = False
     if configured_workspace:
         try:
             workspace_matches = Path(configured_workspace).resolve() == PROJECT_ROOT.resolve()
         except OSError:
             workspace_matches = False
-    server_exists = Path(configured_server).exists() if configured_server else False
+    server_exists = trusted_server.exists()
     source_exists = LOCK_ORCHESTRATOR_ROOT.exists()
     if not source_exists:
         blocked_reason = f"Hermes lock orchestrator source is missing at {LOCK_ORCHESTRATOR_ROOT}."
     elif not server_exists:
-        blocked_reason = f"Hermes lock MCP server entry is missing at {configured_server}."
+        blocked_reason = f"Hermes lock MCP server entry is missing at {trusted_server}."
     elif not configured_workspace:
         blocked_reason = "MCP_LOCK_WORKSPACE is not configured for the Hermes Agent runtime."
     elif not workspace_matches:
@@ -189,8 +257,10 @@ def mcp_lock_readiness(private_values: dict[str, str] | None = None) -> dict[str
         "ready": blocked_reason is None,
         "server_name": "hermes3d-locks",
         "source_path": str(LOCK_ORCHESTRATOR_ROOT),
-        "server_entry": configured_server,
+        "server_entry": str(trusted_server),
         "server_entry_exists": server_exists,
+        "configured_server_override": configured_server or None,
+        "configured_server_override_used": False,
         "configured_workspace": configured_workspace or None,
         "edit_workspace": str(PROJECT_ROOT),
         "workspace_matches": workspace_matches,
@@ -276,6 +346,7 @@ def propose_file_replacement(
     readiness = code_write_readiness()
     if not readiness["ready"]:
         raise ValueError("Code write readiness is blocked: " + "; ".join(readiness["blocked_reasons"]))
+    _validate_owner(agent_id)
     target = _resolve_project_path(relative_path, write=False)
     proposed_bytes = proposed_text.encode("utf-8")
     if len(proposed_bytes) > MAX_PROPOSED_TEXT_BYTES:
@@ -371,6 +442,9 @@ def apply_patch_proposal(
     _validate_owner(agent_id)
     _validate_task_id(task_id)
     proposal = _patch_proposal_payload(proposal_id)
+    proposal_agent_id = str(proposal.get("agent_id") or "")
+    if proposal_agent_id != agent_id:
+        raise ValueError("Patch proposal owner does not match the applying Hermes Agent.")
     rel = str(proposal.get("relative_path") or "")
     proposed_text = proposal.get("proposed_text")
     if not isinstance(proposed_text, str):
@@ -551,9 +625,8 @@ def lock_mcp_files(*, owner: str, files: list[str], task_id: str = "", reason: s
 def heartbeat_mcp_task(*, owner: str, task_id: str = "") -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
-    if task_id:
-        _validate_task_id(task_id)
-    result = _call_mcp_tool("hermes_heartbeat", {"owner": owner, "taskId": task_id or ""})
+    _validate_task_id(task_id)
+    result = _call_mcp_tool("hermes_heartbeat", {"owner": owner, "taskId": task_id})
     return {"status": str(result.get("status") or ("heartbeat" if result.get("ok") else "partial")), "workspace": str(PROJECT_ROOT), "result": result}
 
 
@@ -576,8 +649,7 @@ def release_mcp_task(*, owner: str, task_id: str, note: str = "") -> dict[str, A
 def append_mcp_evidence(*, owner: str, summary: str, task_id: str = "", kind: str = "proof", data: dict[str, Any] | None = None) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
-    if task_id:
-        _validate_task_id(task_id)
+    _validate_task_id(task_id)
     if not summary or len(summary) > 400:
         raise ValueError("Evidence summary must be 1-400 characters.")
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,80}", kind or ""):
@@ -651,6 +723,16 @@ def search_text(pattern: str, root: str = ".", max_results: int = 100) -> dict[s
         "!build/**",
         "--glob",
         "!var/code-history/**",
+        "--glob",
+        "!03_implementation/var/**",
+        "--glob",
+        "!03_implementation/proof/**",
+        "--glob",
+        "!**/.env*",
+        "--glob",
+        "!**/.npmrc",
+        "--glob",
+        "!**/.pypirc",
         "--",
         pattern,
         "." if base == PROJECT_ROOT else _relative_to_project(base),
@@ -697,6 +779,7 @@ def read_file_slice(relative_path: str, start_line: int = 1, line_count: int = 1
 
 
 def snapshot_file(relative_path: str, *, agent_id: str, action_id: str | None = None, reason: str | None = None) -> dict[str, Any]:
+    _validate_owner(agent_id)
     target = _resolve_project_path(relative_path, write=False)
     stat = target.stat()
     if stat.st_size <= 0:
@@ -814,9 +897,12 @@ def snapshot_diff(relative_path: str, snapshot_id: str) -> dict[str, Any]:
     }
 
 
-def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, reason: str | None = None) -> dict[str, Any]:
+def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, task_id: str, reason: str | None = None) -> dict[str, Any]:
+    _validate_owner(agent_id)
+    _validate_task_id(task_id)
     target = _resolve_project_path(relative_path, write=True)
     rel = _relative_to_project(target)
+    lock = _require_active_mcp_lock(rel, owner=agent_id, task_id=task_id)
     snapshot = _snapshot_row(snapshot_id, rel)
     snapshot_path = Path(snapshot["snapshot_path"])
     if not snapshot_path.exists():
@@ -837,8 +923,11 @@ def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, rea
             as_json(
                 {
                     "relative_path": rel,
+                    "task_id": task_id,
+                    "owner": agent_id,
                     "restored_snapshot_id": snapshot_id,
                     "pre_restore_snapshot_id": pre_restore["id"],
+                    "lock_id": lock.get("lock_id"),
                     "sha256": digest,
                     "reason": reason or "",
                 }
@@ -848,9 +937,12 @@ def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, rea
     return {
         "status": "restored",
         "relative_path": rel,
+        "task_id": task_id,
+        "owner": agent_id,
         "restored_snapshot_id": snapshot_id,
         "pre_restore_snapshot_id": pre_restore["id"],
         "proof_event_id": proof_event_id,
+        "lock_id": lock.get("lock_id"),
         "sha256": digest,
     }
 
@@ -926,6 +1018,17 @@ def _require_mcp_locks_ready() -> None:
         raise ValueError(str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready."))
 
 
+def _trusted_lock_server_entry() -> Path:
+    server = LOCK_SERVER_ENTRY.resolve()
+    try:
+        server.relative_to(LOCK_ORCHESTRATOR_ROOT.resolve())
+    except ValueError as exc:
+        raise ValueError("Trusted Hermes MCP lock server must stay inside the lock orchestrator source tree.") from exc
+    if server.name != "server.mjs":
+        raise ValueError("Trusted Hermes MCP lock server entry must be server.mjs.")
+    return server
+
+
 def _validate_owner(owner: str) -> None:
     if not re.fullmatch(r"[a-z][a-z0-9-]{1,63}", owner or ""):
         raise ValueError("Owner must match Hermes MCP owner policy.")
@@ -948,11 +1051,11 @@ def _safe_mcp_files(files: list[str], *, must_exist: bool) -> list[str]:
 
 def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int = 30) -> dict[str, Any]:
     private_values = private_env()
-    server = env_value("MCP_LOCK_SERVER", private_values) or env_value("HERMES3D_MCP_SERVER", private_values) or str(LOCK_SERVER_ENTRY)
+    server = _trusted_lock_server_entry()
     workspace = env_value("MCP_LOCK_WORKSPACE", private_values) or env_value("HERMES3D_WORKSPACE", private_values) or str(PROJECT_ROOT)
     if Path(workspace).resolve() != PROJECT_ROOT.resolve():
         raise ValueError("MCP lock workspace does not match the Hermes3D edit workspace.")
-    if not Path(server).exists():
+    if not server.exists():
         raise FileNotFoundError("Hermes MCP lock server entry is missing.")
     init_id = 1
     call_id = 2
@@ -963,10 +1066,21 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
     ]
     stdin = "".join(json.dumps(message, separators=(",", ":")) + "\n" for message in messages)
     env = {
-        **os.environ,
-        "MCP_LOCK_WORKSPACE": str(PROJECT_ROOT),
-        "MCP_LOCK_SERVER": server,
+        key: value
+        for key, value in {
+            "PATH": os.environ.get("PATH", ""),
+            "PATHEXT": os.environ.get("PATHEXT", ""),
+            "SystemRoot": os.environ.get("SystemRoot", ""),
+            "COMSPEC": os.environ.get("COMSPEC", ""),
+            "TEMP": os.environ.get("TEMP", ""),
+            "TMP": os.environ.get("TMP", ""),
+        }.items()
+        if value
     }
+    env.update({
+        "MCP_LOCK_WORKSPACE": str(PROJECT_ROOT),
+        "MCP_LOCK_SERVER": str(server),
+    })
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
 
@@ -982,7 +1096,7 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
 
     try:
         process = subprocess.Popen(
-            ["node", server],
+            ["node", str(server)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1079,11 +1193,7 @@ def _host_label(url: str) -> str | None:
 
 
 def _resolve_project_path(relative_path: str, *, write: bool) -> Path:
-    if not relative_path or "\x00" in relative_path:
-        raise ValueError("A non-empty project-relative path is required.")
-    raw = relative_path.replace("\\", "/").lstrip("/")
-    if re.match(r"^[A-Za-z]:", raw) or raw.startswith("../") or "/../" in f"/{raw}/":
-        raise ValueError("Only Hermes3D project-relative paths are allowed.")
+    raw = _clean_project_relative_path(relative_path)
     target = (PROJECT_ROOT / raw).resolve()
     try:
         target.relative_to(PROJECT_ROOT)
@@ -1096,14 +1206,10 @@ def _resolve_project_path(relative_path: str, *, write: bool) -> Path:
 
 
 def _resolve_project_subpath(relative_path: str, *, must_exist: bool) -> Path:
-    if not relative_path or "\x00" in relative_path:
-        raise ValueError("A non-empty project-relative path is required.")
-    raw = relative_path.replace("\\", "/").lstrip("/")
+    raw = _clean_project_relative_path(relative_path)
     if raw in {"", "."}:
         target = PROJECT_ROOT.resolve()
     else:
-        if re.match(r"^[A-Za-z]:", raw) or raw.startswith("../") or "/../" in f"/{raw}/":
-            raise ValueError("Only Hermes3D project-relative paths are allowed.")
         target = (PROJECT_ROOT / raw).resolve()
     try:
         target.relative_to(PROJECT_ROOT)
@@ -1116,14 +1222,40 @@ def _resolve_project_subpath(relative_path: str, *, must_exist: bool) -> Path:
     return target
 
 
+def _clean_project_relative_path(relative_path: str) -> str:
+    if relative_path is None or "\x00" in relative_path:
+        raise ValueError("A non-empty project-relative path is required.")
+    raw = str(relative_path).strip().replace("\\", "/")
+    if raw in {"", "/"}:
+        raise ValueError("A non-empty project-relative path is required.")
+    if raw == ".":
+        return raw
+    if (
+        re.match(r"^[A-Za-z]:", raw)
+        or raw.startswith("/")
+        or raw.startswith("//")
+        or raw.startswith("~")
+        or raw == ".."
+        or raw.startswith("../")
+        or "/../" in f"/{raw}/"
+    ):
+        raise ValueError("Only Hermes3D project-relative paths are allowed.")
+    if any(part in {"", "."} for part in raw.split("/")):
+        raise ValueError("Project-relative paths must not contain empty or dot segments.")
+    return raw
+
+
 def _enforce_path_policy(path: Path, *, write: bool) -> None:
     relative_parts = path.relative_to(PROJECT_ROOT).parts
-    lowered_parts = {part.lower() for part in relative_parts}
-    if lowered_parts & DENIED_PARTS:
+    lowered_tuple = tuple(part.lower() for part in relative_parts)
+    lowered_parts = set(lowered_tuple)
+    if _is_denied_parts(lowered_tuple):
         raise ValueError("Path is blocked by Hermes Agent code policy.")
     name = path.name.lower()
-    if name == ".env" or any(name.endswith(suffix) for suffix in DENIED_SUFFIXES):
+    if _is_sensitive_name(name):
         raise ValueError("Sensitive, binary, or generated file type is blocked by Hermes Agent code policy.")
+    if write and not _is_editable_source_path(path):
+        raise ValueError("Hermes Agent code writes are limited to source, test, docs, scripts, and workflow text files.")
     if write and "config" in lowered_parts and "printers.toml" in name:
         raise ValueError("Printer configuration writes require a dedicated printer-policy approval lane.")
 
@@ -1133,11 +1265,39 @@ def _is_denied_path(path: Path) -> bool:
         relative_parts = path.resolve().relative_to(PROJECT_ROOT).parts
     except ValueError:
         return True
-    lowered_parts = {part.lower() for part in relative_parts}
-    if lowered_parts & DENIED_PARTS:
+    lowered_tuple = tuple(part.lower() for part in relative_parts)
+    if _is_denied_parts(lowered_tuple):
         return True
     name = path.name.lower()
-    return name == ".env" or any(name.endswith(suffix) for suffix in DENIED_SUFFIXES)
+    return _is_sensitive_name(name)
+
+
+def _is_denied_parts(parts: tuple[str, ...]) -> bool:
+    if set(parts) & DENIED_PARTS:
+        return True
+    return any(_parts_start_with(parts, prefix) for prefix in DENIED_ROOT_PREFIXES)
+
+
+def _is_sensitive_name(name: str) -> bool:
+    return (
+        name in DENIED_NAMES
+        or any(name.startswith(prefix) for prefix in DENIED_NAME_PREFIXES)
+        or any(name.endswith(suffix) for suffix in DENIED_SUFFIXES)
+    )
+
+
+def _is_editable_source_path(path: Path) -> bool:
+    rel = path.resolve().relative_to(PROJECT_ROOT)
+    parts = tuple(part.lower() for part in rel.parts)
+    if len(parts) == 1 and rel.name in EDITABLE_ROOT_FILES:
+        return True
+    if path.suffix.lower() not in EDITABLE_SUFFIXES:
+        return False
+    return any(_parts_start_with(parts, prefix) for prefix in EDITABLE_ROOT_PREFIXES)
+
+
+def _parts_start_with(parts: tuple[str, ...], prefix: tuple[str, ...]) -> bool:
+    return len(parts) >= len(prefix) and parts[: len(prefix)] == prefix
 
 
 def _parse_rg_line(line: str) -> dict[str, Any]:
@@ -1191,11 +1351,14 @@ def _require_active_mcp_lock(relative_path: str, *, owner: str, task_id: str) ->
     for lock in locks:
         if not isinstance(lock, dict):
             continue
+        lock_file = lock.get("file") or lock.get("path")
+        lock_task_id = lock.get("task_id") or lock.get("taskId")
+        is_stale = lock.get("is_stale") is True or lock.get("stale") is True
         if (
-            lock.get("file") == relative_path
+            lock_file == relative_path
             and lock.get("owner") == owner
-            and lock.get("task_id") == task_id
-            and lock.get("is_stale") is not True
+            and lock_task_id == task_id
+            and not is_stale
         ):
             return lock
     raise ValueError("Active Hermes MCP file lock is required before applying a patch.")

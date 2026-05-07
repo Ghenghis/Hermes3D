@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 import sys
@@ -127,9 +128,6 @@ def _job_patches(conn: sqlite3.Connection, printer_stub: dict | None, is_s1: boo
         # Patch _local_printer in the jobs module (imported as alias)
         patch("hermes3d.api.routes.jobs._local_printer", lambda pid, **kw: printer_stub),
     ]
-
-
-import contextlib
 
 
 @contextlib.contextmanager

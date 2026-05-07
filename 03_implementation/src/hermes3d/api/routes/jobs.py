@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
-from hermes3d.api.safety import check_s1_lock, is_s1_target
+from hermes3d.api.safety import check_s1_lock
 from hermes3d.services.local_state import local_printer as _local_printer
 
 router = APIRouter()
