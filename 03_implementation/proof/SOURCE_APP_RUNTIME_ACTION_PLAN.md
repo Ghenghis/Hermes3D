@@ -1,18 +1,21 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T10:25:05.233701+00:00
+Generated: 2026-05-07T11:28:22.689690+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
 ## Current Truth
 
 - Source-backed apps: 60
-- Runtime-ready apps: 30
-- Runner gaps: 30
+- Runtime-ready apps: 31
+- Runner-not-registered rows: 22
+- Runtime-repair-required rows: 5
+- Source-install-available rows: 0
+- Open P0 runner/repair rows: 29
 - Verified Hermes Agent CLIs: 7
 - Agent-executable runner contracts: 7
 - CLI/service signals needing verifiers: 33
-- Blocked rows: 0
+- Blocked rows: 2
 
 ## Correction Rules
 
@@ -38,13 +41,12 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 
 These rows are installed/source-ready but not Hermes Agent runnable yet. They must remain disabled or plan-only until the acceptance gate passes.
 
-Open P0 rows: 30
+Open P0 rows: 29
 
-### Cli Preferred Gap (4)
+### Cli Preferred Gap (3)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| MeshLab | modelers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/meshlab/runtime/verify` must return ready with proof before any agent execution. |
 | Slic3r | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/slic3r/runtime/verify` must return ready with proof before any agent execution. |
 | Strec3D | slicers | cli_worker | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/strec3d/runtime/verify` must return ready with proof before any agent execution. |
 | SuperSlicer | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/superslicer/runtime/verify` must return ready with proof before any agent execution. |
@@ -116,15 +118,15 @@ Open P0 rows: 30
 
 - agent_cli_ready: 7
 - blocked: 2
-- cli_runner_gap: 2
+- cli_runner_gap: 1
 - desktop_app_runner_gap: 3
 - gpu_worker_runner_gap: 3
 - launcher_metadata_only: 3
-- metadata_ready_needs_runner: 4
+- metadata_ready_needs_runner: 5
 - npm_package_runner_gap: 1
-- python_worker_runner_gap: 5
 - readonly_api_ready: 3
 - runner_not_registered: 5
+- runtime_repair_required: 5
 - service_runner_gap: 6
 - source_reference_only: 13
 - web_app_runner_gap: 3
@@ -143,7 +145,7 @@ These include some rows that are already source/reference/package ready. They st
 | CadQuery | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
 | FreeCAD | modelers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
 | Manifold | modelers | documentation_cli_signal_needs_verifier | package_or_import_ready | Confirm the documented command in the local runtime and register a verifier. |
-| MeshLab | modelers | documentation_cli_signal_needs_verifier | cli_preferred_gap | Confirm the documented command in the local runtime and register a verifier. |
+| MeshLab | modelers | documentation_cli_signal_needs_verifier | package_or_import_ready | Confirm the documented command in the local runtime and register a verifier. |
 | Open3D | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
 | SolveSpace | modelers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
 | build123d | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
@@ -183,7 +185,7 @@ These can prove local desktop app presence, but they are not Hermes Agent CLI ru
 
 ### Runner Gap Tiers
 
-- cli_preferred_gap: 4
+- cli_preferred_gap: 3
 - desktop_app_gap: 3
 - gpu_worker_gap: 3
 - npm_package_gap: 1

@@ -99,6 +99,79 @@ def test_runner_contract_summary_counts_executable_and_gaps(monkeypatch) -> None
     assert summary["by_gap_section"]["slicers"] == 1
 
 
+def test_python_import_contract_is_metadata_not_agent_executable(monkeypatch) -> None:
+    """Import proof is useful runtime truth, but it is not a Hermes Agent runner."""
+
+    def _ready_import(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "ready",
+            "kind": "python_import",
+            "verifier": "pymeshlab import",
+            "proof_gate_version": "python-import-verifier-v1",
+            "path": "python",
+            "executed": True,
+            "return_code": 0,
+            "capabilities": ["mesh_load"],
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _ready_import)
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": "meshlab",
+            "display_name": "MeshLab",
+            "section": "modelers",
+            "launch_kind": "desktop_or_cli",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/MeshLab",
+        }
+    )
+
+    assert contract["runtime_status"] == "ready"
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "metadata_ready_needs_runner"
+    assert contract["required_verifier_family"] == "dry_run_worker_smoke"
+    assert contract["mutation_allowed"] is False
+    assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
+
+
+def test_setup_required_python_import_stays_in_repair_queue(monkeypatch) -> None:
+    def _missing_import(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "setup_required",
+            "kind": "python_import",
+            "verifier": "cadquery import",
+            "proof_gate_version": "python-import-verifier-v1",
+            "path": "python",
+            "executed": True,
+            "return_code": 1,
+            "capabilities": ["parametric_cad_worker"],
+            "reason": "Python module cadquery is not importable in the Hermes3D backend runtime.",
+            "setup_steps": ["Install or select a Hermes3D Python runtime that can import cadquery."],
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _missing_import)
+    summary = module_runtime.module_runner_contracts(
+        [
+            {
+                "id": "cadquery",
+                "display_name": "CadQuery",
+                "section": "modelers",
+                "launch_kind": "python_worker",
+                "install_state": "installed",
+                "local_path": "G:/Github/example/CadQuery",
+            }
+        ]
+    )
+    contract = summary["contracts"][0]
+
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "runtime_repair_required"
+    assert contract["blocked_reason"].startswith("Python module cadquery is not importable")
+    assert contract["required_verifier_family"] == "python_import_or_module_cli"
+    assert summary["runner_gaps"] == 1
+    assert summary["by_runner_status"]["runtime_repair_required"] == 1
+
+
 def test_runner_contract_routes_are_registered() -> None:
     from fastapi import FastAPI
 

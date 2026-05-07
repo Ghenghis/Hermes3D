@@ -65,14 +65,14 @@
     }
   },
   "completion": {
-    "blocked_rows": 0,
-    "remaining_runner_gap": 30,
+    "blocked_rows": 2,
+    "remaining_runner_gap": 22,
     "runtime_ready_complete": false,
     "source_rows_complete": true,
     "status": "runner_gap",
     "unknown_launch_kind_rows": 0
   },
-  "generated_at_utc": "2026-05-06T18:24:35.009477+00:00",
+  "generated_at_utc": "2026-05-07T11:22:11.736751+00:00",
   "launch_kind_classification": {
     "by_launch_kind": {
       "catalog_reference": 1,
@@ -109,12 +109,12 @@
     "agent_gate": "Hermes Agents may consume this queue, but setup execution remains blocked until a module-specific safe runner and verifier are registered.",
     "count": 60,
     "counts": {
-      "blocked": 0,
-      "runner_not_registered": 30,
-      "runtime_ready": 30,
-      "runtime_repair_required": 0,
+      "blocked": 2,
+      "runner_not_registered": 22,
+      "runtime_ready": 31,
+      "runtime_repair_required": 5,
       "source_install_available": 0,
-      "source_ready": 30
+      "source_ready": 22
     },
     "execution_mode": "plan_only_until_safe_runner_registered",
     "registered_runtime_probe_ids": [
@@ -126,6 +126,8 @@
       "botqueue",
       "box_stl_generator",
       "boxturtle",
+      "build123d",
+      "cadquery",
       "comfyui_frontend",
       "cura",
       "curaengine",
@@ -139,19 +141,25 @@
       "langchain",
       "langgraph",
       "manifold",
+      "meshlab",
       "model_context_protocol",
       "moonraker",
+      "numpy_stl",
       "octofarm",
+      "open3d",
       "openscad",
       "orcaslicer",
       "printrun",
       "prusaslicer",
+      "pymesh",
+      "slic3r",
+      "superslicer",
       "trimesh",
       "truck"
     ],
     "registered_runtime_verifiers": {
-      "count": 30,
-      "enabled_count": 30,
+      "count": 38,
+      "enabled_count": 38,
       "registered_ids": [
         "awesome_3d_printing",
         "awesome_extruders",
@@ -161,6 +169,8 @@
         "botqueue",
         "box_stl_generator",
         "boxturtle",
+        "build123d",
+        "cadquery",
         "comfyui_frontend",
         "cura",
         "curaengine",
@@ -174,21 +184,29 @@
         "langchain",
         "langgraph",
         "manifold",
+        "meshlab",
         "model_context_protocol",
         "moonraker",
+        "numpy_stl",
         "octofarm",
+        "open3d",
         "openscad",
         "orcaslicer",
         "printrun",
         "prusaslicer",
+        "pymesh",
+        "slic3r",
+        "superslicer",
         "trimesh",
         "truck"
       ],
       "source": "http://127.0.0.1:8765/api/modules/runtime/verifiers"
     },
     "runner_status_counts": {
-      "runner_not_registered": 30,
-      "runtime_ready": 30
+      "blocked": 2,
+      "runner_not_registered": 22,
+      "runtime_ready": 31,
+      "runtime_repair_required": 5
     },
     "source": "http://127.0.0.1:8765/api/modules/runtime/setup-queue"
   },

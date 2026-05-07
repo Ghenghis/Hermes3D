@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-06T16:13:18.757050+00:00",
+  "generated_at_utc": "2026-05-07T11:21:48.720578+00:00",
   "next_actions": [
     "Keep verified agent CLIs exposed through bounded help/version/dry-run runners first.",
     "Promote candidate CLI surfaces only by adding a module_runtime_verifier row and proof gate.",
@@ -543,9 +543,9 @@
       "launch_kind": "python_worker",
       "module_id": "cadquery",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\CadQuery",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:\\Python314\\python.exe",
+      "proof_gate_version": "python-import-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "modelers",
       "source_signals": [
         {
@@ -567,8 +567,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "python_worker"
+      "verifier": "CadQuery Python import",
+      "verifier_kind": "python_import"
     },
     {
       "agent_enabled": false,
@@ -626,16 +626,16 @@
     },
     {
       "agent_enabled": false,
-      "agent_execution_tier": "cli_preferred_gap",
+      "agent_execution_tier": "package_or_import_ready",
       "cli_surface_status": "documentation_cli_signal_needs_verifier",
       "display": "MeshLab",
       "install_state": "installed",
       "launch_kind": "desktop_or_cli",
       "module_id": "meshlab",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\MeshLab",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:\\Python314\\python.exe",
+      "proof_gate_version": "python-import-verifier-v1",
+      "runtime_status": "ready",
       "section": "modelers",
       "source_signals": [
         {
@@ -645,8 +645,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "desktop_or_cli"
+      "verifier": "MeshLab pymeshlab Python bridge",
+      "verifier_kind": "python_import"
     },
     {
       "agent_enabled": false,
@@ -657,9 +657,9 @@
       "launch_kind": "python_worker",
       "module_id": "open3d",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\modelers\\Open3D",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:\\Python314\\python.exe",
+      "proof_gate_version": "python-import-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "modelers",
       "source_signals": [
         {
@@ -675,8 +675,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "python_worker"
+      "verifier": "Open3D Python import",
+      "verifier_kind": "python_import"
     },
     {
       "agent_enabled": true,
@@ -783,9 +783,9 @@
       "launch_kind": "python_worker",
       "module_id": "build123d",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\build123d",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:\\Python314\\python.exe",
+      "proof_gate_version": "python-import-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "modelers",
       "source_signals": [
         {
@@ -795,8 +795,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "python_worker"
+      "verifier": "build123d Python import",
+      "verifier_kind": "python_import"
     },
     {
       "agent_enabled": false,
@@ -807,9 +807,9 @@
       "launch_kind": "python_worker",
       "module_id": "numpy_stl",
       "next_action": "Add a non-destructive CLI verifier before exposing this to Hermes Agents.",
-      "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\modelers\\numpy-stl",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:\\Python314\\python.exe",
+      "proof_gate_version": "python-import-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "modelers",
       "source_signals": [
         {
@@ -885,8 +885,8 @@
           "source": "setup.py"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "python_worker"
+      "verifier": "numpy-stl Python import",
+      "verifier_kind": "python_import"
     },
     {
       "agent_enabled": false,
@@ -897,13 +897,13 @@
       "launch_kind": "python_worker",
       "module_id": "pymesh",
       "next_action": "Keep agent actions disabled until local docs/source reveal a safe runner or the app is installed.",
-      "path": "G:\\Github\\h3d-gui-wiring-codex\\03_implementation\\source-lab\\sources\\modelers\\pymeshfix",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:\\Python314\\python.exe",
+      "proof_gate_version": "python-import-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "modelers",
       "source_signals": [],
-      "verifier": "source checkout",
-      "verifier_kind": "python_worker"
+      "verifier": "PyMesh/pymeshfix Python import",
+      "verifier_kind": "python_import"
     },
     {
       "agent_enabled": false,
@@ -1567,9 +1567,9 @@
       "launch_kind": "desktop_or_cli",
       "module_id": "slic3r",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Slic3r",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:/Program Files/Slic3r/slic3r-console.exe",
+      "proof_gate_version": "runtime-verifier-v1",
+      "runtime_status": "blocked",
       "section": "slicers",
       "source_signals": [
         {
@@ -1597,8 +1597,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "desktop_or_cli"
+      "verifier": "Slic3r CLI",
+      "verifier_kind": "cli"
     },
     {
       "agent_enabled": false,
@@ -1639,9 +1639,9 @@
       "launch_kind": "desktop_or_cli",
       "module_id": "superslicer",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\SuperSlicer",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "C:/Program Files/SuperSlicer/superslicer-console.exe",
+      "proof_gate_version": "runtime-verifier-v1",
+      "runtime_status": "blocked",
       "section": "slicers",
       "source_signals": [
         {
@@ -1663,8 +1663,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "desktop_or_cli"
+      "verifier": "SuperSlicer CLI",
+      "verifier_kind": "cli"
     },
     {
       "agent_enabled": false,

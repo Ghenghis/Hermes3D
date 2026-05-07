@@ -44,6 +44,10 @@ def main() -> int:
     gap_counts = Counter(str(row.get("agent_execution_tier")) for row in gaps)
     candidate_counts = Counter(str(row.get("cli_surface_status")) for row in candidate_rows)
     completion_counts = completion.get("runtime_setup_queue", {}).get("counts", {}) if isinstance(completion.get("runtime_setup_queue"), dict) else {}
+    runner_not_registered = completion_counts.get("runner_not_registered")
+    runtime_repair_required = completion_counts.get("runtime_repair_required", 0)
+    source_install_available = completion_counts.get("source_install_available", 0)
+    blocked_rows = completion_counts.get("blocked", 0)
 
     lines: list[str] = [
         "# Source OS Runtime Action Plan",
@@ -56,11 +60,14 @@ def main() -> int:
         "",
         f"- Source-backed apps: {completion.get('target', {}).get('source_backed_apps', readiness.get('target', {}).get('source_backed_apps', 60))}",
         f"- Runtime-ready apps: {completion_counts.get('runtime_ready', readiness.get('target', {}).get('registered_verifiers', 'unknown'))}",
-        f"- Runner gaps: {completion_counts.get('runner_not_registered', readiness.get('summary', {}).get('runner_gaps', 'unknown'))}",
+        f"- Runner-not-registered rows: {runner_not_registered if runner_not_registered is not None else 'unknown'}",
+        f"- Runtime-repair-required rows: {runtime_repair_required}",
+        f"- Source-install-available rows: {source_install_available}",
+        f"- Open P0 runner/repair rows: {len(gaps)}",
         f"- Verified Hermes Agent CLIs: {readiness.get('summary', {}).get('verified_agent_cli', len(verified))}",
         f"- Agent-executable runner contracts: {readiness.get('summary', {}).get('agent_executable', len(verified))}",
         f"- CLI/service signals needing verifiers: {cli_surface.get('summary', {}).get('candidate_needs_verifier', len(candidate_rows))}",
-        f"- Blocked rows: {completion_counts.get('blocked', 0)}",
+        f"- Blocked rows: {blocked_rows}",
         "",
         "## Correction Rules",
         "",
