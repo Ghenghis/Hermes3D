@@ -1,0 +1,202 @@
+{
+  "$schema": "hermes3d://proof/modelers_verify_v1",
+  "generated_at_utc": "2026-05-06T23:28:24.686755+00:00",
+  "host_platform": "win32",
+  "lane": "H3D-CLAUDE-SOURCE-MODELERS",
+  "modelers": [
+    {
+      "executable_found": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "help_probe": {
+        "contains_expected_substr": true,
+        "expected_substr": "Blender",
+        "ok": true,
+        "output_head": [
+          "Blender 5.1.1",
+          "Usage: blender [args ...] [file] [args ...]",
+          "",
+          "Render Options:",
+          "-b or --background ",
+          "\tRun in background (often used for UI-less rendering)."
+        ],
+        "return_code": 0
+      },
+      "id": "blender",
+      "installed": true,
+      "kind": "cli",
+      "label": "Blender",
+      "proof_gate_version": "modelers-source-runtime-verifier-v1",
+      "schema_path": "adapter_registry\\schemas\\blender_bridge.schema.json",
+      "schema_valid": true,
+      "status": "found",
+      "version_probe": {
+        "found": true,
+        "return_code": 0,
+        "stderr_head": [],
+        "stdout_head": [
+          "Blender 5.1.1",
+          "\tbuild date: 2026-04-14",
+          "\tbuild time: 01:37:22",
+          "\tbuild commit date: 2026-04-13",
+          "\tbuild commit time: 14:35",
+          "\tbuild hash: b70da489d7f4"
+        ],
+        "version": "5.1.1"
+      }
+    },
+    {
+      "executable_found": "C:\\Program Files\\OpenSCAD\\openscad.exe",
+      "help_probe": {
+        "contains_expected_substr": true,
+        "expected_substr": "Usage",
+        "ok": true,
+        "output_head": [
+          "Usage: openscad.exe [options] file.scad",
+          "Allowed options:",
+          "  --export-format arg          overrides format of exported scad file when ",
+          "                               using option '-o', arg can be any of its ",
+          "                               supported file extensions.  For ascii stl ",
+          "                               export, specify 'asciistl', and for binary stl "
+        ],
+        "return_code": 0
+      },
+      "id": "openscad",
+      "installed": true,
+      "kind": "cli",
+      "label": "OpenSCAD",
+      "proof_gate_version": "modelers-source-runtime-verifier-v1",
+      "schema_path": "adapter_registry\\schemas\\openscad_worker.schema.json",
+      "schema_valid": true,
+      "status": "found",
+      "version_probe": {
+        "found": true,
+        "return_code": 0,
+        "stderr_head": [
+          "OpenSCAD version 2021.01"
+        ],
+        "stdout_head": [],
+        "version": "2021.01"
+      }
+    },
+    {
+      "executable_found": null,
+      "help_probe": {
+        "found": false,
+        "reason": "executable not found"
+      },
+      "id": "freecad",
+      "installed": false,
+      "kind": "cli",
+      "label": "FreeCAD",
+      "proof_gate_version": "modelers-source-runtime-verifier-v1",
+      "schema_path": "adapter_registry\\schemas\\freecad_bridge.schema.json",
+      "schema_valid": true,
+      "status": "not_found",
+      "version_probe": {
+        "found": false,
+        "reason": "executable not found on PATH or known locations"
+      }
+    },
+    {
+      "id": "cadquery",
+      "installed": false,
+      "kind": "python_import",
+      "label": "CadQuery",
+      "pip_probes": [
+        {
+          "installed": false,
+          "location": null,
+          "package": "cadquery",
+          "return_code": 1,
+          "version": null
+        }
+      ],
+      "proof_gate_version": "modelers-source-runtime-verifier-v1",
+      "schema_path": "adapter_registry\\schemas\\cadquery_worker.schema.json",
+      "schema_valid": true,
+      "smoke_probe": null,
+      "status": "not_found"
+    },
+    {
+      "id": "build123d",
+      "installed": false,
+      "kind": "python_import",
+      "label": "build123d",
+      "pip_probes": [
+        {
+          "installed": false,
+          "location": null,
+          "package": "build123d",
+          "return_code": 1,
+          "version": null
+        }
+      ],
+      "proof_gate_version": "modelers-source-runtime-verifier-v1",
+      "schema_path": "adapter_registry\\schemas\\build123d_worker.schema.json",
+      "schema_valid": true,
+      "smoke_probe": null,
+      "status": "not_found"
+    },
+    {
+      "id": "trimesh",
+      "installed": true,
+      "kind": "python_import",
+      "label": "trimesh + numpy-stl + open3d",
+      "pip_probes": [
+        {
+          "installed": true,
+          "location": "C:\\Python314\\Lib\\site-packages",
+          "package": "trimesh",
+          "return_code": 0,
+          "version": "4.12.1"
+        },
+        {
+          "installed": false,
+          "location": null,
+          "package": "numpy-stl",
+          "return_code": 1,
+          "version": null
+        },
+        {
+          "installed": false,
+          "location": null,
+          "package": "open3d",
+          "return_code": 1,
+          "version": null
+        }
+      ],
+      "proof_gate_version": "modelers-source-runtime-verifier-v1",
+      "schema_path": "adapter_registry\\schemas\\trimesh_worker.schema.json",
+      "schema_valid": true,
+      "smoke_probe": {
+        "ok": true,
+        "return_code": 0,
+        "stderr_head": []
+      },
+      "status": "found"
+    }
+  ],
+  "pip_command": [
+    "C:\\Python314\\python.exe",
+    "-m",
+    "pip"
+  ],
+  "policy": {
+    "cli": "version + help probe only (no heavy render)",
+    "downloads": "forbidden",
+    "import": "pip show + python -c (no side effects)",
+    "pip": "show only (no install)"
+  },
+  "summary": {
+    "found": [
+      "blender",
+      "openscad",
+      "trimesh"
+    ],
+    "not_found": [
+      "freecad",
+      "cadquery",
+      "build123d"
+    ],
+    "total": 6
+  }
+}
