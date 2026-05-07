@@ -296,7 +296,7 @@ export function ObserveTab() {
             className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-xs text-fg hover:border-accent-blue disabled:cursor-wait disabled:opacity-70"
           >
             <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
-            {isRefreshing ? "Refreshing" : "Refresh all"}
+            {isRefreshing ? "Refreshing" : "Refresh"}
           </button>
         </div>
       </header>
