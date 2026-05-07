@@ -1,6 +1,6 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T13:55:48.556192+00:00
+Generated: 2026-05-07T15:58:21.635355+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
@@ -8,8 +8,8 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 
 - Source-backed apps: 60
 - Runtime-ready apps: 31
-- Runner-not-registered rows: 17
-- Runtime-repair-required rows: 10
+- Runner-not-registered rows: 12
+- Runtime-repair-required rows: 15
 - Source-install-available rows: 0
 - Open P0 runner/repair rows: 29
 - Verified Hermes Agent CLIs: 7
@@ -125,10 +125,8 @@ Open P0 rows: 29
 - npm_package_runner_gap: 1
 - readonly_api_ready: 3
 - runner_not_registered: 5
-- runtime_repair_required: 10
-- service_runner_gap: 4
+- runtime_repair_required: 15
 - source_reference_only: 13
-- web_app_runner_gap: 1
 
 ## P1 CLI/Service Signals Needing Verifiers
 
