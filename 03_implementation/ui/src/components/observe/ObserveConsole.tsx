@@ -1,14 +1,19 @@
-import { Camera, Eye, ShieldCheck } from "lucide-react";
+import { Activity, Camera, Eye, ShieldCheck, Wifi, WifiOff } from "lucide-react";
+import { useEffect, useState } from "react";
 import { LockedAction } from "../badges/LockedAction";
 import { StatusBadge } from "../badges/StatusBadge";
 import { Panel } from "../layout/Panel";
+import type { CameraStatus, ObserveStatusResponse } from "../../types/observe";
 
-const CAMERAS = [
-  { id: "cam-t1", name: "T1 enclosure", state: "online", fps: 12, printer: "FLSUN T1 #1" },
-  { id: "cam-v400", name: "V400 bed", state: "online", fps: 10, printer: "FLSUN V400" },
-  { id: "cam-s1", name: "S1 maintenance", state: "offline", fps: 0, printer: "FLSUN S1" },
-  { id: "cam-lab", name: "Lab overview", state: "online", fps: 6, printer: "Fleet" },
-];
+type HermesImportMeta = ImportMeta & {
+  env: {
+    VITE_HERMES3D_BRIDGE_PORT?: string;
+  };
+};
+
+const DEFAULT_BRIDGE_PORT = "8765";
+const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
+const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
 
 const EVENTS = [
   "Layer progress sampled for active print",
@@ -17,8 +22,54 @@ const EVENTS = [
   "Observe stream is read-only; no printer command path",
 ];
 
+async function fetchObserveStatus(): Promise<ObserveStatusResponse | null> {
+  try {
+    const response = await fetch(`${LIVE_BASE_URL}/api/observe/status`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload: unknown = await response.json().catch(() => null);
+    if (
+      typeof payload !== "object" ||
+      payload === null ||
+      !Array.isArray((payload as Record<string, unknown>).cameras)
+    ) {
+      return null;
+    }
+    return payload as ObserveStatusResponse;
+  } catch {
+    return null;
+  }
+}
+
 export function ObserveConsole() {
-  const online = CAMERAS.filter((camera) => camera.state === "online").length;
+  const [statusData, setStatusData] = useState<ObserveStatusResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const poll = async () => {
+      const data = await fetchObserveStatus();
+      if (mounted) {
+        setStatusData(data);
+        setLoading(false);
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 5_000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const cameras: CameraStatus[] = statusData?.cameras ?? [];
+  const onlineCount = cameras.filter((c) => c.health === "reachable").length;
+  const totalCount = cameras.length;
 
   return (
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min">
@@ -27,25 +78,70 @@ export function ObserveConsole() {
           id="observe.cameras"
           title="OBSERVE CAMERAS"
           dense
-          status={{ tone: online === CAMERAS.length ? "green" : "amber", label: `${online}/${CAMERAS.length}` }}
+          status={{
+            tone: loading ? "cyan" : onlineCount === totalCount && totalCount > 0 ? "green" : "amber",
+            label: loading ? "loading" : `${onlineCount}/${totalCount}`,
+          }}
           className="h-[360px]"
         >
           <div className="grid h-full grid-cols-1 gap-2 overflow-auto md:grid-cols-2">
-            {CAMERAS.map((camera) => (
-              <article key={camera.id} className="rounded border border-border bg-surface2/40 p-2 text-xs">
-                <div className="aspect-video rounded border border-border bg-bg flex items-center justify-center">
-                  <Camera className={camera.state === "online" ? "text-accent-cyan" : "text-muted"} size={28} />
-                </div>
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold text-fg">{camera.name}</div>
-                    <div className="truncate text-[10px] text-muted">{camera.printer}</div>
+            {loading && (
+              <div className="col-span-full flex items-center justify-center text-xs text-muted">
+                Fetching camera status...
+              </div>
+            )}
+            {!loading && cameras.length === 0 && (
+              <div className="col-span-full flex items-center justify-center text-xs text-muted">
+                No cameras configured. Backend may be unreachable.
+              </div>
+            )}
+            {cameras.map((camera) => {
+              const online = camera.health === "reachable";
+              const fps = camera.estimated_fps;
+              return (
+                <article key={camera.printer_id} className="rounded border border-border bg-surface2/40 p-2 text-xs">
+                  <div className="aspect-video rounded border border-border bg-bg flex items-center justify-center relative overflow-hidden">
+                    <Camera
+                      className={online ? "text-accent-cyan" : "text-muted"}
+                      size={28}
+                    />
+                    {/* Read-only safety badge for S1 (192.168.0.12) */}
+                    {camera.read_only && (
+                      <span className="absolute top-1 right-1 rounded bg-amber-900/70 px-1.5 py-0.5 text-[9px] font-semibold text-amber-300">
+                        READ-ONLY
+                      </span>
+                    )}
                   </div>
-                  <StatusBadge tone={camera.state === "online" ? "green" : "muted"} label={camera.state} />
-                </div>
-                <div className="mt-1 font-mono text-[10px] text-muted">{camera.fps} fps observed</div>
-              </article>
-            ))}
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-fg">{camera.printer_name}</div>
+                      <div className="truncate text-[10px] text-muted font-mono">
+                        {camera.camera_url ?? "not configured"}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <StatusBadge tone={online ? "green" : "muted"} label={online ? "online" : "offline"} />
+                      {online ? (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] text-accent-cyan">
+                          <Wifi size={9} />
+                          {camera.response_ms !== null ? `${camera.response_ms}ms` : ""}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 text-[9px] text-muted">
+                          <WifiOff size={9} />
+                          offline
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* fps indicator — most useful for V400 USB webcam (192.168.0.34) */}
+                  <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-muted">
+                    <Activity size={10} />
+                    {fps !== null ? `~${fps} fps estimated` : online ? "fps unknown" : "no signal"}
+                  </div>
+                </article>
+              );
+            })}
           </div>
         </Panel>
       </div>
