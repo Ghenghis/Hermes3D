@@ -628,7 +628,7 @@ test("printer panel reflects operator IPs and keeps S1 test locked", async ({ pa
   const t1Panel = root.locator("section").filter({ hasText: "T1 #1" });
   await expect(t1Panel.getByRole("button", { name: "Test", exact: true })).toBeEnabled();
   await t1Panel.getByRole("button", { name: "Test", exact: true }).click();
-  await expect(t1Panel.getByText(/OK|FAIL/i)).toBeVisible({ timeout: 20_000 });
+  await expect(t1Panel.getByText(/MOONRAKER (OK|FAIL)/i)).toBeVisible({ timeout: 20_000 });
 });
 
 test("Printers appends onboarded fleet rows after the fixed operator printers", async ({ page }) => {

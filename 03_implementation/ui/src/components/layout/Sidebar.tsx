@@ -12,7 +12,7 @@ export function Sidebar() {
       defaultWidth={260}
       minWidth={200}
       maxWidth={560}
-      label="main navigation and Hermes Agents panel"
+      label="left panel"
       role="navigation"
       dataTestId="main-left-rail"
       className="flex h-screen min-h-0 w-[var(--pane-width)] shrink-0 flex-col border-r border-border bg-surface"
