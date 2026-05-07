@@ -1,17 +1,17 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T16:49:30.602083+00:00
+Generated: 2026-05-07T20:32:38.292923+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
 ## Current Truth
 
 - Source-backed apps: 60
-- Runtime-ready apps: 31
-- Runner-not-registered rows: 12
+- Runtime-ready apps: 36
+- Runner-not-registered rows: 7
 - Runtime-repair-required rows: 15
 - Source-install-available rows: 0
-- Open P0 runner/repair rows: 29
+- Open P0 runner/repair rows: 24
 - Verified Hermes Agent CLIs: 7
 - Agent-executable runner contracts: 7
 - CLI/service signals needing verifiers: 24
@@ -58,7 +58,7 @@ These rows now have a registered setup/start preflight contract at `/api/modules
 
 These rows are installed/source-ready but not Hermes Agent runnable yet. They must remain disabled or plan-only until the acceptance gate passes.
 
-Open P0 rows: 29
+Open P0 rows: 24
 
 ### Cli Preferred Gap (2)
 
@@ -99,15 +99,10 @@ Open P0 rows: 29
 | numpy-stl | modelers | python_worker | cli_candidate_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/numpy_stl/runtime/verify` must return ready with proof before any agent execution. |
 | pymesh | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/pymesh/runtime/verify` must return ready with proof before any agent execution. |
 
-### Runner Gap (6)
+### Runner Gap (1)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| Marlin | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/marlin/runtime/verify` must return ready with proof before any agent execution. |
-| Prusa Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/prusa_firmware/runtime/verify` must return ready with proof before any agent execution. |
-| RepRapFirmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/reprapfirmware/runtime/verify` must return ready with proof before any agent execution. |
-| Repetier Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/repetier_firmware/runtime/verify` must return ready with proof before any agent execution. |
-| Smoothieware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/smoothieware/runtime/verify` must return ready with proof before any agent execution. |
 | OctoFarm | print_farm | service_reference | service_or_setup_candidate_needs_verifier | Add a health/version/setup verifier before exposing service or setup actions. | Register module_specific_safe_verifier; then `/api/modules/octofarm/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Service Gap (6)
@@ -141,9 +136,8 @@ Open P0 rows: 29
 - metadata_ready_needs_runner: 5
 - npm_package_runner_gap: 1
 - readonly_api_ready: 3
-- runner_not_registered: 5
 - runtime_repair_required: 15
-- source_reference_only: 13
+- source_reference_only: 18
 
 ## P1 CLI/Service Signals Needing Verifiers
 
@@ -195,7 +189,7 @@ These can prove local desktop app presence, but they are not Hermes Agent CLI ru
 - gpu_worker_gap: 3
 - npm_package_gap: 1
 - python_worker_gap: 5
-- runner_gap: 6
+- runner_gap: 1
 - service_gap: 6
 - web_app_gap: 3
 

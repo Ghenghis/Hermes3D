@@ -217,6 +217,68 @@ def test_source_inventory_contract_is_reference_only_not_executable(monkeypatch)
     assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
 
 
+@pytest.mark.parametrize(
+    ("module_id", "display_name", "required_files"),
+    [
+        ("marlin", "Marlin", ["README.md", "docs"]),
+        ("prusa_firmware", "Prusa Firmware", ["README.md", "CMakeLists.txt", "Firmware"]),
+        ("reprapfirmware", "RepRapFirmware", ["README.md", "src"]),
+        ("repetier_firmware", "Repetier Firmware", ["README.md", "src"]),
+        ("smoothieware", "Smoothieware", ["COPYING", "src"]),
+    ],
+)
+def test_firmware_source_inventory_is_reference_only_not_executable(
+    monkeypatch,
+    tmp_path,
+    module_id: str,
+    display_name: str,
+    required_files: list[str],
+) -> None:
+    """Firmware rows may prove source inventory, but never become agent-executable.
+
+    This is intentionally not a compile, flash, upload, or printer test.
+    """
+
+    monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
+    for relative in required_files:
+        target = tmp_path / relative
+        if "." in target.name:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("firmware source inventory proof\n", encoding="utf-8")
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+
+    runtime = module_runtime.module_runtime_probe(
+        {
+            "id": module_id,
+            "display_name": display_name,
+            "section": "firmware",
+            "launch_kind": "firmware_source",
+            "install_state": "installed",
+            "local_path": str(tmp_path),
+        }
+    )
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": module_id,
+            "display_name": display_name,
+            "section": "firmware",
+            "launch_kind": "firmware_source",
+            "install_state": "installed",
+            "local_path": str(tmp_path),
+        }
+    )
+
+    assert runtime["status"] == "ready"
+    assert runtime["kind"] == "source_inventory"
+    assert runtime["executed"] is False
+    assert runtime["proof_gate_version"] == "firmware-source-inventory-v1"
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "source_reference_only"
+    assert contract["mutation_allowed"] is False
+    assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
+
+
 def test_readonly_http_contract_is_not_agent_executable(monkeypatch) -> None:
     """A live health API proof is useful, but it is still read-only metadata."""
 

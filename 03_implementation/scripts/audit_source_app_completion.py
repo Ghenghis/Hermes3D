@@ -17,7 +17,6 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROOF_DIR = REPO_ROOT / "03_implementation" / "proof"
 SOURCE_AUDIT_PATH = PROOF_DIR / "SOURCE_REGISTRY_TRUTH_AUDIT.json"
@@ -67,13 +66,13 @@ def main() -> int:
             "by_section": source_audit.get("by_section", {}) if isinstance(source_audit, dict) else {},
         },
         "runtime_setup_queue": {
-            "source": RUNTIME_QUEUE_URL if runtime_queue else "unavailable",
+            "source": (runtime_queue.get("_source") or RUNTIME_QUEUE_URL) if runtime_queue else "unavailable",
             "count": int(runtime_queue.get("count", 0)) if isinstance(runtime_queue, dict) else 0,
             "counts": queue_counts if isinstance(queue_counts, dict) else {},
             "runner_status_counts": dict(sorted(runner_counts.items())),
             "registered_runtime_probe_ids": registered_runtime_probe_ids(),
             "registered_runtime_verifiers": {
-                "source": RUNTIME_VERIFIERS_URL if runtime_verifiers else "service fallback",
+                "source": (runtime_verifiers.get("_source") or RUNTIME_VERIFIERS_URL) if runtime_verifiers else "service fallback",
                 "count": int(runtime_verifiers.get("count", 0)) if isinstance(runtime_verifiers, dict) else len(registered_runtime_probe_ids()),
                 "enabled_count": int(runtime_verifiers.get("enabled_count", 0)) if isinstance(runtime_verifiers, dict) else len(registered_runtime_probe_ids()),
                 "registered_ids": runtime_verifiers.get("registered_ids", registered_runtime_probe_ids()) if isinstance(runtime_verifiers, dict) else registered_runtime_probe_ids(),
@@ -82,13 +81,13 @@ def main() -> int:
             "agent_gate": runtime_queue.get("agent_gate") if isinstance(runtime_queue, dict) else "Local runtime setup queue API was not reachable during this audit.",
         },
         "cli_surface": {
-            "source": CLI_SURFACE_URL if cli_surface else "unavailable",
+            "source": (cli_surface.get("_source") or CLI_SURFACE_URL) if cli_surface else "unavailable",
             "proof_source": cli_surface.get("proof_source") if isinstance(cli_surface, dict) else None,
             "summary": cli_surface.get("summary", {}) if isinstance(cli_surface, dict) else {},
             "rule": cli_surface.get("target", {}).get("rule") if isinstance(cli_surface.get("target"), dict) else None,
         },
         "launch_kind_classification": {
-            "source": MODULES_URL if api_modules else "unavailable",
+            "source": "local checkout database" if api_modules else "unavailable",
             "count": len(api_modules),
             "unknown": launch_kind_counts.get("unknown", 0),
             "by_launch_kind": dict(sorted(launch_kind_counts.items())),
@@ -144,6 +143,9 @@ def read_json(path: Path) -> dict:
 
 
 def read_runtime_queue() -> dict:
+    local = read_local_runtime_queue()
+    if local:
+        return local
     request = Request(RUNTIME_QUEUE_URL, headers={"accept": "application/json"}, method="GET")
     try:
         with urlopen(request, timeout=RUNTIME_ENDPOINT_TIMEOUT_S) as response:
@@ -154,6 +156,22 @@ def read_runtime_queue() -> dict:
 
 
 def read_runtime_verifiers() -> dict:
+    try:
+        from hermes3d.db.init import init_db
+        from hermes3d.db.load_modules import load_modules
+        from hermes3d.services.module_runtime import registered_runtime_probe_ids
+
+        init_db()
+        load_modules()
+        ids = registered_runtime_probe_ids()
+        return {
+            "_source": "local checkout module_runtime registry",
+            "count": len(ids),
+            "enabled_count": len(ids),
+            "registered_ids": ids,
+        }
+    except Exception:
+        pass
     request = Request(RUNTIME_VERIFIERS_URL, headers={"accept": "application/json"}, method="GET")
     try:
         with urlopen(request, timeout=RUNTIME_ENDPOINT_TIMEOUT_S) as response:
@@ -164,6 +182,10 @@ def read_runtime_verifiers() -> dict:
 
 
 def read_cli_surface() -> dict:
+    local = read_json(PROOF_DIR / "SOURCE_APP_CLI_SURFACE_AUDIT.json")
+    if local:
+        local["_source"] = str(PROOF_DIR / "SOURCE_APP_CLI_SURFACE_AUDIT.json")
+        return local
     request = Request(CLI_SURFACE_URL, headers={"accept": "application/json"}, method="GET")
     try:
         with urlopen(request, timeout=RUNTIME_ENDPOINT_TIMEOUT_S) as response:
@@ -174,6 +196,28 @@ def read_cli_surface() -> dict:
 
 
 def read_modules() -> list[dict]:
+    try:
+        from hermes3d.db.init import connect, init_db
+        from hermes3d.db.load_modules import load_modules
+
+        init_db()
+        load_modules()
+        conn = connect()
+        try:
+            return [
+                dict(row)
+                for row in conn.execute(
+                    """
+                    SELECT id, display_name, section, launch_kind, install_state, local_path, repo_url
+                      FROM modules
+                     ORDER BY section, display_name
+                    """
+                ).fetchall()
+            ]
+        finally:
+            conn.close()
+    except Exception:
+        pass
     request = Request(MODULES_URL, headers={"accept": "application/json"}, method="GET")
     try:
         with urlopen(request, timeout=10) as response:
@@ -181,6 +225,21 @@ def read_modules() -> list[dict]:
     except (OSError, URLError, TimeoutError, json.JSONDecodeError):
         return []
     return parsed if isinstance(parsed, list) else []
+
+
+def read_local_runtime_queue() -> dict:
+    try:
+        from hermes3d.api.routes.modules import _runtime_setup_queue_payload
+        from hermes3d.db.init import init_db
+        from hermes3d.db.load_modules import load_modules
+
+        init_db()
+        load_modules()
+        payload = _runtime_setup_queue_payload(section=None)
+        payload["_source"] = "local checkout /api/modules/runtime/setup-queue implementation"
+        return payload
+    except Exception:
+        return {}
 
 
 if __name__ == "__main__":
