@@ -2,7 +2,7 @@
 
 Updated: 2026-05-07
 Owner: codex-master
-Task: H3D-CODEX-SOURCE-OS-FIRMWARE-INVENTORY
+Task: H3D-CODEX-RUST-ACCEL-GCODE-STL-PROOF
 
 ## Contract
 
@@ -79,7 +79,7 @@ Definition of roadmap completion:
 | P1 | Printer onboarding/profile wizard polish | PENDING | New printers can be added with Moonraker probe, camera URL, profile refs, safety policy, and proof without editing TOML/source. |
 | P1 | Idle automation workbench execution | PARTIAL | Agents can create research/build/update candidates while idle, Run fails closed with proof until trusted runtime prerequisites exist, then reports/gates are recorded before user review/merge. |
 | P1 | Observe advanced view presets | DONE | Camera selection layouts for 1/2/3/all feeds, rotations 0/90/180/270, zoom/focus/color controls, undock, persisted presets, and Refresh reconnect proof work across the live Observe tab. |
-| P1 | Rust acceleration worker lane | PENDING | Add Rust only where profiling proves value: STL/3MF/G-code parsing, mesh bounds/repair helpers, large proof/tree hashing, camera frame transforms, and sandbox/process-supervisor primitives. Acceptance: each Rust worker has a Python API wrapper, deterministic CLI smoke, unit tests, proof output, and a fallback/blocked reason; do not rewrite React/UI or ordinary API CRUD paths just to use Rust. |
+| P1 | Rust acceleration worker lane | PARTIAL | First Rust slice adds `hermes3d-accel`, a read-only CLI for SHA-256 proof hashing, bounded G-code metadata parsing, and binary STL triangle/bounds metadata. Python wrappers keep safe fallback behavior when the Rust binary is missing, and proof hashing/G-code metadata paths opportunistically use Rust only when built/configured. Acceptance proof: `cargo test --manifest-path 03_implementation/rust/hermes3d_accel/Cargo.toml` passed 3/3; `cargo build --manifest-path 03_implementation/rust/hermes3d_accel/Cargo.toml` produced the local debug binary; `python -m pytest 04_testing\\pytest\\unit\\test_rust_accel.py -q` passed 4/4; Ruff and py_compile passed. Remaining Rust candidates stay scoped to where profiling pays: 3MF parsing, safety-bounds acceleration after parity tests, large proof/tree hashing expansion, camera-frame transforms, and sandbox/process-supervisor primitives. |
 | P2 | Final density/responsive pass | IN_PROGRESS | Main navigation, Source OS project list, Settings sections, Voice agents, Plugins API panel, and Simple mode left rail now use persisted user-resizable panes with keyboard/Home/End control and double-click reset. Remaining: finish tab-by-tab density/polish after each feature surface is complete; dashboard stays non-scroll at operator viewport sizes. |
 | P2 | Final docs/proof sync | PENDING | README/roadmap/proof docs match live tab count, printer policy, source app count, and current proof event IDs. |
 
