@@ -53,6 +53,8 @@ import {
   planPreviewLive,
   planModuleRuntimeSetupQueueLive,
   onboardPrinterLive,
+  probePrinterLive,
+  validateCameraUrlLive,
   previewVoiceLive,
   proposeJobRepairLive,
   rollbackHermesAgentLive,
@@ -113,6 +115,8 @@ export type {
   HermesDesktopDownload,
   HermesDesktopUpdateStatus,
   LearningReportContent,
+  PrinterProbeResult,
+  CameraValidateResult,
 } from "./adapters.live";
 import type {
   AgentConfigPayload,
@@ -126,6 +130,8 @@ import type {
   HermesDesktopDownload,
   HermesDesktopUpdateStatus,
   LearningReportContent,
+  PrinterProbeResult,
+  CameraValidateResult,
 } from "./adapters.live";
 
 export interface AdapterAPI {
@@ -158,6 +164,8 @@ export interface AdapterAPI {
   getPrinterLockState(id: string): Promise<PrinterLock>;
   testPrinter(id: string): Promise<TestResult>;
   onboardPrinter(request: PrinterOnboardRequest): Promise<PrinterOnboardResult>;
+  probePrinter(ip: string): Promise<PrinterProbeResult>;
+  validateCameraUrl(cameraUrl: string): Promise<CameraValidateResult>;
   uploadGcode(id: string, gcodePath: string, start: boolean, remoteSubdir?: string, actor?: string, jobId?: string): Promise<GcodeUploadResult>;
   updatePrinterStatus(id: string, status: Printer["status"], actor?: string): Promise<void>;
   getVoiceAgents(): Promise<VoiceAgent[]>;
@@ -237,6 +245,8 @@ export const adapters: AdapterAPI = {
   getPrinterLockState: getPrinterLockStateLive,
   testPrinter: testPrinterLive,
   onboardPrinter: onboardPrinterLive,
+  probePrinter: probePrinterLive,
+  validateCameraUrl: validateCameraUrlLive,
   uploadGcode: uploadGcodeLive,
   updatePrinterStatus: updatePrinterStatusLive,
   getVoiceAgents: getVoiceAgentsLive,
