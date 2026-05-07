@@ -13,22 +13,22 @@
     "test:visual:update": "playwright test --config=playwright.e2e.config.ts"
   },
   "dependencies": {
+    "lucide-react": "0.451.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.27.0",
-    "lucide-react": "0.451.0",
+    "react-router-dom": "6.30.3",
     "recharts": "2.13.0",
     "zustand": "5.0.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.48.0",
+    "@playwright/test": "1.59.1",
     "@types/react": "18.3.11",
     "@types/react-dom": "18.3.0",
-    "@vitejs/plugin-react": "4.3.2",
+    "@vitejs/plugin-react": "6.0.1",
     "autoprefixer": "10.4.20",
-    "postcss": "8.4.47",
+    "postcss": "8.5.14",
     "tailwindcss": "3.4.13",
     "typescript": "5.6.2",
-    "vite": "5.4.8"
+    "vite": "8.0.10"
   }
 }
