@@ -4,6 +4,21 @@ import type { Agent } from "../types/agent";
 import type { Artifact, ArtifactGate, ArtifactStage, ArtifactType, EvidenceForm } from "../types/artifact";
 import type { Job } from "../types/job";
 
+// ---- Proof bundle types (Lane 15 — H3D-CLAUDE-ARTIFACTS-PROOF) ----
+interface ProofFile {
+  filename: string;
+  size_bytes: number;
+  modified_utc: string;
+  type: string;
+}
+
+interface ProofManifest {
+  proof_dir: string;
+  file_count: number;
+  total_size_bytes: number;
+  files: ProofFile[];
+}
+
 type HermesImportMeta = ImportMeta & {
   env: {
     VITE_HERMES3D_BRIDGE_PORT?: string;
@@ -20,6 +35,8 @@ export function ArtifactsTab() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [proofManifest, setProofManifest] = useState<ProofManifest | null>(null);
+  const [proofError, setProofError] = useState<string | null>(null);
   const [form, setForm] = useState<EvidenceForm>({
     jobId: "",
     evidenceType: "screenshot",
@@ -44,6 +61,13 @@ export function ArtifactsTab() {
       setForm((current) => ({ ...current, agent: next[0]?.role ?? "" }));
     });
     void loadArtifacts().then(setArtifacts);
+    void loadProofManifest(LIVE_BASE_URL).then((result) => {
+      if (result.ok) {
+        setProofManifest(result.manifest);
+      } else {
+        setProofError(result.error);
+      }
+    });
   }, []);
 
   const attach = async () => {
@@ -84,7 +108,8 @@ export function ArtifactsTab() {
   };
 
   return (
-    <div data-testid="artifacts-root" className="grid min-h-[calc(100vh-6.5rem)] gap-3 lg:grid-cols-12">
+    <div data-testid="artifacts-root" className="flex min-h-[calc(100vh-6.5rem)] flex-col gap-3">
+      <div className="grid gap-3 lg:grid-cols-12">
       <section id="artifacts.attach" className="rounded border border-border bg-surface p-4 lg:col-span-5">
         <h2 className="text-base font-semibold text-fg">ATTACH VISUAL EVIDENCE</h2>
         <div className="mt-4 grid gap-2 text-sm">
@@ -122,8 +147,73 @@ export function ArtifactsTab() {
           {artifacts.length === 0 && <div className="rounded border border-border bg-bg/40 p-3 text-sm text-muted">No artifacts returned by the live artifacts API.</div>}
         </div>
       </section>
+      </div>
+      <section id="artifacts.proof" data-testid="proof-bundles" className="rounded border border-border bg-surface p-4">
+        <h2 className="text-base font-semibold text-fg">Proof Bundles</h2>
+        <p className="text-sm text-muted">Auditable proof files from 03_implementation/proof/ — scanned live from the server.</p>
+        {proofError && <div className="mt-2 rounded border border-border bg-bg/40 p-2 text-xs text-muted">{proofError}</div>}
+        {proofManifest && (
+          <div className="mt-3">
+            <div className="mb-2 text-xs text-muted">{proofManifest.file_count} files · {(proofManifest.total_size_bytes / 1024).toFixed(1)} KB total · scanned from {proofManifest.proof_dir}</div>
+            <div className="grid gap-1">
+              {proofManifest.files.map((f) => (
+                <div key={f.filename} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-2 rounded border border-border bg-bg/40 px-3 py-2 text-sm">
+                  <span className="rounded bg-surface2 px-2 py-0.5 text-xs text-muted">{f.type}</span>
+                  <span className="min-w-0 truncate text-fg">{f.filename}</span>
+                  <span className="text-xs text-muted">{(f.size_bytes / 1024).toFixed(1)} KB</span>
+                  <a
+                    href={`${LIVE_BASE_URL}/api/artifacts/proof/${encodeURIComponent(f.filename)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded border border-border px-2 py-1 text-xs text-fg hover:bg-surface2"
+                  >
+                    View
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {!proofManifest && !proofError && <div className="mt-2 text-sm text-muted">Loading proof bundles…</div>}
+      </section>
     </div>
   );
+}
+
+async function loadProofManifest(baseUrl: string): Promise<{ ok: true; manifest: ProofManifest } | { ok: false; error: string }> {
+  try {
+    const response = await fetch(`${baseUrl}/api/artifacts/list`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return { ok: false, error: `Proof API returned ${response.status} ${response.statusText}` };
+    }
+    const payload: unknown = await response.json();
+    if (!isRecord(payload) || !Array.isArray(payload.files)) {
+      return { ok: false, error: "Proof API returned unexpected shape" };
+    }
+    return {
+      ok: true,
+      manifest: {
+        proof_dir: stringValue(payload.proof_dir),
+        file_count: numberValue(payload.file_count),
+        total_size_bytes: numberValue(payload.total_size_bytes),
+        files: (payload.files as unknown[]).map((f) => {
+          const r = isRecord(f) ? f : {};
+          return {
+            filename: stringValue(r.filename),
+            size_bytes: numberValue(r.size_bytes),
+            modified_utc: stringValue(r.modified_utc),
+            type: stringValue(r.type) || "file",
+          };
+        }),
+      },
+    };
+  } catch (error) {
+    return { ok: false, error: `Proof API unreachable: ${errorMessage(error)}` };
+  }
 }
 
 async function loadArtifacts(): Promise<Artifact[]> {

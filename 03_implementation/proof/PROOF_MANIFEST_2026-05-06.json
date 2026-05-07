@@ -1,0 +1,109 @@
+{
+  "schema_version": "1.0",
+  "generated_utc": "2026-05-06T23:28:09.637878+00:00",
+  "generated_by": "claude-artifacts-proof-15",
+  "task_id": "H3D-CLAUDE-ARTIFACTS-PROOF",
+  "proof_dir": "03_implementation/proof",
+  "file_count": 14,
+  "total_size_bytes": 3470144,
+  "files": [
+    {
+      "filename": "88b731c46f17-20260504T223213Z.zip",
+      "size_bytes": 2913385,
+      "modified_utc": "2026-05-06T22:28:42.702731+00:00",
+      "lane_id": "archive",
+      "type": "zip"
+    },
+    {
+      "filename": "ACTIVE_UI_NO_FAKE_SWEEP.md",
+      "size_bytes": 31242,
+      "modified_utc": "2026-05-06T22:28:42.703731+00:00",
+      "lane_id": "ui-wiring",
+      "type": "md"
+    },
+    {
+      "filename": "FLSUN_PROFILE_SOURCE_AUDIT.json",
+      "size_bytes": 11145,
+      "modified_utc": "2026-05-06T22:28:42.703731+00:00",
+      "lane_id": "printers",
+      "type": "json"
+    },
+    {
+      "filename": "LOCAL_TOOLING_AUDIT.json",
+      "size_bytes": 8585,
+      "modified_utc": "2026-05-06T22:28:42.704731+00:00",
+      "lane_id": "tooling",
+      "type": "json"
+    },
+    {
+      "filename": "PDF_CONTRACT_EXTRACT.txt",
+      "size_bytes": 29819,
+      "modified_utc": "2026-05-06T22:28:42.704731+00:00",
+      "lane_id": "docs",
+      "type": "txt"
+    },
+    {
+      "filename": "screenshots/agents-operator-catalog-2026-05-06.png",
+      "size_bytes": 145520,
+      "modified_utc": "2026-05-06T22:28:42.709731+00:00",
+      "lane_id": "agents",
+      "type": "png"
+    },
+    {
+      "filename": "screenshots/agents-operator-catalog-expanded-2026-05-06.png",
+      "size_bytes": 146792,
+      "modified_utc": "2026-05-06T22:28:42.710732+00:00",
+      "lane_id": "agents",
+      "type": "png"
+    },
+    {
+      "filename": "SOURCE_APP_60_COMPLETION_AUDIT.json",
+      "size_bytes": 6404,
+      "modified_utc": "2026-05-06T22:28:42.705731+00:00",
+      "lane_id": "ui-wiring",
+      "type": "json"
+    },
+    {
+      "filename": "SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json",
+      "size_bytes": 45719,
+      "modified_utc": "2026-05-06T22:28:42.705731+00:00",
+      "lane_id": "agents",
+      "type": "json"
+    },
+    {
+      "filename": "SOURCE_APP_CLI_SURFACE_AUDIT.json",
+      "size_bytes": 76749,
+      "modified_utc": "2026-05-06T22:28:42.706733+00:00",
+      "lane_id": "agents",
+      "type": "json"
+    },
+    {
+      "filename": "SOURCE_APP_RUNTIME_ACTION_PLAN.md",
+      "size_bytes": 19009,
+      "modified_utc": "2026-05-06T22:28:42.706733+00:00",
+      "lane_id": "ui-wiring",
+      "type": "md"
+    },
+    {
+      "filename": "SOURCE_REGISTRY_TRUTH_AUDIT.json",
+      "size_bytes": 30517,
+      "modified_utc": "2026-05-06T22:28:42.707731+00:00",
+      "lane_id": "agents",
+      "type": "json"
+    },
+    {
+      "filename": "T1_DELTA_CALIBRATION_PRINT_PROOF.json",
+      "size_bytes": 3023,
+      "modified_utc": "2026-05-06T22:28:42.707731+00:00",
+      "lane_id": "printers",
+      "type": "json"
+    },
+    {
+      "filename": "TESTS_PROOF_READINESS.md",
+      "size_bytes": 2235,
+      "modified_utc": "2026-05-06T22:28:42.708731+00:00",
+      "lane_id": "testing",
+      "type": "md"
+    }
+  ]
+}
