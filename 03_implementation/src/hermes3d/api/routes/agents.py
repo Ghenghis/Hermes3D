@@ -667,6 +667,43 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         from hermes3d.services import code_history
 
         return code_history.programming_readiness()
+    if handler == "code.teams.readiness":
+        from hermes3d.services import code_history
+
+        return code_history.provider_team_readiness()
+    if handler == "code.teams.assign_task":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        return code_history.assign_provider_team_task(
+            owner=actor,
+            team_id=_required_payload_text(payload, "team_id"),
+            task_id=_required_payload_text(payload, "task_id"),
+            title=_required_payload_text(payload, "title"),
+            files=files,
+            objective=_required_payload_text(payload, "objective"),
+            target_branch=str(payload.get("target_branch") or "") or None,
+            review_required=bool(payload.get("review_required", True)),
+        )
+    if handler == "code.teams.request_review":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        proof_ids = payload.get("proof_ids")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        if not isinstance(proof_ids, list) or not proof_ids:
+            raise ValueError("Payload field proof_ids must be a non-empty list.")
+        return code_history.request_provider_team_review(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            summary=_required_payload_text(payload, "summary"),
+            files=files,
+            proof_ids=proof_ids,
+            reviewer_team_id=str(payload.get("reviewer_team_id") or "deepseek-reviewers"),
+        )
     if handler == "code.mcp_locks.readiness":
         from hermes3d.services import code_history
 
@@ -1176,11 +1213,17 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         from hermes3d.services import code_history
 
         mcp_locks = code_history.mcp_lock_readiness()
+        provider_teams = code_history.provider_team_readiness()
     except Exception:
         mcp_locks = {"ready": False, "blocked_reason": "Hermes MCP lock readiness could not be evaluated."}
+        provider_teams = {"ready": False, "status": "blocked", "blocked_reasons": ["Hermes Agent provider-team readiness could not be evaluated."]}
+    team_blocked_reason = "; ".join(str(item) for item in provider_teams.get("blocked_reasons", [])[:4]) if provider_teams.get("blocked_reasons") else None
     contracts = [
         _contract("agents.health.refresh", "Refresh Hermes Agent runtime health", "agents", "ready" if runtime.get("hermes_agent_runtime") == "ready" else "blocked", "read", "low", "GET /api/agents/health", "agents.health", "Checks the configured local/private agent runtime bridge."),
         _contract("code.programming_readiness.refresh", "Refresh Hermes Agent programming readiness", "agents", "ready", "read", "low", "GET /api/code-operator/programming-readiness", "code.programming_readiness", "Checks true source inputs from Nous Hermes Agent and Atomic Hermes plus MiniMax/DeepSeek provider readiness."),
+        _contract("code.teams.readiness.refresh", "Refresh Hermes Agent team readiness", "agents", str(provider_teams.get("status") or "blocked"), "read", "low", "GET /api/code-operator/teams/readiness", "code.teams.readiness", "Checks MiniMax builder and DeepSeek reviewer team readiness without exposing provider secrets.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
+        _contract("code.teams.assign_task", "Assign provider-backed code task", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/assign-task", "code.teams.assign_task", "Records a proof-backed provider-team coding task only after selected source, provider, and MCP lock prerequisites are ready.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
+        _contract("code.teams.request_review", "Request second-team code review", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/request-review", "code.teams.request_review", "Requests a proof-backed DeepSeek/Atomic Hermes review for files and proof ids before PR shipping.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent reviewer team is not ready.")),
         _contract("code.mcp_locks.readiness.refresh", "Refresh Hermes MCP lock readiness", "agents", "ready" if mcp_locks.get("ready") else "partial", "read", "low", "GET /api/code-operator/mcp-locks/readiness", "code.mcp_locks.readiness", "Checks that the Hermes Agent runtime has hermes3d-locks source/server access and that MCP_LOCK_WORKSPACE matches the actual edit workspace before write tools can enable.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes.")),
         _contract("code.write_readiness.refresh", "Refresh Hermes Agent write readiness", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/write/readiness", "code.write.readiness", "Explains whether Hermes Agents may enable patch/apply/command/git coding tools yet. Read-only context stays available; write tools stay blocked until locks, source inputs, providers, snapshots, and proof gates are ready.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes.")),
         _contract("code.history.files.refresh", "Refresh agent-touched file history", "agents", "ready", "read", "low", "GET /api/code-operator/history/files", "code.history.files", "Lists files already snapshotted by Hermes Agent code operations."),
@@ -1316,6 +1359,16 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "voice.catalog.refresh": {"required": [], "optional": {"locale": "Azure voice locale prefix, defaults to en"}},
         "voice.preview": {"required": [], "optional": {"agent_id": "agent id", "voice": "Azure short name", "text": "preview text", "rate": "0.5-2.0", "pitch_pct": "-50..50"}},
         "voice.stt": {"required": ["artifact_id"], "optional": {"locale": "speech locale, defaults to en-US"}, "safety": "Reads an existing audio artifact; no secret values are returned."},
+        "code.teams.assign_task": {
+            "required": ["team_id", "task_id", "title", "files", "objective"],
+            "optional": {"target_branch": "safe git ref", "review_required": "defaults true"},
+            "safety": "Team id must be minimax-builders, deepseek-reviewers, or dual; selected source/provider/MCP prerequisites must be ready before assignment is accepted.",
+        },
+        "code.teams.request_review": {
+            "required": ["task_id", "summary", "files", "proof_ids"],
+            "optional": {"reviewer_team_id": "defaults to deepseek-reviewers"},
+            "safety": "Review requests require at least one proof/evidence id and route through the proof ledger; no provider secret values are returned.",
+        },
         "code.history.snapshot": {"required": ["relative_path"], "optional": {"action_id": "agent action identifier", "reason": "why this snapshot is needed"}, "safety": "Project-relative source files only; secrets, binary/generated files, .git, node_modules, and printer config writes are blocked."},
         "code.repo.tree.refresh": {"required": [], "optional": {"root": "project-relative directory or file; defaults to repository root", "limit": "1-1200 returned paths"}, "safety": "Secrets, generated output, caches, node_modules, and VCS internals are excluded."},
         "code.repo.search": {"required": ["pattern"], "optional": {"root": "project-relative search root", "max_results": "1-200"}, "safety": "Bounded ripgrep only; absolute paths, parent traversal, secrets, and generated folders are blocked."},

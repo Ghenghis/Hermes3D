@@ -190,6 +190,27 @@ MCP_LOCK_WORKFLOW = (
     "hermes_release_task",
 )
 
+PROVIDER_TEAMS = {
+    "minimax-builders": {
+        "label": "Team A MiniMax builders",
+        "provider_id": "minimax",
+        "role": "builder",
+        "source_input": "nous_hermes_agent",
+        "mission": "implement bounded Hermes3D code changes through MCP locks, snapshots, gates, and proof",
+    },
+    "deepseek-reviewers": {
+        "label": "Team B DeepSeek reviewers",
+        "provider_id": "deepseek",
+        "role": "reviewer",
+        "source_input": "atomic_hermes",
+        "mission": "review code changes, rollback plans, proofs, and security/architecture risk before PR shipping",
+    },
+}
+PROVIDER_TEAM_GROUPS = {
+    "dual": ("minimax-builders", "deepseek-reviewers"),
+    **{team_id: (team_id,) for team_id in PROVIDER_TEAMS},
+}
+
 
 def programming_readiness() -> dict[str, Any]:
     private_values = private_env()
@@ -226,6 +247,66 @@ def programming_readiness() -> dict[str, Any]:
             "mcp_locks": [] if lock_status["ready"] else [lock_status["blocked_reason"]],
             "code_history": _code_history_status(),
         },
+    }
+
+
+def provider_team_readiness() -> dict[str, Any]:
+    private_values = private_env()
+    source_by_id = {item["id"]: item for item in (_source_repo_status(source) for source in SOURCE_REPOS)}
+    provider_by_id = {
+        "minimax": _provider_status("minimax", private_values),
+        "deepseek": _provider_status("deepseek", private_values),
+    }
+    lock_status = mcp_lock_readiness(private_values)
+    teams: list[dict[str, Any]] = []
+    blocked_reasons: list[str] = []
+    for team_id, config in PROVIDER_TEAMS.items():
+        source = source_by_id.get(str(config["source_input"]), {})
+        provider = provider_by_id.get(str(config["provider_id"]), {})
+        team_blockers: list[str] = []
+        if source.get("status") == "missing":
+            team_blockers.append(f"Source input {config['source_input']} is missing.")
+        if provider.get("status") != "ready":
+            team_blockers.append(f"Provider {config['provider_id']} is not configured.")
+        if not lock_status["ready"]:
+            team_blockers.append(str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready."))
+        ready = not team_blockers
+        blocked_reasons.extend(f"{team_id}: {reason}" for reason in team_blockers)
+        teams.append(
+            {
+                "id": team_id,
+                "label": config["label"],
+                "role": config["role"],
+                "mission": config["mission"],
+                "source_input": source,
+                "provider": provider,
+                "mcp_locks_ready": lock_status["ready"],
+                "status": "ready" if ready else "blocked",
+                "ready": ready,
+                "blocked_reasons": team_blockers,
+            }
+        )
+    ready_team_ids = [team["id"] for team in teams if team["ready"]]
+    return {
+        "status": "ready" if len(ready_team_ids) == len(teams) else ("partial" if ready_team_ids else "blocked"),
+        "ready": len(ready_team_ids) == len(teams),
+        "teams": teams,
+        "team_groups": {
+            group_id: list(team_ids)
+            for group_id, team_ids in PROVIDER_TEAM_GROUPS.items()
+        },
+        "mcp_locks": lock_status,
+        "required_flow": [
+            "select provider team",
+            "verify source input and provider env without exposing secrets",
+            "claim Hermes task",
+            "lock target files before write",
+            "snapshot every touched file",
+            "run MCP gates and visual proof",
+            "request second-team review",
+            "ship branch/PR only after proof",
+        ],
+        "blocked_reasons": blocked_reasons,
     }
 
 
@@ -821,6 +902,147 @@ def claim_mcp_task(*, owner: str, task_id: str, title: str = "", files: list[str
     return {"status": "claimed" if result.get("ok") is True else str(result.get("status") or "partial"), "workspace": str(PROJECT_ROOT), "result": result}
 
 
+def assign_provider_team_task(
+    *,
+    owner: str,
+    team_id: str,
+    task_id: str,
+    title: str,
+    files: list[str],
+    objective: str,
+    target_branch: str | None = None,
+    review_required: bool = True,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    selected_teams = _validate_provider_team_selection(team_id)
+    safe_files = _safe_mcp_files(files, must_exist=False)
+    if not safe_files:
+        raise ValueError("At least one project-relative target file is required.")
+    clean_title = _validate_bounded_text(title, "Title", max_chars=180)
+    clean_objective = _validate_bounded_text(objective, "Objective", max_chars=1600)
+    branch = _validate_git_ref(target_branch) if target_branch else None
+    readiness = provider_team_readiness()
+    team_map = {team["id"]: team for team in readiness["teams"]}
+    selected_status = [team_map[item] for item in selected_teams]
+    blocked = [
+        f"{team['id']}: {reason}"
+        for team in selected_status
+        for reason in (team.get("blocked_reasons") or [])
+    ]
+    evidence_payload = {
+        "team_id": team_id,
+        "selected_teams": selected_teams,
+        "task_id": task_id,
+        "title": clean_title,
+        "files": safe_files,
+        "objective_sha256": hashlib.sha256(clean_objective.encode("utf-8")).hexdigest(),
+        "target_branch": branch,
+        "review_required": bool(review_required),
+        "blocked_reasons": blocked,
+    }
+    if blocked:
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_team",
+            summary=f"Blocked Hermes Agent team assignment {task_id}",
+            data=evidence_payload,
+        )
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "team_id": team_id,
+            "selected_teams": selected_status,
+            "files": safe_files,
+            "blocked_reasons": blocked,
+            "mcp_evidence": evidence,
+        }
+    claim = claim_mcp_task(
+        owner=owner,
+        task_id=task_id,
+        title=clean_title,
+        files=safe_files,
+        reason=clean_objective,
+        role="provider-team",
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_team",
+        summary=f"Assigned Hermes Agent team task {task_id}",
+        data=evidence_payload,
+    )
+    return {
+        "status": "assigned",
+        "accepted": True,
+        "team_id": team_id,
+        "selected_teams": selected_status,
+        "files": safe_files,
+        "target_branch": branch,
+        "review_required": bool(review_required),
+        "claim": claim,
+        "mcp_evidence": evidence,
+    }
+
+
+def request_provider_team_review(
+    *,
+    owner: str,
+    task_id: str,
+    summary: str,
+    files: list[str],
+    proof_ids: list[str],
+    reviewer_team_id: str = "deepseek-reviewers",
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    selected_teams = _validate_provider_team_selection(reviewer_team_id)
+    safe_files = _safe_mcp_files(files, must_exist=False)
+    if not safe_files:
+        raise ValueError("At least one project-relative file is required for review.")
+    clean_summary = _validate_bounded_text(summary, "Review summary", max_chars=1200)
+    safe_proofs = [_validate_proof_ref(item) for item in proof_ids]
+    if not safe_proofs:
+        raise ValueError("At least one proof/evidence id is required for review.")
+    readiness = provider_team_readiness()
+    team_map = {team["id"]: team for team in readiness["teams"]}
+    selected_status = [team_map[item] for item in selected_teams]
+    blocked = [
+        f"{team['id']}: {reason}"
+        for team in selected_status
+        for reason in (team.get("blocked_reasons") or [])
+    ]
+    payload = {
+        "reviewer_team_id": reviewer_team_id,
+        "selected_teams": selected_teams,
+        "task_id": task_id,
+        "summary_sha256": hashlib.sha256(clean_summary.encode("utf-8")).hexdigest(),
+        "files": safe_files,
+        "proof_ids": safe_proofs,
+        "blocked_reasons": blocked,
+    }
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_review",
+        summary=(f"Blocked Hermes Agent review {task_id}" if blocked else f"Requested Hermes Agent review {task_id}"),
+        data=payload,
+    )
+    return {
+        "status": "blocked" if blocked else "review_requested",
+        "accepted": not blocked,
+        "reviewer_team_id": reviewer_team_id,
+        "selected_teams": selected_status,
+        "files": safe_files,
+        "proof_ids": safe_proofs,
+        "blocked_reasons": blocked,
+        "mcp_evidence": evidence,
+    }
+
+
 def lock_mcp_files(*, owner: str, files: list[str], task_id: str = "", reason: str = "", role: str = "agent", ttl_minutes: int = 90) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
@@ -1256,6 +1478,21 @@ def _validate_owner(owner: str) -> None:
 def _validate_task_id(task_id: str) -> None:
     if not re.fullmatch(r"[A-Za-z0-9._-]{2,128}", task_id or "") or ".." in task_id:
         raise ValueError("Task id must be 2-128 safe characters.")
+
+
+def _validate_provider_team_selection(team_id: str) -> tuple[str, ...]:
+    value = str(team_id or "").strip()
+    selected = PROVIDER_TEAM_GROUPS.get(value)
+    if not selected:
+        raise ValueError("Team id must be one of: " + ", ".join(sorted(PROVIDER_TEAM_GROUPS)))
+    return selected
+
+
+def _validate_bounded_text(value: str, label: str, *, max_chars: int) -> str:
+    text = str(value or "").strip()
+    if not text or len(text) > max_chars:
+        raise ValueError(f"{label} must be 1-{max_chars} characters.")
+    return text
 
 
 def _safe_mcp_files(files: list[str], *, must_exist: bool) -> list[str]:
