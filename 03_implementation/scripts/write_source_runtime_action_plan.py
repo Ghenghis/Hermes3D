@@ -56,6 +56,11 @@ def main() -> int:
         for row in readiness_rows
         if isinstance(row, dict) and row.get("agent_execution_tier") == "launcher_metadata_only"
     ]
+    read_only_runner_rows = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and row.get("read_only_runner_available")
+    ]
     candidate_rows = [
         row
         for row in surface_rows
@@ -92,6 +97,7 @@ def main() -> int:
         f"- Open P0 runner/repair rows: {len(gaps)}",
         f"- Verified Hermes Agent CLIs: {readiness.get('summary', {}).get('verified_agent_cli', len(verified))}",
         f"- Agent-executable runner contracts: {readiness.get('summary', {}).get('agent_executable', len(verified))}",
+        f"- Read-only runner smoke rows: {readiness.get('summary', {}).get('read_only_runner_available', len(read_only_runner_rows))}",
         f"- CLI/service signals needing verifiers: {cli_surface.get('summary', {}).get('candidate_needs_verifier', len(candidate_rows))}",
         f"- Blocked rows: {blocked_rows}",
         "",
@@ -100,6 +106,7 @@ def main() -> int:
         "- A source checkout is not a working app by itself.",
         "- A README command, package script, or desktop launcher is only a signal until a local non-destructive verifier passes.",
         "- Hermes Agents may execute only verifier-backed runners, never raw unreviewed shell commands from docs.",
+        "- Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.",
         "- Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.",
         "- S1 remains camera/read-only and action-locked until the user changes printer policy.",
         "",
@@ -111,11 +118,40 @@ def main() -> int:
         "| --- | --- | --- | --- | --- | --- |",
         *service_start_runner_rows(),
         "",
-        "## Verified Agent CLI Rows",
+        "## Read-Only Runner Smoke Rows",
         "",
-        "| App | Section | Verifier | Proof gate | Next safe work |",
+        "These rows now have `/api/modules/{module_id}/runtime/read-only-runner`. The route reruns only the registered package/import/local API proof and appends evidence. It is not full app execution and does not mutate source, files, services, or printers.",
+        "",
+        "| App | Section | Verifier | Proof gate | Route |",
         "| --- | --- | --- | --- | --- |",
     ]
+    for row in sorted(
+        read_only_runner_rows,
+        key=lambda item: (str(item.get("section")), str(item.get("display"))),
+    ):
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    cell(row.get("display")),
+                    cell(row.get("section")),
+                    cell(row.get("verifier")),
+                    cell(row.get("proof_gate_version")),
+                    cell(row.get("read_only_runner_route")),
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Verified Agent CLI Rows",
+            "",
+            "| App | Section | Verifier | Proof gate | Next safe work |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
     for row in sorted(
         verified, key=lambda item: (str(item.get("section")), str(item.get("display")))
     ):

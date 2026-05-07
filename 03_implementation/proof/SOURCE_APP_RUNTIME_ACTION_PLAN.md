@@ -1,6 +1,6 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T20:32:38.292923+00:00
+Generated: 2026-05-07T22:33:39.848612+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
@@ -14,6 +14,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Open P0 runner/repair rows: 24
 - Verified Hermes Agent CLIs: 7
 - Agent-executable runner contracts: 7
+- Read-only runner smoke rows: 8
 - CLI/service signals needing verifiers: 24
 - Blocked rows: 2
 
@@ -22,6 +23,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - A source checkout is not a working app by itself.
 - A README command, package script, or desktop launcher is only a signal until a local non-destructive verifier passes.
 - Hermes Agents may execute only verifier-backed runners, never raw unreviewed shell commands from docs.
+- Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.
 - Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.
 - S1 remains camera/read-only and action-locked until the user changes printer policy.
 
@@ -41,6 +43,21 @@ These rows now have a registered setup/start preflight contract at `/api/modules
 | OctoFarm local health | HERMES3D_SOURCE_OCTOFARM_URL | http://127.0.0.1:4001 | node_service | npm run start | preflight/proof only; no process launch until supervisor gate |
 | OctoPrint local version API | HERMES3D_SOURCE_OCTOPRINT_URL | http://127.0.0.1:5000 | python_service_cli | octoprint serve --host=127.0.0.1 --port=5000 | preflight/proof only; no process launch until supervisor gate |
 | Open Filament Database local health | HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL | http://127.0.0.1:3000 | material_database_service | ofd.bat webui --port 3000 | preflight/proof only; no process launch until supervisor gate |
+
+## Read-Only Runner Smoke Rows
+
+These rows now have `/api/modules/{module_id}/runtime/read-only-runner`. The route reruns only the registered package/import/local API proof and appends evidence. It is not full app execution and does not mutate source, files, services, or printers.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Blender MCP Candidates | agents | Blender MCP source import | python-source-import-verifier-v1 | /api/modules/blender_mcp_candidates/runtime/read-only-runner |
+| Model Context Protocol | agents | Model Context Protocol SDK package | node-package-verifier-v1 | /api/modules/model_context_protocol/runtime/read-only-runner |
+| Klipper | firmware | Klipper firmware fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/firmware_klipper/runtime/read-only-runner |
+| Manifold | modelers | Manifold Python import | python-import-verifier-v1 | /api/modules/manifold/runtime/read-only-runner |
+| MeshLab | modelers | MeshLab pymeshlab Python bridge | python-import-verifier-v1 | /api/modules/meshlab/runtime/read-only-runner |
+| trimesh | modelers | Trimesh Python import | python-import-verifier-v1 | /api/modules/trimesh/runtime/read-only-runner |
+| Klipper | print_farm | Klipper fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/klipper/runtime/read-only-runner |
+| Moonraker | print_farm | Moonraker fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/moonraker/runtime/read-only-runner |
 
 ## Verified Agent CLI Rows
 

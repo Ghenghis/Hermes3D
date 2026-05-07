@@ -702,6 +702,15 @@ CLI_POSSIBLE_LAUNCH_KINDS = {
     "npm_package",
 }
 AGENT_EXECUTABLE_VERIFIER_KINDS = {"cli", "python_module_cli"}
+READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS = {
+    "python_import",
+    "python_source_import",
+    "node_package",
+}
+READ_ONLY_API_RUNNER_VERIFIER_KINDS = {"local_http_health", "moonraker_fleet"}
+READ_ONLY_RUNNER_VERIFIER_KINDS = (
+    READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS | READ_ONLY_API_RUNNER_VERIFIER_KINDS
+)
 SERVICE_START_RUNNERS: dict[str, dict[str, Any]] = {
     "fdm_monster": {
         "command": ["npm", "run", "start"],
@@ -848,10 +857,17 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
     agent_executable = (
         runtime_status == "ready" and verifier_kind in AGENT_EXECUTABLE_VERIFIER_KINDS and executed
     )
+    read_only_runner_available = _read_only_runner_available(
+        runtime=runtime, verifier_kind=verifier_kind
+    )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
-    blocked_reason = _runner_blocked_reason(
-        runtime=runtime, runner_status=runner_status, required_family=required_family
+    blocked_reason = (
+        None
+        if read_only_runner_available
+        else _runner_blocked_reason(
+            runtime=runtime, runner_status=runner_status, required_family=required_family
+        )
     )
     return {
         "module_id": str(mod.get("id") or ""),
@@ -862,6 +878,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "runtime_status": runtime_status,
         "runtime_ready": runtime_status == "ready",
         "agent_executable": agent_executable,
+        "read_only_runner_available": read_only_runner_available,
         "runner_status": runner_status,
         "verifier": runtime.get("verifier"),
         "verifier_kind": verifier_kind,
@@ -870,7 +887,11 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "executed": executed,
         "return_code": runtime.get("return_code"),
         "capabilities": list(runtime.get("capabilities") or []),
-        "safe_actions": _safe_runner_actions(runtime, agent_executable=agent_executable),
+        "safe_actions": _safe_runner_actions(
+            runtime,
+            agent_executable=agent_executable,
+            read_only_runner_available=read_only_runner_available,
+        ),
         "required_verifier_family": required_family,
         "acceptance_gate": _runner_acceptance_gate(
             str(mod.get("id") or "module"), runner_status, required_family
@@ -881,7 +902,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
         "proof_required": True,
         "mutation_allowed": False,
-        "policy": "Hermes Agents may run only registered non-destructive verifiers here; setup/install/update remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
+        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, but setup/install/update remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
     }
 
 
@@ -899,6 +920,9 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "status": "ready",
         "count": len(contracts),
         "agent_executable": sum(1 for contract in contracts if contract["agent_executable"]),
+        "read_only_runner_available": sum(
+            1 for contract in contracts if contract.get("read_only_runner_available")
+        ),
         "runner_gaps": sum(
             1
             for contract in contracts
@@ -914,7 +938,75 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "by_runner_status": dict(sorted(by_status.items())),
         "by_gap_section": dict(sorted(by_section.items())),
         "contracts": contracts,
-        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate.",
+        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof and cannot launch, install, update, or write.",
+    }
+
+
+def module_read_only_runner_contract(
+    mod: dict[str, Any], *, live_probe: bool = False
+) -> dict[str, Any]:
+    """Return the proof-only runner smoke contract for metadata/API-ready rows.
+
+    This is deliberately narrower than agent_executable. It lets Hermes Agents
+    re-run import/package/local API proof and append evidence, but it never
+    starts a process, launches a desktop app, installs dependencies, updates
+    source, writes files, or touches printers.
+    """
+
+    runtime = module_runtime_probe(mod, live=live_probe)
+    module_id = str(mod.get("id") or "")
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    verifier_kind = str(runtime.get("kind") or launch_kind)
+    ready = _read_only_runner_available(runtime=runtime, verifier_kind=verifier_kind)
+    runner_family = _read_only_runner_family(verifier_kind)
+    blocked_reason = None if ready else _read_only_runner_blocked_reason(
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+        launch_kind=launch_kind,
+    )
+    runtime_public = {
+        key: value
+        for key, value in runtime.items()
+        if key not in {"output_head"}
+    }
+    if runtime.get("output_head"):
+        runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
+    return {
+        "module_id": module_id,
+        "display": str(mod.get("display_name") or module_id),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": launch_kind,
+        "status": "ready" if ready else "blocked",
+        "accepted": ready,
+        "runtime_ready": str(runtime.get("status") or "") == "ready",
+        "read_only_runner_available": ready,
+        "agent_executable": False,
+        "runner_status": "read_only_metadata_runner_ready"
+        if runner_family == "metadata"
+        else "read_only_api_runner_ready"
+        if runner_family == "api"
+        else "blocked",
+        "runner_family": runner_family,
+        "verifier": runtime.get("verifier"),
+        "verifier_kind": verifier_kind,
+        "proof_gate_version": runtime.get("proof_gate_version"),
+        "path": runtime.get("path") or mod.get("local_path") or "",
+        "executed": bool(runtime.get("executed")),
+        "return_code": runtime.get("return_code"),
+        "capabilities": list(runtime.get("capabilities") or []),
+        "runtime": runtime_public,
+        "safe_actions": ["verify", "read_metadata", "read_only_runner_smoke"]
+        if ready
+        else ["verify", "setup_plan"],
+        "blocked_reason": blocked_reason,
+        "proof_required": True,
+        "mutation_allowed": False,
+        "process_start_allowed": False,
+        "printer_action_allowed": False,
+        "execution_mode": "registered_read_only_metadata_or_api_probe"
+        if ready
+        else "blocked_until_registered_read_only_probe_passes",
+        "policy": "This endpoint re-runs only package/import/local API verifier proof and appends evidence. It cannot launch apps, start services, install/update source, write output files, or send printer commands.",
     }
 
 
@@ -1973,10 +2065,49 @@ def _runner_blocked_reason(
     return f"Runner contract needs {required_family} before Hermes Agents can execute this app."
 
 
-def _safe_runner_actions(runtime: dict[str, Any], *, agent_executable: bool) -> list[str]:
+def _read_only_runner_available(*, runtime: dict[str, Any], verifier_kind: str) -> bool:
+    return (
+        str(runtime.get("status") or "") == "ready"
+        and verifier_kind in READ_ONLY_RUNNER_VERIFIER_KINDS
+        and bool(runtime.get("executed"))
+        and bool(str(runtime.get("proof_gate_version") or "").strip())
+    )
+
+
+def _read_only_runner_family(verifier_kind: str) -> str:
+    if verifier_kind in READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS:
+        return "metadata"
+    if verifier_kind in READ_ONLY_API_RUNNER_VERIFIER_KINDS:
+        return "api"
+    return "unsupported"
+
+
+def _read_only_runner_blocked_reason(
+    *, runtime: dict[str, Any], verifier_kind: str, launch_kind: str
+) -> str:
+    runtime_reason = str(runtime.get("reason") or "").strip()
+    if verifier_kind not in READ_ONLY_RUNNER_VERIFIER_KINDS:
+        return (
+            "Read-only runner smoke is available only for package/import/local API verifier "
+            f"rows; this row uses verifier kind {verifier_kind or launch_kind}."
+        )
+    if str(runtime.get("status") or "") != "ready":
+        return runtime_reason or "The registered read-only verifier must return ready first."
+    if not bool(runtime.get("executed")):
+        return "Read-only runner smoke requires an executed verifier proof."
+    if not str(runtime.get("proof_gate_version") or "").strip():
+        return "Read-only runner smoke requires a registered proof gate version."
+    return "Read-only runner smoke is blocked until the verifier proof contract is complete."
+
+
+def _safe_runner_actions(
+    runtime: dict[str, Any], *, agent_executable: bool, read_only_runner_available: bool = False
+) -> list[str]:
     actions = ["verify", "setup_plan"]
     if agent_executable:
         actions.extend(["version_or_help", "dry_run_smoke_plan"])
+    elif read_only_runner_available:
+        actions.extend(["read_metadata", "read_only_runner_smoke"])
     elif runtime.get("status") == "ready":
         actions.append("read_metadata")
     return actions

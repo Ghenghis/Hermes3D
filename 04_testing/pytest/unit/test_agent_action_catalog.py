@@ -26,6 +26,7 @@ def test_action_catalog_hides_internal_handlers_and_exposes_code_actions() -> No
     assert "code.teams.run_review_pass" in by_id
     assert "source.runner_contracts.refresh" in by_id
     assert "source.runner_contract.refresh" in by_id
+    assert "source.read_only_runner.smoke" in by_id
     assert all("handler" not in contract for contract in contracts)
     assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {"files", "task_id"}
 
@@ -101,6 +102,7 @@ def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> No
     by_id = {contract["id"]: contract for contract in agents.action_catalog()["contracts"]}
     matrix = by_id["source.runner_contracts.refresh"]
     single = by_id["source.runner_contract.refresh"]
+    smoke = by_id["source.read_only_runner.smoke"]
 
     assert matrix["kind"] == "read"
     assert matrix["risk"] == "low"
@@ -114,3 +116,10 @@ def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> No
     assert single["risk"] == "low"
     assert set(single["payload_schema"]["required"]) == {"module_id"}
     assert "no source or runtime mutation" in single["payload_schema"]["safety"]
+
+    assert smoke["kind"] == "proof"
+    assert smoke["risk"] == "low"
+    assert smoke["approval_required"] is False
+    assert smoke["rollback_required"] is False
+    assert set(smoke["payload_schema"]["required"]) == {"module_id"}
+    assert "no setup, install, update, launch" in smoke["payload_schema"]["safety"]
