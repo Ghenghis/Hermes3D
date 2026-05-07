@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-07T12:24:27.917221+00:00",
+  "generated_at_utc": "2026-05-07T13:52:18.754782+00:00",
   "next_actions": [
     "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
     "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
@@ -909,51 +909,57 @@
       "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/fdm_monster/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
       "agent_execution_tier": "service_gap",
-      "capabilities": [],
+      "capabilities": [
+        "print_farm_service_health",
+        "read_only_http_probe"
+      ],
       "display": "FDM Monster",
       "executed": false,
       "launch_kind": "service",
       "module_id": "fdm_monster",
       "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\FDM-Monster",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "path": "HERMES3D_SOURCE_FDM_MONSTER_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "reason": "HERMES3D_SOURCE_FDM_MONSTER_URL is not configured; no local health proof was attempted.",
       "required_verifier_family": "local_health_endpoint_or_process_probe",
       "return_code": null,
-      "runner_contract_status": "service_runner_gap",
-      "runtime_status": "source_ready",
+      "runner_contract_status": "runtime_repair_required",
+      "runtime_status": "setup_required",
       "safe_actions": [
         "verify",
         "setup_plan"
       ],
       "section": "print_farm",
-      "verifier": "source checkout",
-      "verifier_kind": "service"
+      "verifier": "FDM Monster local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "acceptance_gate": "Register local_http_health_or_route_smoke; then `/api/modules/fluidd/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
       "agent_execution_tier": "web_app_gap",
-      "capabilities": [],
+      "capabilities": [
+        "moonraker_web_ui_health",
+        "read_only_http_probe"
+      ],
       "display": "Fluidd",
       "executed": false,
       "launch_kind": "web_app",
       "module_id": "fluidd",
       "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\Fluidd",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "path": "HERMES3D_SOURCE_FLUIDD_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "reason": "HERMES3D_SOURCE_FLUIDD_URL is not configured; no local health proof was attempted.",
       "required_verifier_family": "local_http_health_or_route_smoke",
       "return_code": null,
-      "runner_contract_status": "web_app_runner_gap",
-      "runtime_status": "source_ready",
+      "runner_contract_status": "runtime_repair_required",
+      "runtime_status": "setup_required",
       "safe_actions": [
         "verify",
         "setup_plan"
       ],
       "section": "print_farm",
-      "verifier": "source checkout",
-      "verifier_kind": "web_app"
+      "verifier": "Fluidd local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "acceptance_gate": "Register read_only_api_runner_contract; then `/api/modules/klipper/runtime/verify` must return ready with proof before any agent execution.",
@@ -1017,26 +1023,29 @@
       "acceptance_gate": "Register local_http_health_or_route_smoke; then `/api/modules/mainsail/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
       "agent_execution_tier": "web_app_gap",
-      "capabilities": [],
+      "capabilities": [
+        "moonraker_web_ui_health",
+        "read_only_http_probe"
+      ],
       "display": "Mainsail",
       "executed": false,
       "launch_kind": "web_app",
       "module_id": "mainsail",
       "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\Mainsail",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+      "path": "HERMES3D_SOURCE_MAINSAIL_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "reason": "HERMES3D_SOURCE_MAINSAIL_URL is not configured; no local health proof was attempted.",
       "required_verifier_family": "local_http_health_or_route_smoke",
       "return_code": null,
-      "runner_contract_status": "web_app_runner_gap",
-      "runtime_status": "source_ready",
+      "runner_contract_status": "runtime_repair_required",
+      "runtime_status": "setup_required",
       "safe_actions": [
         "verify",
         "setup_plan"
       ],
       "section": "print_farm",
-      "verifier": "source checkout",
-      "verifier_kind": "web_app"
+      "verifier": "Mainsail local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "acceptance_gate": "Register read_only_api_runner_contract; then `/api/modules/moonraker/runtime/verify` must return ready with proof before any agent execution.",
@@ -1068,58 +1077,60 @@
       "verifier_kind": "moonraker_fleet"
     },
     {
-      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/octofarm/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register module_specific_safe_verifier; then `/api/modules/octofarm/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "source_reference_ready",
+      "agent_execution_tier": "runner_gap",
       "capabilities": [
-        "service_reference",
-        "fleet_reference"
+        "print_farm_service_health",
+        "read_only_http_probe"
       ],
       "display": "OctoFarm",
       "executed": false,
       "launch_kind": "service_reference",
       "module_id": "octofarm",
-      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\OctoFarm",
-      "proof_gate_version": "source-inventory-v1",
-      "reason": null,
-      "required_verifier_family": "reference_parser_or_adapter_contract",
-      "return_code": 0,
-      "runner_contract_status": "source_reference_only",
-      "runtime_status": "ready",
-      "safe_actions": [
-        "verify",
-        "setup_plan",
-        "read_metadata"
-      ],
-      "section": "print_farm",
-      "verifier": "OctoFarm source inventory",
-      "verifier_kind": "source_inventory"
-    },
-    {
-      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/octoprint/runtime/verify` must return ready with proof before any agent execution.",
-      "agent_executable": false,
-      "agent_execution_tier": "service_gap",
-      "capabilities": [],
-      "display": "OctoPrint",
-      "executed": false,
-      "launch_kind": "service",
-      "module_id": "octoprint",
       "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\print-farm\\OctoPrint",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "local_health_endpoint_or_process_probe",
+      "path": "HERMES3D_SOURCE_OCTOFARM_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "reason": "HERMES3D_SOURCE_OCTOFARM_URL is not configured; no local health proof was attempted.",
+      "required_verifier_family": "module_specific_safe_verifier",
       "return_code": null,
-      "runner_contract_status": "service_runner_gap",
-      "runtime_status": "source_ready",
+      "runner_contract_status": "runtime_repair_required",
+      "runtime_status": "setup_required",
       "safe_actions": [
         "verify",
         "setup_plan"
       ],
       "section": "print_farm",
-      "verifier": "source checkout",
-      "verifier_kind": "service"
+      "verifier": "OctoFarm local health",
+      "verifier_kind": "local_http_health"
+    },
+    {
+      "acceptance_gate": "Register local_health_endpoint_or_process_probe; then `/api/modules/octoprint/runtime/verify` must return ready with proof before any agent execution.",
+      "agent_executable": false,
+      "agent_execution_tier": "service_gap",
+      "capabilities": [
+        "octoprint_version_api",
+        "read_only_http_probe"
+      ],
+      "display": "OctoPrint",
+      "executed": false,
+      "launch_kind": "service",
+      "module_id": "octoprint",
+      "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
+      "path": "HERMES3D_SOURCE_OCTOPRINT_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "reason": "HERMES3D_SOURCE_OCTOPRINT_URL is not configured; no local health proof was attempted.",
+      "required_verifier_family": "local_health_endpoint_or_process_probe",
+      "return_code": null,
+      "runner_contract_status": "runtime_repair_required",
+      "runtime_status": "setup_required",
+      "safe_actions": [
+        "verify",
+        "setup_plan"
+      ],
+      "section": "print_farm",
+      "verifier": "OctoPrint local version API",
+      "verifier_kind": "local_http_health"
     },
     {
       "acceptance_gate": "Register cli_api_or_desktop_bridge_smoke; then `/api/modules/printrun/runtime/verify` must return ready with proof before any agent execution.",
@@ -1705,10 +1716,10 @@
       "npm_package_gap": 1,
       "package_or_import_ready": 5,
       "python_worker_gap": 5,
-      "runner_gap": 5,
+      "runner_gap": 6,
       "service_api_ready": 3,
       "service_gap": 6,
-      "source_reference_ready": 14,
+      "source_reference_ready": 13,
       "verified_agent_cli": 7,
       "web_app_gap": 3
     },
@@ -1722,10 +1733,10 @@
       "npm_package_runner_gap": 1,
       "readonly_api_ready": 3,
       "runner_not_registered": 5,
-      "runtime_repair_required": 5,
-      "service_runner_gap": 6,
-      "source_reference_only": 14,
-      "web_app_runner_gap": 3
+      "runtime_repair_required": 10,
+      "service_runner_gap": 4,
+      "source_reference_only": 13,
+      "web_app_runner_gap": 1
     },
     "launcher_metadata_only": 3,
     "launcher_metadata_only_modules": [
@@ -1733,7 +1744,7 @@
       "bambustudio",
       "cura"
     ],
-    "runner_gaps": 28,
+    "runner_gaps": 29,
     "verified_agent_cli": 7,
     "verified_agent_cli_modules": [
       "hermes_agent",
@@ -1746,7 +1757,7 @@
     ]
   },
   "target": {
-    "registered_verifiers": 39,
+    "registered_verifiers": 43,
     "rule": "If an app offers a CLI, Hermes3D must prefer a bounded CLI verifier and Hermes Agent runner; desktop launcher metadata is not agent CLI readiness.",
     "source_backed_apps": 60
   }

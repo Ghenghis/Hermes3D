@@ -7,6 +7,7 @@ non-destructive verifier proves the local runtime path or launch bridge.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import re
@@ -14,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
@@ -249,16 +251,65 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "timeout_s": 1,
         "proof_gate_version": "source-inventory-v1",
     },
-    "octofarm": {
-        "tool_key": "source_inventory",
-        "label": "OctoFarm source inventory",
+    "fdm_monster": {
+        "tool_key": "local_http_health",
+        "label": "FDM Monster local health",
         "path": "",
-        "args": ["README.md", "package.json"],
-        "capabilities": ["service_reference", "fleet_reference"],
-        "kind": "source_inventory",
-        "execute": False,
-        "timeout_s": 1,
-        "proof_gate_version": "source-inventory-v1",
+        "args": ["HERMES3D_SOURCE_FDM_MONSTER_URL", "/", "fdm"],
+        "capabilities": ["print_farm_service_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private FDM Monster URL; does not start or mutate the service.",
+    },
+    "fluidd": {
+        "tool_key": "local_http_health",
+        "label": "Fluidd local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_FLUIDD_URL", "/", "fluidd"],
+        "capabilities": ["moonraker_web_ui_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private Fluidd URL; does not start or mutate the web app.",
+    },
+    "mainsail": {
+        "tool_key": "local_http_health",
+        "label": "Mainsail local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_MAINSAIL_URL", "/", "mainsail"],
+        "capabilities": ["moonraker_web_ui_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private Mainsail URL; does not start or mutate the web app.",
+    },
+    "octofarm": {
+        "tool_key": "local_http_health",
+        "label": "OctoFarm local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_OCTOFARM_URL", "/", "octofarm"],
+        "capabilities": ["print_farm_service_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private OctoFarm URL; does not start or mutate the service.",
+    },
+    "octoprint": {
+        "tool_key": "local_http_health",
+        "label": "OctoPrint local version API",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_OCTOPRINT_URL", "/api/version", "server"],
+        "capabilities": ["octoprint_version_api", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private OctoPrint version endpoint; does not upload, print, or mutate state.",
     },
     "langchain": {
         "tool_key": "source_inventory",
@@ -610,6 +661,8 @@ def _safe_runtime_probe(probe: dict[str, Any], mod: dict[str, Any], *, live: boo
         return _node_package_probe(probe)
     if probe.get("kind") == "moonraker_fleet":
         return _moonraker_fleet_probe(probe)
+    if probe.get("kind") == "local_http_health":
+        return _local_http_health_probe(probe)
     path_value = str(probe.get("path") or "")
     path = Path(path_value) if path_value else None
     audit = _local_tooling_record(str(probe.get("tool_key") or ""))
@@ -926,6 +979,181 @@ def _moonraker_fleet_probe(probe: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
+    args = [str(item) for item in probe.get("args") or []]
+    env_name = args[0].strip() if args else ""
+    endpoint = args[1].strip() if len(args) > 1 and args[1].strip() else "/"
+    expected = args[2].strip().lower() if len(args) > 2 else ""
+    private_values = _private_runtime_env()
+    base_url = (os.environ.get(env_name) or private_values.get(env_name) or str(probe.get("path") or "")).strip()
+    timeout = int(probe.get("timeout_s") or 3)
+    if not env_name:
+        return _local_http_health_response(
+            probe,
+            status="setup_required",
+            path_value="local/private URL env",
+            detected=False,
+            executed=False,
+            return_code=None,
+            reason="Local HTTP health verifier is missing its environment variable binding.",
+            output=["env=missing"],
+            setup_steps=[
+                "Repair the verifier metadata with an environment variable name for the local/private service URL.",
+                "Run Verify again from Source OS.",
+            ],
+        )
+    if not base_url:
+        return _local_http_health_response(
+            probe,
+            status="setup_required",
+            path_value=env_name,
+            detected=False,
+            executed=False,
+            return_code=None,
+            reason=f"{env_name} is not configured; no local health proof was attempted.",
+            output=[
+                f"env={env_name}",
+                "configured=false",
+                "executed=false",
+            ],
+            setup_steps=[
+                f"Set {env_name} in G:/private/.env to the local/private service URL.",
+                "Start the service outside the verifier; this probe never launches or mutates it.",
+                "Run Verify again from Source OS.",
+            ],
+        )
+    if not _is_local_private_url(base_url):
+        return _local_http_health_response(
+            probe,
+            status="setup_required",
+            path_value=env_name,
+            detected=False,
+            executed=False,
+            return_code=None,
+            reason=f"{env_name} must be an http(s) URL on localhost, a private LAN address, or a .local host.",
+            output=[
+                f"env={env_name}",
+                f"url={_redact_text(base_url)}",
+                "guard=blocked_non_local_url",
+            ],
+            setup_steps=[
+                f"Point {env_name} at a trusted local/private Hermes3D service URL.",
+                "Do not use public internet URLs for this Source OS runtime health verifier.",
+                "Run Verify again from Source OS.",
+            ],
+        )
+    health_url = urllib.parse.urljoin(base_url.rstrip("/") + "/", endpoint.lstrip("/"))
+    try:
+        request = urllib.request.Request(health_url, method="GET", headers={"Accept": "application/json,text/html,*/*"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status_code = int(getattr(response, "status", 0) or 0)
+            body = response.read(8192).decode("utf-8", errors="replace")
+    except (OSError, urllib.error.URLError, TimeoutError) as exc:
+        return _local_http_health_response(
+            probe,
+            status="setup_required",
+            path_value=env_name,
+            detected=False,
+            executed=True,
+            return_code=1,
+            reason=f"{probe.get('label')} did not return a read-only health response from the configured local URL.",
+            output=[
+                f"env={env_name}",
+                f"url={_redact_text(health_url)}",
+                f"error={type(exc).__name__}",
+            ],
+            setup_steps=[
+                f"Start or repair the local service configured by {env_name}.",
+                "Confirm the health/version endpoint is reachable with a GET request.",
+                "Run Verify again from Source OS.",
+            ],
+        )
+    body_head = _redact_text(body[:500])
+    token_ok = not expected or expected in body.lower()
+    ready = 200 <= status_code < 400 and token_ok
+    return _local_http_health_response(
+        probe,
+        status="ready" if ready else "setup_required",
+        path_value=env_name,
+        detected=ready,
+        executed=True,
+        return_code=0 if ready else 1,
+        reason=None if ready else f"{probe.get('label')} responded but did not satisfy the expected read-only health/version proof.",
+        output=[
+            f"env={env_name}",
+            f"url={_redact_text(health_url)}",
+            f"http_status={status_code}",
+            f"expected_token={expected or 'none'}",
+            f"token_match={'true' if token_ok else 'false'}",
+            f"body_head={body_head}",
+        ],
+        setup_steps=[] if ready else [
+            f"Confirm {env_name} points at the correct local/private app endpoint.",
+            "If the app is healthy but this endpoint is wrong, update the bounded verifier endpoint.",
+            "Run Verify again from Source OS.",
+        ],
+    )
+
+
+def _local_http_health_response(
+    probe: dict[str, Any],
+    *,
+    status: str,
+    path_value: str,
+    detected: bool,
+    executed: bool,
+    return_code: int | None,
+    reason: str | None,
+    output: list[str],
+    setup_steps: list[str],
+) -> dict[str, Any]:
+    return {
+        "status": status,
+        "label": "Runtime ready" if status == "ready" else "Runtime setup needed",
+        "kind": probe.get("kind"),
+        "verifier": probe.get("label"),
+        "path": path_value,
+        "detected": detected,
+        "executed": executed,
+        "return_code": return_code,
+        "capabilities": list(probe.get("capabilities") or []),
+        "reason": reason,
+        "setup_steps": setup_steps,
+        "proof_source": "Hermes3D local/private read-only HTTP health probe" if executed else None,
+        "output_head": _head_lines(output),
+        "registry_source": probe.get("registry_source") or "builtin",
+        "proof_gate_version": probe.get("proof_gate_version") or "local-http-health-verifier-v1",
+    }
+
+
+def _private_runtime_env() -> dict[str, str]:
+    try:
+        from hermes3d.services.agent_runtime import private_env
+
+        return private_env()
+    except Exception:
+        return {}
+
+
+def _is_local_private_url(value: str) -> bool:
+    try:
+        parsed = urllib.parse.urlparse(value)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        return False
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        return False
+    host = parsed.hostname.strip().lower()
+    if host == "localhost" or host.endswith(".localhost") or host.endswith(".local"):
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return "." not in host
+    return address.is_loopback or address.is_private or address.is_link_local
+
+
 def _configured_moonraker_printers() -> list[dict[str, str]]:
     try:
         from hermes3d.services.local_state import local_printers
@@ -1137,7 +1365,7 @@ def _runner_status(*, runtime: dict[str, Any], mod: dict[str, Any], agent_execut
         return "launcher_metadata_only"
     if runtime_status == "ready" and verifier_kind in {"python_import", "python_source_import", "node_package"}:
         return "metadata_ready_needs_runner"
-    if runtime_status == "ready" and verifier_kind == "moonraker_fleet":
+    if runtime_status == "ready" and verifier_kind in {"local_http_health", "moonraker_fleet"}:
         return "readonly_api_ready"
     if runtime_status == "ready" and verifier_kind == "source_inventory":
         return "source_reference_only"

@@ -204,6 +204,85 @@ def test_source_inventory_contract_is_reference_only_not_executable(monkeypatch)
     assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
 
 
+def test_readonly_http_contract_is_not_agent_executable(monkeypatch) -> None:
+    """A live health API proof is useful, but it is still read-only metadata."""
+
+    def _ready_http(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "ready",
+            "kind": "local_http_health",
+            "verifier": "Fluidd local health",
+            "proof_gate_version": "local-http-health-verifier-v1",
+            "path": "HERMES3D_SOURCE_FLUIDD_URL",
+            "detected": True,
+            "executed": True,
+            "return_code": 0,
+            "capabilities": ["moonraker_web_ui_health", "read_only_http_probe"],
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _ready_http)
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": "fluidd",
+            "display_name": "Fluidd",
+            "section": "print_farm",
+            "launch_kind": "web_app",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/Fluidd",
+        }
+    )
+
+    assert contract["runtime_status"] == "ready"
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "readonly_api_ready"
+    assert contract["required_verifier_family"] == "read_only_api_runner_contract"
+    assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
+
+
+def test_print_farm_health_probe_requires_configured_local_url(monkeypatch) -> None:
+    monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
+    monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
+    monkeypatch.delenv("HERMES3D_SOURCE_FLUIDD_URL", raising=False)
+
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": "fluidd",
+            "display_name": "Fluidd",
+            "section": "print_farm",
+            "launch_kind": "web_app",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/Fluidd",
+        }
+    )
+
+    assert contract["runtime_status"] == "setup_required"
+    assert contract["verifier_kind"] == "local_http_health"
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "runtime_repair_required"
+    assert contract["blocked_reason"].startswith("HERMES3D_SOURCE_FLUIDD_URL is not configured")
+
+
+def test_print_farm_health_probe_rejects_public_urls(monkeypatch) -> None:
+    monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
+    monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
+    monkeypatch.setenv("HERMES3D_SOURCE_FLUIDD_URL", "https://example.com")
+
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": "fluidd",
+            "display_name": "Fluidd",
+            "section": "print_farm",
+            "launch_kind": "web_app",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/Fluidd",
+        }
+    )
+
+    assert contract["runtime_status"] == "setup_required"
+    assert contract["runner_status"] == "runtime_repair_required"
+    assert "localhost, a private LAN address, or a .local host" in contract["blocked_reason"]
+
+
 def test_runner_contract_routes_are_registered() -> None:
     from fastapi import FastAPI
 

@@ -152,7 +152,7 @@ def agent_execution_tier(module: dict[str, Any], runtime: dict[str, Any]) -> str
         return "launcher_metadata_only"
     if runtime_status == "ready" and kind in {"python_import", "python_source_import", "node_package"}:
         return "package_or_import_ready"
-    if runtime_status == "ready" and kind == "moonraker_fleet":
+    if runtime_status == "ready" and kind in {"local_http_health", "moonraker_fleet"}:
         return "service_api_ready"
     if runtime_status == "ready" and kind == "source_inventory":
         return "source_reference_ready"

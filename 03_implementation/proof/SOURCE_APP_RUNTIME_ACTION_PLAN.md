@@ -1,17 +1,17 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T12:41:02.270802+00:00
+Generated: 2026-05-07T13:55:48.556192+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
 ## Current Truth
 
 - Source-backed apps: 60
-- Runtime-ready apps: 32
-- Runner-not-registered rows: 21
-- Runtime-repair-required rows: 5
+- Runtime-ready apps: 31
+- Runner-not-registered rows: 17
+- Runtime-repair-required rows: 10
 - Source-install-available rows: 0
-- Open P0 runner/repair rows: 28
+- Open P0 runner/repair rows: 29
 - Verified Hermes Agent CLIs: 7
 - Agent-executable runner contracts: 7
 - CLI/service signals needing verifiers: 24
@@ -41,7 +41,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 
 These rows are installed/source-ready but not Hermes Agent runnable yet. They must remain disabled or plan-only until the acceptance gate passes.
 
-Open P0 rows: 28
+Open P0 rows: 29
 
 ### Cli Preferred Gap (2)
 
@@ -82,7 +82,7 @@ Open P0 rows: 28
 | numpy-stl | modelers | python_worker | cli_candidate_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/numpy_stl/runtime/verify` must return ready with proof before any agent execution. |
 | pymesh | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/pymesh/runtime/verify` must return ready with proof before any agent execution. |
 
-### Runner Gap (5)
+### Runner Gap (6)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
@@ -91,6 +91,7 @@ Open P0 rows: 28
 | RepRapFirmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/reprapfirmware/runtime/verify` must return ready with proof before any agent execution. |
 | Repetier Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/repetier_firmware/runtime/verify` must return ready with proof before any agent execution. |
 | Smoothieware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/smoothieware/runtime/verify` must return ready with proof before any agent execution. |
+| OctoFarm | print_farm | service_reference | service_or_setup_candidate_needs_verifier | Add a health/version/setup verifier before exposing service or setup actions. | Register module_specific_safe_verifier; then `/api/modules/octofarm/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Service Gap (6)
 
@@ -124,10 +125,10 @@ Open P0 rows: 28
 - npm_package_runner_gap: 1
 - readonly_api_ready: 3
 - runner_not_registered: 5
-- runtime_repair_required: 5
-- service_runner_gap: 6
-- source_reference_only: 14
-- web_app_runner_gap: 3
+- runtime_repair_required: 10
+- service_runner_gap: 4
+- source_reference_only: 13
+- web_app_runner_gap: 1
 
 ## P1 CLI/Service Signals Needing Verifiers
 
@@ -148,7 +149,7 @@ These include some rows that are already source/reference/package ready. They st
 | Fluidd | print_farm | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
 | Mainsail | print_farm | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
 | Moonraker | print_farm | cli_candidate_needs_verifier | service_api_ready | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
-| OctoFarm | print_farm | service_or_setup_candidate_needs_verifier | source_reference_ready | Add a health/version/setup verifier before exposing service or setup actions. |
+| OctoFarm | print_farm | service_or_setup_candidate_needs_verifier | runner_gap | Add a health/version/setup verifier before exposing service or setup actions. |
 | OctoPrint | print_farm | cli_candidate_needs_verifier | service_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
 | Kiri:Moto / GridSpace | slicers | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
 | MatterControl | slicers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
@@ -179,7 +180,7 @@ These can prove local desktop app presence, but they are not Hermes Agent CLI ru
 - gpu_worker_gap: 3
 - npm_package_gap: 1
 - python_worker_gap: 5
-- runner_gap: 5
+- runner_gap: 6
 - service_gap: 6
 - web_app_gap: 3
 
