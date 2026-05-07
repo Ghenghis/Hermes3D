@@ -25,8 +25,8 @@
         "string",
         "null"
       ],
-      "default": null,
-      "description": "Optional absolute executable path."
+      "default": "C:/Program Files/Bambu Studio/bambu-studio.exe",
+      "description": "Bambu Studio Windows launcher path (boolean-presence check only; no launch)."
     },
     "config_path": {
       "type": [
@@ -40,6 +40,30 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "source_repo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "https://github.com/bambulab/BambuStudio.git",
+      "description": "Upstream git repo (used by verify_gen3d.py via git ls-remote, no clone)."
+    },
+    "pip_package": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Bambu Studio is a desktop app; no pip package."
+    },
+    "weights_cache_dirs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Bambu Studio is a slicer; no model weights are required."
     }
   }
 }

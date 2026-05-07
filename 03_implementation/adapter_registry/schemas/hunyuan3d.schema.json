@@ -40,6 +40,33 @@
       "type": "integer",
       "minimum": 100,
       "default": 5000
+    },
+    "source_repo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "https://github.com/Tencent/Hunyuan3D-2.git",
+      "description": "Upstream git repo (used by verify_gen3d.py via git ls-remote, no clone)."
+    },
+    "pip_package": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": "hunyuan3d",
+      "description": "Optional pip package name to probe via 'pip show' (no install)."
+    },
+    "weights_cache_dirs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "~/.cache/huggingface/hub/models--tencent--Hunyuan3D-2",
+        "~/.cache/hunyuan3d"
+      ],
+      "description": "Boolean-presence weight cache locations. Verifier never downloads."
     }
   }
 }
