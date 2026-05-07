@@ -18,6 +18,8 @@ def test_code_operator_routes_are_registered() -> None:
     assert "/api/code-operator/teams/readiness" in paths
     assert "/api/code-operator/teams/assign-task" in paths
     assert "/api/code-operator/teams/request-review" in paths
+    assert "/api/code-operator/teams/run-coding-pass" in paths
+    assert "/api/code-operator/teams/run-review-pass" in paths
     assert "/api/code-operator/patch/apply" in paths
     assert "/api/code-operator/git/commit-owned" in paths
     assert "/api/code-operator/history/restore" in paths
@@ -92,6 +94,8 @@ def test_git_commit_rejects_spoofed_actor_fields() -> None:
     [
         "/api/code-operator/teams/assign-task",
         "/api/code-operator/teams/request-review",
+        "/api/code-operator/teams/run-coding-pass",
+        "/api/code-operator/teams/run-review-pass",
     ],
 )
 def test_provider_team_routes_reject_spoofed_actor_fields(path: str) -> None:
@@ -111,6 +115,71 @@ def test_provider_team_routes_reject_spoofed_actor_fields(path: str) -> None:
     response = client.post(path, json=payload)
 
     assert response.status_code == 422
+
+
+def test_provider_coding_pass_records_artifact_without_mutating(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(
+        code_history,
+        "provider_team_readiness",
+        lambda: {
+            "ready": True,
+            "status": "ready",
+            "teams": [
+                {"id": "minimax-builders", "ready": True, "blocked_reasons": []},
+                {"id": "deepseek-reviewers", "ready": True, "blocked_reasons": []},
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_provider_file_context",
+        lambda files: [{"path": "README.md", "exists": True, "sha256": "0" * 64, "size_bytes": 10, "truncated": False, "content": "# readme"}],
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_call_provider_chat",
+        lambda provider_id, messages, **kwargs: {
+            "provider": {"id": provider_id, "model": "minimax-test", "base_url_label": "api.example", "http_status": 200},
+            "content": '{"plan":["do work"]}',
+            "content_sha256": "a" * 64,
+            "raw_usage": {},
+        },
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_record_provider_run_artifact",
+        lambda **kwargs: {"id": "run-1", "path": "03_implementation/var/code-history/provider-runs/run-1.json", "proof_event_id": "proof-1", "response_sha256": "a" * 64},
+    )
+    monkeypatch.setattr(code_history, "append_mcp_evidence", lambda **kwargs: {"status": "recorded", "evidence_id": "ev_coding"})
+
+    result = code_history.run_provider_team_coding_pass(
+        owner="hermes-agent",
+        team_id="minimax-builders",
+        task_id="TASK-1",
+        title="Plan a fix",
+        files=["README.md"],
+        objective="Plan a README fix.",
+    )
+
+    assert result["accepted"] is True
+    assert result["status"] == "coding_plan_recorded"
+    assert result["artifact"]["id"] == "run-1"
+    assert result["response"]["content_sha256"] == "a" * 64
+
+
+def test_provider_review_pass_requires_deepseek_team(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+
+    with pytest.raises(ValueError, match="Review execution requires"):
+        code_history.run_provider_team_review_pass(
+            owner="hermes-agent",
+            task_id="TASK-1",
+            summary="Review",
+            files=["README.md"],
+            proof_ids=["ev_1"],
+            reviewer_team_id="minimax-builders",
+        )
 
 
 def test_provider_team_readiness_uses_mocked_inputs_not_environment(monkeypatch: pytest.MonkeyPatch) -> None:

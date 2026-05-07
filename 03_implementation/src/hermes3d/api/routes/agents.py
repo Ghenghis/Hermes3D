@@ -704,6 +704,38 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
             proof_ids=proof_ids,
             reviewer_team_id=str(payload.get("reviewer_team_id") or "deepseek-reviewers"),
         )
+    if handler == "code.teams.run_coding_pass":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        return code_history.run_provider_team_coding_pass(
+            owner=actor,
+            team_id=str(payload.get("team_id") or "minimax-builders"),
+            task_id=_required_payload_text(payload, "task_id"),
+            title=_required_payload_text(payload, "title"),
+            files=files,
+            objective=_required_payload_text(payload, "objective"),
+            target_branch=str(payload.get("target_branch") or "") or None,
+        )
+    if handler == "code.teams.run_review_pass":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        proof_ids = payload.get("proof_ids")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        if not isinstance(proof_ids, list) or not proof_ids:
+            raise ValueError("Payload field proof_ids must be a non-empty list.")
+        return code_history.run_provider_team_review_pass(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            summary=_required_payload_text(payload, "summary"),
+            files=files,
+            proof_ids=proof_ids,
+            reviewer_team_id=str(payload.get("reviewer_team_id") or "deepseek-reviewers"),
+        )
     if handler == "code.mcp_locks.readiness":
         from hermes3d.services import code_history
 
@@ -1224,6 +1256,8 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("code.teams.readiness.refresh", "Refresh Hermes Agent team readiness", "agents", str(provider_teams.get("status") or "blocked"), "read", "low", "GET /api/code-operator/teams/readiness", "code.teams.readiness", "Checks MiniMax builder and DeepSeek reviewer team readiness without exposing provider secrets.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
         _contract("code.teams.assign_task", "Assign provider-backed code task", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/assign-task", "code.teams.assign_task", "Records a proof-backed provider-team coding task only after selected source, provider, and MCP lock prerequisites are ready.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
         _contract("code.teams.request_review", "Request second-team code review", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/request-review", "code.teams.request_review", "Requests a proof-backed DeepSeek/Atomic Hermes review for files and proof ids before PR shipping.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent reviewer team is not ready.")),
+        _contract("code.teams.run_coding_pass", "Run MiniMax coding plan pass", "agents", "ready" if provider_teams.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/teams/run-coding-pass", "code.teams.run_coding_pass", "Calls the configured MiniMax builder through a bounded OpenAI-compatible chat request and records a code-plan artifact; it does not edit source files.", None if provider_teams.get("ready") else (team_blocked_reason or "MiniMax builder team is not ready.")),
+        _contract("code.teams.run_review_pass", "Run DeepSeek review pass", "agents", "ready" if provider_teams.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/teams/run-review-pass", "code.teams.run_review_pass", "Calls the configured DeepSeek reviewer through a bounded OpenAI-compatible chat request and records a review artifact tied to proof ids.", None if provider_teams.get("ready") else (team_blocked_reason or "DeepSeek reviewer team is not ready.")),
         _contract("code.mcp_locks.readiness.refresh", "Refresh Hermes MCP lock readiness", "agents", "ready" if mcp_locks.get("ready") else "partial", "read", "low", "GET /api/code-operator/mcp-locks/readiness", "code.mcp_locks.readiness", "Checks that the Hermes Agent runtime has hermes3d-locks source/server access and that MCP_LOCK_WORKSPACE matches the actual edit workspace before write tools can enable.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes.")),
         _contract("code.write_readiness.refresh", "Refresh Hermes Agent write readiness", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/write/readiness", "code.write.readiness", "Explains whether Hermes Agents may enable patch/apply/command/git coding tools yet. Read-only context stays available; write tools stay blocked until locks, source inputs, providers, snapshots, and proof gates are ready.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes.")),
         _contract("code.history.files.refresh", "Refresh agent-touched file history", "agents", "ready", "read", "low", "GET /api/code-operator/history/files", "code.history.files", "Lists files already snapshotted by Hermes Agent code operations."),
@@ -1368,6 +1402,16 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
             "required": ["task_id", "summary", "files", "proof_ids"],
             "optional": {"reviewer_team_id": "defaults to deepseek-reviewers"},
             "safety": "Review requests require at least one proof/evidence id and route through the proof ledger; no provider secret values are returned.",
+        },
+        "code.teams.run_coding_pass": {
+            "required": ["task_id", "title", "files", "objective"],
+            "optional": {"team_id": "defaults to minimax-builders; dual is accepted", "target_branch": "safe git ref"},
+            "safety": "Creates a provider-backed planning artifact only; no source mutation happens without later patch proposal, MCP lock, snapshot, gate, and PR actions.",
+        },
+        "code.teams.run_review_pass": {
+            "required": ["task_id", "summary", "files", "proof_ids"],
+            "optional": {"reviewer_team_id": "defaults to deepseek-reviewers; dual is accepted"},
+            "safety": "Creates a provider-backed review artifact only; it requires proof ids and never claims tests passed unless proof is supplied.",
         },
         "code.history.snapshot": {"required": ["relative_path"], "optional": {"action_id": "agent action identifier", "reason": "why this snapshot is needed"}, "safety": "Project-relative source files only; secrets, binary/generated files, .git, node_modules, and printer config writes are blocked."},
         "code.repo.tree.refresh": {"required": [], "optional": {"root": "project-relative directory or file; defaults to repository root", "limit": "1-1200 returned paths"}, "safety": "Secrets, generated output, caches, node_modules, and VCS internals are excluded."},

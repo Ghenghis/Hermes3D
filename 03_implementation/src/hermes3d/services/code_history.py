@@ -11,6 +11,8 @@ import subprocess
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,9 @@ MAX_SEARCH_RESULTS = 200
 MAX_PROPOSED_TEXT_BYTES = 1024 * 1024
 MAX_COMMIT_MESSAGE_BYTES = 4096
 MAX_PR_BODY_BYTES = 32000
+MAX_PROVIDER_CONTEXT_BYTES = 120_000
+MAX_PROVIDER_FILE_BYTES = 32_000
+MAX_PROVIDER_RESPONSE_BYTES = 1_000_000
 ALLOWED_AGENT_BRANCH_PREFIXES = ("codex/", "hermes-agent/")
 
 DENIED_PARTS = {
@@ -209,6 +214,10 @@ PROVIDER_TEAMS = {
 PROVIDER_TEAM_GROUPS = {
     "dual": ("minimax-builders", "deepseek-reviewers"),
     **{team_id: (team_id,) for team_id in PROVIDER_TEAMS},
+}
+PROVIDER_DEFAULT_BASE_URLS = {
+    "deepseek": "https://api.deepseek.com",
+    "minimax": "https://api.minimax.io/v1",
 }
 
 
@@ -1043,6 +1052,161 @@ def request_provider_team_review(
     }
 
 
+def run_provider_team_coding_pass(
+    *,
+    owner: str,
+    team_id: str,
+    task_id: str,
+    title: str,
+    files: list[str],
+    objective: str,
+    target_branch: str | None = None,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    selected = _validate_provider_team_selection(team_id)
+    if "minimax-builders" not in selected:
+        raise ValueError("Coding execution requires team_id minimax-builders or dual.")
+    clean_title = _validate_bounded_text(title, "Title", max_chars=180)
+    clean_objective = _validate_bounded_text(objective, "Objective", max_chars=2400)
+    branch = _validate_git_ref(target_branch) if target_branch else None
+    context = _provider_file_context(files)
+    readiness = provider_team_readiness()
+    team = next((item for item in readiness["teams"] if item["id"] == "minimax-builders"), None)
+    if not team or team.get("blocked_reasons"):
+        blocked = [f"minimax-builders: {reason}" for reason in ((team or {}).get("blocked_reasons") or ["Team readiness is unavailable."])]
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider",
+            summary=f"Blocked provider coding pass {task_id}",
+            data={"team_id": team_id, "files": [item["path"] for item in context], "blocked_reasons": blocked},
+        )
+        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
+    prompt = _coding_pass_prompt(title=clean_title, objective=clean_objective, files=context, target_branch=branch)
+    response = _call_provider_chat(
+        "minimax",
+        [
+            {"role": "system", "content": _provider_system_prompt("coding")},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.1,
+        max_tokens=2400,
+    )
+    artifact = _record_provider_run_artifact(
+        owner=owner,
+        task_id=task_id,
+        run_type="coding_plan",
+        team_id=team_id,
+        provider_id="minimax",
+        files=[item["path"] for item in context],
+        prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        response=response,
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_provider",
+        summary=f"Recorded MiniMax coding pass for {task_id}",
+        data={
+            "team_id": team_id,
+            "provider_id": "minimax",
+            "artifact_id": artifact["id"],
+            "artifact_path": artifact["path"],
+            "files": [item["path"] for item in context],
+            "target_branch": branch,
+        },
+    )
+    return {
+        "status": "coding_plan_recorded",
+        "accepted": True,
+        "team_id": team_id,
+        "provider": response["provider"],
+        "artifact": artifact,
+        "response": _provider_response_public(response),
+        "mcp_evidence": evidence,
+    }
+
+
+def run_provider_team_review_pass(
+    *,
+    owner: str,
+    task_id: str,
+    summary: str,
+    files: list[str],
+    proof_ids: list[str],
+    reviewer_team_id: str = "deepseek-reviewers",
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    selected = _validate_provider_team_selection(reviewer_team_id)
+    if "deepseek-reviewers" not in selected:
+        raise ValueError("Review execution requires team_id deepseek-reviewers or dual.")
+    clean_summary = _validate_bounded_text(summary, "Review summary", max_chars=2000)
+    safe_proofs = [_validate_proof_ref(item) for item in proof_ids]
+    if not safe_proofs:
+        raise ValueError("At least one proof/evidence id is required for review.")
+    context = _provider_file_context(files)
+    readiness = provider_team_readiness()
+    team = next((item for item in readiness["teams"] if item["id"] == "deepseek-reviewers"), None)
+    if not team or team.get("blocked_reasons"):
+        blocked = [f"deepseek-reviewers: {reason}" for reason in ((team or {}).get("blocked_reasons") or ["Team readiness is unavailable."])]
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider",
+            summary=f"Blocked provider review pass {task_id}",
+            data={"reviewer_team_id": reviewer_team_id, "files": [item["path"] for item in context], "proof_ids": safe_proofs, "blocked_reasons": blocked},
+        )
+        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
+    prompt = _review_pass_prompt(summary=clean_summary, files=context, proof_ids=safe_proofs)
+    response = _call_provider_chat(
+        "deepseek",
+        [
+            {"role": "system", "content": _provider_system_prompt("review")},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.0,
+        max_tokens=2400,
+    )
+    artifact = _record_provider_run_artifact(
+        owner=owner,
+        task_id=task_id,
+        run_type="code_review",
+        team_id=reviewer_team_id,
+        provider_id="deepseek",
+        files=[item["path"] for item in context],
+        prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+        response=response,
+        extra={"proof_ids": safe_proofs},
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_provider",
+        summary=f"Recorded DeepSeek review pass for {task_id}",
+        data={
+            "reviewer_team_id": reviewer_team_id,
+            "provider_id": "deepseek",
+            "artifact_id": artifact["id"],
+            "artifact_path": artifact["path"],
+            "files": [item["path"] for item in context],
+            "proof_ids": safe_proofs,
+        },
+    )
+    return {
+        "status": "review_recorded",
+        "accepted": True,
+        "reviewer_team_id": reviewer_team_id,
+        "provider": response["provider"],
+        "artifact": artifact,
+        "response": _provider_response_public(response),
+        "mcp_evidence": evidence,
+    }
+
+
 def lock_mcp_files(*, owner: str, files: list[str], task_id: str = "", reason: str = "", role: str = "agent", ttl_minutes: int = 90) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
@@ -1413,19 +1577,293 @@ def _source_repo_status(source: SourceRepo) -> dict[str, Any]:
 
 
 def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[str, Any]:
-    prefix = "MINIMAX" if provider_id == "minimax" else "DEEPSEEK"
-    api_key = env_value(f"{prefix}_API_KEY", private_values)
-    base_url = env_value(f"{prefix}_BASE_URL", private_values)
-    model = env_value(f"{prefix}_MODEL", private_values)
+    config = _provider_chat_config(provider_id, private_values, require_ready=False)
     return {
         "id": provider_id,
-        "status": "ready" if api_key and model else "missing_config",
-        "api_key_configured": bool(api_key),
-        "base_url_configured": bool(base_url),
-        "model_configured": bool(model),
-        "base_url_label": _host_label(base_url),
-        "model": model or None,
+        "status": "ready" if config["api_key_configured"] and config["model_configured"] else "missing_config",
+        "api_key_configured": config["api_key_configured"],
+        "base_url_configured": config["base_url_configured"],
+        "model_configured": config["model_configured"],
+        "base_url_label": config["base_url_label"],
+        "model": config["model"],
     }
+
+
+def _provider_chat_config(provider_id: str, private_values: dict[str, str] | None = None, *, require_ready: bool = True) -> dict[str, Any]:
+    provider = str(provider_id or "").strip().lower()
+    if provider not in PROVIDER_DEFAULT_BASE_URLS:
+        raise ValueError("Unsupported provider id.")
+    values = private_values if private_values is not None else private_env()
+    prefix = "MINIMAX" if provider == "minimax" else "DEEPSEEK"
+    api_key = _first_env_value(values, f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY")
+    base_url = _first_env_value(
+        values,
+        f"HERMES3D_{prefix}_BASE_URL",
+        f"HERMES3D_{prefix}_API_BASE",
+        f"HERMES3D_{prefix}_API_URL",
+        f"{prefix}_BASE_URL",
+        f"{prefix}_API_BASE",
+        f"{prefix}_API_URL",
+    )
+    model = _first_env_value(values, f"HERMES3D_{prefix}_MODEL", f"{prefix}_MODEL")
+    effective_base = (base_url or PROVIDER_DEFAULT_BASE_URLS[provider]).strip().rstrip("/")
+    config = {
+        "id": provider,
+        "api_key": api_key,
+        "api_key_configured": bool(api_key),
+        "base_url": effective_base,
+        "base_url_configured": bool(base_url),
+        "base_url_label": _host_label(effective_base),
+        "model": model or None,
+        "model_configured": bool(model),
+    }
+    if require_ready:
+        missing: list[str] = []
+        if not api_key:
+            missing.append(f"{prefix}_API_KEY")
+        if not model:
+            missing.append(f"{prefix}_MODEL")
+        if missing:
+            raise ValueError(f"Provider {provider} is missing required private env keys: {', '.join(missing)}.")
+    return config
+
+
+def _first_env_value(private_values: dict[str, str], *names: str) -> str:
+    for name in names:
+        value = env_value(name, private_values)
+        if value:
+            return value.strip()
+    return ""
+
+
+def _call_provider_chat(
+    provider_id: str,
+    messages: list[dict[str, str]],
+    *,
+    temperature: float,
+    max_tokens: int,
+) -> dict[str, Any]:
+    config = _provider_chat_config(provider_id)
+    body = json.dumps(
+        {
+            "model": config["model"],
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max(256, min(int(max_tokens), 4096)),
+            "stream": False,
+        },
+        separators=(",", ":"),
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        _provider_chat_url(str(config["base_url"])),
+        method="POST",
+        data=body,
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {config['api_key']}",
+            "Content-Type": "application/json",
+        },
+    )
+    started = time.perf_counter()
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response:
+            raw = response.read(MAX_PROVIDER_RESPONSE_BYTES + 1)
+            http_status = int(response.status)
+    except urllib.error.HTTPError as exc:
+        detail = exc.read(2000).decode("utf-8", errors="replace")
+        raise RuntimeError(f"Provider {provider_id} returned HTTP {exc.code}: {_redact_provider_text(detail)}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Provider {provider_id} request failed: {type(exc).__name__}.") from exc
+    if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
+        raise RuntimeError("Provider response exceeded the maximum allowed size.")
+    try:
+        payload = json.loads(raw.decode("utf-8", errors="replace"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("Provider returned non-JSON response.") from exc
+    content = _provider_response_content(payload)
+    if not content:
+        raise RuntimeError("Provider response did not contain assistant content.")
+    return {
+        "provider": {
+            "id": provider_id,
+            "model": config["model"],
+            "base_url_label": config["base_url_label"],
+            "http_status": http_status,
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+        },
+        "content": content[:MAX_PROVIDER_RESPONSE_BYTES],
+        "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
+        "raw_usage": payload.get("usage") if isinstance(payload.get("usage"), dict) else {},
+    }
+
+
+def _provider_chat_url(base_url: str) -> str:
+    base = base_url.rstrip("/")
+    if base.endswith("/chat/completions"):
+        return base
+    return f"{base}/chat/completions"
+
+
+def _provider_response_content(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    choices = payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        if isinstance(first, dict):
+            message = first.get("message")
+            if isinstance(message, dict) and isinstance(message.get("content"), str):
+                return message["content"].strip()
+            if isinstance(first.get("text"), str):
+                return first["text"].strip()
+    if isinstance(payload.get("content"), str):
+        return payload["content"].strip()
+    return ""
+
+
+def _provider_response_public(response: dict[str, Any]) -> dict[str, Any]:
+    content = str(response.get("content") or "")
+    return {
+        "provider": response.get("provider"),
+        "content": content[:12000],
+        "content_sha256": response.get("content_sha256"),
+        "raw_usage": response.get("raw_usage") or {},
+    }
+
+
+def _provider_file_context(files: list[str]) -> list[dict[str, Any]]:
+    safe_files = _safe_mcp_files(files, must_exist=False)
+    if not safe_files:
+        raise ValueError("At least one project-relative file is required.")
+    context: list[dict[str, Any]] = []
+    total = 0
+    for rel in safe_files:
+        path = _resolve_project_subpath(rel, must_exist=False)
+        item: dict[str, Any] = {"path": rel, "exists": path.exists()}
+        if path.exists() and path.is_file():
+            target = _resolve_project_path(rel, write=False)
+            data = target.read_bytes()
+            digest = hashlib.sha256(data).hexdigest()
+            text = data[:MAX_PROVIDER_FILE_BYTES].decode("utf-8", errors="replace")
+            total += len(text.encode("utf-8"))
+            item.update(
+                {
+                    "sha256": digest,
+                    "size_bytes": len(data),
+                    "truncated": len(data) > MAX_PROVIDER_FILE_BYTES,
+                    "content": text,
+                }
+            )
+        else:
+            item.update({"sha256": None, "size_bytes": 0, "truncated": False, "content": ""})
+        context.append(item)
+        if total > MAX_PROVIDER_CONTEXT_BYTES:
+            raise ValueError(f"Provider context is limited to {MAX_PROVIDER_CONTEXT_BYTES} bytes.")
+    return context
+
+
+def _provider_system_prompt(mode: str) -> str:
+    if mode == "review":
+        return (
+            "You are a strict Hermes3D code reviewer. Use only the supplied file context and proof ids. "
+            "Return concise JSON with verdict, findings, security_risks, missing_tests, and required_fixes. "
+            "Do not claim you ran tests or inspected files that were not provided."
+        )
+    return (
+        "You are a Hermes3D coding agent planner. Use only the supplied file context. "
+        "Return concise JSON with plan, proposed_changes, files_to_edit, tests_to_run, risk_notes, and rollback_plan. "
+        "Do not claim source files were changed; this pass only creates a plan/proposal artifact."
+    )
+
+
+def _coding_pass_prompt(*, title: str, objective: str, files: list[dict[str, Any]], target_branch: str | None) -> str:
+    return as_json(
+        {
+            "task": {"title": title, "objective": objective, "target_branch": target_branch},
+            "rules": [
+                "No printer movement/upload/print/test.",
+                "Do not edit secrets or generated/proof output.",
+                "Every proposed mutation must later use MCP locks, snapshots, gates, evidence, and PR.",
+                "Return JSON only.",
+            ],
+            "files": files,
+        }
+    )
+
+
+def _review_pass_prompt(*, summary: str, files: list[dict[str, Any]], proof_ids: list[str]) -> str:
+    return as_json(
+        {
+            "review": {"summary": summary, "proof_ids": proof_ids},
+            "rules": [
+                "Review only the supplied file context and proof ids.",
+                "Flag fake/mock/simulated UX, missing tests, secret exposure, path traversal, unsafe shell, and printer policy bypasses.",
+                "Return JSON only.",
+            ],
+            "files": files,
+        }
+    )
+
+
+def _record_provider_run_artifact(
+    *,
+    owner: str,
+    task_id: str,
+    run_type: str,
+    team_id: str,
+    provider_id: str,
+    files: list[str],
+    prompt_sha256: str,
+    response: dict[str, Any],
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    run_id = new_id()
+    run_dir = HISTORY_ROOT / "provider-runs"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    path = run_dir / f"{run_id}.json"
+    payload = {
+        "id": run_id,
+        "created_at": utc_now(),
+        "workspace_root": str(PROJECT_ROOT),
+        "owner": owner,
+        "task_id": task_id,
+        "run_type": run_type,
+        "team_id": team_id,
+        "provider_id": provider_id,
+        "files": files,
+        "prompt_sha256": prompt_sha256,
+        "response": _provider_response_public(response),
+        "extra": extra or {},
+    }
+    tmp_path = path.with_suffix(path.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}")
+    tmp_path.write_text(as_json(payload), encoding="utf-8")
+    os.replace(tmp_path, path)
+    proof_event_id = _record_git_proof(
+        owner=owner,
+        event_type=f"code_provider.{run_type}",
+        payload={
+            "task_id": task_id,
+            "run_id": run_id,
+            "team_id": team_id,
+            "provider_id": provider_id,
+            "files": files,
+            "prompt_sha256": prompt_sha256,
+            "response_sha256": response.get("content_sha256"),
+        },
+    )
+    return {
+        "id": run_id,
+        "path": _relative_to_project(path),
+        "proof_event_id": proof_event_id,
+        "response_sha256": response.get("content_sha256"),
+    }
+
+
+def _redact_provider_text(text: str) -> str:
+    redacted = text
+    for key in ("api_key", "apikey", "authorization", "bearer"):
+        redacted = re.sub(rf"(?i){key}[^,\\n]{{0,80}}", f"{key}=<redacted>", redacted)
+    return redacted[:2000]
 
 
 def _code_history_status() -> dict[str, Any]:

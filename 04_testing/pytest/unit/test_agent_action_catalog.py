@@ -22,6 +22,8 @@ def test_action_catalog_hides_internal_handlers_and_exposes_code_actions() -> No
     assert "code.git.commit_owned" in by_id
     assert "code.teams.assign_task" in by_id
     assert "code.teams.request_review" in by_id
+    assert "code.teams.run_coding_pass" in by_id
+    assert "code.teams.run_review_pass" in by_id
     assert all("handler" not in contract for contract in contracts)
     assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {"files", "task_id"}
 
@@ -65,6 +67,8 @@ def test_code_team_actions_declare_assignment_and_review_contracts() -> None:
     by_id = {contract["id"]: contract for contract in agents.action_catalog()["contracts"]}
     assignment = by_id["code.teams.assign_task"]
     review = by_id["code.teams.request_review"]
+    coding_pass = by_id["code.teams.run_coding_pass"]
+    review_pass = by_id["code.teams.run_review_pass"]
 
     assert assignment["kind"] == "proof"
     assert assignment["risk"] == "medium"
@@ -77,3 +81,13 @@ def test_code_team_actions_declare_assignment_and_review_contracts() -> None:
     assert review["risk"] == "medium"
     assert set(review["payload_schema"]["required"]) == {"task_id", "summary", "files", "proof_ids"}
     assert "proof/evidence id" in review["payload_schema"]["safety"]
+
+    assert coding_pass["kind"] == "artifact"
+    assert coding_pass["risk"] == "medium"
+    assert set(coding_pass["payload_schema"]["required"]) == {"task_id", "title", "files", "objective"}
+    assert "no source mutation" in coding_pass["payload_schema"]["safety"]
+
+    assert review_pass["kind"] == "artifact"
+    assert review_pass["risk"] == "medium"
+    assert set(review_pass["payload_schema"]["required"]) == {"task_id", "summary", "files", "proof_ids"}
+    assert "proof ids" in review_pass["payload_schema"]["safety"]

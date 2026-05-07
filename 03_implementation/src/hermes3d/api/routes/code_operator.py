@@ -152,6 +152,23 @@ class ProviderTeamReviewRequest(StrictBody):
     reviewer_team_id: str = "deepseek-reviewers"
 
 
+class ProviderCodingPassRequest(StrictBody):
+    team_id: str = "minimax-builders"
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
+
+
+class ProviderReviewPassRequest(StrictBody):
+    task_id: str
+    summary: str = Field(min_length=1, max_length=2000)
+    files: list[str] = Field(min_length=1)
+    proof_ids: list[str] = Field(min_length=1)
+    reviewer_team_id: str = "deepseek-reviewers"
+
+
 @router.get("/programming-readiness")
 def programming_readiness() -> dict[str, Any]:
     return code_history.programming_readiness()
@@ -183,6 +200,37 @@ def provider_team_assign_task(body: ProviderTeamAssignmentRequest) -> dict[str, 
 def provider_team_request_review(body: ProviderTeamReviewRequest) -> dict[str, Any]:
     try:
         return code_history.request_provider_team_review(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            summary=body.summary,
+            files=body.files,
+            proof_ids=body.proof_ids,
+            reviewer_team_id=body.reviewer_team_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/run-coding-pass")
+def provider_team_run_coding_pass(body: ProviderCodingPassRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_provider_team_coding_pass(
+            owner=CODE_OPERATOR_ACTOR,
+            team_id=body.team_id,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/run-review-pass")
+def provider_team_run_review_pass(body: ProviderReviewPassRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_provider_team_review_pass(
             owner=CODE_OPERATOR_ACTOR,
             task_id=body.task_id,
             summary=body.summary,
