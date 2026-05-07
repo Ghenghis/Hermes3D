@@ -29,6 +29,7 @@ DEFAULT_SOURCE_ROOT = Path(
         str(IMPLEMENTATION_ROOT / "source-lab" / "sources"),
     )
 )
+SOURCE_REGISTRY_PROOF_PATH = IMPLEMENTATION_ROOT / "proof" / "SOURCE_REGISTRY_TRUTH_AUDIT.json"
 SOURCE_MANIFEST_CANDIDATES = [
     Path(os.environ["HERMES3D_SOURCE_MANIFEST"]) if os.environ.get("HERMES3D_SOURCE_MANIFEST") else None,
     IMPLEMENTATION_ROOT / "source-lab" / "source_manifest.json",
@@ -111,6 +112,34 @@ def _registry_path() -> Path:
         if candidate.exists():
             return candidate
     raise FileNotFoundError("external_repos_registry.yaml was not found")
+
+
+def _registry_from_committed_proof(path: Path = SOURCE_REGISTRY_PROOF_PATH) -> dict[str, dict[str, dict[str, Any]]]:
+    if not path.exists():
+        raise FileNotFoundError("external_repos_registry.yaml was not found and SOURCE_REGISTRY_TRUTH_AUDIT.json is absent")
+    proof = json.loads(path.read_text(encoding="utf-8"))
+    modules = proof.get("modules")
+    if not isinstance(modules, list) or not modules:
+        raise ValueError("SOURCE_REGISTRY_TRUTH_AUDIT.json does not contain a non-empty modules list")
+    data: dict[str, dict[str, dict[str, Any]]] = {}
+    for module in modules:
+        if not isinstance(module, dict):
+            continue
+        module_id = str(module.get("id") or "").strip()
+        section = str(module.get("section") or "").strip()
+        if not module_id or not section:
+            continue
+        data.setdefault(section, {})[module_id] = {
+            "display": module.get("display_name") or module_id,
+            "priority": module.get("priority") or "reference",
+            "license": module.get("license"),
+            "repo": module.get("repo_url"),
+            "launch_kind": module.get("launch_kind") or "unknown",
+            "bridge_tasks": [],
+        }
+    if not data:
+        raise ValueError("SOURCE_REGISTRY_TRUTH_AUDIT.json did not yield registry module rows")
+    return data
 
 
 def _parse_scalar(value: str) -> Any:
@@ -300,7 +329,10 @@ def inspect_source_path(local_path: str | None, repo_url: str | None) -> dict[st
 def load_modules() -> int:
     if not DB_PATH.exists():
         init_db()
-    registry = _parse_registry(_registry_path())
+    try:
+        registry = _parse_registry(_registry_path())
+    except FileNotFoundError:
+        registry = _registry_from_committed_proof()
     manifest = _manifest_index()
     conn = connect()
     count = 0
