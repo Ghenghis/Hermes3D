@@ -1,0 +1,117 @@
+{
+  "generated_at_utc": "2026-05-06T23:29:36.844112+00:00",
+  "policy": "read-only-version-check-only; never slices; never sends to printer",
+  "probe_version": "slicer-verifier-v1",
+  "task_id": "H3D-CLAUDE-SOURCE-SLICERS",
+  "lane": "claude-source-slicers-01",
+  "summary": {
+    "total": 7,
+    "found": 5,
+    "not_found": 2
+  },
+  "slicers": [
+    {
+      "id": "prusaslicer",
+      "name": "PrusaSlicer",
+      "status": "found",
+      "version": "2.9.5-beta2",
+      "exe_path": "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe",
+      "return_code": 0,
+      "output_head": [
+        "PrusaSlicer-2.9.5-beta2 based on Slic3r (with GUI support)",
+        "https://github.com/prusa3d/PrusaSlicer",
+        "Usage: prusa-slicer [ INPUT ] [ OPTIONS ] [ ACTIONS ] [ TRANSFORM ] [ file.stl ... ]",
+        "Input:",
+        " --load ABCD         Load configuration from the specified file. It can be used more than once to",
+        "                     load options from multiple files.",
+        " --material-profile ABCD",
+        "                     Name(s) of the material preset(s) used for slicing. Could be filaments or",
+        "                     sla_material preset name(s) depending on printer tochnology",
+        " --print-profile ABCD"
+      ],
+      "note": null
+    },
+    {
+      "id": "orcaslicer",
+      "name": "OrcaSlicer",
+      "status": "found",
+      "version": null,
+      "exe_path": "C:\\Program Files\\OrcaSlicer\\orca-slicer.exe",
+      "return_code": 0,
+      "output_head": [],
+      "note": "OrcaSlicer CLI exits 0 with no stdout; detected as found by return code."
+    },
+    {
+      "id": "flsun_slicer",
+      "name": "FLSUN Slicer",
+      "status": "found",
+      "version": "2.0.4.0",
+      "exe_path": "C:\\FlsunSlicer2.0\\FlsunSlicer.exe",
+      "return_code": 0,
+      "output_head": [
+        "[2026-05-06 16:29:36.138695] [0x0000659c] [trace]   Initializing StaticPrintConfigs",
+        "FlsunSlicer-2.0.4.0:",
+        "Usage: flusn-slicer [ OPTIONS ] [ file.3mf/file.stl ... ]",
+        "OPTIONS:",
+        " --allow-multicolor-oneplate",
+        "                     If enabled, the arrange will allow multiple color on one plate",
+        " --allow-newer-file option",
+        "                     Allow 3mf with newer version to be sliced",
+        " --allow-rotations   If enabled, the arrange will allow rotations when place object",
+        " --avoid-extrusion-cali-region",
+        "                     If enabled, the arrange will avoid extrusion calibrate region when place object"
+      ],
+      "note": null
+    },
+    {
+      "id": "curaengine",
+      "name": "CuraEngine",
+      "status": "found",
+      "version": "5.12.1",
+      "exe_path": "C:\\Program Files\\UltiMaker Cura 5.12.1\\CuraEngine.exe",
+      "return_code": 0,
+      "output_head": [
+        "Cura_SteamEngine version 5.12.1",
+        "Copyright (C) 2024 Ultimaker",
+        "This program is free software: you can redistribute it and/or modify",
+        "it under the terms of the GNU Affero General Public License as published by",
+        "the Free Software Foundation, either version 3 of the License, or",
+        "(at your option) any later version.",
+        "This program is distributed in the hope that it will be useful,",
+        "but WITHOUT ANY WARRANTY; without even the implied warranty of",
+        "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+      ],
+      "note": null
+    },
+    {
+      "id": "superslicer",
+      "name": "SuperSlicer",
+      "status": "not_found",
+      "version": null,
+      "exe_path": null,
+      "return_code": null,
+      "output_head": [],
+      "note": "No candidate executable found on this system. SuperSlicer is not installed."
+    },
+    {
+      "id": "slic3r",
+      "name": "Slic3r",
+      "status": "not_found",
+      "version": null,
+      "exe_path": null,
+      "return_code": null,
+      "output_head": [],
+      "note": "No candidate executable found on this system. Slic3r is not installed."
+    },
+    {
+      "id": "bambustudio",
+      "name": "BambuStudio",
+      "status": "found",
+      "version": null,
+      "exe_path": "C:\\Program Files\\Bambu Studio\\bambu-studio.exe",
+      "return_code": null,
+      "output_head": [],
+      "note": "Detected via filesystem metadata; CLI version flag not available. GUI-only launcher."
+    }
+  ]
+}
