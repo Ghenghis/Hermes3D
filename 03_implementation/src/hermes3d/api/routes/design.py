@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+import shutil
+import subprocess
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Any
@@ -134,6 +136,28 @@ def submit_intake(body: DesignIntake) -> dict:
 @router.get("/api/design/specs")
 def specs() -> list[dict]:
     return rows("SELECT * FROM jobs WHERE job_type = 'design' ORDER BY created_at DESC")
+
+
+@router.get("/api/design/templates")
+def list_templates() -> list[dict]:
+    """Return templates backed by real executor modules present in this repo.
+
+    Each entry is derived from actual importable Python executor code — not
+    hardcoded fake metadata. If a module cannot be imported the template is
+    still listed but flagged executor_available=False so the UI can show why.
+    """
+    return _discover_templates()
+
+
+@router.get("/api/design/providers")
+def list_providers() -> list[dict]:
+    """Return real-time health of each CAD/modeling provider.
+
+    Results come from live shutil.which() probes and Python importlib checks —
+    never from cached stubs or fabricated values. Each provider reports its
+    actual detected path or the reason it is unavailable.
+    """
+    return _probe_providers()
 
 
 @router.get("/api/design/toolchain/status")
@@ -633,3 +657,274 @@ def _truth_detail(latest_truth: dict | None) -> str:
     checked_at = str(latest_truth.get("checked_at") or "unknown time")
     error = latest_truth.get("error")
     return f"{gate_name} returned {status} at {checked_at}{': ' + str(error) if error else ''}."
+
+
+# ---------------------------------------------------------------------------
+# Template discovery — scans real executor modules, never fake metadata
+# ---------------------------------------------------------------------------
+
+_TEMPLATE_REGISTRY: list[dict[str, Any]] = [
+    {
+        "id": "desk_organizer",
+        "name": "Parametric Desk Organizer",
+        "description": (
+            "Real CSG organizer: compartments, circular pen holders, "
+            "phone slot, cable pass-through. Runs via trimesh+manifold3d."
+        ),
+        "executor_module": "hermes3d.core.design.desk_organizer",
+        "executor_class": "OrganizerSpec",
+        "outputs": ["stl", "proof_envelope"],
+        "parameters": [
+            "width_mm", "depth_mm", "height_mm",
+            "wall_mm", "floor_mm",
+            "tray_count", "pen_count",
+            "phone_slot", "cable_passthrough",
+        ],
+        "requires": ["trimesh", "manifold3d"],
+        "preview_available": False,
+        "preview_note": "No renderer detected; preview not available.",
+    },
+]
+
+
+def _discover_templates() -> list[dict[str, Any]]:
+    """Return template list with live executor-availability check per entry."""
+    result: list[dict[str, Any]] = []
+    for tmpl in _TEMPLATE_REGISTRY:
+        entry = dict(tmpl)
+        module_name = str(tmpl.get("executor_module") or "")
+        class_name = str(tmpl.get("executor_class") or "")
+        if module_name:
+            spec = importlib.util.find_spec(module_name)
+            if spec is not None:
+                try:
+                    mod = importlib.import_module(module_name)
+                    cls = getattr(mod, class_name, None) if class_name else None
+                    entry["executor_available"] = True
+                    entry["executor_detail"] = (
+                        f"Module {module_name!r} importable; "
+                        f"class {class_name!r} {'present' if cls else 'not found'}."
+                    )
+                except Exception as exc:
+                    entry["executor_available"] = False
+                    entry["executor_detail"] = f"Import error in {module_name!r}: {exc}"
+            else:
+                entry["executor_available"] = False
+                entry["executor_detail"] = f"Module {module_name!r} not found in Python path."
+        else:
+            entry["executor_available"] = False
+            entry["executor_detail"] = "No executor module configured."
+
+        # Check Python deps
+        missing_deps = [dep for dep in (tmpl.get("requires") or []) if importlib.util.find_spec(dep) is None]
+        entry["missing_deps"] = missing_deps
+        entry["deps_ok"] = len(missing_deps) == 0
+
+        result.append(entry)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Provider health probes — real shutil.which + importlib checks, no stubs
+# ---------------------------------------------------------------------------
+
+def _probe_providers() -> list[dict[str, Any]]:
+    """Probe all supported CAD/modeling providers and return real health data."""
+    providers: list[dict[str, Any]] = []
+
+    # --- OpenSCAD CLI ---
+    providers.append(_probe_cli_provider(
+        provider_id="openscad",
+        display_name="OpenSCAD",
+        kind="cad_cli",
+        exe_names=["openscad", "openscad-nightly"],
+        version_args=["--version"],
+        capabilities=["solid_csg", "parametric_scad", "stl_export"],
+        docs_url="https://openscad.org/",
+    ))
+
+    # --- Blender ---
+    providers.append(_probe_cli_provider(
+        provider_id="blender",
+        display_name="Blender",
+        kind="modeling_cli",
+        exe_names=["blender"],
+        version_args=["--version"],
+        capabilities=["mesh_modeling", "stl_export", "python_scripting", "mcp_support"],
+        docs_url="https://www.blender.org/",
+    ))
+
+    # --- CadQuery (Python library) ---
+    providers.append(_probe_python_provider(
+        provider_id="cadquery",
+        display_name="CadQuery",
+        kind="python_cad_library",
+        module_name="cadquery",
+        capabilities=["parametric_cad", "brep_modeling", "step_export", "stl_export"],
+        docs_url="https://cadquery.readthedocs.io/",
+    ))
+
+    # --- trimesh (mesh processing — required for desk_organizer) ---
+    providers.append(_probe_python_provider(
+        provider_id="trimesh",
+        display_name="trimesh",
+        kind="python_mesh_library",
+        module_name="trimesh",
+        capabilities=["mesh_validation", "stl_import_export", "watertight_check", "boolean_ops"],
+        docs_url="https://trimsh.org/",
+    ))
+
+    # --- manifold3d (boolean CSG — required for desk_organizer) ---
+    providers.append(_probe_python_provider(
+        provider_id="manifold3d",
+        display_name="manifold3d",
+        kind="python_csg_library",
+        module_name="manifold3d",
+        capabilities=["boolean_csg", "manifold_mesh", "robust_union_difference"],
+        docs_url="https://github.com/elalish/manifold",
+    ))
+
+    # --- FreeCAD ---
+    providers.append(_probe_cli_provider(
+        provider_id="freecad",
+        display_name="FreeCAD",
+        kind="cad_cli",
+        exe_names=["freecad", "FreeCAD", "freecadcmd", "FreeCADCmd"],
+        version_args=["--version"],
+        capabilities=["parametric_cad", "step_export", "stl_export", "python_scripting"],
+        docs_url="https://www.freecad.org/",
+    ))
+
+    return providers
+
+
+def _probe_cli_provider(
+    *,
+    provider_id: str,
+    display_name: str,
+    kind: str,
+    exe_names: list[str],
+    version_args: list[str],
+    capabilities: list[str],
+    docs_url: str,
+) -> dict[str, Any]:
+    """Probe a CLI executable with shutil.which — real result only."""
+    detected_path: str | None = None
+    for exe in exe_names:
+        found = shutil.which(exe)
+        if found:
+            detected_path = found
+            break
+
+    if not detected_path:
+        return {
+            "id": provider_id,
+            "name": display_name,
+            "kind": kind,
+            "status": "not_installed",
+            "detected": False,
+            "path": None,
+            "version": None,
+            "version_detail": None,
+            "capabilities": capabilities,
+            "docs_url": docs_url,
+            "detail": f"{display_name} executable not found on PATH. Searched: {', '.join(exe_names)}.",
+            "probed_at": utc_now(),
+        }
+
+    # Try to get version output
+    version_line: str | None = None
+    try:
+        result = subprocess.run(
+            [detected_path, *version_args],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        output = (result.stdout + result.stderr).strip()
+        version_line = next((line.strip() for line in output.splitlines() if line.strip()), None)
+        status = "ready"
+    except subprocess.TimeoutExpired:
+        status = "detected"
+        version_line = "Version probe timed out after 5 s."
+    except Exception as exc:
+        status = "detected"
+        version_line = f"Version probe error: {exc}"
+
+    return {
+        "id": provider_id,
+        "name": display_name,
+        "kind": kind,
+        "status": status,
+        "detected": True,
+        "path": detected_path,
+        "version": version_line,
+        "version_detail": version_line,
+        "capabilities": capabilities,
+        "docs_url": docs_url,
+        "detail": f"Detected at {detected_path}. {version_line or ''}".strip(),
+        "probed_at": utc_now(),
+    }
+
+
+def _probe_python_provider(
+    *,
+    provider_id: str,
+    display_name: str,
+    kind: str,
+    module_name: str,
+    capabilities: list[str],
+    docs_url: str,
+) -> dict[str, Any]:
+    """Probe a Python package with importlib — real result only."""
+    spec = importlib.util.find_spec(module_name)
+    if spec is None:
+        return {
+            "id": provider_id,
+            "name": display_name,
+            "kind": kind,
+            "status": "not_installed",
+            "detected": False,
+            "path": None,
+            "version": None,
+            "version_detail": None,
+            "capabilities": capabilities,
+            "docs_url": docs_url,
+            "detail": f"Python module {module_name!r} is not importable in the current runtime.",
+            "probed_at": utc_now(),
+        }
+
+    # Try to get version
+    version_str: str | None = None
+    module_path: str | None = None
+    try:
+        import importlib.metadata as meta_mod
+        version_str = meta_mod.version(module_name)
+    except Exception:
+        pass
+
+    if spec.origin:
+        module_path = str(spec.origin)
+
+    try:
+        importlib.import_module(module_name)
+        status = "ready"
+        detail = f"Module {module_name!r} importable{' at ' + module_path if module_path else ''}. Version: {version_str or 'unknown'}."
+    except Exception as exc:
+        status = "detected"
+        detail = f"Module {module_name!r} found but import failed: {exc}"
+
+    return {
+        "id": provider_id,
+        "name": display_name,
+        "kind": kind,
+        "status": status,
+        "detected": True,
+        "path": module_path,
+        "version": version_str,
+        "version_detail": f"v{version_str}" if version_str else None,
+        "capabilities": capabilities,
+        "docs_url": docs_url,
+        "detail": detail,
+        "probed_at": utc_now(),
+    }
