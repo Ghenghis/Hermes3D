@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/toolchain_arm_none_eabi.schema.json",
+  "title": "arm-none-eabi-gcc toolchain descriptor",
+  "description": "Compile-only ARM bare-metal toolchain descriptor (32-bit ARM firmwares: Klipper MCU, RepRapFirmware, Marlin STM32). NEVER used for flashing; only --version probe.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "source_url", "install_check", "version_pattern"],
+  "properties": {
+    "name": {"type": "string", "const": "arm_none_eabi_gcc"},
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "default": "https://developer.arm.com/Tools%20and%20Software/GNU%20Toolchain",
+      "description": "Upstream Arm GNU Toolchain. Typically obtained via OS package manager (apt install gcc-arm-none-eabi) or Arm release archive."
+    },
+    "install_check": {
+      "type": "string",
+      "default": "arm-none-eabi-gcc --version",
+      "description": "Read-only version probe. NEVER a flash command (st-flash, dfu-util, openocd flashing are explicitly excluded)."
+    },
+    "version_pattern": {
+      "type": "string",
+      "default": "arm-none-eabi-gcc \\(.*\\) ([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)",
+      "description": "Regex extracting the GCC version triple from --version output."
+    },
+    "compile_only": {"type": "boolean", "const": true},
+    "no_flash": {"type": "boolean", "const": true}
+  }
+}
