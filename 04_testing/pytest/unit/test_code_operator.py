@@ -16,6 +16,7 @@ def test_code_operator_routes_are_registered() -> None:
 
     assert "/api/code-operator/programming-readiness" in paths
     assert "/api/code-operator/patch/apply" in paths
+    assert "/api/code-operator/git/commit-owned" in paths
     assert "/api/code-operator/history/restore" in paths
     assert "/api/code-operator/mcp-locks/evidence" in paths
 
@@ -65,6 +66,22 @@ def test_mcp_file_locks_require_claimed_task() -> None:
 
     assert missing_task.status_code == 422
     assert spoofed.status_code == 422
+
+
+def test_git_commit_rejects_spoofed_actor_fields() -> None:
+    client = TestClient(create_gui_app())
+
+    response = client.post(
+        "/api/code-operator/git/commit-owned",
+        json={
+            "task_id": "TASK-1",
+            "files": ["README.md"],
+            "message": "test",
+            "owner": "other-agent",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize(
@@ -173,3 +190,36 @@ def test_same_owner_mcp_lock_accepts_task_id_key_shapes(monkeypatch: pytest.Monk
     lock = code_history._require_active_mcp_lock("README.md", owner="hermes-agent", task_id="TASK-1")
 
     assert lock["taskId"] == "TASK-1"
+
+
+def test_git_branch_names_are_limited_to_agent_prefixes() -> None:
+    assert code_history._validate_agent_branch_name("codex/test-lane") == "codex/test-lane"
+    assert code_history._validate_agent_branch_name("hermes-agent/test-lane") == "hermes-agent/test-lane"
+
+    with pytest.raises(ValueError):
+        code_history._validate_agent_branch_name("main")
+    with pytest.raises(ValueError):
+        code_history._validate_agent_branch_name("codex/../escape")
+
+
+def test_git_stage_requires_snapshot_and_same_owner_lock(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(code_history, "_agent_snapshot_files", lambda owner: {"README.md"})
+    monkeypatch.setattr(code_history, "_changed_git_files", lambda: {"README.md"})
+    monkeypatch.setattr(code_history, "_require_active_mcp_lock", lambda path, *, owner, task_id: {"lock_id": "lock-1"})
+    monkeypatch.setattr(code_history, "_run_git", lambda args, **_kwargs: calls.append(args) or {"stdout": "", "stderr": "", "returncode": 0})
+
+    result = code_history.git_stage_owned_files(owner="hermes-agent", task_id="TASK-1", files=["README.md"])
+
+    assert result["status"] == "staged"
+    assert calls == [["add", "--", "README.md"]]
+
+
+def test_git_stage_rejects_unsnapshotted_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(code_history, "_agent_snapshot_files", lambda owner: set())
+    monkeypatch.setattr(code_history, "_changed_git_files", lambda: {"README.md"})
+
+    with pytest.raises(ValueError, match="no pre-change snapshot"):
+        code_history.git_stage_owned_files(owner="hermes-agent", task_id="TASK-1", files=["README.md"])

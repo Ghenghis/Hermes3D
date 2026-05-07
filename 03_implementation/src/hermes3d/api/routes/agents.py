@@ -746,6 +746,64 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
             owner=actor,
             cwd=str(payload.get("cwd") or "."),
         )
+    if handler == "code.git.readiness":
+        from hermes3d.services import code_history
+
+        return code_history.git_ship_readiness()
+    if handler == "code.git.branch":
+        from hermes3d.services import code_history
+
+        return code_history.git_create_branch(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            branch_name=_required_payload_text(payload, "branch_name"),
+            base_ref=str(payload.get("base_ref") or "") or None,
+            reason=str(payload.get("reason") or "Hermes Agent branch creation"),
+        )
+    if handler == "code.git.stage_owned":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        return code_history.git_stage_owned_files(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            files=files,
+        )
+    if handler == "code.git.commit_owned":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        proof_ids = payload.get("proof_ids")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        return code_history.git_commit_owned_files(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            files=files,
+            message=_required_payload_text(payload, "message"),
+            proof_ids=proof_ids if isinstance(proof_ids, list) else [],
+        )
+    if handler == "code.git.push":
+        from hermes3d.services import code_history
+
+        return code_history.git_push_current_branch(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            remote=str(payload.get("remote") or "origin"),
+        )
+    if handler == "code.git.pr":
+        from hermes3d.services import code_history
+
+        return code_history.git_open_pull_request(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            base_ref=_required_payload_text(payload, "base_ref"),
+            title=_required_payload_text(payload, "title"),
+            body=str(payload.get("body") or ""),
+            draft=bool(payload.get("draft", True)),
+        )
     if handler == "code.mcp_locks.state":
         from hermes3d.services import code_history
 
@@ -1135,6 +1193,12 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("code.patch.apply", "Apply MCP-locked Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply", "code.patch.apply", "Applies an existing patch proposal only with a same-owner Hermes MCP file lock for the target, records pre/post snapshots, and appends chained MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch apply.")),
         _contract("code.gates.list.refresh", "List Hermes MCP code gates", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/gates", "code.gates.list", "Lists gates exposed by the exact-worktree hermes3d-locks MCP server; no arbitrary shell is exposed.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
         _contract("code.gate.run", "Run Hermes MCP allowlisted gate", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/gates/run", "code.gate.run", "Runs one allowlisted hermes3d-locks MCP gate in the exact edit worktree and stores the gate result in the MCP evidence ledger.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
+        _contract("code.git.readiness.refresh", "Refresh Hermes Agent git shipping readiness", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/git/readiness", "code.git.readiness", "Shows whether the current branch, dirty files, snapshots, and MCP lock prerequisites allow agent branch/commit/push/PR work.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
+        _contract("code.git.branch", "Create Hermes Agent git branch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/branch", "code.git.branch", "Creates only codex/ or hermes-agent/ branches from a clean worktree and records MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
+        _contract("code.git.stage_owned", "Stage snapshotted locked files", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/stage-owned", "code.git.stage_owned", "Stages only files that are changed, source-allowed, snapshotted by the same agent, and covered by an active same-owner MCP file lock.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
+        _contract("code.git.commit_owned", "Commit snapshotted Hermes Agent changes", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/commit-owned", "code.git.commit_owned", "Commits only the same snapshotted locked file set and embeds supplied proof ids in the commit message.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
+        _contract("code.git.push", "Push Hermes Agent branch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/push", "code.git.push", "Pushes the current codex/ or hermes-agent/ branch to origin without force after the worktree is clean.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
+        _contract("code.git.pr", "Open Hermes Agent pull request", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "high", "POST /api/code-operator/git/pr", "code.git.pr", "Opens a GitHub PR for the current safe agent branch through the authenticated gh CLI and records evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
         _contract("code.mcp_locks.state.refresh", "Refresh Hermes MCP lock state", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/mcp-locks/state", "code.mcp_locks.state", "Reads exact-worktree Hermes lock/task/evidence state before coding work.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
         _contract("code.mcp_locks.claim_task", "Claim Hermes MCP code task", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/claim-task", "code.mcp_locks.claim_task", "Claims a task through hermes3d-locks before any file lock or write.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
         _contract("code.mcp_locks.lock_files", "Lock Hermes3D code files", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/lock-files", "code.mcp_locks.lock_files", "Atomically locks project-relative files through hermes3d-locks; denied paths and unsafe file types fail closed.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
@@ -1259,6 +1323,11 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "code.patch.propose": {"required": ["relative_path", "proposed_text"], "optional": {"base_sha256": "current file hash for stale-write protection", "reason": "why this patch is proposed"}, "safety": "Creates a review artifact and proof only; it does not mutate source files. Apply remains a separate gated action."},
         "code.patch.apply": {"required": ["proposal_id", "task_id"], "optional": {"reason": "why this proposal is being applied"}, "safety": "Requires matching base sha256, active same-owner Hermes MCP file lock, pre/post snapshots, proof event, and chained MCP evidence."},
         "code.gate.run": {"required": ["gate_id"], "optional": {"cwd": "project-relative directory; defaults to repository root"}, "safety": "Calls hermes3d-locks hermes_run_gate only. Arbitrary commands and cwd outside the edit workspace are blocked."},
+        "code.git.branch": {"required": ["task_id", "branch_name"], "optional": {"base_ref": "safe git ref", "reason": "why this branch is needed"}, "safety": "Only codex/ and hermes-agent/ branch prefixes are accepted; worktree must be clean."},
+        "code.git.stage_owned": {"required": ["task_id", "files"], "optional": {}, "safety": "Every file must be changed, snapshotted by the same agent, source-allowed, and locked by the same owner/task."},
+        "code.git.commit_owned": {"required": ["task_id", "files", "message"], "optional": {"proof_ids": "list of proof/evidence ids to embed"}, "safety": "Commits only staged files from the owned snapshot/lock set."},
+        "code.git.push": {"required": ["task_id"], "optional": {"remote": "origin only"}, "safety": "No force push; current branch must use codex/ or hermes-agent/ prefix and worktree must be clean."},
+        "code.git.pr": {"required": ["task_id", "base_ref", "title"], "optional": {"body": "PR body", "draft": "defaults true"}, "safety": "Uses gh pr create only for the current safe agent branch."},
         "code.mcp_locks.claim_task": {"required": ["task_id"], "optional": {"title": "short task title", "files": "project-relative paths", "reason": "why the task is claimed"}, "safety": "Uses hermes_claim_task in the exact edit workspace."},
         "code.mcp_locks.lock_files": {"required": ["files", "task_id"], "optional": {"ttl_minutes": "5-720", "reason": "why files are locked"}, "safety": "Uses hermes_lock_files only after a claimed task id is provided; secrets, denied paths, and outside-workspace paths fail closed."},
         "code.mcp_locks.heartbeat": {"required": ["task_id"], "optional": {}, "safety": "Uses hermes_heartbeat only for the server-side actor that owns the claimed task."},

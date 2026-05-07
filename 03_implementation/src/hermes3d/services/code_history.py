@@ -8,6 +8,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import threading
 import time
 from dataclasses import dataclass
@@ -26,6 +27,9 @@ MAX_DIFF_BYTES = 1024 * 1024
 MAX_FILE_VIEW_BYTES = 512 * 1024
 MAX_SEARCH_RESULTS = 200
 MAX_PROPOSED_TEXT_BYTES = 1024 * 1024
+MAX_COMMIT_MESSAGE_BYTES = 4096
+MAX_PR_BODY_BYTES = 32000
+ALLOWED_AGENT_BRANCH_PREFIXES = ("codex/", "hermes-agent/")
 
 DENIED_PARTS = {
     ".git",
@@ -283,6 +287,221 @@ def repo_status() -> dict[str, Any]:
         "status_short": status.splitlines()[:300],
         "diff_stat": diff_summary.splitlines()[:120],
     }
+
+
+def git_ship_readiness() -> dict[str, Any]:
+    write = code_write_readiness()
+    branch = _current_branch()
+    dirty_files = sorted(_changed_git_files())
+    staged_files = sorted(_staged_git_files())
+    branch_allowed = bool(branch and _is_allowed_agent_branch(branch))
+    blockers = list(write.get("blocked_reasons") or [])
+    if branch and not branch_allowed:
+        blockers.append(f"Current branch {branch!r} is not an agent shipping branch.")
+    return {
+        "status": "ready" if not blockers else "blocked",
+        "ready": not blockers,
+        "workspace_root": str(PROJECT_ROOT),
+        "branch": branch,
+        "branch_allowed": branch_allowed,
+        "allowed_branch_prefixes": list(ALLOWED_AGENT_BRANCH_PREFIXES),
+        "dirty_files": dirty_files[:300],
+        "staged_files": staged_files[:300],
+        "blocked_reasons": blockers,
+        "warnings": write.get("warnings") or [],
+        "required_flow": [
+            "claim task",
+            "lock files",
+            "snapshot before write",
+            "apply patch under same-owner lock",
+            "run gates",
+            "stage only snapshotted locked files",
+            "commit with proof ids",
+            "push without force",
+            "open PR",
+        ],
+    }
+
+
+def git_create_branch(*, owner: str, task_id: str, branch_name: str, base_ref: str | None = None, reason: str = "") -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    branch = _validate_agent_branch_name(branch_name)
+    base = _validate_git_ref(base_ref) if base_ref else None
+    if _changed_git_files():
+        raise ValueError("Create an agent branch only from a clean worktree; commit or restore current changes first.")
+    args = ["switch", "-c", branch]
+    if base:
+        args.append(base)
+    result = _run_git(args, timeout_s=30)
+    proof_event_id = _record_git_proof(
+        owner=owner,
+        event_type="code_git.branch_created",
+        payload={"task_id": task_id, "branch": branch, "base_ref": base, "reason": reason},
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_git",
+        summary=f"Created Hermes Agent branch {branch}",
+        data={"branch": branch, "base_ref": base, "proof_event_id": proof_event_id},
+    )
+    return {
+        "status": "created",
+        "branch": branch,
+        "base_ref": base,
+        "stdout": result["stdout"],
+        "proof_event_id": proof_event_id,
+        "mcp_evidence": evidence,
+    }
+
+
+def git_stage_owned_files(*, owner: str, task_id: str, files: list[str]) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    safe_files = _ensure_git_ship_files(files, owner=owner, task_id=task_id)
+    _run_git(["add", "--", *safe_files], timeout_s=30)
+    return {"status": "staged", "files": safe_files, "count": len(safe_files)}
+
+
+def git_commit_owned_files(
+    *,
+    owner: str,
+    task_id: str,
+    files: list[str],
+    message: str,
+    proof_ids: list[str] | None = None,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    branch = _validate_agent_branch_name(_current_branch())
+    if not message.strip() or len(message.encode("utf-8")) > MAX_COMMIT_MESSAGE_BYTES:
+        raise ValueError(f"Commit message must be 1-{MAX_COMMIT_MESSAGE_BYTES} bytes.")
+    evidence_ids = [_validate_proof_ref(item) for item in (proof_ids or [])]
+    safe_files = git_stage_owned_files(owner=owner, task_id=task_id, files=files)["files"]
+    staged = _staged_git_files()
+    unexpected = sorted(staged - set(safe_files))
+    if unexpected:
+        raise ValueError(f"Refusing to commit staged files outside the owned snapshot set: {', '.join(unexpected[:10])}")
+    if not staged:
+        raise ValueError("No staged files are available for commit.")
+    full_message = message.strip()
+    if evidence_ids:
+        full_message += "\n\nHermes evidence: " + ", ".join(evidence_ids)
+    result = _run_git(["commit", "-m", full_message], timeout_s=120)
+    commit = _git_value(["rev-parse", "HEAD"]) or ""
+    proof_event_id = _record_git_proof(
+        owner=owner,
+        event_type="code_git.committed",
+        payload={
+            "task_id": task_id,
+            "branch": branch,
+            "commit": commit,
+            "files": sorted(staged),
+            "evidence_ids": evidence_ids,
+        },
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_git",
+        summary=f"Committed Hermes Agent changes on {branch}",
+        data={"branch": branch, "commit": commit, "files": sorted(staged), "proof_event_id": proof_event_id},
+    )
+    return {
+        "status": "committed",
+        "branch": branch,
+        "commit": commit,
+        "files": sorted(staged),
+        "stdout": result["stdout"],
+        "proof_event_id": proof_event_id,
+        "mcp_evidence": evidence,
+    }
+
+
+def git_push_current_branch(*, owner: str, task_id: str, remote: str = "origin") -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    branch = _validate_agent_branch_name(_current_branch())
+    if remote != "origin":
+        raise ValueError("Hermes Agent git push is limited to the origin remote.")
+    if _changed_git_files():
+        raise ValueError("Push requires a clean worktree after commit.")
+    result = _run_git(["push", "-u", remote, branch], timeout_s=180)
+    proof_event_id = _record_git_proof(
+        owner=owner,
+        event_type="code_git.pushed",
+        payload={"task_id": task_id, "branch": branch, "remote": remote},
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_git",
+        summary=f"Pushed Hermes Agent branch {branch}",
+        data={"branch": branch, "remote": remote, "proof_event_id": proof_event_id},
+    )
+    return {"status": "pushed", "branch": branch, "remote": remote, "stdout": result["stdout"], "proof_event_id": proof_event_id, "mcp_evidence": evidence}
+
+
+def git_open_pull_request(
+    *,
+    owner: str,
+    task_id: str,
+    base_ref: str,
+    title: str,
+    body: str,
+    draft: bool = True,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    branch = _validate_agent_branch_name(_current_branch())
+    base = _validate_git_ref(base_ref)
+    if not title.strip() or len(title) > 180:
+        raise ValueError("PR title must be 1-180 characters.")
+    if len(body.encode("utf-8")) > MAX_PR_BODY_BYTES:
+        raise ValueError(f"PR body is limited to {MAX_PR_BODY_BYTES} bytes.")
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".md", delete=False) as handle:
+        handle.write(body)
+        body_file = Path(handle.name)
+    try:
+        args = [
+            "pr",
+            "create",
+            "--repo",
+            "Ghenghis/Hermes3D",
+            "--base",
+            base,
+            "--head",
+            branch,
+            "--title",
+            title.strip(),
+            "--body-file",
+            str(body_file),
+        ]
+        if draft:
+            args.append("--draft")
+        result = _run_gh(args, timeout_s=120)
+    finally:
+        body_file.unlink(missing_ok=True)
+    url = _first_url(result["stdout"])
+    proof_event_id = _record_git_proof(
+        owner=owner,
+        event_type="code_git.pr_opened",
+        payload={"task_id": task_id, "branch": branch, "base_ref": base, "url": url, "draft": draft},
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_git",
+        summary=f"Opened Hermes Agent PR for {branch}",
+        data={"branch": branch, "base_ref": base, "url": url, "draft": draft, "proof_event_id": proof_event_id},
+    )
+    return {"status": "opened", "branch": branch, "base_ref": base, "url": url, "draft": draft, "proof_event_id": proof_event_id, "mcp_evidence": evidence}
 
 
 def code_write_readiness() -> dict[str, Any]:
@@ -1183,6 +1402,164 @@ def _git_value(args: list[str], *, allow_multiline: bool = False) -> str | None:
         return None
     value = result.stdout if allow_multiline else result.stdout.strip()
     return value[:12000]
+
+
+def _run_git(args: list[str], *, timeout_s: int = 30) -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(PROJECT_ROOT), *args],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("Git command could not run.") from exc
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Git command failed.").strip()[:2000])
+    return {"stdout": result.stdout[:12000], "stderr": result.stderr[:4000], "returncode": result.returncode}
+
+
+def _run_gh(args: list[str], *, timeout_s: int = 60) -> dict[str, Any]:
+    try:
+        result = subprocess.run(
+            ["gh", *args],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("GitHub CLI command could not run.") from exc
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "GitHub CLI command failed.").strip()[:2000])
+    return {"stdout": result.stdout[:12000], "stderr": result.stderr[:4000], "returncode": result.returncode}
+
+
+def _current_branch() -> str:
+    return _git_value(["branch", "--show-current"]) or ""
+
+
+def _changed_git_files() -> set[str]:
+    changed: set[str] = set()
+    for args in (
+        ["diff", "--name-only"],
+        ["diff", "--cached", "--name-only"],
+        ["ls-files", "--others", "--exclude-standard"],
+    ):
+        value = _git_value(args, allow_multiline=True) or ""
+        changed.update(line.strip().replace("\\", "/") for line in value.splitlines() if line.strip())
+    return changed
+
+
+def _staged_git_files() -> set[str]:
+    value = _git_value(["diff", "--cached", "--name-only"], allow_multiline=True) or ""
+    return {line.strip().replace("\\", "/") for line in value.splitlines() if line.strip()}
+
+
+def _validate_agent_branch_name(branch_name: str | None) -> str:
+    branch = str(branch_name or "").strip()
+    if not _is_allowed_agent_branch(branch):
+        raise ValueError("Agent git branches must start with codex/ or hermes-agent/ and use safe ref characters.")
+    try:
+        result = subprocess.run(
+            ["git", "check-ref-format", "--branch", branch],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("Git branch validation could not run.") from exc
+    if result.returncode != 0:
+        raise ValueError("Agent git branch name failed git check-ref-format.")
+    return branch
+
+
+def _is_allowed_agent_branch(branch_name: str | None) -> bool:
+    branch = str(branch_name or "").strip()
+    return (
+        any(branch.startswith(prefix) for prefix in ALLOWED_AGENT_BRANCH_PREFIXES)
+        and len(branch) <= 120
+        and "\\" not in branch
+        and " " not in branch
+        and ".." not in branch
+        and "@{" not in branch
+        and not branch.endswith("/")
+        and not branch.endswith(".")
+        and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]+", branch) is not None
+    )
+
+
+def _validate_git_ref(ref: str | None) -> str:
+    value = str(ref or "").strip()
+    if (
+        not value
+        or len(value) > 160
+        or "\\" in value
+        or " " in value
+        or ".." in value
+        or "@{" in value
+        or value.startswith("-")
+        or value.endswith("/")
+        or value.endswith(".")
+        or re.fullmatch(r"[A-Za-z0-9._/-]+", value) is None
+    ):
+        raise ValueError("Git ref must use safe ref characters.")
+    return value
+
+
+def _validate_proof_ref(ref: str) -> str:
+    value = str(ref or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{2,128}", value):
+        raise ValueError("Proof/evidence ids must use safe characters.")
+    return value
+
+
+def _ensure_git_ship_files(files: list[str], *, owner: str, task_id: str) -> list[str]:
+    if not files:
+        raise ValueError("At least one owned file is required.")
+    snapshot_files = _agent_snapshot_files(owner)
+    changed_files = _changed_git_files()
+    safe_files: list[str] = []
+    for item in files:
+        target = _resolve_project_path(item, write=True)
+        rel = _relative_to_project(target)
+        if rel not in changed_files:
+            raise ValueError(f"{rel} has no git changes to stage.")
+        if rel not in snapshot_files:
+            raise ValueError(f"{rel} has no pre-change snapshot for {owner}.")
+        _require_active_mcp_lock(rel, owner=owner, task_id=task_id)
+        safe_files.append(rel)
+    return sorted(dict.fromkeys(safe_files))
+
+
+def _agent_snapshot_files(owner: str) -> set[str]:
+    records = rows(
+        """
+        SELECT DISTINCT relative_path
+        FROM code_history_snapshots
+        WHERE workspace_root = ? AND agent_id = ?
+        """,
+        (str(PROJECT_ROOT), owner),
+    )
+    return {str(record.get("relative_path") or "") for record in records if record.get("relative_path")}
+
+
+def _record_git_proof(*, owner: str, event_type: str, payload: dict[str, Any]) -> str:
+    proof_event_id = new_id()
+    execute(
+        "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
+        (proof_event_id, event_type, owner, as_json(payload)),
+    )
+    return proof_event_id
+
+
+def _first_url(text: str) -> str | None:
+    match = re.search(r"https://[^\s]+", text or "")
+    return match.group(0) if match else None
 
 
 def _host_label(url: str) -> str | None:

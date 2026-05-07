@@ -65,6 +65,38 @@ class GateRunRequest(StrictBody):
     cwd: str | None = None
 
 
+class GitBranchRequest(StrictBody):
+    task_id: str
+    branch_name: str
+    base_ref: str | None = None
+    reason: str = ""
+
+
+class GitStageRequest(StrictBody):
+    task_id: str
+    files: list[str] = Field(min_length=1)
+
+
+class GitCommitRequest(StrictBody):
+    task_id: str
+    files: list[str] = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=4096)
+    proof_ids: list[str] = Field(default_factory=list)
+
+
+class GitPushRequest(StrictBody):
+    task_id: str
+    remote: str = "origin"
+
+
+class GitPullRequestRequest(StrictBody):
+    task_id: str
+    base_ref: str
+    title: str = Field(min_length=1, max_length=180)
+    body: str = Field(default="", max_length=32000)
+    draft: bool = True
+
+
 class McpTaskClaimRequest(StrictBody):
     task_id: str
     title: str = ""
@@ -277,6 +309,70 @@ def run_gate(body: GateRunRequest) -> dict[str, Any]:
         return code_history.run_mcp_gate(body.gate_id, owner=CODE_OPERATOR_ACTOR, cwd=body.cwd)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.get("/git/readiness")
+def git_readiness() -> dict[str, Any]:
+    return code_history.git_ship_readiness()
+
+
+@router.post("/git/branch")
+def git_branch(body: GitBranchRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_create_branch(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            branch_name=body.branch_name,
+            base_ref=body.base_ref,
+            reason=body.reason,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/stage-owned")
+def git_stage_owned(body: GitStageRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_stage_owned_files(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, files=body.files)
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/commit-owned")
+def git_commit_owned(body: GitCommitRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_commit_owned_files(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            files=body.files,
+            message=body.message,
+            proof_ids=body.proof_ids,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/push")
+def git_push(body: GitPushRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_push_current_branch(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, remote=body.remote)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/pr")
+def git_pr(body: GitPullRequestRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_open_pull_request(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            base_ref=body.base_ref,
+            title=body.title,
+            body=body.body,
+            draft=body.draft,
+        )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
