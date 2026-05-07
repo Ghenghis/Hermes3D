@@ -15,7 +15,7 @@
  * react-router; the universal shell uses the TABS pattern only.
  */
 import { useState } from "react";
-import { Bot, Cog, Cpu, Info, Map, Printer as PrinterIcon, Terminal } from "lucide-react";
+import { Bot, Cog, Cpu, Info, Map, Package, Printer as PrinterIcon, Terminal } from "lucide-react";
 import { Panel } from "../layout/Panel";
 import { ResizablePane } from "../layout/ResizablePane";
 import { useStore } from "../../app/store";
@@ -24,15 +24,17 @@ import { PrintersSubtab } from "./PrintersSubtab";
 import { EnvironmentSubtab } from "./EnvironmentSubtab";
 import { AboutSubtab } from "./AboutSubtab";
 import { AgentConfigSection } from "./AgentConfigSection";
+import { UpdateCenterSubtab } from "./UpdateCenterSubtab";
 
-type SubtabKey = "providers" | "agents" | "printers" | "environment" | "about";
+type SubtabKey = "providers" | "agents" | "printers" | "environment" | "about" | "updates";
 
 const SUBTABS: { key: SubtabKey; label: string; Icon: typeof Cpu; description: string }[] = [
-  { key: "providers",   label: "Providers",   Icon: Cpu,         description: "LLM endpoints + policy" },
-  { key: "agents",      label: "Agents",      Icon: Bot,         description: "Agent policy preview" },
-  { key: "printers",    label: "Printers",    Icon: PrinterIcon, description: "Fleet + health" },
-  { key: "environment", label: "Environment", Icon: Terminal,    description: "env-var presence (redacted)" },
-  { key: "about",       label: "About",       Icon: Info,        description: "Version + links" },
+  { key: "providers",   label: "Providers",     Icon: Cpu,         description: "LLM endpoints + policy" },
+  { key: "agents",      label: "Agents",        Icon: Bot,         description: "Agent policy preview" },
+  { key: "printers",    label: "Printers",      Icon: PrinterIcon, description: "Fleet + health" },
+  { key: "environment", label: "Environment",   Icon: Terminal,    description: "env-var presence (redacted)" },
+  { key: "updates",     label: "Update Center", Icon: Package,     description: "Versions, updater, rollback" },
+  { key: "about",       label: "About",         Icon: Info,        description: "Version + links" },
 ];
 
 export function SettingsPage() {
@@ -131,6 +133,7 @@ export function SettingsPage() {
             {active === "agents" && <AgentConfigSection />}
             {active === "printers" && <PrintersSubtab />}
             {active === "environment" && <EnvironmentSubtab />}
+            {active === "updates" && <UpdateCenterSubtab />}
             {active === "about" && <AboutSubtab />}
           </div>
         </Panel>

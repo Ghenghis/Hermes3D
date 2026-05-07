@@ -34,6 +34,7 @@ from hermes3d.api.routes import (
     settings,
     source_os,
     system,
+    update_center,
     voice,
 )
 from hermes3d.db.init import init_db
@@ -98,6 +99,7 @@ def create_gui_app() -> FastAPI:
         agent_updates,
         desktop_compat,
         desktop_updates,
+        update_center,
         autonomous,
         notifications,
         observe,
