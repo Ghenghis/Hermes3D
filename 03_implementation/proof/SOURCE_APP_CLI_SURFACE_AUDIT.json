@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-07T11:21:48.720578+00:00",
+  "generated_at_utc": "2026-05-07T12:35:00.706948+00:00",
   "next_actions": [
     "Keep verified agent CLIs exposed through bounded help/version/dry-run runners first.",
     "Promote candidate CLI surfaces only by adding a module_runtime_verifier row and proof gate.",
@@ -74,24 +74,6 @@
           "kind": "readme_cli_signal",
           "name": "docs",
           "source": "README.md"
-        },
-        {
-          "command": "## Usage",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
-          "command": "BlenderMCP collects anonymous usage data to help improve the tool. You can control telemetry in two ways:",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
-          "command": "- Without consent (unchecked): Only collects minimal anonymous usage data (tool names, success/failure, duration)",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
         }
       ],
       "verifier": "Blender MCP source import",
@@ -154,12 +136,6 @@
           "source": "README.md"
         },
         {
-          "command": "| Compress context / check usage | `/compress`, `/usage`, `/insights [--days N]` | `/compress`, `/usage`, `/insights [days]` |",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
           "command": "For the full command lists, see the [CLI guide](https://hermes-agent.nousresearch.com/docs/user-guide/cli) and the [Messaging Gateway guide](https://hermes-agent.nousresearch.com/docs/user-guide/messaging).",
           "kind": "readme_cli_signal",
           "name": "docs",
@@ -184,12 +160,12 @@
     {
       "agent_enabled": false,
       "agent_execution_tier": "source_reference_ready",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "source_reference_ready_not_cli",
       "display": "Kiln",
       "install_state": "installed",
       "launch_kind": "web_app_reference",
       "module_id": "kiln",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Use the existing proof tier; add a separate runner smoke before any write actions.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\orchestration\\Kiln",
       "proof_gate_version": "source-inventory-v1",
       "runtime_status": "ready",
@@ -573,78 +549,51 @@
     {
       "agent_enabled": false,
       "agent_execution_tier": "desktop_app_gap",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "no_local_cli_signal",
       "display": "FreeCAD",
       "install_state": "installed",
       "launch_kind": "desktop_app",
       "module_id": "freecad",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Keep agent actions disabled until local docs/source reveal a safe runner or the app is installed.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\FreeCAD",
       "proof_gate_version": "",
       "runtime_status": "source_ready",
       "section": "modelers",
-      "source_signals": [
-        {
-          "command": "Usage & Getting Help",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
-          "command": "general FreeCAD usage, Python scripting, and development.",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "source checkout",
       "verifier_kind": "desktop_app"
     },
     {
       "agent_enabled": false,
       "agent_execution_tier": "package_or_import_ready",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "package_or_import_ready_not_cli",
       "display": "Manifold",
       "install_state": "installed",
       "launch_kind": "cli_or_python_worker",
       "module_id": "manifold",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Use the existing proof tier; add a separate runner smoke before any write actions.",
       "path": "C:\\Python314\\python.exe",
       "proof_gate_version": "python-import-verifier-v1",
       "runtime_status": "ready",
       "section": "modelers",
-      "source_signals": [
-        {
-          "command": "CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "Manifold Python import",
       "verifier_kind": "python_import"
     },
     {
       "agent_enabled": false,
       "agent_execution_tier": "package_or_import_ready",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "package_or_import_ready_not_cli",
       "display": "MeshLab",
       "install_state": "installed",
       "launch_kind": "desktop_or_cli",
       "module_id": "meshlab",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Use the existing proof tier; add a separate runner smoke before any write actions.",
       "path": "C:\\Python314\\python.exe",
       "proof_gate_version": "python-import-verifier-v1",
       "runtime_status": "ready",
       "section": "modelers",
-      "source_signals": [
-        {
-          "command": "If it is a new feature that will change the behaviour or the usage of the software, use the `devel` branch.",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "MeshLab pymeshlab Python bridge",
       "verifier_kind": "python_import"
     },
@@ -667,12 +616,6 @@
           "kind": "readme_cli_signal",
           "name": "docs",
           "source": "README.md"
-        },
-        {
-          "command": "- [Forum](https://github.com/isl-org/Open3D/discussions): discussion on the usage of Open3D.",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
         }
       ],
       "verifier": "Open3D Python import",
@@ -692,12 +635,6 @@
       "runtime_status": "ready",
       "section": "modelers",
       "source_signals": [
-        {
-          "command": "We support building OpenSCAD headless for WebAssembly w/ Emscripten, using a premade Docker image built in [openscad/openscad-wasm](https://github.com/openscad/openscad-wasm) (which also has usage examples)",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
         {
           "command": "* Install [circleci-cli](https://circleci.com/docs/2.0/local-cli/) (you'll need an API key)",
           "kind": "readme_cli_signal",
@@ -777,24 +714,17 @@
     {
       "agent_enabled": false,
       "agent_execution_tier": "python_worker_gap",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "no_local_cli_signal",
       "display": "build123d",
       "install_state": "installed",
       "launch_kind": "python_worker",
       "module_id": "build123d",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Keep agent actions disabled until local docs/source reveal a safe runner or the app is installed.",
       "path": "C:\\Python314\\python.exe",
       "proof_gate_version": "python-import-verifier-v1",
       "runtime_status": "setup_required",
       "section": "modelers",
-      "source_signals": [
-        {
-          "command": "## Usage",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "build123d Python import",
       "verifier_kind": "python_import"
     },
@@ -932,24 +862,17 @@
     {
       "agent_enabled": false,
       "agent_execution_tier": "source_reference_ready",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "source_reference_ready_not_cli",
       "display": "truck",
       "install_state": "installed",
       "launch_kind": "rust_library_reference",
       "module_id": "truck",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Use the existing proof tier; add a separate runner smoke before any write actions.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\modelers\\Truck",
       "proof_gate_version": "source-inventory-v1",
       "runtime_status": "ready",
       "section": "modelers",
-      "source_signals": [
-        {
-          "command": "## Usage",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "Truck source inventory",
       "verifier_kind": "source_inventory"
     },
@@ -1602,33 +1525,20 @@
     },
     {
       "agent_enabled": false,
-      "agent_execution_tier": "cli_preferred_gap",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "agent_execution_tier": "source_reference_ready",
+      "cli_surface_status": "source_reference_ready_not_cli",
       "display": "Strec3D",
       "install_state": "installed",
-      "launch_kind": "cli_worker",
+      "launch_kind": "desktop_app",
       "module_id": "strec3d",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Use the existing proof tier; add a separate runner smoke before any write actions.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Strecs3D",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "source-inventory-v1",
+      "runtime_status": "ready",
       "section": "slicers",
-      "source_signals": [
-        {
-          "command": "## Usage",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
-          "command": "- A: The file size might be too large. Check memory usage and simplify the model if necessary.",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
-      "verifier": "source checkout",
-      "verifier_kind": "cli_worker"
+      "source_signals": [],
+      "verifier": "Strec3D source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
       "agent_enabled": false,
@@ -1854,19 +1764,7 @@
           "source": "README.md"
         },
         {
-          "command": "The detailed usage of `setup.sh` can be found by running `. ./setup.sh --help`.",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
           "command": "Usage: setup.sh [OPTIONS]",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        },
-        {
-          "command": "## \ud83d\ude80 Usage",
           "kind": "readme_cli_signal",
           "name": "docs",
           "source": "README.md"
@@ -1884,48 +1782,34 @@
     {
       "agent_enabled": false,
       "agent_execution_tier": "gpu_worker_gap",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "no_local_cli_signal",
       "display": "Tencent Hunyuan3D 2.1",
       "install_state": "installed",
       "launch_kind": "gpu_worker",
       "module_id": "hunyuan3d_2_1",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Keep agent actions disabled until local docs/source reveal a safe runner or the app is installed.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\Hunyuan3D-2.1",
       "proof_gate_version": "",
       "runtime_status": "source_ready",
       "section": "three_d_generation",
-      "source_signals": [
-        {
-          "command": "### Code Usage",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "source checkout",
       "verifier_kind": "gpu_worker"
     },
     {
       "agent_enabled": false,
       "agent_execution_tier": "gpu_worker_gap",
-      "cli_surface_status": "documentation_cli_signal_needs_verifier",
+      "cli_surface_status": "no_local_cli_signal",
       "display": "TripoSR",
       "install_state": "installed",
       "launch_kind": "gpu_worker",
       "module_id": "triposr",
-      "next_action": "Confirm the documented command in the local runtime and register a verifier.",
+      "next_action": "Keep agent actions disabled until local docs/source reveal a safe runner or the app is installed.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\TripoSR",
       "proof_gate_version": "",
       "runtime_status": "source_ready",
       "section": "three_d_generation",
-      "source_signals": [
-        {
-          "command": "For detailed usage of this script, use `python run.py --help`.",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
-        }
-      ],
+      "source_signals": [],
       "verifier": "source checkout",
       "verifier_kind": "gpu_worker"
     },
@@ -1966,12 +1850,6 @@
           "kind": "readme_cli_signal",
           "name": "docs",
           "source": "README.md"
-        },
-        {
-          "command": "## Usage",
-          "kind": "readme_cli_signal",
-          "name": "docs",
-          "source": "README.md"
         }
       ],
       "verifier": "3D Box Generator source inventory",
@@ -1991,32 +1869,26 @@
     ],
     "by_cli_surface_status": {
       "cli_candidate_needs_verifier": 7,
-      "documentation_cli_signal_needs_verifier": 20,
+      "documentation_cli_signal_needs_verifier": 11,
       "enabled_agent_cli": 7,
       "launcher_only_not_cli": 3,
-      "no_local_cli_signal": 6,
-      "package_or_import_ready_not_cli": 1,
+      "no_local_cli_signal": 10,
+      "package_or_import_ready_not_cli": 3,
       "service_api_ready_not_cli": 2,
       "service_or_setup_candidate_needs_verifier": 6,
-      "source_reference_ready_not_cli": 8
+      "source_reference_ready_not_cli": 11
     },
-    "candidate_needs_verifier": 33,
+    "candidate_needs_verifier": 24,
     "candidate_needs_verifier_modules": [
       "azure_speech_sdk_js",
       "blender_mcp_candidates",
-      "kiln",
       "manyfold",
       "open_filament_database",
       "cadquery",
-      "freecad",
-      "manifold",
-      "meshlab",
       "open3d",
       "solvespace",
-      "build123d",
       "numpy_stl",
       "trimesh",
-      "truck",
       "fdm_monster",
       "fluidd",
       "mainsail",
@@ -2026,17 +1898,14 @@
       "kirimoto_gridspace",
       "mattercontrol",
       "slic3r",
-      "strec3d",
       "superslicer",
       "comfyui",
       "comfyui_frontend",
       "comfyui_trellis_wrapper",
       "trellis",
-      "hunyuan3d_2_1",
-      "triposr",
       "box_stl_generator"
     ],
-    "no_local_cli_signal": 6
+    "no_local_cli_signal": 10
   },
   "target": {
     "rule": "Hermes Agents may use CLI/service runners only after a bounded local verifier proves the runtime. CLI hints in source docs are candidates, not enabled actions.",

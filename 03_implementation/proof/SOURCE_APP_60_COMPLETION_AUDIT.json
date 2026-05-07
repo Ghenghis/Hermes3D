@@ -16,32 +16,26 @@
       ],
       "by_cli_surface_status": {
         "cli_candidate_needs_verifier": 7,
-        "documentation_cli_signal_needs_verifier": 20,
+        "documentation_cli_signal_needs_verifier": 11,
         "enabled_agent_cli": 7,
         "launcher_only_not_cli": 3,
-        "no_local_cli_signal": 6,
-        "package_or_import_ready_not_cli": 1,
+        "no_local_cli_signal": 10,
+        "package_or_import_ready_not_cli": 3,
         "service_api_ready_not_cli": 2,
         "service_or_setup_candidate_needs_verifier": 6,
-        "source_reference_ready_not_cli": 8
+        "source_reference_ready_not_cli": 11
       },
-      "candidate_needs_verifier": 33,
+      "candidate_needs_verifier": 24,
       "candidate_needs_verifier_modules": [
         "azure_speech_sdk_js",
         "blender_mcp_candidates",
-        "kiln",
         "manyfold",
         "open_filament_database",
         "cadquery",
-        "freecad",
-        "manifold",
-        "meshlab",
         "open3d",
         "solvespace",
-        "build123d",
         "numpy_stl",
         "trimesh",
-        "truck",
         "fdm_monster",
         "fluidd",
         "mainsail",
@@ -51,34 +45,31 @@
         "kirimoto_gridspace",
         "mattercontrol",
         "slic3r",
-        "strec3d",
         "superslicer",
         "comfyui",
         "comfyui_frontend",
         "comfyui_trellis_wrapper",
         "trellis",
-        "hunyuan3d_2_1",
-        "triposr",
         "box_stl_generator"
       ],
-      "no_local_cli_signal": 6
+      "no_local_cli_signal": 10
     }
   },
   "completion": {
     "blocked_rows": 2,
-    "remaining_runner_gap": 22,
+    "remaining_runner_gap": 21,
     "runtime_ready_complete": false,
     "source_rows_complete": true,
     "status": "runner_gap",
     "unknown_launch_kind_rows": 0
   },
-  "generated_at_utc": "2026-05-07T11:22:11.736751+00:00",
+  "generated_at_utc": "2026-05-07T12:41:02.173431+00:00",
   "launch_kind_classification": {
     "by_launch_kind": {
       "catalog_reference": 1,
       "cli_or_python_worker": 1,
-      "cli_worker": 2,
-      "desktop_app": 8,
+      "cli_worker": 1,
+      "desktop_app": 9,
       "desktop_or_cli": 6,
       "firmware_source": 5,
       "gpu_worker": 3,
@@ -110,11 +101,11 @@
     "count": 60,
     "counts": {
       "blocked": 2,
-      "runner_not_registered": 22,
-      "runtime_ready": 31,
+      "runner_not_registered": 21,
+      "runtime_ready": 32,
       "runtime_repair_required": 5,
       "source_install_available": 0,
-      "source_ready": 22
+      "source_ready": 21
     },
     "execution_mode": "plan_only_until_safe_runner_registered",
     "registered_runtime_probe_ids": [
@@ -153,13 +144,14 @@
       "prusaslicer",
       "pymesh",
       "slic3r",
+      "strec3d",
       "superslicer",
       "trimesh",
       "truck"
     ],
     "registered_runtime_verifiers": {
-      "count": 38,
-      "enabled_count": 38,
+      "count": 39,
+      "enabled_count": 39,
       "registered_ids": [
         "awesome_3d_printing",
         "awesome_extruders",
@@ -196,6 +188,7 @@
         "prusaslicer",
         "pymesh",
         "slic3r",
+        "strec3d",
         "superslicer",
         "trimesh",
         "truck"
@@ -204,8 +197,8 @@
     },
     "runner_status_counts": {
       "blocked": 2,
-      "runner_not_registered": 22,
-      "runtime_ready": 31,
+      "runner_not_registered": 21,
+      "runtime_ready": 32,
       "runtime_repair_required": 5
     },
     "source": "http://127.0.0.1:8765/api/modules/runtime/setup-queue"

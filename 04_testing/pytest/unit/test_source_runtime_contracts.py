@@ -172,6 +172,38 @@ def test_setup_required_python_import_stays_in_repair_queue(monkeypatch) -> None
     assert summary["by_runner_status"]["runtime_repair_required"] == 1
 
 
+def test_source_inventory_contract_is_reference_only_not_executable(monkeypatch) -> None:
+    def _ready_inventory(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "ready",
+            "kind": "source_inventory",
+            "verifier": "Strec3D source inventory",
+            "proof_gate_version": "source-inventory-v1",
+            "path": "G:/Github/Hermes3D-OS/source-lab/sources/slicers/Strecs3D",
+            "executed": False,
+            "return_code": 0,
+            "capabilities": ["structural_infill_reference"],
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _ready_inventory)
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": "strec3d",
+            "display_name": "Strec3D",
+            "section": "slicers",
+            "launch_kind": "desktop_app",
+            "install_state": "installed",
+            "local_path": "G:/Github/Hermes3D-OS/source-lab/sources/slicers/Strecs3D",
+        }
+    )
+
+    assert contract["runtime_status"] == "ready"
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "source_reference_only"
+    assert contract["required_verifier_family"] == "reference_parser_or_adapter_contract"
+    assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
+
+
 def test_runner_contract_routes_are_registered() -> None:
     from fastapi import FastAPI
 
