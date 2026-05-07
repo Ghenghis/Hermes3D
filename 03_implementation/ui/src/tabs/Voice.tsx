@@ -1,8 +1,8 @@
-import { Play, RefreshCw, Save, Settings, Volume2 } from "lucide-react";
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { ChevronRight, Clock, Mic, MicOff, Pause, Play, RefreshCw, Save, Settings, Shield, Square, Volume2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { adapters } from "../api/adapters";
 import { ResizablePane } from "../components/layout/ResizablePane";
-import type { AzureVoice, VoiceAgent, VoiceCatalog, VoiceProvider } from "../types/voice";
+import type { AzureVoice, VoiceAgent, VoiceCatalog, VoiceProofEvent, VoiceProvider, VoiceTranscript } from "../types/voice";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -29,6 +29,8 @@ const VOICE_LOCALES = [
 
 const DEFAULT_SAMPLE = "Hello. I'm your Hermes3D coding and print assistant. How can I help today?";
 
+type TabName = "browser" | "transcripts" | "proof";
+
 export function VoiceTab() {
   const [agents, setAgents] = useState<VoiceAgent[]>([]);
   const [providers, setProviders] = useState<VoiceProvider[]>([]);
@@ -43,6 +45,24 @@ export function VoiceTab() {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabName>("browser");
+
+  // Transcript history state
+  const [transcripts, setTranscripts] = useState<VoiceTranscript[]>([]);
+  const [transcriptsLoading, setTranscriptsLoading] = useState(false);
+  const [transcriptsError, setTranscriptsError] = useState<string | null>(null);
+  const [selectedTranscript, setSelectedTranscript] = useState<VoiceTranscript | null>(null);
+
+  // Playback state (backend-proxied audio only)
+  const [playbackState, setPlaybackState] = useState<"idle" | "loading" | "playing" | "paused">("idle");
+  const [playbackRecordingId, setPlaybackRecordingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Proof review state
+  const [proofEvents, setProofEvents] = useState<VoiceProofEvent[]>([]);
+  const [proofLoading, setProofLoading] = useState(false);
+  const [proofError, setProofError] = useState<string | null>(null);
+  const [expandedProofId, setExpandedProofId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadAgents(setAgents, setSelectedAgentId, setSelectedVoiceId);
@@ -52,6 +72,15 @@ export function VoiceTab() {
   useEffect(() => {
     void loadCatalog(locale, setCatalog, setSelectedVoiceId, setMessage);
   }, [locale]);
+
+  useEffect(() => {
+    if (activeTab === "transcripts") {
+      void loadTranscripts();
+    } else if (activeTab === "proof") {
+      void loadProofEvents();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const selectedAgent = agents.find((agent) => agent.id === selectedAgentId) ?? agents[0] ?? null;
   const voices = catalog?.voices ?? [];
@@ -117,6 +146,82 @@ export function VoiceTab() {
     }
   };
 
+  const loadTranscripts = async () => {
+    setTranscriptsLoading(true);
+    setTranscriptsError(null);
+    try {
+      const items = await adapters.getVoiceTranscripts(50);
+      setTranscripts(items);
+    } catch (error) {
+      setTranscriptsError(errorMessage(error));
+    } finally {
+      setTranscriptsLoading(false);
+    }
+  };
+
+  const loadProofEvents = async () => {
+    setProofLoading(true);
+    setProofError(null);
+    try {
+      const items = await adapters.getVoiceProofEvents(100);
+      setProofEvents(items);
+    } catch (error) {
+      setProofError(errorMessage(error));
+    } finally {
+      setProofLoading(false);
+    }
+  };
+
+  const playRecording = (recordingId: string) => {
+    if (playbackRecordingId === recordingId && playbackState === "playing") {
+      // pause current
+      audioRef.current?.pause();
+      setPlaybackState("paused");
+      return;
+    }
+    if (playbackRecordingId === recordingId && playbackState === "paused") {
+      // resume
+      void audioRef.current?.play().catch(() => undefined);
+      setPlaybackState("playing");
+      return;
+    }
+    // stop any existing
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    setPlaybackRecordingId(recordingId);
+    setPlaybackState("loading");
+    const url = adapters.getVoiceRecordingUrl(recordingId);
+    const audio = new Audio(url);
+    audioRef.current = audio;
+    audio.oncanplaythrough = () => {
+      setPlaybackState("playing");
+      void audio.play().catch(() => {
+        setPlaybackState("idle");
+      });
+    };
+    audio.onended = () => {
+      setPlaybackState("idle");
+      setPlaybackRecordingId(null);
+    };
+    audio.onerror = () => {
+      setPlaybackState("idle");
+      setPlaybackRecordingId(null);
+    };
+  };
+
+  const stopPlayback = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = "";
+      audioRef.current = null;
+    }
+    setPlaybackState("idle");
+    setPlaybackRecordingId(null);
+  };
+
   return (
     <div data-testid="voice-root" className="flex h-[calc(100vh-5rem)] min-h-0 min-w-0 flex-col gap-2.5 lg:flex-row">
       <ResizablePane
@@ -176,111 +281,401 @@ export function VoiceTab() {
         </div>
       </ResizablePane>
 
-      <section className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] rounded-card border border-border bg-surface">
-        <header className="grid gap-2 border-b border-border p-3 lg:grid-cols-[1fr_auto]">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-[13px] font-semibold text-fg">Voice Browser & Fine-Tuning</h2>
-              <span className="rounded-chip border border-border bg-bg px-2 py-0.5 text-[10px] text-muted">
-                {catalog ? `${catalog.count} live voices` : "loading voices"}
-              </span>
-              {selectedVoice && (
-                <span className="rounded-chip border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-0.5 text-[10px] text-accent-cyan">
-                  {selectedVoice.displayName} · {selectedVoice.locale}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-[11px] text-muted">
-              Catalog rows come from Azure Speech through the Python backend. The frontend never receives the Speech key.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              className="rounded border border-border bg-bg px-2 py-1 text-xs text-fg"
-              value={locale}
-              onChange={(event) => setLocale(event.target.value)}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2.5">
+        {/* Tab bar */}
+        <nav className="flex gap-1 rounded-card border border-border bg-surface px-2 py-1.5">
+          {(
+            [
+              { id: "browser", label: "Voice Browser", icon: <Volume2 size={13} /> },
+              { id: "transcripts", label: "Transcript History", icon: <Mic size={13} /> },
+              { id: "proof", label: "Proof Review", icon: <Shield size={13} /> },
+            ] as { id: TabName; label: string; icon: React.ReactNode }[]
+          ).map(({ id, label, icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={[
+                "inline-flex items-center gap-1.5 rounded px-3 py-1 text-xs font-medium transition-colors",
+                activeTab === id
+                  ? "bg-accent-cyan/20 text-accent-cyan"
+                  : "text-muted hover:text-fg",
+              ].join(" ")}
             >
-              {VOICE_LOCALES.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-            <input
-              className="w-44 rounded border border-border bg-bg px-2 py-1 text-xs text-fg"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search voices"
-            />
-          </div>
-        </header>
+              {icon}
+              {label}
+            </button>
+          ))}
+        </nav>
 
-        <div className="grid min-h-0 gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
-          <div className="min-h-0 overflow-auto rounded border border-border bg-bg/40">
-            {visibleVoices.length > 0 ? (
-              visibleVoices.map((voice) => (
-                <VoiceRow
-                  key={voice.id}
-                  voice={voice}
-                  selected={voice.id === selectedVoiceId}
-                  onSelect={() => setSelectedVoiceId(voice.id)}
-                  onPreview={() => {
-                    setSelectedVoiceId(voice.id);
-                    void previewVoice(voice.id);
-                  }}
-                  previewEnabled={providerReady}
-                />
-              ))
-            ) : (
-              <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-1 p-4 text-center text-xs text-muted">
-                <Volume2 size={22} />
-                <div className="font-semibold text-fg">{catalog?.reason ?? "No Azure voices returned for this filter."}</div>
-                <div>Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in `G:\\private\\.env` to load the live Azure catalog.</div>
+        {/* Voice Browser tab */}
+        {activeTab === "browser" && (
+          <section className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] rounded-card border border-border bg-surface">
+            <header className="grid gap-2 border-b border-border p-3 lg:grid-cols-[1fr_auto]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-[13px] font-semibold text-fg">Voice Browser & Fine-Tuning</h2>
+                  <span className="rounded-chip border border-border bg-bg px-2 py-0.5 text-[10px] text-muted">
+                    {catalog ? `${catalog.count} live voices` : "loading voices"}
+                  </span>
+                  {selectedVoice && (
+                    <span className="rounded-chip border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-0.5 text-[10px] text-accent-cyan">
+                      {selectedVoice.displayName} · {selectedVoice.locale}
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-muted">
+                  Catalog rows come from Azure Speech through the Python backend. The frontend never receives the Speech key.
+                </p>
               </div>
-            )}
-          </div>
+              <div className="flex items-center gap-2">
+                <select
+                  className="rounded border border-border bg-bg px-2 py-1 text-xs text-fg"
+                  value={locale}
+                  onChange={(event) => setLocale(event.target.value)}
+                >
+                  {VOICE_LOCALES.map((item) => (
+                    <option key={item.value} value={item.value}>{item.label}</option>
+                  ))}
+                </select>
+                <input
+                  className="w-44 rounded border border-border bg-bg px-2 py-1 text-xs text-fg"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Search voices"
+                />
+              </div>
+            </header>
 
-          <div className="flex min-h-0 flex-col gap-2 overflow-auto rounded border border-border bg-bg/40 p-3 text-xs">
-            <div className="flex items-center gap-2 font-semibold text-fg">
-              <Settings size={14} className="text-accent-cyan" />
-              Fine-Tuning
+            <div className="grid min-h-0 gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="min-h-0 overflow-auto rounded border border-border bg-bg/40">
+                {visibleVoices.length > 0 ? (
+                  visibleVoices.map((voice) => (
+                    <VoiceRow
+                      key={voice.id}
+                      voice={voice}
+                      selected={voice.id === selectedVoiceId}
+                      onSelect={() => setSelectedVoiceId(voice.id)}
+                      onPreview={() => {
+                        setSelectedVoiceId(voice.id);
+                        void previewVoice(voice.id);
+                      }}
+                      previewEnabled={providerReady}
+                    />
+                  ))
+                ) : (
+                  <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-1 p-4 text-center text-xs text-muted">
+                    <Volume2 size={22} />
+                    <div className="font-semibold text-fg">{catalog?.reason ?? "No Azure voices returned for this filter."}</div>
+                    <div>Set `AZURE_SPEECH_KEY` and `AZURE_SPEECH_REGION` in `G:\\private\\.env` to load the live Azure catalog.</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex min-h-0 flex-col gap-2 overflow-auto rounded border border-border bg-bg/40 p-3 text-xs">
+                <div className="flex items-center gap-2 font-semibold text-fg">
+                  <Settings size={14} className="text-accent-cyan" />
+                  Fine-Tuning
+                </div>
+                <label className="grid gap-1">
+                  <span className="text-muted">Sample text</span>
+                  <textarea
+                    className="min-h-24 rounded border border-border bg-bg p-2 text-fg"
+                    value={previewText}
+                    onChange={(event) => setPreviewText(event.target.value)}
+                  />
+                </label>
+                <RangeControl label={`Rate: ${rate.toFixed(1)}x`} min={0.5} max={2} step={0.1} value={rate} onChange={setRate} />
+                <RangeControl label={`Pitch: ${pitch}%`} min={-50} max={50} step={1} value={pitch} onChange={setPitch} />
+                <div className="mt-auto grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={!selectedAgent || selectedVoiceId === "" || saving}
+                    onClick={() => void saveAssignment()}
+                    className="inline-flex items-center justify-center gap-1 rounded border border-border px-2 py-1.5 text-fg hover:border-accent-blue disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Save size={13} />
+                    {saving ? "Saving" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!providerReady || !selectedAgent || selectedVoiceId === "" || previewing}
+                    title={providerReady ? "Play real Azure TTS preview" : catalog?.reason ?? "Azure Speech is not configured."}
+                    onClick={() => void previewVoice()}
+                    className="inline-flex items-center justify-center gap-1 rounded bg-accent-cyan px-2 py-1.5 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Play size={13} />
+                    {previewing ? "Loading" : "Preview"}
+                  </button>
+                </div>
+                {message && <div className="rounded border border-border bg-surface p-2 text-[11px] text-muted">{message}</div>}
+              </div>
             </div>
-            <label className="grid gap-1">
-              <span className="text-muted">Sample text</span>
-              <textarea
-                className="min-h-24 rounded border border-border bg-bg p-2 text-fg"
-                value={previewText}
-                onChange={(event) => setPreviewText(event.target.value)}
-              />
-            </label>
-            <RangeControl label={`Rate: ${rate.toFixed(1)}x`} min={0.5} max={2} step={0.1} value={rate} onChange={setRate} />
-            <RangeControl label={`Pitch: ${pitch}%`} min={-50} max={50} step={1} value={pitch} onChange={setPitch} />
-            <div className="mt-auto grid grid-cols-2 gap-2">
+          </section>
+        )}
+
+        {/* Transcript History tab */}
+        {activeTab === "transcripts" && (
+          <section
+            data-testid="voice-transcript-history"
+            className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] rounded-card border border-border bg-surface"
+          >
+            <header className="flex items-center justify-between border-b border-border p-3">
+              <div>
+                <h2 className="text-[13px] font-semibold text-fg">Transcript History</h2>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  STT interactions stored by the backend, newest first. No audio device access from the frontend.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Playback controls — audio served from backend only */}
+                {playbackState !== "idle" && (
+                  <div className="flex items-center gap-1 rounded border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-1">
+                    <span className="text-[10px] font-mono text-accent-cyan truncate max-w-24">
+                      {playbackState === "loading" ? "buffering…" : playbackState}
+                    </span>
+                    <button
+                      type="button"
+                      title={playbackState === "playing" ? "Pause" : "Resume"}
+                      onClick={() => playbackRecordingId && playRecording(playbackRecordingId)}
+                      className="text-accent-cyan hover:text-fg"
+                    >
+                      {playbackState === "playing" ? <Pause size={13} /> : <Play size={13} />}
+                    </button>
+                    <button
+                      type="button"
+                      title="Stop playback"
+                      onClick={stopPlayback}
+                      className="text-accent-amber hover:text-fg"
+                    >
+                      <Square size={13} />
+                    </button>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  title="Refresh transcript history"
+                  onClick={() => void loadTranscripts()}
+                  disabled={transcriptsLoading}
+                  className="rounded border border-border p-1.5 text-muted hover:text-fg disabled:opacity-50"
+                >
+                  <RefreshCw size={14} className={transcriptsLoading ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </header>
+
+            <div className="grid min-h-0 gap-2 p-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
+              {/* Left: transcript list */}
+              <div className="min-h-0 overflow-auto rounded border border-border bg-bg/40">
+                {transcriptsError && (
+                  <div className="flex h-20 items-center justify-center p-4 text-center text-xs text-accent-red">
+                    <MicOff size={14} className="mr-2 shrink-0" />
+                    {transcriptsError}
+                  </div>
+                )}
+                {!transcriptsError && transcripts.length === 0 && !transcriptsLoading && (
+                  <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 p-4 text-center text-xs text-muted">
+                    <Clock size={22} />
+                    <div className="font-semibold text-fg">No transcripts yet</div>
+                    <div>Voice STT interactions will appear here once the backend has processed audio.</div>
+                  </div>
+                )}
+                {transcripts.map((tr) => (
+                  <button
+                    key={tr.id}
+                    type="button"
+                    onClick={() => setSelectedTranscript(tr)}
+                    className={[
+                      "w-full border-b border-border/60 px-3 py-2 text-left last:border-0 hover:bg-surface2/60",
+                      selectedTranscript?.id === tr.id ? "bg-accent-cyan/10" : "",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={[
+                        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold",
+                        tr.status === "ready" ? "bg-accent-green/15 text-accent-green" : "bg-accent-amber/15 text-accent-amber",
+                      ].join(" ")}>
+                        {tr.status === "ready" ? <Mic size={10} /> : <MicOff size={10} />}
+                        {tr.status}
+                      </span>
+                      <span className="font-mono text-[10px] text-muted">{formatTs(tr.tsUtc)}</span>
+                    </div>
+                    <p className="mt-1 line-clamp-2 text-[11px] text-fg">
+                      {tr.transcript || <span className="text-muted italic">(no transcript text)</span>}
+                    </p>
+                    <div className="mt-0.5 flex gap-2 text-[10px] text-muted">
+                      {tr.locale && <span>{tr.locale}</span>}
+                      {tr.phraseCount !== undefined && <span>{tr.phraseCount} phrase{tr.phraseCount !== 1 ? "s" : ""}</span>}
+                      {tr.bytes !== undefined && <span>{formatBytes(tr.bytes)}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Right: detail + playback controls */}
+              <div className="flex min-h-0 flex-col gap-2 overflow-auto rounded border border-border bg-bg/40 p-3 text-xs">
+                {selectedTranscript ? (
+                  <>
+                    <div className="flex items-center gap-2 font-semibold text-fg">
+                      <Mic size={14} className="text-accent-cyan" />
+                      Transcript Detail
+                    </div>
+                    <div className="grid gap-1 text-[11px]">
+                      <Row label="ID" value={selectedTranscript.id} mono />
+                      <Row label="Status" value={selectedTranscript.status} />
+                      <Row label="Locale" value={selectedTranscript.locale || "—"} />
+                      <Row label="Provider" value={selectedTranscript.provider || "—"} />
+                      {selectedTranscript.phraseCount !== undefined && (
+                        <Row label="Phrases" value={String(selectedTranscript.phraseCount)} />
+                      )}
+                      {selectedTranscript.bytes !== undefined && (
+                        <Row label="Audio size" value={formatBytes(selectedTranscript.bytes)} />
+                      )}
+                      <Row label="Timestamp" value={selectedTranscript.tsUtc} />
+                      <Row label="Proof event" value={selectedTranscript.proofEventId} mono />
+                    </div>
+                    {selectedTranscript.transcript && (
+                      <div className="mt-1 rounded border border-border bg-bg p-2">
+                        <div className="mb-1 text-[10px] font-semibold text-muted uppercase tracking-wide">Transcript</div>
+                        <p className="text-[12px] text-fg leading-relaxed whitespace-pre-wrap">{selectedTranscript.transcript}</p>
+                      </div>
+                    )}
+                    {/* Agent voice playback — backend-proxied, no direct device access */}
+                    <div className="mt-auto rounded border border-border bg-surface p-2">
+                      <div className="mb-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Agent Voice Playback</div>
+                      <p className="mb-2 text-[10px] text-muted">
+                        Audio is fetched from the local backend. No API keys are exposed to the browser.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={playbackState === "loading"}
+                          onClick={() => playRecording(selectedTranscript.proofEventId)}
+                          className={[
+                            "inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium",
+                            playbackState === "playing" && playbackRecordingId === selectedTranscript.proofEventId
+                              ? "bg-accent-amber/20 text-accent-amber border border-accent-amber/40"
+                              : "bg-accent-cyan/90 text-bg disabled:opacity-50 disabled:cursor-not-allowed",
+                          ].join(" ")}
+                        >
+                          {playbackState === "loading" && playbackRecordingId === selectedTranscript.proofEventId ? (
+                            <><RefreshCw size={12} className="animate-spin" /> Buffering</>
+                          ) : playbackState === "playing" && playbackRecordingId === selectedTranscript.proofEventId ? (
+                            <><Pause size={12} /> Pause</>
+                          ) : playbackState === "paused" && playbackRecordingId === selectedTranscript.proofEventId ? (
+                            <><Play size={12} /> Resume</>
+                          ) : (
+                            <><Play size={12} /> Play Recording</>
+                          )}
+                        </button>
+                        {playbackRecordingId === selectedTranscript.proofEventId && playbackState !== "idle" && (
+                          <button
+                            type="button"
+                            onClick={stopPlayback}
+                            className="inline-flex items-center justify-center gap-1.5 rounded border border-border px-2 py-1.5 text-xs text-muted hover:text-fg"
+                          >
+                            <Square size={12} /> Stop
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-center text-muted">
+                    <div>
+                      <ChevronRight size={20} className="mx-auto mb-1 opacity-40" />
+                      <p>Select a transcript to view detail and play its recording.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* Proof Review tab */}
+        {activeTab === "proof" && (
+          <section
+            data-testid="voice-proof-review"
+            className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] rounded-card border border-border bg-surface"
+          >
+            <header className="flex items-center justify-between border-b border-border p-3">
+              <div>
+                <h2 className="text-[13px] font-semibold text-fg">Voice Proof Review</h2>
+                <p className="mt-0.5 text-[11px] text-muted">
+                  Immutable proof events emitted by the voice runtime. TTS and STT keys stay in the backend; the frontend only receives event metadata.
+                </p>
+              </div>
               <button
                 type="button"
-                disabled={!selectedAgent || selectedVoiceId === "" || saving}
-                onClick={() => void saveAssignment()}
-                className="inline-flex items-center justify-center gap-1 rounded border border-border px-2 py-1.5 text-fg hover:border-accent-blue disabled:cursor-not-allowed disabled:opacity-50"
+                title="Refresh proof events"
+                onClick={() => void loadProofEvents()}
+                disabled={proofLoading}
+                className="rounded border border-border p-1.5 text-muted hover:text-fg disabled:opacity-50"
               >
-                <Save size={13} />
-                {saving ? "Saving" : "Save"}
+                <RefreshCw size={14} className={proofLoading ? "animate-spin" : ""} />
               </button>
-              <button
-                type="button"
-                disabled={!providerReady || !selectedAgent || selectedVoiceId === "" || previewing}
-                title={providerReady ? "Play real Azure TTS preview" : catalog?.reason ?? "Azure Speech is not configured."}
-                onClick={() => void previewVoice()}
-                className="inline-flex items-center justify-center gap-1 rounded bg-accent-cyan px-2 py-1.5 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Play size={13} />
-                {previewing ? "Loading" : "Preview"}
-              </button>
+            </header>
+
+            <div className="min-h-0 overflow-auto p-3">
+              {proofError && (
+                <div className="mb-3 rounded border border-accent-red/40 bg-accent-red/10 p-3 text-xs text-accent-red">
+                  {proofError}
+                </div>
+              )}
+              {!proofError && proofEvents.length === 0 && !proofLoading && (
+                <div className="flex min-h-[180px] flex-col items-center justify-center gap-2 text-center text-xs text-muted">
+                  <Shield size={22} />
+                  <div className="font-semibold text-fg">No voice proof events yet</div>
+                  <div>Events are recorded each time TTS or STT is invoked through the backend.</div>
+                </div>
+              )}
+              <div className="flex flex-col gap-1">
+                {proofEvents.map((ev) => (
+                  <div
+                    key={ev.id}
+                    className="rounded border border-border bg-bg/40"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedProofId(expandedProofId === ev.id ? null : ev.id)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left"
+                    >
+                      <ProofEventBadge eventType={ev.eventType} status={ev.status} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[11px] text-fg">{ev.eventType}</span>
+                          <span className="text-[10px] text-muted">{formatTs(ev.tsUtc)}</span>
+                        </div>
+                        <p className="truncate text-[11px] text-muted">{ev.summary}</p>
+                      </div>
+                      <ChevronRight
+                        size={13}
+                        className={["text-muted transition-transform", expandedProofId === ev.id ? "rotate-90" : ""].join(" ")}
+                      />
+                    </button>
+                    {expandedProofId === ev.id && (
+                      <div className="border-t border-border px-3 pb-2 pt-2">
+                        <div className="grid gap-1 text-[11px]">
+                          <Row label="Event ID" value={ev.id} mono />
+                          <Row label="Source agent" value={ev.sourceAgent || "voice-runtime"} />
+                          <Row label="Status" value={ev.status} />
+                          <Row label="Timestamp" value={ev.tsUtc} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-            {message && <div className="rounded border border-border bg-surface p-2 text-[11px] text-muted">{message}</div>}
-          </div>
-        </div>
-      </section>
+          </section>
+        )}
+      </div>
     </div>
   );
 }
+
+// ── helper components ────────────────────────────────────────────────────────
 
 async function loadAgents(
   setAgents: (agents: VoiceAgent[]) => void,
@@ -419,6 +814,26 @@ function RangeControl({
   );
 }
 
+function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex gap-2">
+      <span className="w-24 shrink-0 text-muted">{label}</span>
+      <span className={["break-all text-fg", mono ? "font-mono" : ""].join(" ")}>{value}</span>
+    </div>
+  );
+}
+
+function ProofEventBadge({ eventType, status }: { eventType: string; status: string }) {
+  const isBlocked = eventType.includes("blocked") || eventType.includes("failed");
+  const isOk = status === "ready" || eventType.includes("synthesized") || eventType.includes("transcribed") || eventType.includes("saved");
+  const color = isBlocked ? "bg-accent-red/15 text-accent-red" : isOk ? "bg-accent-green/15 text-accent-green" : "bg-accent-amber/15 text-accent-amber";
+  return (
+    <span className={["inline-flex shrink-0 items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-semibold", color].join(" ")}>
+      {isBlocked ? "FAIL" : isOk ? "OK" : "WARN"}
+    </span>
+  );
+}
+
 function filterVoices(voices: AzureVoice[], query: string): AzureVoice[] {
   const needle = query.trim().toLowerCase();
   if (!needle) {
@@ -442,4 +857,19 @@ function isVoiceProvider(value: unknown): value is VoiceProvider {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function formatTs(ts: string): string {
+  if (!ts) return "—";
+  try {
+    return new Date(ts).toLocaleString(undefined, { dateStyle: "short", timeStyle: "medium" });
+  } catch {
+    return ts;
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }

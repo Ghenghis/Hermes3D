@@ -51,3 +51,26 @@ export interface VoicePreviewResult {
   bytes?: number;
   proofEventId?: string;
 }
+
+export interface VoiceTranscript {
+  id: string;
+  eventType: string;
+  status: string;
+  locale: string;
+  transcript: string;
+  transcriptSha256?: string;
+  phraseCount?: number;
+  bytes?: number;
+  provider: string;
+  tsUtc: string;
+  proofEventId: string;
+}
+
+export interface VoiceProofEvent {
+  id: string;
+  eventType: string;
+  sourceAgent: string;
+  status: string;
+  tsUtc: string;
+  summary: string;
+}

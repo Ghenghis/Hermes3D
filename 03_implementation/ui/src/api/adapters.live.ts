@@ -36,7 +36,7 @@ import type { RoadmapItem, RoadmapTabCompletion } from "../types/roadmap";
 import type { AppSettings } from "../types/settings";
 import type { SourceModuleRuntimeSetupQueue, SourceModuleUpdateReadiness, SourceOSModule } from "../types/source-os";
 import type { ToolchainStatus } from "../types/toolchain";
-import type { AzureVoice, VoiceAgent, VoiceCatalog, VoicePreviewResult } from "../types/voice";
+import type { AzureVoice, VoiceAgent, VoiceCatalog, VoicePreviewResult, VoiceTranscript, VoiceProofEvent } from "../types/voice";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -609,6 +609,23 @@ export async function previewVoiceLive(
       voice,
     };
   }
+}
+
+export function getVoiceTranscriptsLive(limit = 50): Promise<VoiceTranscript[]> {
+  return fetchArray<unknown>(`/api/voice/transcripts?limit=${limit}`).then((items) =>
+    items.map(parseVoiceTranscript).filter(isPresent),
+  );
+}
+
+export function getVoiceProofEventsLive(limit = 100): Promise<VoiceProofEvent[]> {
+  return fetchArray<unknown>(`/api/voice/proof-events?limit=${limit}`).then((items) =>
+    items.map(parseVoiceProofEvent).filter(isPresent),
+  );
+}
+
+/** Returns the URL to stream a voice recording from the backend (no audio key in the URL). */
+export function getVoiceRecordingUrlLive(recordingId: string): string {
+  return `${LIVE_BASE_URL}/api/voice/recordings/${encodeURIComponent(recordingId)}`;
 }
 
 export function getPluginsLive(): Promise<Plugin[]> {
@@ -1562,6 +1579,47 @@ function normalizeVoicePreviewStatus(value: unknown): VoicePreviewResult["status
     return value;
   }
   return "invalid_response";
+}
+
+function parseVoiceTranscript(value: unknown): VoiceTranscript | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const id = isString(value.id) ? value.id : isString(value.proof_event_id) ? value.proof_event_id : "";
+  if (id === "") {
+    return null;
+  }
+  return {
+    id,
+    eventType: isString(value.event_type) ? value.event_type : "voice.stt.transcribed",
+    status: isString(value.status) ? value.status : "unknown",
+    locale: isString(value.locale) ? value.locale : "",
+    transcript: isString(value.transcript) ? value.transcript : "",
+    transcriptSha256: isString(value.transcript_sha256) ? value.transcript_sha256 : undefined,
+    phraseCount: isNumber(value.phrase_count) ? value.phrase_count : undefined,
+    bytes: isNumber(value.bytes) ? value.bytes : undefined,
+    provider: isString(value.provider) ? value.provider : "",
+    tsUtc: isString(value.ts_utc) ? value.ts_utc : "",
+    proofEventId: isString(value.proof_event_id) ? value.proof_event_id : id,
+  };
+}
+
+function parseVoiceProofEvent(value: unknown): VoiceProofEvent | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const id = isString(value.id) ? value.id : "";
+  if (id === "") {
+    return null;
+  }
+  return {
+    id,
+    eventType: isString(value.event_type) ? value.event_type : "",
+    sourceAgent: isString(value.source_agent) ? value.source_agent : "",
+    status: isString(value.status) ? value.status : "unknown",
+    tsUtc: isString(value.ts_utc) ? value.ts_utc : "",
+    summary: isString(value.summary) ? value.summary : "",
+  };
 }
 
 function parseAgentHealth(value: unknown): AgentHealthResult | null {

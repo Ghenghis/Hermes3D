@@ -199,6 +199,129 @@ async def speech_to_text(request: Request) -> dict:
     }
 
 
+@router.get("/api/voice/transcripts")
+def voice_transcripts(limit: int = 50, offset: int = 0) -> list[dict]:
+    """Return STT transcript history, newest first."""
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    raw = rows(
+        """
+        SELECT id, event_type, source_agent, payload, created_at
+        FROM proof_events
+        WHERE event_type IN ('voice.stt.transcribed', 'voice.stt.failed', 'voice.stt.blocked')
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    )
+    result = []
+    for row in raw:
+        try:
+            payload = json.loads(row.get("payload") or "{}")
+        except (ValueError, TypeError):
+            payload = {}
+        result.append({
+            "id": row.get("id", ""),
+            "event_type": row.get("event_type", ""),
+            "status": payload.get("status", "unknown"),
+            "locale": payload.get("locale", ""),
+            "transcript": payload.get("transcript", ""),
+            "transcript_sha256": payload.get("transcript_sha256"),
+            "phrase_count": payload.get("phrase_count"),
+            "bytes": payload.get("bytes"),
+            "provider": payload.get("provider", ""),
+            "ts_utc": payload.get("ts_utc") or row.get("created_at", ""),
+            "proof_event_id": row.get("id", ""),
+        })
+    return result
+
+
+@router.get("/api/voice/recordings/{recording_id}")
+def voice_recording(recording_id: str):
+    """
+    Serve a stored voice recording by ID.
+
+    Recordings are stored as rows in proof_events with event_type
+    'voice.tts.synthesized' and base64-encoded audio in the payload.
+    The frontend never receives audio device handles — audio is served
+    from the backend buffer only.
+    """
+    from fastapi.responses import Response as FastAPIResponse
+    raw = rows(
+        "SELECT payload FROM proof_events WHERE id = ? AND event_type = 'voice.tts.synthesized'",
+        (recording_id,),
+    )
+    if not raw:
+        raise HTTPException(status_code=404, detail="Recording not found.")
+    try:
+        payload = json.loads(raw[0].get("payload") or "{}")
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=500, detail="Recording payload is corrupt.")
+    audio_b64 = payload.get("audio_base64")
+    if not audio_b64:
+        raise HTTPException(status_code=404, detail="Recording has no audio data.")
+    try:
+        audio_bytes = base64.b64decode(audio_b64)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Recording audio data is not valid base64.")
+    output_format = payload.get("output_format", DEFAULT_OUTPUT_FORMAT)
+    mime = "audio/mpeg" if "mp3" in output_format or "mpeg" in output_format else "audio/wav"
+    return FastAPIResponse(content=audio_bytes, media_type=mime, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/voice/proof-events")
+def voice_proof_events(limit: int = 100, offset: int = 0) -> list[dict]:
+    """Return recent voice proof events for the proof review panel."""
+    limit = max(1, min(limit, 500))
+    offset = max(0, offset)
+    raw = rows(
+        """
+        SELECT id, event_type, source_agent, payload, created_at
+        FROM proof_events
+        WHERE event_type LIKE 'voice.%'
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    )
+    result = []
+    for row in raw:
+        try:
+            payload = json.loads(row.get("payload") or "{}")
+        except (ValueError, TypeError):
+            payload = {}
+        result.append({
+            "id": row.get("id", ""),
+            "event_type": row.get("event_type", ""),
+            "source_agent": row.get("source_agent", ""),
+            "status": payload.get("status", "unknown"),
+            "ts_utc": payload.get("ts_utc") or row.get("created_at", ""),
+            "summary": _proof_event_summary(row.get("event_type", ""), payload),
+        })
+    return result
+
+
+def _proof_event_summary(event_type: str, payload: dict) -> str:
+    status = payload.get("status", "")
+    if event_type == "voice.tts.synthesized":
+        return f"TTS: {payload.get('bytes', 0)} bytes, voice={payload.get('voice', '')}"
+    if event_type == "voice.tts.blocked":
+        return f"TTS blocked: {status}"
+    if event_type == "voice.tts.failed":
+        return f"TTS failed: {status} HTTP={payload.get('http_status', '')}"
+    if event_type == "voice.stt.transcribed":
+        return f"STT: {payload.get('phrase_count', 0)} phrases, {payload.get('bytes', 0)} bytes"
+    if event_type == "voice.stt.blocked":
+        return f"STT blocked: {status}"
+    if event_type == "voice.stt.failed":
+        return f"STT failed: {status}"
+    if event_type == "voice.agent.voice_saved":
+        return f"Agent {payload.get('agent_id', '')} → voice={payload.get('voice', '')}"
+    if event_type == "voice.agent.preview.triggered":
+        return f"Preview: agent={payload.get('agent_id', '')}, accepted={payload.get('accepted', False)}"
+    return event_type
+
+
 @router.get("/api/voice/providers")
 def providers() -> list[dict]:
     config = _azure_config()
