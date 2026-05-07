@@ -32,6 +32,7 @@ from hermes3d.api.routes import (
     printers,
     roadmap,
     settings,
+    source_os,
     system,
     voice,
 )
@@ -100,6 +101,7 @@ def create_gui_app() -> FastAPI:
         autonomous,
         notifications,
         observe,
+        source_os,
     ]:
         app.include_router(route_module.router)
 

@@ -36,9 +36,72 @@ type CliSurfaceSummary = {
   no_local_cli_signal: number;
 };
 
+// --- Source OS readiness types (from /api/sources/readiness) ---
+type ToolReadinessStatus = "verified" | "detected" | "source_ready" | "not_installed" | "unavailable";
+
+type KeyToolDetail = {
+  module_id: string;
+  display: string;
+  status: ToolReadinessStatus;
+  runtime_status: string;
+  agent_execution_tier: string;
+  path: string | null;
+  verifier: string | null;
+  return_code: number | null;
+  executed: boolean;
+  cli_surface_status: string | null;
+  next_action: string | null;
+};
+
+type CategoryReadiness = {
+  id: string;
+  label: string;
+  section: string;
+  total: number;
+  status_counts: Record<string, number>;
+  key_tools: KeyToolDetail[];
+};
+
+type SourcesReadinessPayload = {
+  generated_at_utc: string;
+  proof_files: Record<string, string>;
+  summary: {
+    verified_agent_cli: number;
+    runner_gaps: number;
+    agent_enabled_cli: number;
+    candidate_needs_verifier: number;
+  };
+  categories: Record<string, CategoryReadiness>;
+  artifacts_url: string;
+};
+
 const DEFAULT_BRIDGE_PORT = "8765";
 const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool status badge helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const TOOL_STATUS_BADGE: Record<ToolReadinessStatus, string> = {
+  verified: "bg-green-900/70 text-green-300 border border-green-700/40",
+  detected: "bg-cyan-900/60 text-cyan-200 border border-cyan-700/40",
+  source_ready: "bg-blue-900/50 text-blue-300 border border-blue-700/40",
+  not_installed: "bg-surface2 text-muted border border-border",
+  unavailable: "bg-red-950/50 text-red-400 border border-red-800/40",
+};
+
+const TOOL_STATUS_LABEL: Record<ToolReadinessStatus, string> = {
+  verified: "Verified CLI",
+  detected: "Detected",
+  source_ready: "Source Ready",
+  not_installed: "Not Installed",
+  unavailable: "Unavailable",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SourceOSTab (main export)
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function SourceOSTab() {
   const [activeSection, setActiveSection] = useState("source_backed");
@@ -55,6 +118,11 @@ export function SourceOSTab() {
   const [verifierSummary, setVerifierSummary] = useState<RuntimeVerifierSummary | null>(null);
   const [cliSurfaceSummary, setCliSurfaceSummary] = useState<CliSurfaceSummary | null>(null);
   const [cliSurfaceRecords, setCliSurfaceRecords] = useState<SourceModuleCliSurfaceRecord[]>([]);
+  // CLI readiness panel state
+  const [sourcesReadiness, setSourcesReadiness] = useState<SourcesReadinessPayload | null>(null);
+  const [sourcesReadinessLoading, setSourcesReadinessLoading] = useState(false);
+  const [cliPanelExpanded, setCliPanelExpanded] = useState(true);
+  const [proofPanelExpanded, setProofPanelExpanded] = useState(false);
 
   const loadModules = async ({ showLoading = true }: { showLoading?: boolean } = {}) => {
     if (showLoading) {
@@ -87,6 +155,7 @@ export function SourceOSTab() {
     void loadUpdateReadiness(false);
     void loadVerifierSummary();
     void loadCliSurfaceSummary();
+    void loadSourcesReadiness();
   }, []);
 
   const loadVerifierSummary = async () => {
@@ -124,6 +193,27 @@ export function SourceOSTab() {
     } catch {
       setCliSurfaceSummary(null);
       setCliSurfaceRecords([]);
+    }
+  };
+
+  const loadSourcesReadiness = async () => {
+    setSourcesReadinessLoading(true);
+    try {
+      const response = await fetch(`${LIVE_BASE_URL}/api/sources/readiness`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        setSourcesReadiness(null);
+        return;
+      }
+      const payload = await response.json() as SourcesReadinessPayload;
+      setSourcesReadiness(payload);
+    } catch {
+      setSourcesReadiness(null);
+    } finally {
+      setSourcesReadinessLoading(false);
     }
   };
 
@@ -228,6 +318,7 @@ export function SourceOSTab() {
 
   return (
     <div data-testid="source-os-root" className="source-os-shell flex h-full min-h-0 flex-col overflow-hidden rounded border border-border bg-bg">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between gap-3 border-b border-border bg-surface px-3 py-2">
         <div className="min-w-0">
           <h1 className="truncate text-base font-semibold text-fg">Hermes3D OS</h1>
@@ -237,6 +328,8 @@ export function SourceOSTab() {
         </div>
         <DockModeControls mode={dockMode} onChange={setDockMode} />
       </div>
+
+      {/* ── Status bars ── */}
       <UpdateReadinessBar readiness={updateReadiness} busy={updateBusy} onDeepCheck={() => void loadUpdateReadiness(true)} />
       <RuntimeReadinessBar
         counts={runtimeCounts}
@@ -250,6 +343,26 @@ export function SourceOSTab() {
         cliSurfaceSummary={cliSurfaceSummary}
         unclassifiedLaunchKinds={unclassifiedLaunchKinds}
       />
+
+      {/* ── CLI Readiness Panel ── */}
+      <CliReadinessPanel
+        readiness={sourcesReadiness}
+        loading={sourcesReadinessLoading}
+        expanded={cliPanelExpanded}
+        onToggle={() => setCliPanelExpanded((v) => !v)}
+        onRefresh={() => void loadSourcesReadiness()}
+        baseUrl={LIVE_BASE_URL}
+      />
+
+      {/* ── Proof & Artifact Panel ── */}
+      <ProofArtifactPanel
+        readiness={sourcesReadiness}
+        expanded={proofPanelExpanded}
+        onToggle={() => setProofPanelExpanded((v) => !v)}
+        baseUrl={LIVE_BASE_URL}
+      />
+
+      {/* ── Module registry browser ── */}
       <SecondaryNav activeSection={activeSection} counts={counts} onSelect={handleSectionSelect} />
       <div
         className={[
@@ -288,6 +401,225 @@ export function SourceOSTab() {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// CLI Readiness Panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CATEGORY_ORDER = ["slicers", "modelers", "print_farm", "firmware", "gen3d"] as const;
+
+function CliReadinessPanel({
+  readiness,
+  loading,
+  expanded,
+  onToggle,
+  onRefresh,
+  baseUrl,
+}: {
+  readiness: SourcesReadinessPayload | null;
+  loading: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onRefresh: () => void;
+  baseUrl: string;
+}) {
+  const summary = readiness?.summary;
+  return (
+    <div className="border-b border-border bg-bg" data-testid="source-cli-readiness-panel">
+      {/* Collapsed header row */}
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-surface/60"
+        aria-expanded={expanded}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold text-fg">CLI Readiness</span>
+          {summary && (
+            <>
+              <Metric label="verified CLI" value={summary.verified_agent_cli} tone="green" />
+              <Metric label="runner gaps" value={summary.runner_gaps} tone={summary.runner_gaps > 0 ? "amber" : "muted"} />
+              <Metric label="candidates" value={summary.candidate_needs_verifier} tone={summary.candidate_needs_verifier > 0 ? "cyan" : "muted"} />
+            </>
+          )}
+          {loading && <span className="text-[11px] text-muted italic">refreshing…</span>}
+          {!readiness && !loading && (
+            <span className="text-[11px] text-amber-400">backend unavailable — {baseUrl}/api/sources/readiness</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {readiness?.generated_at_utc && (
+            <span className="text-[10px] text-muted" title={readiness.generated_at_utc}>
+              proof {readiness.generated_at_utc.slice(0, 10)}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onRefresh(); }}
+            disabled={loading}
+            className="rounded border border-border px-2 py-0.5 text-[11px] text-fg hover:border-accent-blue/40 disabled:opacity-50"
+          >
+            {loading ? "Loading" : "Refresh"}
+          </button>
+          <span className="text-[11px] text-muted">{expanded ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {/* Expanded body */}
+      {expanded && readiness && (
+        <div className="overflow-y-auto px-3 pb-3 pt-1" style={{ maxHeight: "420px" }}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {CATEGORY_ORDER.map((catId) => {
+              const cat = readiness.categories[catId];
+              if (!cat) return null;
+              return <CategoryCard key={catId} category={cat} />;
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CategoryCard({ category }: { category: CategoryReadiness }) {
+  const { verified = 0, detected = 0, source_ready = 0, not_installed = 0, unavailable = 0 } = category.status_counts;
+  const allReady = verified + detected;
+
+  return (
+    <div className="flex flex-col gap-2 rounded border border-border bg-surface/50 p-2">
+      <div className="flex items-center justify-between gap-1">
+        <span className="text-[11px] font-semibold text-fg">{category.label}</span>
+        <span className="text-[10px] text-muted">{category.total} total</span>
+      </div>
+
+      {/* Status mini-bar */}
+      <div className="flex flex-wrap gap-1">
+        {verified > 0 && <span className="rounded bg-green-900/60 px-1.5 py-0.5 text-[10px] text-green-300">{verified} verified</span>}
+        {detected > 0 && <span className="rounded bg-cyan-900/60 px-1.5 py-0.5 text-[10px] text-cyan-200">{detected} detected</span>}
+        {source_ready > 0 && <span className="rounded bg-blue-900/50 px-1.5 py-0.5 text-[10px] text-blue-300">{source_ready} src ready</span>}
+        {not_installed > 0 && <span className="rounded bg-surface2 px-1.5 py-0.5 text-[10px] text-muted">{not_installed} not installed</span>}
+        {unavailable > 0 && <span className="rounded bg-red-950/50 px-1.5 py-0.5 text-[10px] text-red-400">{unavailable} unavailable</span>}
+        {allReady === 0 && <span className="text-[10px] text-amber-400">no verified tools</span>}
+      </div>
+
+      {/* Key tools */}
+      <div className="flex flex-col gap-1">
+        {category.key_tools.map((tool) => (
+          <KeyToolRow key={tool.module_id} tool={tool} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KeyToolRow({ tool }: { tool: KeyToolDetail }) {
+  const badgeClass = TOOL_STATUS_BADGE[tool.status] ?? TOOL_STATUS_BADGE.unavailable;
+  const label = TOOL_STATUS_LABEL[tool.status] ?? tool.status;
+  return (
+    <div
+      className="flex items-center justify-between gap-1 rounded bg-bg/60 px-1.5 py-1"
+      title={tool.next_action ?? tool.path ?? tool.module_id}
+    >
+      <span className="min-w-0 flex-1 truncate text-[11px] text-fg">{tool.display}</span>
+      <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${badgeClass}`}>{label}</span>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proof Artifact Panel
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ProofArtifactPanel({
+  readiness,
+  expanded,
+  onToggle,
+  baseUrl,
+}: {
+  readiness: SourcesReadinessPayload | null;
+  expanded: boolean;
+  onToggle: () => void;
+  baseUrl: string;
+}) {
+  return (
+    <div className="border-b border-border bg-bg" data-testid="source-proof-panel">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs hover:bg-surface/60"
+        aria-expanded={expanded}
+      >
+        <span className="font-semibold text-fg">Proof Artifacts</span>
+        <span className="text-[11px] text-muted">{expanded ? "▲" : "▼"}</span>
+      </button>
+
+      {expanded && (
+        <div className="overflow-y-auto px-3 pb-3 pt-1" style={{ maxHeight: "320px" }}>
+          {/* Artifact browser link */}
+          <div className="mb-2 flex flex-wrap gap-2">
+            <a
+              href={`${baseUrl}/api/artifacts`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded border border-border px-2 py-1 text-[11px] text-accent-blue hover:border-accent-blue/60 hover:underline"
+            >
+              Browse all proof artifacts →
+            </a>
+            <a
+              href={`${baseUrl}/api/artifacts?grouped=job`}
+              target="_blank"
+              rel="noreferrer"
+              className="rounded border border-border px-2 py-1 text-[11px] text-accent-blue hover:border-accent-blue/60 hover:underline"
+            >
+              Grouped by job →
+            </a>
+          </div>
+
+          {/* Per-category proof file listing */}
+          {readiness ? (
+            <div className="flex flex-col gap-2">
+              <p className="text-[11px] text-muted">Proof files read by /api/sources/readiness:</p>
+              {Object.entries(readiness.proof_files).map(([key, path]) => (
+                <div key={key} className="flex flex-col gap-0.5 rounded border border-border bg-surface/40 px-2 py-1.5">
+                  <span className="text-[11px] font-medium text-fg capitalize">{key.replace(/_/g, " ")}</span>
+                  <span className="truncate text-[10px] text-muted font-mono" title={path}>{path}</span>
+                </div>
+              ))}
+              {readiness.generated_at_utc && (
+                <p className="text-[10px] text-muted">Generated: {readiness.generated_at_utc}</p>
+              )}
+              {/* Per-category artifact links */}
+              <p className="mt-1 text-[11px] text-muted">Category artifact queries:</p>
+              {CATEGORY_ORDER.map((catId) => {
+                const cat = readiness.categories[catId];
+                if (!cat) return null;
+                return (
+                  <a
+                    key={catId}
+                    href={`${baseUrl}/api/artifacts?grouped=job`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded border border-border px-2 py-1 text-[11px] text-accent-blue hover:border-accent-blue/60 hover:underline"
+                  >
+                    {cat.label} artifacts →
+                  </a>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-[11px] text-muted">
+              Proof data unavailable. Backend at {baseUrl} may be offline.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Runtime counts helper
+// ─────────────────────────────────────────────────────────────────────────────
+
 function runtimeCountsFor(modules: SourceOSModule[]): RuntimeCounts {
   return modules.reduce<RuntimeCounts>((acc, module) => {
     if (module.runtime.status === "ready") {
@@ -314,6 +646,10 @@ function runtimeCountsFor(modules: SourceOSModule[]): RuntimeCounts {
     blocked: 0,
   });
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RuntimeReadinessBar (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function RuntimeReadinessBar({
   counts,
@@ -378,6 +714,10 @@ function RuntimeReadinessBar({
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Normalizers (unchanged from original)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function normalizeVerifierSummary(payload: unknown): RuntimeVerifierSummary | null {
   if (!isRecord(payload)) {
@@ -446,6 +786,10 @@ function setupQueueSummary(payload: unknown, fallback: string): string {
   return `${runtimeReady} runtime ready / ${sourceReady} source ready / ${runnerMissing} need runners / ${installAvailable} install ready / ${repairRequired} repair / ${blocked} blocked${proof ? ` · proof ${proof}` : ""}`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// UpdateReadinessBar (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
 function UpdateReadinessBar({
   readiness,
   busy,
@@ -484,6 +828,10 @@ function UpdateReadinessBar({
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Metric badge (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
 function Metric({ label, value, tone = "muted" }: { label: string; value: number; tone?: "green" | "amber" | "cyan" | "muted" }) {
   const toneClass = {
     green: "bg-green-950/70 text-green-300",
@@ -493,6 +841,10 @@ function Metric({ label, value, tone = "muted" }: { label: string; value: number
   }[tone];
   return <span className={`rounded px-2 py-1 text-[10px] uppercase ${toneClass}`}>{value} {label}</span>;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Module normalizers (unchanged from original)
+// ─────────────────────────────────────────────────────────────────────────────
 
 function normalizeModule(raw: RawModule): SourceOSModule | null {
   const id = stringValue(raw.id);
