@@ -3,13 +3,20 @@
  *
  * Prompt + reference image · provider selector · generated model cards ·
  * "Send to Blender MCP" (locked).
+ *
+ * Lane 13 additions (H3D-CLAUDE-GEN3D):
+ *  - Provider status panel backed by real /api/gen3d/providers data
+ *    (sourced from Lane 04 GEN3D_VERIFY proof + live port probes)
+ *  - Local template gallery backed by real /api/gen3d/templates data
+ *  - Generate button shows "Provider not available" for provider-backed
+ *    templates when the provider is not available
  */
 import { Panel } from "../components/layout/Panel";
 import { WorkflowPipeline, type PipelineStage } from "../components/pipeline/WorkflowPipeline";
 import { adapters } from "../api/adapters";
 import type { TaskDAG } from "../types/dag";
 import type { ProviderHealth } from "../types/provider";
-import { GitBranch, Image as ImageIcon } from "lucide-react";
+import { GitBranch, Image as ImageIcon, Layers, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type HermesImportMeta = ImportMeta & {
@@ -34,12 +41,42 @@ interface GeneratedModelResult {
   truthGate?: string;
 }
 
+/** From GET /api/gen3d/providers — real provider readiness data */
+interface Gen3DProvider {
+  provider_id: string;
+  label: string;
+  readiness: "available" | "installed_not_running" | "not_installed" | "unavailable";
+  installed: boolean;
+  pip_version: string | null;
+  repo_reachable: boolean;
+  weights_present: boolean;
+  live_reachable: boolean | null;
+  proof_source: string | null;
+  proof_gate_version: string | null;
+}
+
+/** From GET /api/gen3d/templates — real local templates */
+interface Gen3DTemplate {
+  id: string;
+  name: string;
+  source: "local_executor" | "provider_backed";
+  description: string;
+  parameters: Array<{ name: string; type: string; default: unknown; min?: number; max?: number }>;
+  outputs: string[];
+  requires_provider: string | null;
+  schema_file: string | null;
+  schema_present?: boolean;
+}
+
 export function Gen3DTab() {
   const [prompt, setPrompt] = useState("calibration cube");
   const [sizeMm, setSizeMm] = useState(20);
   const [previewDag, setPreviewDag] = useState<TaskDAG | null>(null);
   const [previewState, setPreviewState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [providerHealth, setProviderHealth] = useState<ProviderHealth[]>([]);
+  const [gen3dProviders, setGen3DProviders] = useState<Gen3DProvider[]>([]);
+  const [gen3dTemplates, setGen3DTemplates] = useState<Gen3DTemplate[]>([]);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("calibration_cube");
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [generatedModels, setGeneratedModels] = useState<GeneratedModelResult[]>([]);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -48,6 +85,8 @@ export function Gen3DTab() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // Existing provider health (LLM providers)
     adapters.getProviderHealth()
       .then((data) => {
         if (!cancelled) setProviderHealth(data);
@@ -55,6 +94,37 @@ export function Gen3DTab() {
       .catch((error) => {
         if (!cancelled) setGenerateMessage(`Blocked: ${errorMessage(error)}`);
       });
+
+    // Lane 13: real 3D generation provider readiness
+    fetch(`${LIVE_BASE_URL}/api/gen3d/providers`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data: unknown = await res.json();
+        if (!cancelled && Array.isArray(data)) {
+          setGen3DProviders(data as Gen3DProvider[]);
+        }
+      })
+      .catch(() => {/* backend not yet running — silently ignore */});
+
+    // Lane 13: real local template gallery
+    fetch(`${LIVE_BASE_URL}/api/gen3d/templates`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        if (!res.ok) return;
+        const data: unknown = await res.json();
+        if (!cancelled && Array.isArray(data)) {
+          setGen3DTemplates(data as Gen3DTemplate[]);
+        }
+      })
+      .catch(() => {/* backend not yet running — silently ignore */});
+
     return () => {
       cancelled = true;
     };
@@ -74,6 +144,25 @@ export function Gen3DTab() {
   };
 
   const runGeneration = async () => {
+    // Check if selected template requires a provider that isn't available
+    const template = gen3dTemplates.find((t) => t.id === selectedTemplate);
+    if (template?.requires_provider) {
+      const reqProvider = gen3dProviders.find((p) => p.provider_id === template.requires_provider);
+      if (!reqProvider || reqProvider.readiness !== "available") {
+        const providerLabel = reqProvider?.label ?? template.requires_provider;
+        setGenerateMessage(
+          `Blocked: Provider not available — ${providerLabel} is ${reqProvider?.readiness ?? "not configured"}. ` +
+          `Install and start ${providerLabel} to use this template.`
+        );
+        await adapters.emitProofEvent("generation.run.blocked", {
+          reason: "provider_not_available",
+          provider_id: template.requires_provider,
+          readiness: reqProvider?.readiness ?? "unknown",
+        });
+        return;
+      }
+    }
+
     try {
       const response = await fetch(`${LIVE_BASE_URL}/api/generation/run`, {
         method: "POST",
@@ -221,45 +310,101 @@ export function Gen3DTab() {
       <div className="col-span-12 min-h-0 lg:col-span-4">
         <Panel
           id="gen3d.providers"
-          title="PROVIDERS"
+          title="3D GENERATION PROVIDERS"
           dense
-          status={{ tone: providerHealth.some((p) => p.status === "green") ? "green" : "muted", label: `${providerHealth.length} live` }}
+          status={{
+            tone: gen3dProviders.some((p) => p.readiness === "available")
+              ? "green"
+              : providerHealth.some((p) => p.status === "green")
+                ? "green"
+                : "muted",
+            label: `${gen3dProviders.filter((p) => p.readiness === "available").length} available`,
+          }}
           className="h-full min-h-0"
         >
-          <div data-testid="gen3d-provider-health">
-            <div className="text-muted text-[10px] uppercase tracking-wide mb-1">
-              Live Provider Health
-            </div>
-            {providerHealth.length > 0 ? (
-              <ul className="flex flex-col gap-1">
-                {providerHealth.map((p) => (
-                  <li
-                    key={p.provider_id}
-                    className="flex items-center gap-2 px-1 py-0.5 text-[11px]"
-                  >
-                    <span
-                      data-testid="gen3d-provider-dot"
+          <div className="flex flex-col gap-3">
+            {/* Real Gen3D provider readiness from /api/gen3d/providers */}
+            <div data-testid="gen3d-provider-readiness">
+              <div className="text-muted text-[10px] uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                <Layers size={10} />
+                Generation Provider Readiness
+                <span className="ml-auto font-mono text-[9px]">(GEN3D_VERIFY proof)</span>
+              </div>
+              {gen3dProviders.length > 0 ? (
+                <ul className="flex flex-col gap-1">
+                  {gen3dProviders.map((p) => (
+                    <li
+                      key={p.provider_id}
+                      className="flex items-center gap-2 px-1 py-0.5 text-[11px]"
+                      data-testid="gen3d-readiness-row"
                       data-provider={p.provider_id}
-                      data-status={p.status}
-                      aria-label={`${p.provider_id} status ${p.status}`}
-                      className={[
-                        "h-1.5 w-1.5 rounded-full shrink-0",
-                        p.status === "green"
-                          ? "bg-accent-green"
-                          : p.status === "amber"
-                            ? "bg-amber-400"
-                            : p.status === "red"
-                              ? "bg-red-500"
-                              : "bg-muted",
-                      ].join(" ")}
-                    />
-                    <span className="text-fg font-medium">{p.provider_id}</span>
-                    <span className="text-muted text-[10px] font-mono">{p.status}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState title="No live providers" detail="The provider health API returned no configured providers." />
+                      data-readiness={p.readiness}
+                    >
+                      <span
+                        className={[
+                          "h-1.5 w-1.5 rounded-full shrink-0",
+                          p.readiness === "available"
+                            ? "bg-accent-green"
+                            : p.readiness === "installed_not_running"
+                              ? "bg-amber-400"
+                              : p.readiness === "not_installed"
+                                ? "bg-red-500"
+                                : "bg-muted",
+                        ].join(" ")}
+                        aria-label={`${p.provider_id} readiness ${p.readiness}`}
+                      />
+                      <span className="text-fg font-medium truncate">{p.label}</span>
+                      <span className="text-muted text-[10px] font-mono ml-auto">
+                        {p.readiness === "available"
+                          ? "live"
+                          : p.readiness === "installed_not_running"
+                            ? "installed"
+                            : p.readiness === "not_installed"
+                              ? "not installed"
+                              : "unavailable"}
+                      </span>
+                      {p.readiness !== "available" && (
+                        <AlertTriangle size={9} className="text-amber-400 shrink-0" aria-hidden />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="text-muted text-[10px]">Loading provider readiness…</div>
+              )}
+            </div>
+            {/* LLM provider health for context */}
+            {providerHealth.length > 0 && (
+              <div data-testid="gen3d-provider-health">
+                <div className="text-muted text-[10px] uppercase tracking-wide mb-1">LLM Providers</div>
+                <ul className="flex flex-col gap-1">
+                  {providerHealth.map((p) => (
+                    <li
+                      key={p.provider_id}
+                      className="flex items-center gap-2 px-1 py-0.5 text-[11px]"
+                    >
+                      <span
+                        data-testid="gen3d-provider-dot"
+                        data-provider={p.provider_id}
+                        data-status={p.status}
+                        aria-label={`${p.provider_id} status ${p.status}`}
+                        className={[
+                          "h-1.5 w-1.5 rounded-full shrink-0",
+                          p.status === "green"
+                            ? "bg-accent-green"
+                            : p.status === "amber"
+                              ? "bg-amber-400"
+                              : p.status === "red"
+                                ? "bg-red-500"
+                                : "bg-muted",
+                        ].join(" ")}
+                      />
+                      <span className="text-fg font-medium">{p.provider_id}</span>
+                      <span className="text-muted text-[10px] font-mono">{p.status}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </Panel>
@@ -298,6 +443,82 @@ export function Gen3DTab() {
               <div className="h-full flex items-center justify-center text-muted text-xs">
                 No plan preview loaded
               </div>
+            )}
+          </div>
+        </Panel>
+      </div>
+      <div className="col-span-12 min-h-0">
+        <Panel
+          id="gen3d.templates"
+          title="LOCAL TEMPLATE GALLERY"
+          dense
+          status={{
+            tone: gen3dTemplates.length > 0 ? "cyan" : "muted",
+            label: `${gen3dTemplates.length} templates`,
+          }}
+          className="h-full min-h-0"
+        >
+          <div data-testid="gen3d-template-gallery">
+            {gen3dTemplates.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {gen3dTemplates.map((t) => {
+                  const isSelected = selectedTemplate === t.id;
+                  const requiresProvider = t.requires_provider != null;
+                  const providerReady = !requiresProvider
+                    || gen3dProviders.find((p) => p.provider_id === t.requires_provider)?.readiness === "available";
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTemplate(t.id);
+                        // If it's a local template, pre-fill a matching prompt keyword
+                        if (t.source === "local_executor" && t.id === "calibration_cube") {
+                          setPrompt("calibration cube");
+                        }
+                      }}
+                      data-testid="gen3d-template-card"
+                      data-template-id={t.id}
+                      data-source={t.source}
+                      data-requires-provider={t.requires_provider ?? "none"}
+                      className={[
+                        "text-left rounded border px-2.5 py-2 text-xs transition-colors",
+                        isSelected
+                          ? "border-accent-cyan/70 bg-accent-cyan/10"
+                          : "border-border bg-surface2/30 hover:border-accent-cyan/40",
+                        !providerReady ? "opacity-60" : "",
+                      ].join(" ")}
+                      aria-pressed={isSelected}
+                      title={t.description}
+                    >
+                      <div className="flex items-start justify-between gap-1 mb-0.5">
+                        <span className="font-semibold text-fg truncate">{t.name}</span>
+                        <span
+                          className={[
+                            "shrink-0 rounded px-1 py-0.5 text-[9px] uppercase font-medium",
+                            t.source === "local_executor"
+                              ? "bg-accent-green/15 text-accent-green"
+                              : providerReady
+                                ? "bg-accent-cyan/15 text-accent-cyan"
+                                : "bg-surface2 text-muted",
+                          ].join(" ")}
+                        >
+                          {t.source === "local_executor" ? "local" : (providerReady ? "ready" : "needs provider")}
+                        </span>
+                      </div>
+                      <div className="text-muted text-[10px] leading-relaxed line-clamp-2">{t.description}</div>
+                      <div className="mt-1 text-[10px] text-muted font-mono">
+                        out: {t.outputs.join(", ")}
+                        {t.requires_provider && (
+                          <span className="ml-1 text-amber-400">· requires {t.requires_provider}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <EmptyState title="No templates loaded" detail="The /api/gen3d/templates endpoint is not yet reachable. Start the backend to see available templates." />
             )}
           </div>
         </Panel>
