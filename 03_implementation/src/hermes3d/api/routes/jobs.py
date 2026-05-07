@@ -10,8 +10,90 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
+from hermes3d.api.safety import check_s1_lock, is_s1_target
+from hermes3d.services.local_state import local_printer as _local_printer
 
 router = APIRouter()
+
+# Printer IDs that may receive job commands (write-enabled, policy-gated).
+# S1 (192.168.0.12) is camera/read-only and MUST NOT receive job commands.
+WRITE_ALLOWED_PRINTERS = {"flsun_t1_a", "flsun_t1_b", "flsun_v400"}
+# Moonraker print_stats states that are safe to send a new job to.
+PRINTER_IDLE_STATES = {"standby", "complete", "ready", "error"}
+
+
+def _check_printer_policy(job: dict[str, Any], actor: str) -> None:
+    """Policy gate: raises HTTPException if the job's printer cannot accept commands.
+
+    Rules enforced (in order):
+    1. S1 (192.168.0.12) is always locked — never a job target.
+    2. The printer must be in WRITE_ALLOWED_PRINTERS or have write_enabled=True in the DB.
+    3. The printer must report an idle Moonraker state (PRINTER_IDLE gate).
+    """
+    printer_id = job.get("printer_id")
+    if not printer_id:
+        # No printer assigned — policy gate passes; the job does not command any printer.
+        return
+
+    # Gate 1: S1 hard lock
+    check_s1_lock(printer_id)
+
+    # Gate 2: write-allowed list + DB policy
+    printer = _local_printer(printer_id)
+    if printer is not None:
+        safety_policy = str(printer.get("safety_policy") or "read_only")
+        write_enabled = printer.get("write_enabled", False)
+        is_write_allowed = (
+            printer["id"] in WRITE_ALLOWED_PRINTERS
+            or write_enabled
+            or safety_policy == "write_enabled"
+        )
+        if not is_write_allowed:
+            proof_event_id = _append_proof_event(
+                "jobs.policy.printer_write_denied",
+                actor,
+                {
+                    "job_id": job["id"],
+                    "printer_id": printer_id,
+                    "safety_policy": safety_policy,
+                    "reason": "Printer is not write-enabled; job commands are blocked by policy.",
+                },
+            )
+            raise HTTPException(
+                status_code=423,
+                detail={
+                    "error": "PRINTER_WRITE_DENIED",
+                    "printer_id": printer_id,
+                    "safety_policy": safety_policy,
+                    "reason": "Printer is not write-enabled; job commands are blocked by policy.",
+                    "proof_event_id": proof_event_id,
+                },
+            )
+
+        # Gate 3: PRINTER_IDLE — never send job commands to a moving printer
+        live_state: str | None = printer.get("state") or printer.get("status")
+        if live_state and live_state.lower() not in PRINTER_IDLE_STATES:
+            proof_event_id = _append_proof_event(
+                "jobs.policy.printer_not_idle",
+                actor,
+                {
+                    "job_id": job["id"],
+                    "printer_id": printer_id,
+                    "printer_state": live_state,
+                    "reason": "PRINTER_IDLE gate: printer is not idle; retry/repair/rollback commands are blocked.",
+                },
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "PRINTER_NOT_IDLE",
+                    "gate": "PRINTER_IDLE",
+                    "printer_id": printer_id,
+                    "printer_state": live_state,
+                    "reason": "PRINTER_IDLE gate: printer is not idle; retry/repair/rollback commands are blocked until the printer reaches standby/complete/ready.",
+                    "proof_event_id": proof_event_id,
+                },
+            )
 
 
 class JobCreate(BaseModel):
@@ -99,6 +181,9 @@ def cancel_job(job_id: str) -> dict:
 @router.post("/api/jobs/{job_id}/repair/propose", status_code=202)
 def propose_repair(job_id: str, body: JobActorRequest) -> dict:
     job = _require_job(job_id)
+    # Repair proposal is a read-only planning step — no printer commands are sent.
+    # We still check the S1 hard lock to prevent accidental mis-routing.
+    check_s1_lock(job.get("printer_id"))
     steps = rows("SELECT * FROM job_steps WHERE job_id = ? ORDER BY step_number", (job_id,))
     failed_step = _failed_step(job, steps)
     if not failed_step:
@@ -145,6 +230,8 @@ def propose_repair(job_id: str, body: JobActorRequest) -> dict:
 @router.post("/api/jobs/{job_id}/repair/apply")
 def apply_repair(job_id: str, body: JobActorRequest) -> dict:
     job = _require_job(job_id)
+    # Policy gate: repair apply may queue the job — check printer is idle and write-allowed.
+    _check_printer_policy(job, body.actor)
     steps = rows("SELECT * FROM job_steps WHERE job_id = ? ORDER BY step_number", (job_id,))
     failed_step = _failed_step(job, steps)
     approval = _approved_repair_approval(job_id)
@@ -188,6 +275,8 @@ def apply_repair(job_id: str, body: JobActorRequest) -> dict:
 @router.post("/api/jobs/{job_id}/retry")
 def retry_job(job_id: str, body: JobActorRequest) -> dict:
     job = _require_job(job_id)
+    # Policy gate: retry re-queues the job for print — must pass PRINTER_IDLE + write policy.
+    _check_printer_policy(job, body.actor)
     pending = _pending_repair_approval(job_id)
     if pending:
         proof_event_id = _append_proof_event(
@@ -229,6 +318,8 @@ def retry_job(job_id: str, body: JobActorRequest) -> dict:
 @router.post("/api/jobs/{job_id}/rollback")
 def rollback_job(job_id: str, body: JobRollbackRequest) -> dict:
     job = _require_job(job_id)
+    # Policy gate: rollback reverts job state and may requeue — check printer is idle and write-allowed.
+    _check_printer_policy(job, body.actor)
     target = _rollback_target(job_id, body.target_artifact_id)
     if not target:
         proof_event_id = _append_proof_event(
