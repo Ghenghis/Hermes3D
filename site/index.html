@@ -27,6 +27,7 @@
     </a>
     <nav class="nav__links" aria-label="Primary">
       <a href="#catalog">60 apps</a>
+      <a href="#stacks">Custom Stacks</a>
       <a href="#image-to-print">Image→Print</a>
       <a href="#safety">Safety</a>
       <a href="#hermes-teams">Hermes Teams</a>
@@ -132,6 +133,50 @@
     </div>
     <p class="reveal" style="text-align:center; margin-top:1.5rem; color: var(--text-faint);">
       <code>/api/modules/runtime/runner-contracts</code> · 60 modules · 7 agent-CLI-ready · 24 runner gaps to close · <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/03_implementation/docs/handoffs/hermes3d-os-folder-index-2026-05-07/source-os-60-apps/REGISTRY.md">full registry →</a>
+    </p>
+  </div>
+</section>
+
+<!-- ================= CUSTOM STACKS ================= -->
+<section id="stacks" class="section">
+  <div class="container">
+    <header class="section__header">
+      <span class="kicker">Workflows · any combination</span>
+      <h2>Custom Stacks — yours or Hermes-built.</h2>
+      <p class="lead">A <strong>Custom Stack</strong> is a named, signed selection from the 60-app catalog — bundled with operator settings, printer profile, and truth-gate config — that reproduces an exact environment in one click. Users define stacks in Source OS. Hermes agents define them programmatically during the coding loop.</p>
+    </header>
+
+    <div class="grid grid--3" style="margin-top:2rem;">
+      <div class="card card--green">
+        <h3>FDM Core <span style="font-weight:400;font-size:.85em;opacity:.7">built-in</span></h3>
+        <p>OrcaSlicer · PrusaSlicer · Moonraker · Mainsail · Klipper</p>
+        <p style="font-size:.8em;opacity:.65;margin-top:.5rem;">Standard FDM print-farm. Pre-configured, truth-gated, one-click load.</p>
+      </div>
+      <div class="card card--blue">
+        <h3>Resin Detail <span style="font-weight:400;font-size:.85em;opacity:.7">built-in</span></h3>
+        <p>Lychee · Chitubox · UVtools · Moonraker</p>
+        <p style="font-size:.8em;opacity:.65;margin-top:.5rem;">SLA / MSLA resin workflow. Exposure profiles, hollow-drain support, UV validation.</p>
+      </div>
+      <div class="card card--purple">
+        <h3>GPU Concept <span style="font-weight:400;font-size:.85em;opacity:.7">built-in</span></h3>
+        <p>Blender · TRELLIS.2 · Hunyuan3D 2.1 · ComfyUI · OpenSCAD</p>
+        <p style="font-size:.8em;opacity:.65;margin-top:.5rem;">Full image-to-print chain on RTX 3090 Ti. Switch generation models on command.</p>
+      </div>
+    </div>
+
+    <div class="grid grid--2" style="margin-top:1.5rem;">
+      <div class="card">
+        <h3>User-defined stacks</h3>
+        <p>Source OS tab → pick catalog rows → name the bundle → save. Stored as a signed <code>stacks/&lt;name&gt;.stack.json</code> manifest. Export and share with any Hermes3D-OS instance. Rollback to any prior timestamped snapshot.</p>
+      </div>
+      <div class="card">
+        <h3>Agent-defined stacks</h3>
+        <p>Hermes agents call <code>hermes_lock_files</code> on catalog rows, build the environment, and persist the manifest as a signed artifact alongside the PR proof. Subsequent agents load the manifest — no re-derivation needed. Stack changes go through the same MCP lock + truth-gate flow as code changes.</p>
+      </div>
+    </div>
+
+    <p class="reveal" style="text-align:center; margin-top:1.5rem; color: var(--text-faint);">
+      <code>stacks/*.stack.json</code> · signed · versioned · importable on any instance · <code>GET /api/stacks</code>
     </p>
   </div>
 </section>

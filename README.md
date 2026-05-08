@@ -31,7 +31,7 @@ A 60-app, dual-Hermes, GPU-backed ecosystem for **printing, designing, generatin
 
 **Live site → [ghenghis.github.io/Hermes3D](https://ghenghis.github.io/Hermes3D/)**
 
-[60 apps](#-the-60-app-catalog) · [Image→Print](#-image-to-print-autonomously) · [Build-plate safety](#-build-plate-safety--stop-before-heat) · [Two Hermes teams](#-two-hermes-teams) · [Pipeline](#-the-pipeline) · [Truth Gate](#-truth-gate) · [Fleet](#-print-farm) · [MCP](#-mcp-coordination) · [Anonymous](#-anonymous--fully-agentic) · [Quickstart](#-quickstart) · [Self-host](#-self-host)
+[60 apps](#-the-60-app-catalog) · [Custom Stacks](#-custom-stacks) · [Image→Print](#-image-to-print-autonomously) · [Build-plate safety](#-build-plate-safety--stop-before-heat) · [Two Hermes teams](#-two-hermes-teams) · [Pipeline](#-the-pipeline) · [Truth Gate](#-truth-gate) · [Fleet](#-print-farm) · [MCP](#-mcp-coordination) · [Anonymous](#-anonymous--fully-agentic) · [Quickstart](#-quickstart) · [Self-host](#-self-host)
 
 </div>
 
@@ -101,6 +101,36 @@ catalog truth (live `/api/modules/runtime/runner-contracts`):
   · 1 npm_package_preflight · 3 desktop_app_runner_gap · 3 gpu_worker_runner_gap
   · 15 runtime_repair_required · 18 source_reference_only · 2 blocked
 ```
+
+---
+
+## ✦ Custom Stacks
+
+Not every workflow needs every app. A **Custom Stack** is a named, saved selection from the 60-app catalog — combined with its operator settings, printer profile, and truth-gate configuration — that reproduces a specific environment in one click.
+
+**Users create stacks** from the Source OS tab: pick rows from the catalog, give the bundle a name ("FDM Prototyping", "Resin Detail", "GPU Concept"), and save. The stack is stored as a signed manifest (`stacks/<name>.stack.json`). Reload it on any Hermes3D-OS instance to restore that exact environment — apps verified, gates re-run, profiles applied.
+
+**Hermes agents create stacks programmatically** during the coding loop. When an agent determines that a task requires a particular combination of tools, it calls `hermes_lock_files` on the relevant catalog rows, builds the environment, and persists the resulting stack manifest as a signed artifact alongside the PR proof. Subsequent agents load that manifest rather than re-deriving the environment.
+
+| Capability | Detail |
+|---|---|
+| **Author** | User via Source OS tab _or_ Hermes agent via MCP |
+| **Storage** | `stacks/<name>.stack.json` · signed · truth-gated snapshot |
+| **Contents** | App list · operator settings · printer profile · gate config |
+| **Load / switch** | One click in Source OS (user) · `hermes_claim_task` payload (agent) |
+| **Share** | Export `.stack.json` · import on any Hermes3D-OS instance |
+| **Version** | Each save creates a timestamped snapshot; rollback to any prior version |
+| **Defaults** | Three built-in stacks ship pre-configured on every install |
+
+Built-in stacks shipped with every install:
+
+| Stack name | Apps included | Use case |
+|---|---|---|
+| **FDM Core** | OrcaSlicer · PrusaSlicer · Moonraker · Mainsail · Klipper | Standard FDM print-farm |
+| **Resin Detail** | Lychee · Chitubox · UVtools · Moonraker | Resin SLA / MSLA printing |
+| **GPU Concept** | Blender · TRELLIS.2 · Hunyuan3D 2.1 · ComfyUI · OpenSCAD | Image-to-print on RTX 3090 Ti |
+
+Stacks are the unit of sharing between operators: export a `.stack.json`, share it with another Hermes3D-OS user, and they get an identical verified environment. Hermes agents can propose stack additions in PRs — the same MCP lock + truth-gate flow that governs code changes governs stack changes.
 
 ---
 
