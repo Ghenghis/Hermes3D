@@ -16,6 +16,9 @@
 
   <link rel="preconnect" href="https://api.github.com" crossorigin />
   <link rel="stylesheet" href="./css/styles.css" />
+
+  <!-- Wonder Emporium M1: particle constellation (pure Canvas, zero deps) -->
+  <script src="./wonder/particles.js" defer></script>
 </head>
 <body>
 
@@ -45,8 +48,12 @@
 <main id="top">
 
 <!-- ================= HERO ================= -->
-<section class="hero">
-  <div class="container">
+<section class="hero" style="position:relative; overflow:hidden;">
+  <!-- Wonder Emporium: live particle constellation background -->
+  <div class="hero__canvas-wrap" aria-hidden="true">
+    <canvas id="hero-particles"></canvas>
+  </div>
+  <div class="container" style="position:relative; z-index:1;">
     <div class="hero__inner">
       <div class="hero__copy">
         <div class="hero__pills">
@@ -89,7 +96,7 @@
 <section id="catalog" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">The emporium · 60 apps</span>
+      <span class="kicker" data-section="modelers">The emporium · 60 apps</span>
       <h2>Pick your stack. Bring more on demand.</h2>
       <p class="lead">You don't get a black box. You get a <strong>catalog</strong>. 60 source-backed open-source apps across 11 sections — slicers, modelers, firmware, print-farm services, 3D-generation engines, agent runtimes, libraries, materials, hardware, research, utilities. Pick at least one per <em>must-pick</em> section. Defaults ship pre-installed. Add more anytime.</p>
     </div>
@@ -141,7 +148,7 @@
 <section id="stacks" class="section">
   <div class="container">
     <header class="section__header">
-      <span class="kicker">Workflows · any combination</span>
+      <span class="kicker" data-section="stacks">Workflows · any combination</span>
       <h2>Custom Stacks — yours or Hermes-built.</h2>
       <p class="lead">A <strong>Custom Stack</strong> is a named, signed selection from the 60-app catalog — bundled with operator settings, printer profile, and truth-gate config — that reproduces an exact environment in one click. Users define stacks in Source OS. Hermes agents define them programmatically during the coding loop.</p>
     </header>
@@ -185,7 +192,7 @@
 <section id="image-to-print" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">GPU-backed · RTX 3090 Ti</span>
+      <span class="kicker" data-section="gen3d">GPU-backed · RTX 3090 Ti</span>
       <h2>Drop an image. Get a printed part.</h2>
       <p class="lead">Hermes orchestrates the whole image-to-print chain on your local GPU. Switch generation models on command. Truth-gate every mesh. Slice. Dispatch — only when the build plate is clear.</p>
     </div>
@@ -222,7 +229,7 @@
 <section id="safety" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Autonomous, but only when safe</span>
+      <span class="kicker" data-section="hardware">Autonomous, but only when safe</span>
       <h2>STOP before heat. Every time.</h2>
       <p class="lead">Hermes will start a print on its own — only when the build plate is empty, the last print has been removed, the camera observer reports no obstruction, and policy approval is in place. <strong>Any single failure halts the entire chain and alerts the user.</strong> No override without explicit user action.</p>
     </div>
@@ -265,7 +272,7 @@
 <section id="hermes-teams" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">The OS extends itself</span>
+      <span class="kicker" data-section="agents">The OS extends itself</span>
       <h2>Two Hermes teams. One coding loop.</h2>
       <p class="lead">Hermes3D-OS extends itself. Two distinct Hermes Agent teams, two distinct API keys, one bounded coding loop with MCP locks, snapshots, gates, and signed PRs.</p>
     </div>
@@ -312,7 +319,7 @@
 <section id="pipeline" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Pipeline</span>
+      <span class="kicker" data-section="pipeline">Pipeline</span>
       <h2>Nine stages, one source of truth.</h2>
       <p class="lead">Every print walks the same orchestrator state machine — from intent to delivery — and emits structured evidence at every transition.</p>
     </div>
@@ -340,7 +347,7 @@
 <section id="truth-gate" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Truth Gate</span>
+      <span class="kicker" data-section="farmware">Truth Gate</span>
       <h2>Six independent verifications. One signed verdict.</h2>
       <p class="lead">Drop an STL into the launcher and Hermes3D runs six concurrent printability checks, then HMAC-signs the verdict so it can be verified later — even by parties who don't trust the printer that ran the job.</p>
     </div>
@@ -380,7 +387,7 @@
 <section id="fleet" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Print farm</span>
+      <span class="kicker" data-section="farmware">Print farm</span>
       <h2>Dispatch, lock, print, report — in parallel.</h2>
       <p class="lead">Fleet-wide orchestration with per-file locks and atomic handoffs. Multiple agents, multiple printers, no clobber.</p>
     </div>
@@ -408,7 +415,7 @@
 <section id="mcp" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">MCP coordination · 44 tools · 220 routes</span>
+      <span class="kicker" data-section="pipeline">MCP coordination · 44 tools · 220 routes</span>
       <h2>Six AI clients. Forty-four tools. One governed surface.</h2>
       <p class="lead">Hermes3D ships an MCP server with 44 tools that any compliant client can call — locks, tasks, A2A, handoffs, evidence, gates, doctor, anonymous claims, agent health, queue. The FastAPI runtime exposes 220 HTTP routes including the 10 required Agent Workbench routes for the dual-Hermes coding loop. HermesProof's governance layer makes sure concurrent agents don't step on each other.</p>
     </div>
@@ -436,7 +443,7 @@
 <section id="launcher" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Gradio launcher</span>
+      <span class="kicker" data-section="gen3d">Gradio launcher</span>
       <h2>Drop an STL. Get a verdict. Generate a part.</h2>
       <p class="lead">The Lite launcher (`python -m hermes3d.app.launcher`) ships four tabs. Three are real; one is conspicuously disabled until Blender + ComfyUI + LLM keys are provisioned. <strong>No "Coming Soon" buttons. Ever.</strong></p>
     </div>
@@ -476,7 +483,7 @@
 <section id="ui" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">React control plane · 18 tabs</span>
+      <span class="kicker" data-section="agents">React control plane · 18 tabs</span>
       <h2>Operate the emporium from anywhere.</h2>
       <p class="lead">A full-fat React UI for ops mode — 18 tabs covering Dashboard, Simple GUI, Observe (live cameras), Printers, Source OS (60-app catalog), Agents (dual-Hermes workbench), Artifacts, Settings, Plugins, Jobs, Autopilot, Learning, Voice, Design, 3D Generation, Approvals, Roadmap, plus a persistent Agents Rail. <code>scan_active_ui_no_fake.py</code> confirms 81 production files, zero fake/mock markers.</p>
     </div>
@@ -508,7 +515,7 @@
 <section id="cli" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Headless · scriptable</span>
+      <span class="kicker" data-section="utilities">Headless · scriptable</span>
       <h2>Every UI action has a CLI verb.</h2>
       <p class="lead">The launcher is a face for the same code your CI runs. Truth-gate batches of STLs, probe a fleet, dispatch a job — all from the terminal, all with structured output.</p>
     </div>
@@ -526,7 +533,7 @@
 <section id="install" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Install · run · prove</span>
+      <span class="kicker" data-section="slicers">Install · run · prove</span>
       <h2>Three commands and you're at <code>localhost:7860</code>.</h2>
       <p class="lead">Hermes3D runs on Python 3.11+ with no external services required. The base launcher needs zero API keys — Blender, ComfyUI, and LLM provisioning are opt-in.</p>
     </div>
@@ -560,7 +567,7 @@ hermes3d truth-gate ./mymesh.stl</code></pre>
 <section id="releases" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Releases</span>
+      <span class="kicker" data-section="library">Releases</span>
       <h2>Signed binaries on every tag.</h2>
       <p class="lead">Windows installer (PyInstaller + Velopack auto-update + Azure Artifact Signing), source bundle with Sigstore-signed proof envelope, GitHub native build-provenance attestation.</p>
     </div>
@@ -581,7 +588,7 @@ winget install Hermes3D</code></pre>
 <section id="deploy" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">Self-host · own your inference</span>
+      <span class="kicker" data-section="gen3d">Self-host · own your inference</span>
       <h2>VPS for the UI. Your gaming PC for the brain.</h2>
       <p class="lead">A turnkey deploy bundle puts Hermes3D's web UI on a Hostinger VPS while inference stays on your local machine over a Tailscale tailnet. No port forwarding, no public LLM endpoint, ~$8/month total.</p>
     </div>
@@ -606,7 +613,7 @@ winget install Hermes3D</code></pre>
 <section id="governance" class="section">
   <div class="container">
     <div class="section__head reveal">
-      <span class="kicker">HermesProof governance</span>
+      <span class="kicker" data-section="research">HermesProof governance</span>
       <h2>Every claim is verifiable.</h2>
       <p class="lead">Hermes3D doesn't ask you to trust it. <strong>17 truth gates</strong> re-attest the system on every push to main, sign <code>PROOF/latest.json</code> with Sigstore (keyless OIDC), publish a build-provenance attestation, and commit the refreshed proof bundle back to the repo.</p>
     </div>

@@ -268,6 +268,102 @@
     }
   }
 
+  // ---------- 6. Wonder Emporium — hero particle canvas ----------
+  function setupParticles() {
+    if (typeof window.WonderParticles === "undefined") return;
+    window.WonderParticles.init("hero-particles");
+  }
+
+  // ---------- 7. Wonder Emporium — word-by-word hero title ----------
+  function setupHeroTitle() {
+    const h1 = document.querySelector(".hero__h1");
+    if (!h1 || reduceMotion) return;
+
+    // Wrap each word in a span
+    const text = h1.textContent;
+    const words = text.split(/(\s+)/);
+    h1.innerHTML = words.map((chunk) => {
+      if (/^\s+$/.test(chunk)) return chunk;
+      return `<span class="word" style="opacity:0;transform:translateY(22px) rotate(${(Math.random() * 3 - 1.5).toFixed(1)}deg)">${chunk}</span>`;
+    }).join("");
+
+    const wordEls = h1.querySelectorAll(".word");
+    wordEls.forEach((w, i) => {
+      setTimeout(() => {
+        w.style.transition =
+          `opacity 0.7s cubic-bezier(0.22,1,0.36,1), transform 0.7s cubic-bezier(0.22,1,0.36,1)`;
+        w.style.opacity = "1";
+        w.style.transform = "translateY(0) rotate(0deg)";
+      }, 120 + i * 70);
+    });
+  }
+
+  // ---------- 8. Wonder Emporium — stat glow on counter complete ----------
+  function setupStatGlow() {
+    if (reduceMotion) return;
+    // Patch setupCounters' animate to add glow when done
+    document.querySelectorAll("[data-count-to]").forEach((el) => {
+      const orig = el.textContent;
+      const observer = new MutationObserver(() => {
+        const target = el.getAttribute("data-count-to");
+        if (el.textContent === target) {
+          const stat = el.closest(".stat");
+          if (stat) {
+            stat.style.transition = "box-shadow 0.3s ease";
+            stat.style.boxShadow = "0 0 28px rgba(168,85,247,0.45), 0 0 56px rgba(168,85,247,0.15)";
+            setTimeout(() => { stat.style.boxShadow = ""; }, 1200);
+          }
+          observer.disconnect();
+        }
+      });
+      observer.observe(el, { childList: true, characterData: true, subtree: true });
+    });
+  }
+
+  // ---------- 9. Wonder Emporium — copy button sparkle ----------
+  function setupCopySparkle() {
+    const COLORS = ["#a855f7", "#06b6d4", "#ec4899", "#f59e0b"];
+
+    function burst(btn) {
+      const rect = btn.getBoundingClientRect();
+      for (let i = 0; i < 8; i++) {
+        const s = document.createElement("span");
+        s.className = "sparkle";
+        const angle = (i / 8) * Math.PI * 2;
+        const dist = 24 + Math.random() * 20;
+        s.style.cssText = [
+          `position:fixed`,
+          `left:${rect.left + rect.width / 2}px`,
+          `top:${rect.top + rect.height / 2}px`,
+          `background:${COLORS[i % COLORS.length]}`,
+          `--sx:${(Math.cos(angle) * dist).toFixed(1)}px`,
+          `--sy:${(Math.sin(angle) * dist).toFixed(1)}px`,
+          `z-index:9999`,
+          `pointer-events:none`,
+        ].join(";");
+        document.body.appendChild(s);
+        setTimeout(() => s.remove(), 650);
+      }
+    }
+
+    // Attach to existing copy buttons (data-copy or .btn-copy)
+    document.querySelectorAll("[data-copy], .btn-copy, .copy-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { if (!reduceMotion) burst(btn); });
+    });
+    // Also patch any future copy via MutationObserver on body
+    if ("MutationObserver" in window) {
+      const mo = new MutationObserver((recs) => {
+        recs.forEach((r) => r.addedNodes.forEach((n) => {
+          if (n.nodeType === 1 && n.classList &&
+              (n.classList.contains("btn-copy") || n.classList.contains("copy-btn"))) {
+            n.addEventListener("click", () => { if (!reduceMotion) burst(n); });
+          }
+        }));
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
+    }
+  }
+
   // ---------- boot ----------
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);
@@ -280,5 +376,10 @@
     setupTerminal();
     setupShotSwap();
     setupReleases();
+    setupHeroTitle();
+    setupStatGlow();
+    setupCopySparkle();
+    // Particles init after short delay so canvas is laid out
+    setTimeout(setupParticles, 80);
   }
 })();
