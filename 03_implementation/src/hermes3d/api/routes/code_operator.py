@@ -220,7 +220,24 @@ def code_cli_runners() -> dict[str, Any]:
 
 @router.get("/sandbox/readiness")
 def code_sandbox_readiness() -> dict[str, Any]:
-    return code_history.code_sandbox_readiness()
+    """Return OpenCode/OpenHands sandbox readiness (I3 spec).
+
+    Fields: opencode_detected, opencode_version, openhands_detected,
+    openhands_image, sandbox_network_mode (always "none"), denied_paths, ready.
+    """
+    return code_history.opencode_openhands_sandbox_readiness()
+
+
+@router.get("/cli-runners/preflight")
+def preflight_code_cli_runner_get(runner_id: str = "opencode") -> dict[str, Any]:
+    """Non-mutating dry-run preflight for a CLI runner (GET, no task claim required).
+
+    Runs `<runner> --version` and returns stdout, exit_code, elapsed_ms.
+    """
+    try:
+        return code_history.preflight_code_cli_runner_get(runner_id=runner_id)
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.post("/cli-runners/preflight")
