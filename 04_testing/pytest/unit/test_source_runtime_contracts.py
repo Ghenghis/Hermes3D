@@ -388,6 +388,52 @@ def test_read_only_runner_blocks_desktop_launcher(monkeypatch) -> None:
     assert "package/import/local API" in contract["blocked_reason"]
 
 
+def test_executable_path_runner_accepts_desktop_launcher_metadata(monkeypatch, tmp_path) -> None:
+    launcher = tmp_path / "BambuStudio.exe"
+    launcher.write_bytes(b"desktop launcher proof")
+
+    def _ready_launcher(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "ready",
+            "kind": "desktop_app",
+            "verifier": "Bambu Studio launcher",
+            "proof_gate_version": "desktop-launcher-metadata-v1",
+            "path": str(launcher),
+            "detected": True,
+            "executed": False,
+            "return_code": None,
+            "capabilities": ["desktop_slicer_launcher"],
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _ready_launcher)
+    mod = {
+        "id": "bambustudio",
+        "display_name": "Bambu Studio",
+        "section": "slicers",
+        "launch_kind": "desktop_app",
+        "install_state": "installed",
+        "local_path": "G:/Github/example/BambuStudio",
+    }
+
+    contract = module_runtime.module_runner_contract(mod)
+    path_smoke = module_runtime.module_executable_path_runner_contract(mod)
+
+    assert contract["agent_executable"] is False
+    assert contract["executable_path_runner_available"] is True
+    assert contract["safe_actions"] == [
+        "verify",
+        "setup_plan",
+        "read_metadata",
+        "executable_path_smoke",
+    ]
+    assert path_smoke["accepted"] is True
+    assert path_smoke["agent_executable"] is False
+    assert path_smoke["process_start_allowed"] is False
+    assert path_smoke["printer_action_allowed"] is False
+    assert path_smoke["executable"]["sha256"]
+    assert path_smoke["execution_mode"] == "registered_executable_path_metadata_probe"
+
+
 def test_print_farm_health_probe_requires_configured_local_url(monkeypatch) -> None:
     monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
     monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
@@ -643,6 +689,7 @@ def test_runner_contract_routes_are_registered() -> None:
     assert "/api/modules/runtime/runner-contracts" in paths
     assert "/api/modules/{module_id}/runtime/runner-contract" in paths
     assert "/api/modules/{module_id}/runtime/read-only-runner" in paths
+    assert "/api/modules/{module_id}/runtime/executable-path-runner" in paths
     assert "/api/modules/{module_id}/runtime/start-runner" in paths
     assert "/api/modules/{module_id}/runtime/stop-runner" in paths
 

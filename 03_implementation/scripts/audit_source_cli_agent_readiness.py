@@ -51,6 +51,7 @@ def main() -> int:
     launcher_rows = [row for row in rows if row["agent_execution_tier"] == "launcher_metadata_only"]
     gap_rows = [row for row in rows if row["agent_execution_tier"].endswith("_gap")]
     read_only_rows = [row for row in rows if row["read_only_runner_available"]]
+    executable_path_rows = [row for row in rows if row["executable_path_runner_available"]]
     audit = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "target": {
@@ -64,11 +65,13 @@ def main() -> int:
             "verified_agent_cli": len(cli_rows),
             "agent_executable": len(executable_rows),
             "read_only_runner_available": len(read_only_rows),
+            "executable_path_runner_available": len(executable_path_rows),
             "launcher_metadata_only": len(launcher_rows),
             "runner_gaps": len(gap_rows),
             "verified_agent_cli_modules": [row["module_id"] for row in cli_rows],
             "agent_executable_modules": [row["module_id"] for row in executable_rows],
             "read_only_runner_modules": [row["module_id"] for row in read_only_rows],
+            "executable_path_runner_modules": [row["module_id"] for row in executable_path_rows],
             "launcher_metadata_only_modules": [row["module_id"] for row in launcher_rows],
         },
         "rows": rows,
@@ -76,6 +79,7 @@ def main() -> int:
             "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
             "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
             "Use /api/modules/{module_id}/runtime/read-only-runner only for read_only_runner_available rows; it appends proof and cannot install, launch, update, write outputs, or touch printers.",
+            "Use /api/modules/{module_id}/runtime/executable-path-runner only for executable_path_runner_available rows; it reads executable metadata/hash only and cannot launch apps or touch printers.",
             "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
             "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
             "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -129,6 +133,12 @@ def classify_module(runtime: dict[str, Any], module: dict[str, Any], contract: d
         "read_only_runner_available": bool(contract.get("read_only_runner_available")),
         "read_only_runner_route": f"/api/modules/{module.get('id')}/runtime/read-only-runner"
         if contract.get("read_only_runner_available")
+        else None,
+        "executable_path_runner_available": bool(
+            contract.get("executable_path_runner_available")
+        ),
+        "executable_path_runner_route": f"/api/modules/{module.get('id')}/runtime/executable-path-runner"
+        if contract.get("executable_path_runner_available")
         else None,
         "runner_contract_status": str(contract.get("runner_status") or "blocked"),
         "required_verifier_family": str(contract.get("required_verifier_family") or ""),

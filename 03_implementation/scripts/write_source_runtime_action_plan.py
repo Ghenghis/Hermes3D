@@ -61,6 +61,11 @@ def main() -> int:
         for row in readiness_rows
         if isinstance(row, dict) and row.get("read_only_runner_available")
     ]
+    executable_path_runner_rows = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and row.get("executable_path_runner_available")
+    ]
     candidate_rows = [
         row
         for row in surface_rows
@@ -98,6 +103,7 @@ def main() -> int:
         f"- Verified Hermes Agent CLIs: {readiness.get('summary', {}).get('verified_agent_cli', len(verified))}",
         f"- Agent-executable runner contracts: {readiness.get('summary', {}).get('agent_executable', len(verified))}",
         f"- Read-only runner smoke rows: {readiness.get('summary', {}).get('read_only_runner_available', len(read_only_runner_rows))}",
+        f"- Executable path runner smoke rows: {readiness.get('summary', {}).get('executable_path_runner_available', len(executable_path_runner_rows))}",
         f"- CLI/service signals needing verifiers: {cli_surface.get('summary', {}).get('candidate_needs_verifier', len(candidate_rows))}",
         f"- Blocked rows: {blocked_rows}",
         "",
@@ -107,6 +113,7 @@ def main() -> int:
         "- A README command, package script, or desktop launcher is only a signal until a local non-destructive verifier passes.",
         "- Hermes Agents may execute only verifier-backed runners, never raw unreviewed shell commands from docs.",
         "- Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.",
+        "- Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.",
         "- Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.",
         "- S1 remains camera/read-only and action-locked until the user changes printer policy.",
         "",
@@ -138,6 +145,35 @@ def main() -> int:
                     cell(row.get("verifier")),
                     cell(row.get("proof_gate_version")),
                     cell(row.get("read_only_runner_route")),
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Executable Path Runner Smoke Rows",
+            "",
+            "These rows now have `/api/modules/{module_id}/runtime/executable-path-runner`. The route reads only installed executable metadata/hash and appends evidence. It is not a CLI bridge, desktop automation bridge, or launch permission.",
+            "",
+            "| App | Section | Launcher | Proof gate | Route |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for row in sorted(
+        executable_path_runner_rows,
+        key=lambda item: (str(item.get("section")), str(item.get("display"))),
+    ):
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    cell(row.get("display")),
+                    cell(row.get("section")),
+                    cell(row.get("path")),
+                    cell(row.get("proof_gate_version")),
+                    cell(row.get("executable_path_runner_route")),
                 ]
             )
             + " |"
@@ -269,7 +305,10 @@ def main() -> int:
                     cell(row.get("display")),
                     cell(row.get("section")),
                     cell(row.get("path")),
-                    cell(row.get("next_action")),
+                    cell(
+                        row.get("executable_path_runner_route")
+                        or row.get("next_action")
+                    ),
                 ]
             )
             + " |"

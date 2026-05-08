@@ -1,6 +1,6 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T22:33:39.848612+00:00
+Generated: 2026-05-08T03:48:01.432345+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
@@ -15,6 +15,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Verified Hermes Agent CLIs: 7
 - Agent-executable runner contracts: 7
 - Read-only runner smoke rows: 8
+- Executable path runner smoke rows: 3
 - CLI/service signals needing verifiers: 24
 - Blocked rows: 2
 
@@ -24,6 +25,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - A README command, package script, or desktop launcher is only a signal until a local non-destructive verifier passes.
 - Hermes Agents may execute only verifier-backed runners, never raw unreviewed shell commands from docs.
 - Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.
+- Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.
 - Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.
 - S1 remains camera/read-only and action-locked until the user changes printer policy.
 
@@ -58,6 +60,16 @@ These rows now have `/api/modules/{module_id}/runtime/read-only-runner`. The rou
 | trimesh | modelers | Trimesh Python import | python-import-verifier-v1 | /api/modules/trimesh/runtime/read-only-runner |
 | Klipper | print_farm | Klipper fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/klipper/runtime/read-only-runner |
 | Moonraker | print_farm | Moonraker fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/moonraker/runtime/read-only-runner |
+
+## Executable Path Runner Smoke Rows
+
+These rows now have `/api/modules/{module_id}/runtime/executable-path-runner`. The route reads only installed executable metadata/hash and appends evidence. It is not a CLI bridge, desktop automation bridge, or launch permission.
+
+| App | Section | Launcher | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Printrun | print_farm | G:/Github/apps/Pronterface.exe | runtime-verifier-v1 | /api/modules/printrun/runtime/executable-path-runner |
+| BambuStudio | slicers | C:/Program Files/Bambu Studio/bambu-studio.exe | desktop-launcher-metadata-v1 | /api/modules/bambustudio/runtime/executable-path-runner |
+| Ultimaker Cura | slicers | C:/Program Files/UltiMaker Cura 5.12.1/UltiMaker-Cura.exe | desktop-launcher-metadata-v1 | /api/modules/cura/runtime/executable-path-runner |
 
 ## Verified Agent CLI Rows
 
@@ -193,9 +205,9 @@ These can prove local desktop app presence, but they are not Hermes Agent CLI ru
 
 | App | Section | Launcher | Required correction |
 | --- | --- | --- | --- |
-| Printrun | print_farm | G:/Github/apps/Pronterface.exe | Do not call this agent CLI-ready; add CLI/API smoke or explicit desktop bridge before agent execution. |
-| BambuStudio | slicers | C:/Program Files/Bambu Studio/bambu-studio.exe | Do not call this agent CLI-ready; add CLI/API smoke or explicit desktop bridge before agent execution. |
-| Ultimaker Cura | slicers | C:/Program Files/UltiMaker Cura 5.12.1/UltiMaker-Cura.exe | Do not call this agent CLI-ready; add CLI/API smoke or explicit desktop bridge before agent execution. |
+| Printrun | print_farm | G:/Github/apps/Pronterface.exe | /api/modules/printrun/runtime/executable-path-runner |
+| BambuStudio | slicers | C:/Program Files/Bambu Studio/bambu-studio.exe | /api/modules/bambustudio/runtime/executable-path-runner |
+| Ultimaker Cura | slicers | C:/Program Files/UltiMaker Cura 5.12.1/UltiMaker-Cura.exe | /api/modules/cura/runtime/executable-path-runner |
 
 ## Rollup
 

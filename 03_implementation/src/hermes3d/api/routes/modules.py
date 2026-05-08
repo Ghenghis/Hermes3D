@@ -21,6 +21,7 @@ from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
 from hermes3d.services.module_runtime import (
+    module_executable_path_runner_contract,
     module_read_only_runner_contract,
     module_runner_contract,
     module_runner_contracts,
@@ -98,6 +99,10 @@ class ModuleRuntimeStartRunnerRequest(BaseModel):
 
 
 class ModuleRuntimeReadOnlyRunnerRequest(BaseModel):
+    actor: str = "operator"
+
+
+class ModuleRuntimeExecutablePathRunnerRequest(BaseModel):
     actor: str = "operator"
 
 
@@ -725,7 +730,7 @@ def module_runtime_runner_contracts(section: str | None = None) -> dict[str, Any
         **contracts,
         "section": section,
         "execution_mode": "contract_only_until_registered_runner_passes",
-        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; every other row remains Verify/Setup Plan only.",
+        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; executable_path_runner_available rows may read executable metadata only; every other row remains Verify/Setup Plan only.",
     }
 
 
@@ -801,6 +806,11 @@ def module_agent_cli_readiness() -> dict[str, Any]:
     read_only_runners = [
         record["module_id"] for record in records if record["read_only_runner_available"]
     ]
+    executable_path_runners = [
+        record["module_id"]
+        for record in records
+        if record["executable_path_runner_available"]
+    ]
     return {
         "status": "ready",
         "count": len(records),
@@ -808,10 +818,12 @@ def module_agent_cli_readiness() -> dict[str, Any]:
         "counts": dict(sorted(tier_counts.items())),
         "verified_agent_cli": len(verified_cli),
         "read_only_runner_available": len(read_only_runners),
+        "executable_path_runner_available": len(executable_path_runners),
         "launcher_metadata_only": len(launcher_only),
         "runner_gaps": len(runner_gaps),
         "verified_agent_cli_modules": verified_cli,
         "read_only_runner_modules": read_only_runners,
+        "executable_path_runner_modules": executable_path_runners,
         "launcher_metadata_only_modules": launcher_only,
         "records": records,
     }
@@ -864,6 +876,12 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
         "read_only_runner_available": bool(contract.get("read_only_runner_available")),
         "read_only_runner_route": f"/api/modules/{mod['id']}/runtime/read-only-runner"
         if contract.get("read_only_runner_available")
+        else None,
+        "executable_path_runner_available": bool(
+            contract.get("executable_path_runner_available")
+        ),
+        "executable_path_runner_route": f"/api/modules/{mod['id']}/runtime/executable-path-runner"
+        if contract.get("executable_path_runner_available")
         else None,
         "next_action": _agent_cli_next_action(
             execution_tier, launch_kind, str(runtime.get("verifier") or "")
@@ -970,6 +988,40 @@ def create_module_runtime_read_only_runner(
             "runner_family": contract["runner_family"],
             "verifier_kind": contract["verifier_kind"],
             "proof_gate_version": contract.get("proof_gate_version"),
+            "contract": contract,
+        },
+    )
+    return {
+        "module_id": module_id,
+        "accepted": bool(contract["accepted"]),
+        "status": str(contract["status"]),
+        "runtime_ready": bool(contract["runtime_ready"]),
+        "execution_mode": str(contract["execution_mode"]),
+        "contract": contract,
+        "proof_event_id": proof_event_id,
+    }
+
+
+@router.post("/api/modules/{module_id}/runtime/executable-path-runner")
+def create_module_runtime_executable_path_runner(
+    module_id: str,
+    body: ModuleRuntimeExecutablePathRunnerRequest | None = None,
+) -> dict[str, Any]:
+    mod = _sync_module_status(_module_or_404(module_id))
+    actor = _safe_actor(body.actor if body else "operator")
+    contract = module_executable_path_runner_contract(mod)
+    proof_event_id = _append_module_proof(
+        "source_module.runtime_executable_path_runner.proved"
+        if contract["accepted"]
+        else "source_module.runtime_executable_path_runner.blocked",
+        actor,
+        {
+            "module_id": module_id,
+            "accepted": contract["accepted"],
+            "status": contract["status"],
+            "verifier_kind": contract["verifier_kind"],
+            "proof_gate_version": contract.get("proof_gate_version"),
+            "executable_sha256": (contract.get("executable") or {}).get("sha256"),
             "contract": contract,
         },
     )

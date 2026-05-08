@@ -7,6 +7,7 @@ non-destructive verifier proves the local runtime path or launch bridge.
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import json
 import os
@@ -711,6 +712,7 @@ READ_ONLY_API_RUNNER_VERIFIER_KINDS = {"local_http_health", "moonraker_fleet"}
 READ_ONLY_RUNNER_VERIFIER_KINDS = (
     READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS | READ_ONLY_API_RUNNER_VERIFIER_KINDS
 )
+EXECUTABLE_PATH_RUNNER_VERIFIER_KINDS = {"desktop_app"}
 SERVICE_START_RUNNERS: dict[str, dict[str, Any]] = {
     "fdm_monster": {
         "command": ["npm", "run", "start"],
@@ -860,11 +862,14 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
     read_only_runner_available = _read_only_runner_available(
         runtime=runtime, verifier_kind=verifier_kind
     )
+    executable_path_runner_available = _executable_path_runner_available(
+        runtime=runtime, verifier_kind=verifier_kind
+    )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
     blocked_reason = (
         None
-        if read_only_runner_available
+        if read_only_runner_available or executable_path_runner_available
         else _runner_blocked_reason(
             runtime=runtime, runner_status=runner_status, required_family=required_family
         )
@@ -879,6 +884,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "runtime_ready": runtime_status == "ready",
         "agent_executable": agent_executable,
         "read_only_runner_available": read_only_runner_available,
+        "executable_path_runner_available": executable_path_runner_available,
         "runner_status": runner_status,
         "verifier": runtime.get("verifier"),
         "verifier_kind": verifier_kind,
@@ -891,6 +897,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
             runtime,
             agent_executable=agent_executable,
             read_only_runner_available=read_only_runner_available,
+            executable_path_runner_available=executable_path_runner_available,
         ),
         "required_verifier_family": required_family,
         "acceptance_gate": _runner_acceptance_gate(
@@ -902,7 +909,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
         "proof_required": True,
         "mutation_allowed": False,
-        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, but setup/install/update remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
+        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, and executable path smoke may read installed launcher metadata only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
     }
 
 
@@ -923,6 +930,9 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "read_only_runner_available": sum(
             1 for contract in contracts if contract.get("read_only_runner_available")
         ),
+        "executable_path_runner_available": sum(
+            1 for contract in contracts if contract.get("executable_path_runner_available")
+        ),
         "runner_gaps": sum(
             1
             for contract in contracts
@@ -938,7 +948,7 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "by_runner_status": dict(sorted(by_status.items())),
         "by_gap_section": dict(sorted(by_section.items())),
         "contracts": contracts,
-        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof and cannot launch, install, update, or write.",
+        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata. Neither can launch, install, update, or write.",
     }
 
 
@@ -1007,6 +1017,71 @@ def module_read_only_runner_contract(
         if ready
         else "blocked_until_registered_read_only_probe_passes",
         "policy": "This endpoint re-runs only package/import/local API verifier proof and appends evidence. It cannot launch apps, start services, install/update source, write output files, or send printer commands.",
+    }
+
+
+def module_executable_path_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
+    """Return the non-launching executable path proof contract.
+
+    This supports desktop launcher rows such as Printrun, BambuStudio, and
+    Cura. It reads file metadata and a hash from the configured executable, but
+    never starts the app, sends files, opens printers, or writes outputs.
+    """
+
+    runtime = module_runtime_probe(mod, live=False)
+    module_id = str(mod.get("id") or "")
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    verifier_kind = str(runtime.get("kind") or launch_kind)
+    ready = _executable_path_runner_available(runtime=runtime, verifier_kind=verifier_kind)
+    path_value = str(runtime.get("path") or mod.get("local_path") or "")
+    path = Path(path_value) if path_value else None
+    metadata = _executable_file_metadata(path) if ready else {}
+    if ready and not metadata.get("exists"):
+        ready = False
+    blocked_reason = None if ready else _executable_path_runner_blocked_reason(
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+        path_value=path_value,
+    )
+    runtime_public = {
+        key: value
+        for key, value in runtime.items()
+        if key not in {"output_head"}
+    }
+    if runtime.get("output_head"):
+        runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
+    return {
+        "module_id": module_id,
+        "display": str(mod.get("display_name") or module_id),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": launch_kind,
+        "status": "ready" if ready else "blocked",
+        "accepted": ready,
+        "runtime_ready": str(runtime.get("status") or "") == "ready",
+        "executable_path_runner_available": ready,
+        "agent_executable": False,
+        "runner_status": "executable_path_runner_ready" if ready else "blocked",
+        "verifier": runtime.get("verifier"),
+        "verifier_kind": verifier_kind,
+        "proof_gate_version": runtime.get("proof_gate_version"),
+        "path": path_value,
+        "executed": False,
+        "return_code": runtime.get("return_code"),
+        "capabilities": list(runtime.get("capabilities") or []),
+        "runtime": runtime_public,
+        "executable": metadata,
+        "safe_actions": ["verify", "read_metadata", "executable_path_smoke"]
+        if ready
+        else ["verify", "setup_plan"],
+        "blocked_reason": blocked_reason,
+        "proof_required": True,
+        "mutation_allowed": False,
+        "process_start_allowed": False,
+        "printer_action_allowed": False,
+        "execution_mode": "registered_executable_path_metadata_probe"
+        if ready
+        else "blocked_until_installed_executable_path_is_verified",
+        "policy": "This endpoint reads only the configured executable file metadata/hash and appends evidence. It cannot launch apps, start services, install/update source, write output files, or send printer commands.",
     }
 
 
@@ -2074,6 +2149,16 @@ def _read_only_runner_available(*, runtime: dict[str, Any], verifier_kind: str) 
     )
 
 
+def _executable_path_runner_available(*, runtime: dict[str, Any], verifier_kind: str) -> bool:
+    return (
+        str(runtime.get("status") or "") == "ready"
+        and verifier_kind in EXECUTABLE_PATH_RUNNER_VERIFIER_KINDS
+        and bool(runtime.get("detected"))
+        and not bool(runtime.get("executed"))
+        and bool(str(runtime.get("proof_gate_version") or "").strip())
+    )
+
+
 def _read_only_runner_family(verifier_kind: str) -> str:
     if verifier_kind in READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS:
         return "metadata"
@@ -2100,14 +2185,38 @@ def _read_only_runner_blocked_reason(
     return "Read-only runner smoke is blocked until the verifier proof contract is complete."
 
 
+def _executable_path_runner_blocked_reason(
+    *, runtime: dict[str, Any], verifier_kind: str, path_value: str
+) -> str:
+    runtime_reason = str(runtime.get("reason") or "").strip()
+    if verifier_kind not in EXECUTABLE_PATH_RUNNER_VERIFIER_KINDS:
+        return (
+            "Executable path smoke is available only for installed desktop launcher verifier "
+            f"rows; this row uses verifier kind {verifier_kind}."
+        )
+    if str(runtime.get("status") or "") != "ready":
+        return runtime_reason or "The executable path verifier must return ready first."
+    if bool(runtime.get("executed")):
+        return "Executable path smoke is metadata-only and cannot wrap executed CLI probes."
+    if not path_value:
+        return "Executable path smoke requires a configured executable path."
+    return "Executable path smoke is blocked until the launcher file can be verified."
+
+
 def _safe_runner_actions(
-    runtime: dict[str, Any], *, agent_executable: bool, read_only_runner_available: bool = False
+    runtime: dict[str, Any],
+    *,
+    agent_executable: bool,
+    read_only_runner_available: bool = False,
+    executable_path_runner_available: bool = False,
 ) -> list[str]:
     actions = ["verify", "setup_plan"]
     if agent_executable:
         actions.extend(["version_or_help", "dry_run_smoke_plan"])
     elif read_only_runner_available:
         actions.extend(["read_metadata", "read_only_runner_smoke"])
+    elif executable_path_runner_available:
+        actions.extend(["read_metadata", "executable_path_smoke"])
     elif runtime.get("status") == "ready":
         actions.append("read_metadata")
     return actions
@@ -2129,6 +2238,34 @@ def _local_tooling_record(tool_key: str) -> dict[str, Any]:
     tools = audit.get("tools") if isinstance(audit, dict) else None
     record = tools.get(tool_key) if isinstance(tools, dict) else None
     return record if isinstance(record, dict) else {}
+
+
+def _executable_file_metadata(path: Path | None) -> dict[str, Any]:
+    if path is None:
+        return {"exists": False, "reason": "path_not_configured"}
+    try:
+        stat = path.stat()
+    except OSError as exc:
+        return {"exists": False, "reason": type(exc).__name__}
+    if not path.is_file():
+        return {"exists": False, "path": str(path), "reason": "not_a_file"}
+    return {
+        "exists": True,
+        "path": str(path),
+        "name": path.name,
+        "suffix": path.suffix.lower(),
+        "size_bytes": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "sha256": _sha256_file(path),
+    }
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _run_runtime_command(

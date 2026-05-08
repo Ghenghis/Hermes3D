@@ -1,9 +1,10 @@
 {
-  "generated_at_utc": "2026-05-07T22:33:39.581645+00:00",
+  "generated_at_utc": "2026-05-08T03:48:01.177780+00:00",
   "next_actions": [
     "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
     "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
     "Use /api/modules/{module_id}/runtime/read-only-runner only for read_only_runner_available rows; it appends proof and cannot install, launch, update, write outputs, or touch printers.",
+    "Use /api/modules/{module_id}/runtime/executable-path-runner only for executable_path_runner_available rows; it reads executable metadata/hash only and cannot launch apps or touch printers.",
     "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
     "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
     "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -16,6 +17,8 @@
       "agent_execution_tier": "npm_package_gap",
       "capabilities": [],
       "display": "Azure Speech SDK JS",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "npm_package",
       "module_id": "azure_speech_sdk_js",
@@ -47,6 +50,8 @@
         "provider_candidate"
       ],
       "display": "Blender MCP Candidates",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "blender_mcp_candidates",
@@ -81,6 +86,8 @@
         "self_update_cli"
       ],
       "display": "Hermes Agent (NousResearch)",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "hermes_agent",
@@ -113,6 +120,8 @@
         "agent_eval_reference"
       ],
       "display": "Kiln",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "web_app_reference",
       "module_id": "kiln",
@@ -144,6 +153,8 @@
         "source_inventory"
       ],
       "display": "LangChain",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "source_reference",
       "module_id": "langchain",
@@ -175,6 +186,8 @@
         "workflow_reference"
       ],
       "display": "LangGraph",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "source_reference",
       "module_id": "langgraph",
@@ -206,6 +219,8 @@
         "tool_protocol_reference"
       ],
       "display": "Model Context Protocol",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "npm_package",
       "module_id": "model_context_protocol",
@@ -238,6 +253,8 @@
         "fleet_status_probe"
       ],
       "display": "Klipper",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "firmware_klipper",
@@ -270,6 +287,8 @@
         "configuration_reference"
       ],
       "display": "Marlin",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "marlin",
@@ -301,6 +320,8 @@
         "cmake_reference"
       ],
       "display": "Prusa Firmware",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "prusa_firmware",
@@ -332,6 +353,8 @@
         "duet_firmware_reference"
       ],
       "display": "RepRapFirmware",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "reprapfirmware",
@@ -363,6 +386,8 @@
         "configuration_reference"
       ],
       "display": "Repetier Firmware",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "repetier_firmware",
@@ -394,6 +419,8 @@
         "configuration_reference"
       ],
       "display": "Smoothieware",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "smoothieware",
@@ -425,6 +452,8 @@
         "hardware_reference"
       ],
       "display": "Awesome Extruders",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "catalog_reference",
       "module_id": "awesome_extruders",
@@ -456,6 +485,8 @@
         "configuration_reference"
       ],
       "display": "BoxTurtle",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "hardware_reference",
       "module_id": "boxturtle",
@@ -487,6 +518,8 @@
         "configuration_reference"
       ],
       "display": "EnragedRabbitProject",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "hardware_reference",
       "module_id": "enraged_rabbit_project",
@@ -518,6 +551,8 @@
         "read_only_http_probe"
       ],
       "display": "Manyfold",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "manyfold",
@@ -548,6 +583,8 @@
         "read_only_http_probe"
       ],
       "display": "Open Filament Database",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "open_filament_database",
@@ -579,6 +616,8 @@
         "mesh_convert"
       ],
       "display": "Blender",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "desktop_app",
       "module_id": "blender",
@@ -611,6 +650,8 @@
         "step_stl_export"
       ],
       "display": "CadQuery",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "cadquery",
@@ -638,6 +679,8 @@
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
       "display": "FreeCAD",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "desktop_app",
       "module_id": "freecad",
@@ -668,6 +711,8 @@
         "boolean_geometry"
       ],
       "display": "Manifold",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "cli_or_python_worker",
       "module_id": "manifold",
@@ -701,6 +746,8 @@
         "mesh_repair_reference"
       ],
       "display": "MeshLab",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "desktop_or_cli",
       "module_id": "meshlab",
@@ -734,6 +781,8 @@
         "geometry_analysis"
       ],
       "display": "Open3D",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "open3d",
@@ -765,6 +814,8 @@
         "render_png"
       ],
       "display": "OpenSCAD",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "desktop_or_cli",
       "module_id": "openscad",
@@ -794,6 +845,8 @@
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
       "display": "SolveSpace",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "desktop_app",
       "module_id": "solvespace",
@@ -824,6 +877,8 @@
         "solid_modeling"
       ],
       "display": "build123d",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "build123d",
@@ -855,6 +910,8 @@
         "mesh_measurement"
       ],
       "display": "numpy-stl",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "numpy_stl",
@@ -886,6 +943,8 @@
         "watertightness_reference"
       ],
       "display": "pymesh",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "pymesh",
@@ -917,6 +976,8 @@
         "mesh_analysis"
       ],
       "display": "trimesh",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "python_worker",
       "module_id": "trimesh",
@@ -949,6 +1010,8 @@
         "source_inventory"
       ],
       "display": "truck",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "rust_library_reference",
       "module_id": "truck",
@@ -980,6 +1043,8 @@
         "queue_reference"
       ],
       "display": "BotQueue",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "service_reference",
       "module_id": "botqueue",
@@ -1011,6 +1076,8 @@
         "read_only_http_probe"
       ],
       "display": "FDM Monster",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "fdm_monster",
@@ -1041,6 +1108,8 @@
         "read_only_http_probe"
       ],
       "display": "Fluidd",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "web_app",
       "module_id": "fluidd",
@@ -1071,6 +1140,8 @@
         "fleet_status_probe"
       ],
       "display": "Klipper",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "klipper",
@@ -1103,6 +1174,8 @@
         "klipper_reference"
       ],
       "display": "KlipperScreen",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "touch_ui_reference",
       "module_id": "klipperscreen",
@@ -1134,6 +1207,8 @@
         "read_only_http_probe"
       ],
       "display": "Mainsail",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "web_app",
       "module_id": "mainsail",
@@ -1164,6 +1239,8 @@
         "fleet_status_probe"
       ],
       "display": "Moonraker",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "moonraker",
@@ -1196,6 +1273,8 @@
         "read_only_http_probe"
       ],
       "display": "OctoFarm",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service_reference",
       "module_id": "octofarm",
@@ -1226,6 +1305,8 @@
         "read_only_http_probe"
       ],
       "display": "OctoPrint",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "octoprint",
@@ -1255,6 +1336,8 @@
         "serial_gui_app"
       ],
       "display": "Printrun",
+      "executable_path_runner_available": true,
+      "executable_path_runner_route": "/api/modules/printrun/runtime/executable-path-runner",
       "executed": false,
       "launch_kind": "desktop_or_cli",
       "module_id": "printrun",
@@ -1271,7 +1354,8 @@
       "safe_actions": [
         "verify",
         "setup_plan",
-        "read_metadata"
+        "read_metadata",
+        "executable_path_smoke"
       ],
       "section": "print_farm",
       "verifier": "Printrun Windows launcher",
@@ -1286,6 +1370,8 @@
         "research_reference"
       ],
       "display": "Awesome 3D Printing",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "reference",
       "module_id": "awesome_3d_printing",
@@ -1317,6 +1403,8 @@
         "project_workspace"
       ],
       "display": "BambuStudio",
+      "executable_path_runner_available": true,
+      "executable_path_runner_route": "/api/modules/bambustudio/runtime/executable-path-runner",
       "executed": false,
       "launch_kind": "desktop_or_cli",
       "module_id": "bambustudio",
@@ -1333,7 +1421,8 @@
       "safe_actions": [
         "verify",
         "setup_plan",
-        "read_metadata"
+        "read_metadata",
+        "executable_path_smoke"
       ],
       "section": "slicers",
       "verifier": "Bambu Studio Windows launcher",
@@ -1349,6 +1438,8 @@
         "mesh_to_gcode_cli"
       ],
       "display": "CuraEngine",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "cli_worker",
       "module_id": "curaengine",
@@ -1384,6 +1475,8 @@
         "load_filaments"
       ],
       "display": "FLSUN Slicer",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "desktop_app",
       "module_id": "flsun_slicer",
@@ -1416,6 +1509,8 @@
         "read_only_http_probe"
       ],
       "display": "Kiri:Moto / GridSpace",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "web_app",
       "module_id": "kirimoto_gridspace",
@@ -1443,6 +1538,8 @@
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
       "display": "MatterControl",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "desktop_app",
       "module_id": "mattercontrol",
@@ -1474,6 +1571,8 @@
         "export_stl"
       ],
       "display": "OrcaSlicer",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "desktop_app",
       "module_id": "orcaslicer",
@@ -1508,6 +1607,8 @@
         "info"
       ],
       "display": "PrusaSlicer",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "desktop_app",
       "module_id": "prusaslicer",
@@ -1541,6 +1642,8 @@
         "info"
       ],
       "display": "Slic3r",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "desktop_or_cli",
       "module_id": "slic3r",
@@ -1572,6 +1675,8 @@
         "cmake_build_reference"
       ],
       "display": "Strec3D",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "desktop_app",
       "module_id": "strec3d",
@@ -1605,6 +1710,8 @@
         "info"
       ],
       "display": "SuperSlicer",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "desktop_or_cli",
       "module_id": "superslicer",
@@ -1635,6 +1742,8 @@
         "profile_workspace"
       ],
       "display": "Ultimaker Cura",
+      "executable_path_runner_available": true,
+      "executable_path_runner_route": "/api/modules/cura/runtime/executable-path-runner",
       "executed": false,
       "launch_kind": "desktop_app",
       "module_id": "cura",
@@ -1651,7 +1760,8 @@
       "safe_actions": [
         "verify",
         "setup_plan",
-        "read_metadata"
+        "read_metadata",
+        "executable_path_smoke"
       ],
       "section": "slicers",
       "verifier": "UltiMaker Cura Windows launcher",
@@ -1667,6 +1777,8 @@
         "system_stats"
       ],
       "display": "ComfyUI",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "comfyui",
@@ -1697,6 +1809,8 @@
         "generation_ui_reference"
       ],
       "display": "ComfyUI Frontend",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "web_app_reference",
       "module_id": "comfyui_frontend",
@@ -1728,6 +1842,8 @@
         "read_only_http_probe"
       ],
       "display": "ComfyUI TRELLIS.2 Wrapper",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": true,
       "launch_kind": "service",
       "module_id": "comfyui_trellis_wrapper",
@@ -1755,6 +1871,8 @@
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
       "display": "Microsoft TRELLIS.2",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "gpu_worker",
       "module_id": "trellis",
@@ -1782,6 +1900,8 @@
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
       "display": "Tencent Hunyuan3D 2.1",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "gpu_worker",
       "module_id": "hunyuan3d_2_1",
@@ -1809,6 +1929,8 @@
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
       "display": "TripoSR",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "gpu_worker",
       "module_id": "triposr",
@@ -1839,6 +1961,8 @@
         "parametric_generator_reference"
       ],
       "display": "3D Box Generator",
+      "executable_path_runner_available": false,
+      "executable_path_runner_route": null,
       "executed": false,
       "launch_kind": "web_app_reference",
       "module_id": "box_stl_generator",
@@ -1900,6 +2024,12 @@
       "runtime_repair_required": 15,
       "source_reference_only": 18
     },
+    "executable_path_runner_available": 3,
+    "executable_path_runner_modules": [
+      "printrun",
+      "bambustudio",
+      "cura"
+    ],
     "launcher_metadata_only": 3,
     "launcher_metadata_only_modules": [
       "printrun",
