@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -272,6 +273,84 @@ def test_provider_team_assignment_blocks_when_provider_missing(monkeypatch: pyte
     assert result["status"] == "blocked"
     assert "deepseek-reviewers" in result["blocked_reasons"][0]
     assert result["mcp_evidence"]["evidence_id"] == "ev_team_blocked"
+
+
+def test_provider_status_requires_live_smoke_proof(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+
+    status = code_history._provider_status(
+        "minimax",
+        {
+            "HERMES3D_MINIMAX_API_KEY": "configured-but-unproven",
+            "HERMES3D_MINIMAX_MODEL": "minimax-test",
+        },
+    )
+
+    assert status["status"] == "smoke_required"
+    assert status["live_status"] == "not_probed"
+    assert "smoke proof" in status["blocked_reason"]
+
+
+def test_provider_status_blocks_after_failed_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+    auth_contract = {
+        "provider_id": "minimax",
+        "base_url_label": "api.minimax.io",
+        "chat_path": "/v1/chat/completions",
+        "auth_scheme": "Authorization: Bearer <redacted>",
+        "api_key_configured": True,
+        "model": "minimax-test",
+        "model_configured": True,
+    }
+    code_history._write_provider_smoke_status(
+        "minimax",
+        accepted=False,
+        status="blocked",
+        blocked_reasons=["Provider minimax returned HTTP 401: login fail"],
+        auth_contract=auth_contract,
+        evidence={"evidence_id": "ev_failed_smoke"},
+    )
+
+    status = code_history._provider_status(
+        "minimax",
+        {
+            "HERMES3D_MINIMAX_API_KEY": "configured-but-rejected",
+            "HERMES3D_MINIMAX_MODEL": "minimax-test",
+        },
+    )
+
+    assert status["status"] == "auth_failed"
+    assert status["live_status"] == "failed"
+    assert status["last_smoke"]["evidence_id"] == "ev_failed_smoke"
+    assert "401" in status["blocked_reason"]
+
+
+def test_sandbox_readiness_inspects_configured_image(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        code_history,
+        "private_env",
+        lambda: {
+            "HERMES3D_AGENT_SANDBOX_IMAGE": "ghcr.io/openhands/openhands:latest",
+            "HERMES3D_AGENT_SANDBOX_NETWORK": "none",
+        },
+    )
+    monkeypatch.setattr(code_history.shutil, "which", lambda _name: "docker")
+
+    def fake_run(args: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        if args[1] == "version":
+            return subprocess.CompletedProcess(args, 0, stdout="29.4.1\n", stderr="")
+        if args[1:3] == ["image", "inspect"]:
+            return subprocess.CompletedProcess(args, 0, stdout="sha256:abc123 123456\n", stderr="")
+        raise AssertionError(f"unexpected command: {args}")
+
+    monkeypatch.setattr(code_history.subprocess, "run", fake_run)
+
+    status = code_history.code_sandbox_readiness()
+
+    assert status["ready"] is True
+    assert status["image_status"] == "present"
+    assert status["image_id"] == "sha256:abc123"
+    assert status["image_size_bytes"] == 123456
 
 
 def test_provider_team_review_requires_proof_id(monkeypatch: pytest.MonkeyPatch) -> None:

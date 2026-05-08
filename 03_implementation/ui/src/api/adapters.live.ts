@@ -72,6 +72,12 @@ const LIVE_PLAN_PREVIEW_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/plan/pre
 const LIVE_PROVIDER_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/providers/health`;
 const LIVE_SERVICE_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/health/services`;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
+const API_BASE_URLS = Array.from(new Set([
+  LIVE_BASE_URL,
+  `http://127.0.0.1:${DEFAULT_BRIDGE_PORT}`,
+  "http://127.0.0.1:8766",
+  "http://127.0.0.1:8767",
+]));
 
 export type AgentConfigPayload = Record<string, unknown>;
 
@@ -1345,7 +1351,7 @@ export function getCameraObserverStatusLive(): Promise<{ status: string; reason:
 
 async function fetchJson<T>(path: string): Promise<T | null> {
   try {
-    const response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    const response = await fetchApiResponse(path, {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
@@ -1366,7 +1372,7 @@ async function fetchArray<T>(path: string): Promise<T[]> {
 
 async function fetchNullable<T>(path: string): Promise<T | null> {
   try {
-    const response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    const response = await fetchApiResponse(path, {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
@@ -1382,7 +1388,7 @@ async function fetchNullable<T>(path: string): Promise<T | null> {
 
 async function postBinary(path: string, body: Blob): Promise<unknown | null> {
   try {
-    const response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    const response = await fetchApiResponse(path, {
       method: "POST",
       headers: { Accept: "application/json" },
       body,
@@ -1400,7 +1406,7 @@ async function postBinary(path: string, body: Blob): Promise<unknown | null> {
 async function postJsonWithResult(path: string, body: unknown): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    response = await fetchApiResponse(path, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -1410,7 +1416,7 @@ async function postJsonWithResult(path: string, body: unknown): Promise<unknown>
       cache: "no-store",
     });
   } catch (error) {
-    throw new Error(`${path} is unreachable at ${LIVE_BASE_URL}: ${errorMessage(error)}`);
+    throw new Error(`${path} is unreachable at ${apiBaseSummary()}: ${errorMessage(error)}`);
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -1431,7 +1437,7 @@ async function postJobTransition(path: string, body: unknown): Promise<JobTransi
 async function postVoid(path: string, body?: unknown): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    response = await fetchApiResponse(path, {
       method: "POST",
       headers: body === undefined ? { Accept: "application/json" } : {
         Accept: "application/json",
@@ -1441,7 +1447,7 @@ async function postVoid(path: string, body?: unknown): Promise<void> {
       cache: "no-store",
     });
   } catch (error) {
-    throw new Error(`${path} is unreachable at ${LIVE_BASE_URL}: ${errorMessage(error)}`);
+    throw new Error(`${path} is unreachable at ${apiBaseSummary()}: ${errorMessage(error)}`);
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -1452,7 +1458,7 @@ async function postVoid(path: string, body?: unknown): Promise<void> {
 async function putVoid(path: string, body: unknown): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    response = await fetchApiResponse(path, {
       method: "PUT",
       headers: {
         Accept: "application/json",
@@ -1462,12 +1468,40 @@ async function putVoid(path: string, body: unknown): Promise<void> {
       cache: "no-store",
     });
   } catch (error) {
-    throw new Error(`${path} is unreachable at ${LIVE_BASE_URL}: ${errorMessage(error)}`);
+    throw new Error(`${path} is unreachable at ${apiBaseSummary()}: ${errorMessage(error)}`);
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(httpFailureReason(payload, response, path));
   }
+}
+
+async function fetchApiResponse(path: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown = null;
+  let lastResponse: Response | null = null;
+  for (const baseUrl of API_BASE_URLS) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, init);
+      if (response.ok || !isRetryableApiMiss(response)) {
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastResponse) {
+    return lastResponse;
+  }
+  throw new Error(lastError instanceof Error ? lastError.message : "all API base URLs failed");
+}
+
+function isRetryableApiMiss(response: Response): boolean {
+  return response.status === 404 || response.status === 405 || response.status === 502 || response.status === 503;
+}
+
+function apiBaseSummary(): string {
+  return API_BASE_URLS.join(", ");
 }
 
 function parseAutopilotCheck(value: unknown): AutopilotCheck | null {

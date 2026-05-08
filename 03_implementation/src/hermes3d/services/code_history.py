@@ -25,6 +25,7 @@ from hermes3d.services.agent_runtime import env_value, private_env
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 PROJECT_ROOT = IMPLEMENTATION_ROOT.parent
 HISTORY_ROOT = IMPLEMENTATION_ROOT / "var" / "code-history"
+PROVIDER_SMOKE_STATUS_FILE = HISTORY_ROOT / "provider-smoke-status.json"
 MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024
 MAX_DIFF_BYTES = 1024 * 1024
 MAX_FILE_VIEW_BYTES = 512 * 1024
@@ -260,6 +261,11 @@ def programming_readiness() -> dict[str, Any]:
     missing_sources = [item["id"] for item in source_results if item["status"] == "missing"]
     source_warnings = [item["id"] for item in source_results if item["status"] == "source_tree"]
     missing_providers = [item["id"] for item in provider_results if item["status"] != "ready"]
+    provider_blockers = [
+        f"{item['id']}: {item.get('blocked_reason') or item['status']}"
+        for item in provider_results
+        if item["status"] != "ready"
+    ]
     ready = not missing_sources and not missing_providers and lock_status["ready"]
     return {
         "status": "ready" if ready else "partial",
@@ -287,6 +293,11 @@ def programming_readiness() -> dict[str, Any]:
             "mcp_locks": [] if lock_status["ready"] else [lock_status["blocked_reason"]],
             "code_history": _code_history_status(),
         },
+        "blocked_reasons": [
+            *[f"Source input {source_id} is missing." for source_id in missing_sources],
+            *provider_blockers,
+            *([] if lock_status["ready"] else [str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready.")]),
+        ],
     }
 
 
@@ -307,7 +318,9 @@ def provider_team_readiness() -> dict[str, Any]:
         if source.get("status") == "missing":
             team_blockers.append(f"Source input {config['source_input']} is missing.")
         if provider.get("status") != "ready":
-            team_blockers.append(f"Provider {config['provider_id']} is not configured.")
+            team_blockers.append(
+                str(provider.get("blocked_reason") or f"Provider {config['provider_id']} status is {provider.get('status', 'not_ready')}.")
+            )
         if not lock_status["ready"]:
             team_blockers.append(str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready."))
         ready = not team_blockers
@@ -410,6 +423,9 @@ def code_sandbox_readiness() -> dict[str, Any]:
     mode = env_value("HERMES3D_AGENT_SANDBOX_MODE", private_values, "docker").strip().lower() or "docker"
     blocked: list[str] = []
     docker_version: str | None = None
+    image_status = "not_configured"
+    image_id: str | None = None
+    image_size_bytes: int | None = None
     if mode not in {"docker", "container"}:
         blocked.append("Only docker/container sandbox mode is accepted for OpenHands/OpenCode runner execution.")
     if not docker:
@@ -425,6 +441,34 @@ def code_sandbox_readiness() -> dict[str, Any]:
             blocked.append("Docker version probe could not complete.")
     if not configured_image:
         blocked.append("HERMES3D_AGENT_SANDBOX_IMAGE is not configured in private env.")
+    elif not docker:
+        image_status = "unverified"
+    elif docker:
+        try:
+            result = subprocess.run(
+                [docker, "image", "inspect", configured_image, "--format", "{{.Id}} {{.Size}}"],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+            output = (result.stdout or "").strip()
+            parts = output.split()
+            if result.returncode == 0 and parts:
+                image_status = "present"
+                image_id = parts[0][:160]
+                if len(parts) > 1:
+                    try:
+                        image_size_bytes = int(parts[1])
+                    except ValueError:
+                        image_size_bytes = None
+            else:
+                image_status = "missing"
+                blocked.append("Configured sandbox image is not present locally or cannot be inspected.")
+        except (OSError, subprocess.TimeoutExpired):
+            image_status = "missing"
+            blocked.append("Configured sandbox image inspect probe could not complete.")
     if network_mode not in {"none", "private", "bridge"}:
         blocked.append("HERMES3D_AGENT_SANDBOX_NETWORK must be none, private, or bridge.")
     return {
@@ -435,6 +479,9 @@ def code_sandbox_readiness() -> dict[str, Any]:
         "docker_version": docker_version,
         "image_configured": bool(configured_image),
         "image": configured_image or None,
+        "image_status": image_status,
+        "image_id": image_id,
+        "image_size_bytes": image_size_bytes,
         "network_mode": network_mode,
         "workspace_mount": str(PROJECT_ROOT),
         "denied_paths": sorted(["G:/private", ".git", "node_modules", "03_implementation/proof", "03_implementation/var"]),
@@ -1592,7 +1639,7 @@ def run_provider_team_coding_pass(
             max_tokens=2400,
         )
     except RuntimeError as exc:
-        blocked = [str(exc)]
+        blocked = [_provider_error_summary("minimax", str(exc))]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
@@ -1686,7 +1733,7 @@ def run_provider_team_review_pass(
             max_tokens=2400,
         )
     except RuntimeError as exc:
-        blocked = [str(exc)]
+        blocked = [_provider_error_summary("deepseek", str(exc))]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
@@ -1772,6 +1819,14 @@ def provider_execution_smoke(
             summary=f"Blocked {provider} provider smoke: missing private env",
             data={"provider_id": provider, "missing": missing, "auth_contract": auth_contract},
         )
+        _write_provider_smoke_status(
+            provider,
+            accepted=False,
+            status="missing_config",
+            blocked_reasons=["Missing private env: " + ", ".join(missing)],
+            auth_contract=auth_contract,
+            evidence=evidence,
+        )
         return {
             "status": "blocked",
             "accepted": False,
@@ -1791,13 +1846,21 @@ def provider_execution_smoke(
             max_tokens=256,
         )
     except RuntimeError as exc:
-        blocked = [str(exc)]
+        blocked = [_provider_error_summary(provider, str(exc))]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
             kind="code_provider_smoke",
             summary=f"Blocked {provider} provider smoke",
             data={"provider_id": provider, "blocked_reasons": blocked, "auth_contract": auth_contract},
+        )
+        _write_provider_smoke_status(
+            provider,
+            accepted=False,
+            status="blocked",
+            blocked_reasons=blocked,
+            auth_contract=auth_contract,
+            evidence=evidence,
         )
         return {
             "status": "blocked",
@@ -1818,6 +1881,15 @@ def provider_execution_smoke(
             "content_sha256": response["content_sha256"],
             "auth_contract": auth_contract,
         },
+    )
+    _write_provider_smoke_status(
+        provider,
+        accepted=True,
+        status="ready",
+        blocked_reasons=[],
+        auth_contract=auth_contract,
+        content_sha256=str(response["content_sha256"]),
+        evidence=evidence,
     )
     return {
         "status": "ready",
@@ -2274,6 +2346,13 @@ def _cli_runner_source_path(config: dict[str, Any]) -> str | None:
 
 def _cli_runner_next_steps(status: dict[str, Any]) -> list[str]:
     if status.get("detected"):
+        sandbox = code_sandbox_readiness()
+        if sandbox.get("ready"):
+            return [
+                "rerun MiniMax and DeepSeek provider smokes; fix private provider auth if either returns blocked",
+                "use /api/code-operator/cli-runners/run only after provider smoke, review handoff, and output proof pass",
+                "ship through reviewed patch apply, gates, git branch/stage/commit/push/PR, and rollback proof",
+            ]
         return [
             "configure HERMES3D_AGENT_SANDBOX_IMAGE in G:/private/.env",
             "pass /api/code-operator/sandbox/readiness",
@@ -2399,9 +2478,44 @@ def _provider_proof_ids(coding: dict[str, Any]) -> list[str]:
 
 def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[str, Any]:
     config = _provider_chat_config(provider_id, private_values, require_ready=False)
+    auth_contract = {
+        "provider_id": provider_id,
+        "base_url_label": config["base_url_label"],
+        "chat_path": _provider_chat_path(str(config["base_url"])),
+        "auth_scheme": "Authorization: Bearer <redacted>",
+        "api_key_configured": config["api_key_configured"],
+        "model": config["model"],
+        "model_configured": config["model_configured"],
+    }
+    smoke = _provider_smoke_status(provider_id)
+    status = "missing_config"
+    live_status = "not_probed"
+    blocked_reason = "Provider private env is missing API key or model."
+    if config["api_key_configured"] and config["model_configured"]:
+        status = "smoke_required"
+        blocked_reason = "Provider is configured but has not passed a live smoke proof."
+        if smoke:
+            smoke_contract = smoke.get("auth_contract") if isinstance(smoke.get("auth_contract"), dict) else {}
+            same_contract = (
+                smoke_contract.get("base_url_label") == auth_contract["base_url_label"]
+                and smoke_contract.get("chat_path") == auth_contract["chat_path"]
+                and smoke_contract.get("model") == auth_contract["model"]
+            )
+            if same_contract and smoke.get("accepted") is True:
+                status = "ready"
+                live_status = "passed"
+                blocked_reason = None
+            elif same_contract:
+                reason_text = " ".join(str(item) for item in smoke.get("blocked_reasons") or [])
+                status = "auth_failed" if _provider_smoke_auth_failed(reason_text) else "smoke_failed"
+                live_status = "failed"
+                blocked_reason = f"Last live smoke failed: {reason_text[:240] or status}"
+            else:
+                live_status = "stale_smoke"
+                blocked_reason = "Provider config changed or smoke proof is stale; rerun provider smoke."
     return {
         "id": provider_id,
-        "status": "ready" if config["api_key_configured"] and config["model_configured"] else "missing_config",
+        "status": status,
         "api_key_configured": config["api_key_configured"],
         "base_url_configured": config["base_url_configured"],
         "model_configured": config["model_configured"],
@@ -2409,8 +2523,85 @@ def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[s
         "model": config["model"],
         "auth_scheme": "bearer",
         "chat_path": _provider_chat_path(str(config["base_url"])),
-        "live_status": "not_probed",
+        "live_status": live_status,
+        "blocked_reason": blocked_reason,
+        "last_smoke": smoke,
     }
+
+
+def _provider_smoke_status(provider_id: str) -> dict[str, Any] | None:
+    statuses = _provider_smoke_statuses()
+    record = statuses.get(str(provider_id or "").strip().lower())
+    return record if isinstance(record, dict) else None
+
+
+def _provider_smoke_statuses() -> dict[str, Any]:
+    try:
+        raw = json.loads(PROVIDER_SMOKE_STATUS_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    providers = raw.get("providers") if isinstance(raw, dict) else None
+    return providers if isinstance(providers, dict) else {}
+
+
+def _write_provider_smoke_status(
+    provider_id: str,
+    *,
+    accepted: bool,
+    status: str,
+    blocked_reasons: list[str],
+    auth_contract: dict[str, Any],
+    content_sha256: str | None = None,
+    evidence: dict[str, Any] | None = None,
+) -> None:
+    provider = str(provider_id or "").strip().lower()
+    if provider not in PROVIDER_DEFAULT_BASE_URLS:
+        return
+    existing = _provider_smoke_statuses()
+    record = {
+        "provider_id": provider,
+        "accepted": bool(accepted),
+        "status": str(status or ("ready" if accepted else "blocked")),
+        "ts_utc": utc_now(),
+        "blocked_reasons": [_redact_provider_text(str(item)) for item in blocked_reasons][:5],
+        "auth_contract": {
+            "provider_id": auth_contract.get("provider_id"),
+            "base_url_label": auth_contract.get("base_url_label"),
+            "chat_path": auth_contract.get("chat_path"),
+            "auth_scheme": "Authorization: Bearer <redacted>",
+            "api_key_configured": bool(auth_contract.get("api_key_configured")),
+            "model": auth_contract.get("model"),
+            "model_configured": bool(auth_contract.get("model_configured")),
+        },
+        "content_sha256": content_sha256,
+        "evidence_id": (evidence or {}).get("evidence_id"),
+    }
+    existing[provider] = record
+    payload = {"schema": 1, "updated_at": utc_now(), "providers": existing}
+    PROVIDER_SMOKE_STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = PROVIDER_SMOKE_STATUS_FILE.with_suffix(
+        PROVIDER_SMOKE_STATUS_FILE.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}"
+    )
+    tmp_path.write_text(as_json(payload), encoding="utf-8")
+    os.replace(tmp_path, PROVIDER_SMOKE_STATUS_FILE)
+
+
+def _provider_smoke_auth_failed(reason_text: str) -> bool:
+    normalized = reason_text.lower()
+    return any(
+        token in normalized
+        for token in (
+            "401",
+            "unauthorized",
+            "authorized_error",
+            "authentication fails",
+            "authentication_error",
+            "invalid api",
+            "invalid key",
+            "login fail",
+            "forbidden",
+        )
+    )
 
 
 def _provider_chat_config(provider_id: str, private_values: dict[str, str] | None = None, *, require_ready: bool = True) -> dict[str, Any]:
@@ -2699,9 +2890,20 @@ def _record_provider_run_artifact(
 
 def _redact_provider_text(text: str) -> str:
     redacted = text
+    redacted = re.sub(r"(?i)(your\s+api\s+key\s*:\s*)[^\"',}]+", r"\1<redacted>", redacted)
+    redacted = re.sub(r"(?i)(authorization\s*[=:]\s*)[^\"',}]+", r"\1<redacted>", redacted)
+    redacted = re.sub(r"(?i)(api\s+secret\s+key\s+in\s+the\s+')[^']+", r"\1<redacted>", redacted)
     for key in ("api_key", "apikey", "authorization", "bearer"):
         redacted = re.sub(rf"(?i){key}[^,\\n]{{0,80}}", f"{key}=<redacted>", redacted)
     return redacted[:2000]
+
+
+def _provider_error_summary(provider_id: str, text: str) -> str:
+    http = re.search(r"HTTP\s+(\d{3})", text, re.IGNORECASE)
+    status = f"HTTP {http.group(1)}" if http else "request failure"
+    if _provider_smoke_auth_failed(text):
+        return f"Provider {provider_id} returned {status}: authentication failed; verify private API key, base URL, and model."
+    return f"Provider {provider_id} returned {status}: {_redact_provider_text(text)[:300]}"
 
 
 def _code_history_status() -> dict[str, Any]:
