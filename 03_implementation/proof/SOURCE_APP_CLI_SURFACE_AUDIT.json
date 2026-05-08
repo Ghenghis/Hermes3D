@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-07T13:52:15.557405+00:00",
+  "generated_at_utc": "2026-05-07T15:57:33.425402+00:00",
   "next_actions": [
     "Keep verified agent CLIs exposed through bounded help/version/dry-run runners first.",
     "Promote candidate CLI surfaces only by adding a module_runtime_verifier row and proof gate.",
@@ -436,9 +436,9 @@
       "launch_kind": "service",
       "module_id": "manyfold",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\libraries\\Manyfold",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "HERMES3D_SOURCE_MANYFOLD_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "library",
       "source_signals": [
         {
@@ -448,8 +448,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "service"
+      "verifier": "Manyfold local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "agent_enabled": false,
@@ -460,9 +460,9 @@
       "launch_kind": "service",
       "module_id": "open_filament_database",
       "next_action": "Add a non-destructive CLI verifier before exposing this to Hermes Agents.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\materials\\Open-Filament-Database",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "materials",
       "source_signals": [
         {
@@ -490,8 +490,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "service"
+      "verifier": "Open Filament Database local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "agent_enabled": true,
@@ -1292,9 +1292,9 @@
       "launch_kind": "web_app",
       "module_id": "kirimoto_gridspace",
       "next_action": "Add a health/version/setup verifier before exposing service or setup actions.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Kiri-Moto",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "slicers",
       "source_signals": [
         {
@@ -1352,8 +1352,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "web_app"
+      "verifier": "Kiri:Moto / GridSpace local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "agent_enabled": false,
@@ -1602,9 +1602,9 @@
       "launch_kind": "service",
       "module_id": "comfyui",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\ComfyUI",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "HERMES3D_SOURCE_COMFYUI_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "three_d_generation",
       "source_signals": [
         {
@@ -1644,8 +1644,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "service"
+      "verifier": "ComfyUI local system stats",
+      "verifier_kind": "local_http_health"
     },
     {
       "agent_enabled": false,
@@ -1686,9 +1686,9 @@
       "launch_kind": "service",
       "module_id": "comfyui_trellis_wrapper",
       "next_action": "Confirm the documented command in the local runtime and register a verifier.",
-      "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\generation\\ComfyUI-Trellis2",
-      "proof_gate_version": "",
-      "runtime_status": "source_ready",
+      "path": "HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL",
+      "proof_gate_version": "local-http-health-verifier-v1",
+      "runtime_status": "setup_required",
       "section": "three_d_generation",
       "source_signals": [
         {
@@ -1740,8 +1740,8 @@
           "source": "README.md"
         }
       ],
-      "verifier": "source checkout",
-      "verifier_kind": "service"
+      "verifier": "ComfyUI TRELLIS wrapper local health",
+      "verifier_kind": "local_http_health"
     },
     {
       "agent_enabled": false,

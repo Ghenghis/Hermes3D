@@ -57,13 +57,13 @@
   },
   "completion": {
     "blocked_rows": 2,
-    "remaining_runner_gap": 17,
+    "remaining_runner_gap": 12,
     "runtime_ready_complete": false,
     "source_rows_complete": true,
     "status": "runner_gap",
     "unknown_launch_kind_rows": 0
   },
-  "generated_at_utc": "2026-05-07T13:54:47.938094+00:00",
+  "generated_at_utc": "2026-05-07T15:58:21.516669+00:00",
   "launch_kind_classification": {
     "by_launch_kind": {},
     "count": 0,
@@ -82,11 +82,11 @@
     "count": 60,
     "counts": {
       "blocked": 2,
-      "runner_not_registered": 17,
+      "runner_not_registered": 12,
       "runtime_ready": 31,
-      "runtime_repair_required": 10,
+      "runtime_repair_required": 15,
       "source_install_available": 0,
-      "source_ready": 17
+      "source_ready": 12
     },
     "execution_mode": "plan_only_until_safe_runner_registered",
     "registered_runtime_probe_ids": [
@@ -100,7 +100,9 @@
       "boxturtle",
       "build123d",
       "cadquery",
+      "comfyui",
       "comfyui_frontend",
+      "comfyui_trellis_wrapper",
       "cura",
       "curaengine",
       "enraged_rabbit_project",
@@ -110,12 +112,14 @@
       "fluidd",
       "hermes_agent",
       "kiln",
+      "kirimoto_gridspace",
       "klipper",
       "klipperscreen",
       "langchain",
       "langgraph",
       "mainsail",
       "manifold",
+      "manyfold",
       "meshlab",
       "model_context_protocol",
       "moonraker",
@@ -123,6 +127,7 @@
       "octofarm",
       "octoprint",
       "open3d",
+      "open_filament_database",
       "openscad",
       "orcaslicer",
       "printrun",
@@ -135,8 +140,8 @@
       "truck"
     ],
     "registered_runtime_verifiers": {
-      "count": 43,
-      "enabled_count": 43,
+      "count": 48,
+      "enabled_count": 48,
       "registered_ids": [
         "awesome_3d_printing",
         "awesome_extruders",
@@ -148,7 +153,9 @@
         "boxturtle",
         "build123d",
         "cadquery",
+        "comfyui",
         "comfyui_frontend",
+        "comfyui_trellis_wrapper",
         "cura",
         "curaengine",
         "enraged_rabbit_project",
@@ -158,12 +165,14 @@
         "fluidd",
         "hermes_agent",
         "kiln",
+        "kirimoto_gridspace",
         "klipper",
         "klipperscreen",
         "langchain",
         "langgraph",
         "mainsail",
         "manifold",
+        "manyfold",
         "meshlab",
         "model_context_protocol",
         "moonraker",
@@ -171,6 +180,7 @@
         "octofarm",
         "octoprint",
         "open3d",
+        "open_filament_database",
         "openscad",
         "orcaslicer",
         "printrun",
@@ -186,9 +196,9 @@
     },
     "runner_status_counts": {
       "blocked": 2,
-      "runner_not_registered": 17,
+      "runner_not_registered": 12,
       "runtime_ready": 31,
-      "runtime_repair_required": 10
+      "runtime_repair_required": 15
     },
     "source": "http://127.0.0.1:8765/api/modules/runtime/setup-queue"
   },

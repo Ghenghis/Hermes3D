@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from hermes3d.api.routes import modules
 from hermes3d.services import module_runtime
 
@@ -281,6 +282,90 @@ def test_print_farm_health_probe_rejects_public_urls(monkeypatch) -> None:
     assert contract["runtime_status"] == "setup_required"
     assert contract["runner_status"] == "runtime_repair_required"
     assert "localhost, a private LAN address, or a .local host" in contract["blocked_reason"]
+
+
+@pytest.mark.parametrize(
+    ("module_id", "display_name", "section", "launch_kind", "env_name"),
+    [
+        ("manyfold", "Manyfold", "library", "service", "HERMES3D_SOURCE_MANYFOLD_URL"),
+        (
+            "open_filament_database",
+            "Open Filament Database",
+            "materials",
+            "service",
+            "HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL",
+        ),
+        (
+            "kirimoto_gridspace",
+            "Kiri:Moto / GridSpace",
+            "slicers",
+            "web_app",
+            "HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL",
+        ),
+        ("comfyui", "ComfyUI", "three_d_generation", "service", "HERMES3D_SOURCE_COMFYUI_URL"),
+        (
+            "comfyui_trellis_wrapper",
+            "ComfyUI TRELLIS.2 Wrapper",
+            "three_d_generation",
+            "service",
+            "HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL",
+        ),
+    ],
+)
+def test_service_web_health_rows_require_configured_local_urls(
+    monkeypatch,
+    module_id: str,
+    display_name: str,
+    section: str,
+    launch_kind: str,
+    env_name: str,
+) -> None:
+    monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
+    monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
+    monkeypatch.delenv(env_name, raising=False)
+
+    contract = module_runtime.module_runner_contract(
+        {
+            "id": module_id,
+            "display_name": display_name,
+            "section": section,
+            "launch_kind": launch_kind,
+            "install_state": "installed",
+            "local_path": f"G:/Github/example/{module_id}",
+        }
+    )
+
+    assert contract["runtime_status"] == "setup_required"
+    assert contract["verifier_kind"] == "local_http_health"
+    assert contract["agent_executable"] is False
+    assert contract["runner_status"] == "runtime_repair_required"
+    assert env_name in contract["blocked_reason"]
+
+
+def test_local_http_health_probes_declare_default_urls_and_setup_steps() -> None:
+    expected_envs = {
+        "HERMES3D_SOURCE_FDM_MONSTER_URL",
+        "HERMES3D_SOURCE_FLUIDD_URL",
+        "HERMES3D_SOURCE_MAINSAIL_URL",
+        "HERMES3D_SOURCE_OCTOFARM_URL",
+        "HERMES3D_SOURCE_OCTOPRINT_URL",
+        "HERMES3D_SOURCE_MANYFOLD_URL",
+        "HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL",
+        "HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL",
+        "HERMES3D_SOURCE_COMFYUI_URL",
+        "HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL",
+    }
+    rows = [
+        probe
+        for probe in module_runtime.BUILTIN_RUNTIME_PROBES.values()
+        if probe.get("kind") == "local_http_health"
+    ]
+
+    assert {str((probe.get("args") or [""])[0]) for probe in rows} == expected_envs
+    assert len(rows) == 10
+    for probe in rows:
+        assert str(probe.get("default_url", "")).startswith("http://127.0.0.1:")
+        assert probe.get("setup_steps")
 
 
 def test_runner_contract_routes_are_registered() -> None:

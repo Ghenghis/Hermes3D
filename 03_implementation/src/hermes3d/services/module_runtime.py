@@ -256,6 +256,11 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "label": "FDM Monster local health",
         "path": "",
         "args": ["HERMES3D_SOURCE_FDM_MONSTER_URL", "/", "fdm"],
+        "default_url": "http://127.0.0.1:4000",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_FDM_MONSTER_URL=http://127.0.0.1:4000 unless the local service is assigned a different private port.",
+            "From the FDM Monster source checkout, install/build/start the server with its documented Node workflow.",
+        ],
         "capabilities": ["print_farm_service_health", "read_only_http_probe"],
         "kind": "local_http_health",
         "execute": True,
@@ -268,6 +273,11 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "label": "Fluidd local health",
         "path": "",
         "args": ["HERMES3D_SOURCE_FLUIDD_URL", "/", "fluidd"],
+        "default_url": "http://127.0.0.1:8083",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_FLUIDD_URL=http://127.0.0.1:8083 for the Hermes3D local Fluidd service.",
+            "Fluidd's container default is port 80/8080 and its preview default can conflict with other local apps, so bind a dedicated local port for Hermes3D.",
+        ],
         "capabilities": ["moonraker_web_ui_health", "read_only_http_probe"],
         "kind": "local_http_health",
         "execute": True,
@@ -280,6 +290,11 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "label": "Mainsail local health",
         "path": "",
         "args": ["HERMES3D_SOURCE_MAINSAIL_URL", "/", "mainsail"],
+        "default_url": "http://127.0.0.1:4173",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_MAINSAIL_URL=http://127.0.0.1:4173 for the local Mainsail preview service.",
+            "From the Mainsail source checkout, run the documented preview/dev workflow without printer mutation.",
+        ],
         "capabilities": ["moonraker_web_ui_health", "read_only_http_probe"],
         "kind": "local_http_health",
         "execute": True,
@@ -292,6 +307,11 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "label": "OctoFarm local health",
         "path": "",
         "args": ["HERMES3D_SOURCE_OCTOFARM_URL", "/", "octofarm"],
+        "default_url": "http://127.0.0.1:4001",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_OCTOFARM_URL=http://127.0.0.1:4001 because OctoFarm and FDM Monster both default to port 4000.",
+            "Start OctoFarm with OCTOFARM_PORT=4001 from its source checkout after dependencies are installed.",
+        ],
         "capabilities": ["print_farm_service_health", "read_only_http_probe"],
         "kind": "local_http_health",
         "execute": True,
@@ -304,12 +324,102 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "label": "OctoPrint local version API",
         "path": "",
         "args": ["HERMES3D_SOURCE_OCTOPRINT_URL", "/api/version", "server"],
+        "default_url": "http://127.0.0.1:5000",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_OCTOPRINT_URL=http://127.0.0.1:5000 for OctoPrint's documented local default.",
+            "Start OctoPrint with a local-only host binding before running this read-only version probe.",
+        ],
         "capabilities": ["octoprint_version_api", "read_only_http_probe"],
         "kind": "local_http_health",
         "execute": True,
         "timeout_s": 3,
         "proof_gate_version": "local-http-health-verifier-v1",
         "notes": "Reads only a configured local/private OctoPrint version endpoint; does not upload, print, or mutate state.",
+    },
+    "manyfold": {
+        "tool_key": "local_http_health",
+        "label": "Manyfold local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_MANYFOLD_URL", "/", "manyfold"],
+        "default_url": "http://127.0.0.1:3214",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_MANYFOLD_URL=http://127.0.0.1:3214 for Manyfold's documented local default.",
+            "From the Manyfold source checkout, run bin/dev to set up and start the app.",
+        ],
+        "capabilities": ["model_library_service_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private Manyfold URL; does not start, import, or mutate the library.",
+    },
+    "open_filament_database": {
+        "tool_key": "local_http_health",
+        "label": "Open Filament Database local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL", "/", "filament"],
+        "default_url": "http://127.0.0.1:3000",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL=http://127.0.0.1:3000 because the documented default 5173 is reserved for Hermes3D UI.",
+            "From the Open Filament Database source checkout, run ofd.bat webui --port 3000.",
+        ],
+        "capabilities": ["material_database_service_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private material database URL; does not write material records.",
+    },
+    "kirimoto_gridspace": {
+        "tool_key": "local_http_health",
+        "label": "Kiri:Moto / GridSpace local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL", "/", "grid"],
+        "default_url": "http://127.0.0.1:8081/kiri",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL=http://127.0.0.1:8081/kiri; do not use 8080 while GitLab owns that port.",
+            "Start Kiri:Moto/GridSpace with a host-port remap such as 8081:8080 or an equivalent local-only dev port.",
+        ],
+        "capabilities": ["browser_slicer_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private Kiri:Moto or GridSpace URL; does not slice or upload files.",
+    },
+    "comfyui": {
+        "tool_key": "local_http_health",
+        "label": "ComfyUI local system stats",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_COMFYUI_URL", "/system_stats", "system"],
+        "default_url": "http://127.0.0.1:8188",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_COMFYUI_URL=http://127.0.0.1:8188 for ComfyUI's documented local default.",
+            "From the ComfyUI source checkout, start it on 127.0.0.1:8188 before running the system-stats probe.",
+        ],
+        "capabilities": ["generation_service_health", "read_only_http_probe", "system_stats"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only ComfyUI's configured local/private system stats endpoint; does not enqueue generation work.",
+    },
+    "comfyui_trellis_wrapper": {
+        "tool_key": "local_http_health",
+        "label": "ComfyUI TRELLIS wrapper local health",
+        "path": "",
+        "args": ["HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL", "/", "trellis"],
+        "default_url": "http://127.0.0.1:8188",
+        "setup_steps": [
+            "Use HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL=http://127.0.0.1:8188 only after TRELLIS wrapper/custom-node support is installed in the local ComfyUI runtime.",
+            "Confirm the running ComfyUI instance exposes TRELLIS wrapper UI or health text before accepting this verifier.",
+        ],
+        "capabilities": ["trellis_wrapper_service_health", "read_only_http_probe"],
+        "kind": "local_http_health",
+        "execute": True,
+        "timeout_s": 3,
+        "proof_gate_version": "local-http-health-verifier-v1",
+        "notes": "Reads only a configured local/private wrapper health page; does not submit ComfyUI or TRELLIS jobs.",
     },
     "langchain": {
         "tool_key": "source_inventory",
@@ -984,6 +1094,10 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
     env_name = args[0].strip() if args else ""
     endpoint = args[1].strip() if len(args) > 1 and args[1].strip() else "/"
     expected = args[2].strip().lower() if len(args) > 2 else ""
+    default_url = str(probe.get("default_url") or "").strip()
+    probe_setup_steps = [
+        str(step).strip() for step in (probe.get("setup_steps") or []) if str(step).strip()
+    ]
     private_values = _private_runtime_env()
     base_url = (os.environ.get(env_name) or private_values.get(env_name) or str(probe.get("path") or "")).strip()
     timeout = int(probe.get("timeout_s") or 3)
@@ -1013,14 +1127,24 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
             reason=f"{env_name} is not configured; no local health proof was attempted.",
             output=[
                 f"env={env_name}",
+                f"default_url={default_url or 'not_declared'}",
                 "configured=false",
                 "executed=false",
             ],
-            setup_steps=[
-                f"Set {env_name} in G:/private/.env to the local/private service URL.",
-                "Start the service outside the verifier; this probe never launches or mutates it.",
-                "Run Verify again from Source OS.",
-            ],
+            setup_steps=(
+                [
+                    (
+                        f"Set {env_name} in G:/private/.env to {default_url}."
+                        if default_url
+                        else f"Set {env_name} in G:/private/.env to the local/private service URL."
+                    )
+                ]
+                + (
+                    probe_setup_steps
+                    or ["Start the service outside the verifier; this probe never launches or mutates it."]
+                )
+                + ["Run Verify again from Source OS."]
+            )[:6],
         )
     if not _is_local_private_url(base_url):
         return _local_http_health_response(
@@ -1037,7 +1161,11 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
                 "guard=blocked_non_local_url",
             ],
             setup_steps=[
-                f"Point {env_name} at a trusted local/private Hermes3D service URL.",
+                (
+                    f"Point {env_name} at a trusted local/private Hermes3D service URL such as {default_url}."
+                    if default_url
+                    else f"Point {env_name} at a trusted local/private Hermes3D service URL."
+                ),
                 "Do not use public internet URLs for this Source OS runtime health verifier.",
                 "Run Verify again from Source OS.",
             ],
@@ -1062,11 +1190,14 @@ def _local_http_health_probe(probe: dict[str, Any]) -> dict[str, Any]:
                 f"url={_redact_text(health_url)}",
                 f"error={type(exc).__name__}",
             ],
-            setup_steps=[
-                f"Start or repair the local service configured by {env_name}.",
-                "Confirm the health/version endpoint is reachable with a GET request.",
-                "Run Verify again from Source OS.",
-            ],
+            setup_steps=(
+                probe_setup_steps
+                or [
+                    f"Start or repair the local service configured by {env_name}.",
+                    "Confirm the health/version endpoint is reachable with a GET request.",
+                ]
+            )[:5]
+            + ["Run Verify again from Source OS."],
         )
     body_head = _redact_text(body[:500])
     token_ok = not expected or expected in body.lower()
