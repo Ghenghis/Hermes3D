@@ -980,6 +980,12 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
 
         module_id = _required_payload_text(payload, "module_id")
         return modules_route.get_module_runtime_runner_contract(module_id)
+    if handler == "source.read_only_runner.smoke":
+        from hermes3d.api.routes import modules as modules_route
+
+        module_id = _required_payload_text(payload, "module_id")
+        body = modules_route.ModuleRuntimeReadOnlyRunnerRequest(actor=actor)
+        return modules_route.create_module_runtime_read_only_runner(module_id, body)
     if handler == "source.service_runner.start":
         from hermes3d.api.routes import modules as modules_route
 
@@ -1266,6 +1272,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
     source_gaps = int(source_counts.get("runner_gaps") or 0)
     agent_cli = int(source_counts.get("verified_agent_cli") or 0)
     cli_candidates = int(source_counts.get("cli_candidates") or 0)
+    read_only_runners = int(source_counts.get("read_only_runner_available") or 0)
     try:
         from hermes3d.services import code_history
 
@@ -1317,8 +1324,9 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("source.plan_setup_queue", "Plan Source OS setup queue", "source_os", "ready", "plan", "low", "POST /api/modules/runtime/setup-queue", "source.plan_setup_queue", "Creates a proof-backed plan; it does not run unregistered installers."),
         _contract("source.update_readiness.refresh", "Refresh Source OS update readiness", "source_os", "ready", "read", "low", "GET /api/modules/update/readiness", "source.update_readiness", "Reads update readiness without fetch, pull, build, install, or update side effects."),
         _contract("source.runtime_gaps.refresh", "Refresh Source OS runner gaps", "source_os", "ready", "read", "low", "GET /api/modules/runtime/gaps", "source.runtime_gaps", f"Shows {source_gaps} source-app runner gaps that still block full agent app operation."),
-        _contract("source.runner_contracts.refresh", "Refresh Source OS runner contracts", "source_os", "ready", "read", "low", "GET /api/modules/runtime/runner-contracts", "source.runner_contracts", "Returns the 60-row Hermes Agent execution contract matrix; only rows with agent_executable=true may run agent actions."),
+        _contract("source.runner_contracts.refresh", "Refresh Source OS runner contracts", "source_os", "ready", "read", "low", "GET /api/modules/runtime/runner-contracts", "source.runner_contracts", "Returns the 60-row Hermes Agent execution contract matrix; only rows with agent_executable=true may run app actions. read_only_runner_available rows may only re-run metadata/API proof."),
         _contract("source.runner_contract.refresh", "Refresh one Source OS runner contract", "source_os", "ready", "read", "low", "GET /api/modules/{module_id}/runtime/runner-contract", "source.runner_contract", "Returns the proof gate, safe actions, and exact blocked reason for one source-backed app."),
+        _contract("source.read_only_runner.smoke", "Run Source OS read-only runner smoke", "source_os", "ready" if read_only_runners else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/read-only-runner", "source.read_only_runner.smoke", f"Reruns only registered package/import/local API verifier proof for {read_only_runners} eligible rows; no setup, install, update, launch, file output, or printer action."),
         _contract("source.service_runner.start", "Start supervised Source OS service runner", "source_os", "partial", "mutate", "high", "POST /api/modules/{module_id}/runtime/start-runner", "source.service_runner.start", "Runs only a registered local/private service command through the Source OS supervisor, then requires live health proof before runtime-ready.", "Per-module start still blocks unless its runner contract preflight passes; use execute=false for proof-only preflight."),
         _contract("source.service_runner.stop", "Stop supervised Source OS service runner", "source_os", "ready", "mutate", "medium", "POST /api/modules/{module_id}/runtime/stop-runner", "source.service_runner.stop", "Stops only a PID that the Source OS supervisor previously recorded for the same module."),
         _contract("source.verifiers.refresh", "Refresh Source OS verifier registry", "source_os", "ready", "read", "low", "GET /api/modules/runtime/verifiers", "source.verifiers", "Shows registered safe runtime verifier rows."),
@@ -1407,6 +1415,7 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "source.runtime_gaps.refresh": {"required": [], "optional": {"section": "source registry section id"}},
         "source.runner_contracts.refresh": {"required": [], "optional": {"section": "source registry section id"}, "safety": "Read-only contract matrix; does not run setup, install, update, or launch commands."},
         "source.runner_contract.refresh": {"required": ["module_id"], "optional": {}, "safety": "Read-only single-module contract; no source or runtime mutation."},
+        "source.read_only_runner.smoke": {"required": ["module_id"], "optional": {}, "safety": "Reruns only registered package/import/local API verifier proof and appends evidence; no setup, install, update, launch, output writes, or printer actions."},
         "source.service_runner.start": {"required": ["module_id"], "optional": {"execute": "boolean; false writes a preflight proof only, true attempts supervised local start"}, "safety": "No arbitrary command input is accepted. Only registered service/web rows with local/private URL, source checkout, available command, and post-start health proof may start."},
         "source.service_runner.stop": {"required": ["module_id"], "optional": {}, "safety": "Stops only PIDs previously started and tracked by the Source OS supervisor."},
         "printers.upload_start": {
@@ -1482,6 +1491,7 @@ def _source_action_counts() -> dict[str, int]:
             "runner_gaps": int(queue_counts.get("runner_not_registered") or readiness_summary.get("runner_gaps") or completion.get("completion", {}).get("remaining_runner_gap") or 0),
             "verified_agent_cli": int(readiness_summary.get("verified_agent_cli") or nested_surface_summary.get("agent_enabled_cli") or surface_summary.get("agent_enabled_cli") or 0),
             "cli_candidates": int(surface_summary.get("candidate_needs_verifier") or nested_surface_summary.get("candidate_needs_verifier") or 0),
+            "read_only_runner_available": int(readiness_summary.get("read_only_runner_available") or 0),
         }
     try:
         from hermes3d.api.routes import modules as modules_route
@@ -1495,9 +1505,10 @@ def _source_action_counts() -> dict[str, int]:
             "runner_gaps": int(counts.get("runner_not_registered") or cli.get("runner_gaps") or 0),
             "verified_agent_cli": int(cli.get("verified_agent_cli") or 0),
             "cli_candidates": int((surface.get("summary") or {}).get("candidate_needs_verifier") or 0),
+            "read_only_runner_available": int(cli.get("read_only_runner_available") or 0),
         }
     except Exception:
-        return {"runtime_ready": 0, "runner_gaps": 0, "verified_agent_cli": 0, "cli_candidates": 0}
+        return {"runtime_ready": 0, "runner_gaps": 0, "verified_agent_cli": 0, "cli_candidates": 0, "read_only_runner_available": 0}
 
 
 def _read_json(path: Path) -> dict[str, Any]:

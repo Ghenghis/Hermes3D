@@ -21,6 +21,7 @@ from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
 from hermes3d.services.module_runtime import (
+    module_read_only_runner_contract,
     module_runner_contract,
     module_runner_contracts,
     module_runtime_probe,
@@ -94,6 +95,10 @@ class ModuleRollbackRequest(BaseModel):
 class ModuleRuntimeStartRunnerRequest(BaseModel):
     actor: str = "operator"
     execute: bool = False
+
+
+class ModuleRuntimeReadOnlyRunnerRequest(BaseModel):
+    actor: str = "operator"
 
 
 def _sync_registry_once() -> None:
@@ -720,7 +725,7 @@ def module_runtime_runner_contracts(section: str | None = None) -> dict[str, Any
         **contracts,
         "section": section,
         "execution_mode": "contract_only_until_registered_runner_passes",
-        "agent_gate": "Hermes Agents may execute only rows with agent_executable=true; every other row remains Verify/Setup Plan only.",
+        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; every other row remains Verify/Setup Plan only.",
     }
 
 
@@ -793,15 +798,20 @@ def module_agent_cli_readiness() -> dict[str, Any]:
     runner_gaps = [
         record["module_id"] for record in records if record["agent_execution_tier"].endswith("_gap")
     ]
+    read_only_runners = [
+        record["module_id"] for record in records if record["read_only_runner_available"]
+    ]
     return {
         "status": "ready",
         "count": len(records),
         "rule": "If an app offers a CLI, Hermes3D must prefer a bounded CLI verifier and Hermes Agent runner; desktop launcher metadata is not agent CLI readiness.",
         "counts": dict(sorted(tier_counts.items())),
         "verified_agent_cli": len(verified_cli),
+        "read_only_runner_available": len(read_only_runners),
         "launcher_metadata_only": len(launcher_only),
         "runner_gaps": len(runner_gaps),
         "verified_agent_cli_modules": verified_cli,
+        "read_only_runner_modules": read_only_runners,
         "launcher_metadata_only_modules": launcher_only,
         "records": records,
     }
@@ -809,6 +819,7 @@ def module_agent_cli_readiness() -> dict[str, Any]:
 
 def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
     runtime = _module_runtime_probe(mod, live=False)
+    contract = module_runner_contract(mod)
     runtime_status = str(runtime.get("status") or "blocked")
     kind = str(runtime.get("kind") or mod.get("launch_kind") or "unknown")
     proof_gate = str(runtime.get("proof_gate_version") or "")
@@ -850,6 +861,10 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
         "return_code": runtime.get("return_code"),
         "capabilities": list(runtime.get("capabilities") or []),
         "reason": runtime.get("reason"),
+        "read_only_runner_available": bool(contract.get("read_only_runner_available")),
+        "read_only_runner_route": f"/api/modules/{mod['id']}/runtime/read-only-runner"
+        if contract.get("read_only_runner_available")
+        else None,
         "next_action": _agent_cli_next_action(
             execution_tier, launch_kind, str(runtime.get("verifier") or "")
         ),
@@ -932,6 +947,40 @@ def get_module_runtime_runner_contract(module_id: str) -> dict[str, Any]:
         "status": "ready",
         "module_id": module_id,
         "contract": module_runner_contract(mod),
+    }
+
+
+@router.post("/api/modules/{module_id}/runtime/read-only-runner")
+def create_module_runtime_read_only_runner(
+    module_id: str,
+    body: ModuleRuntimeReadOnlyRunnerRequest | None = None,
+) -> dict[str, Any]:
+    mod = _sync_module_status(_module_or_404(module_id))
+    actor = _safe_actor(body.actor if body else "operator")
+    contract = module_read_only_runner_contract(mod, live_probe=True)
+    proof_event_id = _append_module_proof(
+        "source_module.runtime_read_only_runner.proved"
+        if contract["accepted"]
+        else "source_module.runtime_read_only_runner.blocked",
+        actor,
+        {
+            "module_id": module_id,
+            "accepted": contract["accepted"],
+            "status": contract["status"],
+            "runner_family": contract["runner_family"],
+            "verifier_kind": contract["verifier_kind"],
+            "proof_gate_version": contract.get("proof_gate_version"),
+            "contract": contract,
+        },
+    )
+    return {
+        "module_id": module_id,
+        "accepted": bool(contract["accepted"]),
+        "status": str(contract["status"]),
+        "runtime_ready": bool(contract["runtime_ready"]),
+        "execution_mode": str(contract["execution_mode"]),
+        "contract": contract,
+        "proof_event_id": proof_event_id,
     }
 
 

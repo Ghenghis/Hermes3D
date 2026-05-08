@@ -139,10 +139,33 @@ def test_python_import_contract_is_metadata_not_agent_executable(monkeypatch) ->
 
     assert contract["runtime_status"] == "ready"
     assert contract["agent_executable"] is False
+    assert contract["read_only_runner_available"] is True
     assert contract["runner_status"] == "metadata_ready_needs_runner"
     assert contract["required_verifier_family"] == "dry_run_worker_smoke"
     assert contract["mutation_allowed"] is False
-    assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
+    assert contract["safe_actions"] == [
+        "verify",
+        "setup_plan",
+        "read_metadata",
+        "read_only_runner_smoke",
+    ]
+    assert contract["blocked_reason"] is None
+
+    read_only = module_runtime.module_read_only_runner_contract(
+        {
+            "id": "meshlab",
+            "display_name": "MeshLab",
+            "section": "modelers",
+            "launch_kind": "desktop_or_cli",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/MeshLab",
+        }
+    )
+    assert read_only["accepted"] is True
+    assert read_only["agent_executable"] is False
+    assert read_only["runner_status"] == "read_only_metadata_runner_ready"
+    assert read_only["mutation_allowed"] is False
+    assert read_only["process_start_allowed"] is False
 
 
 def test_setup_required_python_import_stays_in_repair_queue(monkeypatch) -> None:
@@ -309,9 +332,60 @@ def test_readonly_http_contract_is_not_agent_executable(monkeypatch) -> None:
 
     assert contract["runtime_status"] == "ready"
     assert contract["agent_executable"] is False
+    assert contract["read_only_runner_available"] is True
     assert contract["runner_status"] == "readonly_api_ready"
     assert contract["required_verifier_family"] == "read_only_api_runner_contract"
-    assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
+    assert contract["safe_actions"] == [
+        "verify",
+        "setup_plan",
+        "read_metadata",
+        "read_only_runner_smoke",
+    ]
+
+    read_only = module_runtime.module_read_only_runner_contract(
+        {
+            "id": "fluidd",
+            "display_name": "Fluidd",
+            "section": "print_farm",
+            "launch_kind": "web_app",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/Fluidd",
+        }
+    )
+    assert read_only["accepted"] is True
+    assert read_only["runner_status"] == "read_only_api_runner_ready"
+    assert read_only["printer_action_allowed"] is False
+
+
+def test_read_only_runner_blocks_desktop_launcher(monkeypatch) -> None:
+    def _ready_launcher(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "ready",
+            "kind": "desktop_app",
+            "verifier": "Bambu Studio launcher",
+            "proof_gate_version": "desktop-launcher-metadata-v1",
+            "path": "C:/Program Files/Bambu Studio/bambu-studio.exe",
+            "executed": False,
+            "return_code": None,
+            "capabilities": ["desktop_slicer_launcher"],
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _ready_launcher)
+    contract = module_runtime.module_read_only_runner_contract(
+        {
+            "id": "bambustudio",
+            "display_name": "Bambu Studio",
+            "section": "slicers",
+            "launch_kind": "desktop_or_cli",
+            "install_state": "installed",
+            "local_path": "G:/Github/example/BambuStudio",
+        }
+    )
+
+    assert contract["accepted"] is False
+    assert contract["read_only_runner_available"] is False
+    assert contract["mutation_allowed"] is False
+    assert "package/import/local API" in contract["blocked_reason"]
 
 
 def test_print_farm_health_probe_requires_configured_local_url(monkeypatch) -> None:
@@ -568,6 +642,7 @@ def test_runner_contract_routes_are_registered() -> None:
 
     assert "/api/modules/runtime/runner-contracts" in paths
     assert "/api/modules/{module_id}/runtime/runner-contract" in paths
+    assert "/api/modules/{module_id}/runtime/read-only-runner" in paths
     assert "/api/modules/{module_id}/runtime/start-runner" in paths
     assert "/api/modules/{module_id}/runtime/stop-runner" in paths
 
