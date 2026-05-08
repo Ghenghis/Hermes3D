@@ -1,5 +1,5 @@
 import type { Agent, AgentStatus } from "../types/agent";
-import type { AgentActionCatalog, AgentActionRunResult } from "../types/agent-actions";
+import type { AgentActionCatalog, AgentActionRunResult, AgentE2EJobRequest, AgentE2EJobResult, AgentE2EReadiness, CodeCliRunnerReadiness } from "../types/agent-actions";
 import type { DimensionalAccuracyReport } from "../types/dimensional";
 import type { LogEntry } from "../types/log";
 import type { Notification } from "../types/notification";
@@ -763,6 +763,36 @@ export async function runAgentCatalogActionLive(actionId: string, reason = "oper
     throw new Error("Hermes Agent action result was not in the expected shape.");
   }
   return result as unknown as AgentActionRunResult;
+}
+
+export function getAgentE2EReadinessLive(): Promise<AgentE2EReadiness> {
+  return fetchJson<AgentE2EReadiness>("/api/code-operator/e2e/readiness").then((payload) => payload ?? {
+    status: "blocked",
+    ready: false,
+    summary: "Hermes Agent E2E readiness API is unavailable from the local backend.",
+    blocked_reasons: ["Hermes Agent E2E readiness API returned no payload."],
+    folder_index: { status: "blocked", loaded: [], missing: [], target_roots: [], required: [] },
+    cli_runners: { status: "blocked", count: 0, detected: 0, runners: [], policy: { write_runs_allowed: false, reason: "unavailable", allowed_now: [] } },
+    next_required_steps: [],
+  });
+}
+
+export function getCodeCliRunnersLive(): Promise<CodeCliRunnerReadiness> {
+  return fetchJson<CodeCliRunnerReadiness>("/api/code-operator/cli-runners").then((payload) => payload ?? {
+    status: "blocked",
+    count: 0,
+    detected: 0,
+    runners: [],
+    policy: { write_runs_allowed: false, reason: "Hermes Agent CLI runner API returned no payload.", allowed_now: [] },
+  });
+}
+
+export async function runAgentE2EJobLive(request: AgentE2EJobRequest): Promise<AgentE2EJobResult> {
+  const result = await postJsonWithResult("/api/code-operator/e2e/jobs", request);
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("Hermes Agent E2E job response was not in the expected shape.");
+  }
+  return result as unknown as AgentE2EJobResult;
 }
 
 export async function uploadAgentAttachmentLive(personaId: string, file: File): Promise<AgentAttachmentUpload> {

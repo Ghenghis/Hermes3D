@@ -7,6 +7,7 @@ import {
   emitProofEventLive,
   getActiveWorkflowsLive,
   getAgentActionCatalogLive,
+  getAgentE2EReadinessLive,
   getAgentsLive,
   getApprovalHistoryLive,
   getArtifactsLive,
@@ -17,6 +18,7 @@ import {
   getHermesAgentUpdateStatusLive,
   getHermesDesktopUpdateStatusLive,
   getCameraObserverStatusLive,
+  getCodeCliRunnersLive,
   getDesignToolchainStatusLive,
   getDimensionalReportsLive,
   getJobDetailLive,
@@ -71,6 +73,7 @@ import {
   requestIdleCandidateReviewLive,
   runIdleCandidateLive,
   runAgentCatalogActionLive,
+  runAgentE2EJobLive,
   saveVoiceAgentLive,
   retryJobLive,
   testPrinterLive,
@@ -79,7 +82,7 @@ import {
   uploadGcodeLive,
 } from "./adapters.live";
 import type { Agent } from "../types/agent";
-import type { AgentActionCatalog, AgentActionRunResult } from "../types/agent-actions";
+import type { AgentActionCatalog, AgentActionRunResult, AgentE2EJobRequest, AgentE2EJobResult, AgentE2EReadiness, CodeCliRunnerReadiness } from "../types/agent-actions";
 import type { Approval } from "../types/approval";
 import type { Artifact, EvidenceForm } from "../types/artifact";
 import type { AutopilotCheck, GuardrailPolicy } from "../types/autopilot";
@@ -139,6 +142,9 @@ export interface AdapterAPI {
   getAgents(): Promise<Agent[]>;
   getAgentActionCatalog(): Promise<AgentActionCatalog>;
   runAgentCatalogAction(actionId: string, reason?: string, payload?: Record<string, unknown>): Promise<AgentActionRunResult>;
+  getAgentE2EReadiness(): Promise<AgentE2EReadiness>;
+  runAgentE2EJob(request: AgentE2EJobRequest): Promise<AgentE2EJobResult>;
+  getCodeCliRunners(): Promise<CodeCliRunnerReadiness>;
   getActiveWorkflows(): Promise<Workflow[]>;
   getRecentJobs(): Promise<Job[]>;
   getProofBundles(): Promise<ProofBundle[]>;
@@ -220,6 +226,9 @@ export const adapters: AdapterAPI = {
   getAgents: getAgentsLive,
   getAgentActionCatalog: getAgentActionCatalogLive,
   runAgentCatalogAction: runAgentCatalogActionLive,
+  getAgentE2EReadiness: getAgentE2EReadinessLive,
+  runAgentE2EJob: runAgentE2EJobLive,
+  getCodeCliRunners: getCodeCliRunnersLive,
   getActiveWorkflows: getActiveWorkflowsLive,
   getRecentJobs: getRecentJobsLive,
   getProofBundles: getProofBundlesLive,

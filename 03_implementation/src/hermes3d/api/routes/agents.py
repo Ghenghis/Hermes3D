@@ -671,6 +671,34 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         from hermes3d.services import code_history
 
         return code_history.provider_team_readiness()
+    if handler == "code.e2e.readiness":
+        from hermes3d.services import code_history
+
+        return code_history.agent_e2e_readiness()
+    if handler == "code.cli_runners.readiness":
+        from hermes3d.services import code_history
+
+        return code_history.code_cli_runners()
+    if handler == "code.e2e.run":
+        from hermes3d.services import code_history
+
+        files = payload.get("files")
+        role_chain = payload.get("role_chain")
+        if not isinstance(files, list) or not files:
+            raise ValueError("Payload field files must be a non-empty list.")
+        if role_chain is not None and not isinstance(role_chain, list):
+            raise ValueError("Payload field role_chain must be a list when supplied.")
+        return code_history.run_agent_e2e_job(
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            title=_required_payload_text(payload, "title"),
+            files=files,
+            objective=_required_payload_text(payload, "objective"),
+            target_branch=str(payload.get("target_branch") or "") or None,
+            role_chain=role_chain,
+            cli_worker=str(payload.get("cli_worker") or "") or None,
+            release_on_finish=bool(payload.get("release_on_finish", True)),
+        )
     if handler == "code.teams.assign_task":
         from hermes3d.services import code_history
 
@@ -1306,14 +1334,23 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
 
         mcp_locks = code_history.mcp_lock_readiness()
         provider_teams = code_history.provider_team_readiness()
+        e2e_readiness = code_history.agent_e2e_readiness()
+        cli_runners = code_history.code_cli_runners()
     except Exception:
         mcp_locks = {"ready": False, "blocked_reason": "Hermes MCP lock readiness could not be evaluated."}
         provider_teams = {"ready": False, "status": "blocked", "blocked_reasons": ["Hermes Agent provider-team readiness could not be evaluated."]}
+        e2e_readiness = {"ready": False, "status": "blocked", "blocked_reasons": ["Hermes Agent E2E readiness could not be evaluated."]}
+        cli_runners = {"status": "blocked", "detected": 0, "runners": [], "policy": {"write_runs_allowed": False}}
     team_blocked_reason = "; ".join(str(item) for item in provider_teams.get("blocked_reasons", [])[:4]) if provider_teams.get("blocked_reasons") else None
+    e2e_blocked_reason = "; ".join(str(item) for item in e2e_readiness.get("blocked_reasons", [])[:4]) if e2e_readiness.get("blocked_reasons") else None
+    cli_runner_count = int(cli_runners.get("detected") or 0) if isinstance(cli_runners, dict) else 0
     contracts = [
         _contract("agents.health.refresh", "Refresh Hermes Agent runtime health", "agents", "ready" if runtime.get("hermes_agent_runtime") == "ready" else "blocked", "read", "low", "GET /api/agents/health", "agents.health", "Checks the configured local/private agent runtime bridge."),
         _contract("code.programming_readiness.refresh", "Refresh Hermes Agent programming readiness", "agents", "ready", "read", "low", "GET /api/code-operator/programming-readiness", "code.programming_readiness", "Checks true source inputs from Nous Hermes Agent and Atomic Hermes plus MiniMax/DeepSeek provider readiness."),
         _contract("code.teams.readiness.refresh", "Refresh Hermes Agent team readiness", "agents", str(provider_teams.get("status") or "blocked"), "read", "low", "GET /api/code-operator/teams/readiness", "code.teams.readiness", "Checks MiniMax builder and DeepSeek reviewer team readiness without exposing provider secrets.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
+        _contract("code.e2e.readiness.refresh", "Refresh Agent Code Workbench readiness", "agents", "ready" if e2e_readiness.get("ready") else "blocked", "read", "low", "GET /api/code-operator/e2e/readiness", "code.e2e.readiness", "Checks folder index, MCP locks, MiniMax builder, DeepSeek reviewer, snapshots, and proof prerequisites for Hermes Agents coding alongside Codex.", None if e2e_readiness.get("ready") else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready.")),
+        _contract("code.cli_runners.readiness.refresh", "Refresh OpenHands/OpenCode CLI readiness", "agents", "ready", "read", "low", "GET /api/code-operator/cli-runners", "code.cli_runners.readiness", f"Detects OpenHands and OpenCode CLI binaries for future sandboxed agent delegation; current contract is detection/version only, no writes. Detected now: {cli_runner_count}."),
+        _contract("code.e2e.run", "Run proof-gated Agent Code Workbench job", "agents", "ready" if e2e_readiness.get("ready") else "blocked", "artifact", "high", "POST /api/code-operator/e2e/jobs", "code.e2e.run", "Runs the real folder-index -> task claim -> file lock -> pre-snapshot -> MiniMax coding pass -> DeepSeek review pass loop and returns a reviewed patch-planning artifact. It does not mutate source directly.", None if e2e_readiness.get("ready") else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready.")),
         _contract("code.teams.assign_task", "Assign provider-backed code task", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/assign-task", "code.teams.assign_task", "Records a proof-backed provider-team coding task only after selected source, provider, and MCP lock prerequisites are ready.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
         _contract("code.teams.request_review", "Request second-team code review", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/request-review", "code.teams.request_review", "Requests a proof-backed DeepSeek/Atomic Hermes review for files and proof ids before PR shipping.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent reviewer team is not ready.")),
         _contract("code.teams.run_coding_pass", "Run MiniMax coding plan pass", "agents", "ready" if provider_teams.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/teams/run-coding-pass", "code.teams.run_coding_pass", "Calls the configured MiniMax builder through a bounded OpenAI-compatible chat request and records a code-plan artifact; it does not edit source files.", None if provider_teams.get("ready") else (team_blocked_reason or "MiniMax builder team is not ready.")),
@@ -1490,6 +1527,11 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
             "required": ["task_id", "summary", "files", "proof_ids"],
             "optional": {"reviewer_team_id": "defaults to deepseek-reviewers; dual is accepted"},
             "safety": "Creates a provider-backed review artifact only; it requires proof ids and never claims tests passed unless proof is supplied.",
+        },
+        "code.e2e.run": {
+            "required": ["task_id", "title", "files", "objective"],
+            "optional": {"target_branch": "safe git ref", "role_chain": "finder/builder/reviewer/tester role list", "cli_worker": "opencode or openhands preflight only", "release_on_finish": "defaults true"},
+            "safety": "Runs folder-index context, task claim, same-owner file locks, pre-snapshots, MiniMax coding pass, and DeepSeek review pass. It records proof and returns reviewed planning artifacts; source mutation remains blocked until a separate patch proposal/apply/gate/PR workflow.",
         },
         "code.history.snapshot": {"required": ["relative_path"], "optional": {"action_id": "agent action identifier", "reason": "why this snapshot is needed"}, "safety": "Project-relative source files only; secrets, binary/generated files, .git, node_modules, and printer config writes are blocked."},
         "code.repo.tree.refresh": {"required": [], "optional": {"root": "project-relative directory or file; defaults to repository root", "limit": "1-1200 returned paths"}, "safety": "Secrets, generated output, caches, node_modules, and VCS internals are excluded."},

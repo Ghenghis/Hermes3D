@@ -169,9 +169,48 @@ class ProviderReviewPassRequest(StrictBody):
     reviewer_team_id: str = "deepseek-reviewers"
 
 
+class AgentE2EJobRequest(StrictBody):
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
+    role_chain: list[str] = Field(default_factory=lambda: ["finder", "builder", "reviewer", "tester"])
+    cli_worker: str | None = None
+    release_on_finish: bool = True
+
+
 @router.get("/programming-readiness")
 def programming_readiness() -> dict[str, Any]:
     return code_history.programming_readiness()
+
+
+@router.get("/e2e/readiness")
+def agent_e2e_readiness() -> dict[str, Any]:
+    return code_history.agent_e2e_readiness()
+
+
+@router.get("/cli-runners")
+def code_cli_runners() -> dict[str, Any]:
+    return code_history.code_cli_runners()
+
+
+@router.post("/e2e/jobs")
+def run_agent_e2e_job(body: AgentE2EJobRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_agent_e2e_job(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+            role_chain=body.role_chain,
+            cli_worker=body.cli_worker,
+            release_on_finish=body.release_on_finish,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.get("/teams/readiness")

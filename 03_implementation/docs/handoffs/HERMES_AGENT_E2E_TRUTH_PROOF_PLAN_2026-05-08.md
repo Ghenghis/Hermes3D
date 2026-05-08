@@ -26,10 +26,11 @@ Until that chain passes on a real Hermes3D task, the agent system is `IN_PROGRES
 
 Every coding task starts with the folder index created for agents:
 
-- `03_implementation/docs/handoffs/00_INDEX.md`
-- `03_implementation/docs/handoffs/01_TAXONOMY.md`
-- `03_implementation/docs/handoffs/02_EXCLUSIONS.md`
-- the relevant per-folder category README under `03_implementation/docs/handoffs/`
+- `03_implementation/docs/handoffs/hermes3d-os-folder-index-2026-05-07/00_INDEX.md`
+- `03_implementation/docs/handoffs/hermes3d-os-folder-index-2026-05-07/01_TAXONOMY.md`
+- `03_implementation/docs/handoffs/hermes3d-os-folder-index-2026-05-07/02_EXCLUSIONS.md`
+- the relevant per-folder/category docs under `03_implementation/docs/handoffs/hermes3d-os-folder-index-2026-05-07/`
+- this contract, `03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md`
 
 Acceptance:
 
@@ -46,6 +47,13 @@ Acceptance:
 | Local fallback | LM Studio/Ollama | Backup reviewer or offline assistant | May assist only when explicitly marked fallback; cannot replace MiniMax/DeepSeek proof when those keys are configured. |
 
 Provider keys stay in `G:/private/.env` only. The UI and proof files may name env keys and provider ids, never secret values.
+
+Current live-smoke result for this branch:
+
+- Folder-index context and MCP locks are now ready.
+- OpenHands/OpenCode CLI runners are detection-only and currently report no local PATH executable.
+- MiniMax execution is currently blocked by live HTTP 401 from the configured endpoint/key; the route records this as a redacted blocked reason instead of crashing or claiming the provider is usable.
+- Until MiniMax auth is corrected in `G:/private/.env`, the workbench can prove readiness/context but cannot complete the two-provider build/review pass.
 
 Shared provider rule:
 
@@ -114,9 +122,9 @@ Hermes3D already has provider-team readiness, MCP locks, snapshots, patch propos
 | Agent action/observation envelope | OpenHands-style tools return observations after actions; Hermes3D needs a common envelope for file, terminal, browser, and proof results. | Every code-operator action returns action id, observation summary, artifact/proof ids, and blocked reason when denied. |
 | Role-chain registry | OpenCode-style multiagent work needs primary/subagent roles, but Hermes3D must enforce roles through proof. | Task records list finder, builder, reviewer, tester, security roles with provider/team and evidence ids. |
 | Hermes skill pack | Agents need reusable project-specific skills rather than huge prompts. | Source OS runner, printer safety, no-fake UI, code patch, evidence, PR shipping, and rollback skills exist and are referenced by task records. |
-| Folder-index boot loader | Agents must know the repo layout before editing. | Every coding task records the folder-index files loaded and target ownership path. |
-| Provider execution loop | MiniMax and DeepSeek currently create artifacts, but do not drive one closed workflow. | One route links assignment -> coding pass -> review pass -> patch proposal -> lock/apply -> gates -> git PR. |
-| UI Agent Code Workbench | The user needs to launch and inspect the agent workflow from Hermes3D OS, not through Codex hidden execution. | Agents tab can submit a task, select files/roles, run builder/reviewer, see artifacts, apply/rollback, run gates, and open the PR. |
+| Folder-index boot loader | Agents must know the repo layout before editing. | DONE for planning/review: the E2E route loads the PR #86 folder index path, sends selected index docs as provider file context, and records loaded docs plus target ownership path. |
+| Provider execution loop | MiniMax and DeepSeek currently create artifacts, but do not drive one closed workflow. | PARTIAL: `/api/code-operator/e2e/jobs` links readiness -> folder-index context -> assignment -> locks -> pre-snapshots -> MiniMax coding artifact -> DeepSeek review artifact -> evidence/release. Patch apply, gates, and PR are still the next slice. |
+| UI Agent Code Workbench | The user needs to launch and inspect the agent workflow from Hermes3D OS, not through Codex hidden execution. | PARTIAL: Agents tab has the workbench form, readiness proof, CLI runner preflight state, and provider artifact result view. Apply/rollback/gates/PR controls remain blocked until the next slice. |
 | Policy bridge | OpenHands/OpenCode patterns can run powerful tools; Hermes3D must apply printer, secret, and path policy first. | S1/printer actions, secrets, destructive git, env writes, and denied paths fail closed before sandbox/provider execution. |
 
 No adapter is considered complete without a route probe, test, proof event, and visible UI state or explicit blocked reason.
@@ -191,9 +199,8 @@ No PR is accepted from an agent if any required gate is skipped, timed out witho
 
 | Gap | Why it blocks "working agents" | Required completion |
 | --- | --- | --- |
-| Provider actions are not first-class UI run buttons | Agents tab exposes safe read actions, but not the full MiniMax/DeepSeek coding loop with payload forms. | Add an Agent Code Workbench that can submit task title, files, objective, branch, and run builder/reviewer passes. |
-| Provider outputs are artifacts only | MiniMax and DeepSeek can write plan/review artifacts, but do not yet close the loop to patch proposal/apply/PR from one workflow. | Add a bounded orchestration route that links assignment -> coding pass -> review pass -> patch proposal/apply -> gates -> git lane. |
-| Patch application still requires Codex-like hidden execution | The safe APIs exist, but the UI does not yet let Hermes Agents drive the sequence end-to-end. | Surface snapshot, proposal, apply, gate, restore, branch, commit, push, and PR steps in the agent UI. |
+| Patch proposal/apply is not yet chained from provider artifact | The workbench now gets to reviewed provider artifacts, but it deliberately stops before source mutation. | Add reviewed patch extraction, same-owner lock validation, apply, post-snapshot, gate runner, git branch/stage/commit/push/PR, and rollback proof controls. |
+| OpenHands/OpenCode are detection-only | CLI worker rows are visible but cannot run write tasks safely yet. | Add sandbox readiness, read-only preflight route, task-scoped env/cwd/files, output proof capture, and keep write runs blocked until every gate is present. |
 | No real co-developer smoke task has passed | There is route smoke for individual pieces, but no full task completed by both agent teams. | Run a small docs or UI patch task through MiniMax + DeepSeek + locks + gates + PR and record proof ids. |
 | Source app runner gaps distract from agent runtime P0 | Runner gaps are useful but secondary while agents cannot co-develop. | Keep runner work queued; prioritize the agent coding loop until it can help complete the runner gaps itself. |
 
@@ -206,11 +213,13 @@ This is the next implementation sequence. Do not resume manual Source OS runner-
    - Prove both providers are visible only through backend/private env.
    - Show blocked reasons if either is unavailable.
 2. Agent Code Workbench:
-   - Add a visible Agents-tab workbench for coding tasks.
+   - DONE for planning/review: add a visible Agents-tab workbench for coding tasks.
    - Inputs: title, objective, file list, target branch, role chain, provider policy, and optional OpenHands/OpenCode CLI worker preference.
-   - Output: task id, loaded folder-index docs, provider artifacts, snapshots, gates, branch, PR URL, rollback ids.
+   - Current output: task id, loaded folder-index docs, provider artifacts, snapshots, evidence, and next-required-step list.
+   - Remaining output: gates, branch, PR URL, rollback ids.
 3. E2E orchestration route:
-   - One route coordinates folder-index context, claim, locks, snapshots, MiniMax pass, DeepSeek pass, patch proposal, apply, gates, git lane, evidence, release.
+   - PARTIAL: one route coordinates folder-index context, assignment, locks, snapshots, MiniMax pass, DeepSeek pass, evidence, and release.
+   - Remaining: patch proposal, apply, gates, git lane, and rollback proof.
    - Route fails closed at the first missing prerequisite.
 4. OpenHands/OpenCode CLI adapters:
    - Add detection/preflight routes first.

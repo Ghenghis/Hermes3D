@@ -11,7 +11,7 @@ import { AgentCommandCenter } from "../components/agents/AgentCommandCenter";
 import { NotificationCenter } from "../components/notifications/NotificationCenter";
 import { adapters } from "../api/adapters";
 import type { Agent } from "../types/agent";
-import type { AgentActionCatalog, AgentActionContract } from "../types/agent-actions";
+import type { AgentActionCatalog, AgentActionContract, AgentE2EJobResult, AgentE2EReadiness } from "../types/agent-actions";
 import type { IdleWorkbenchState } from "../types/learning";
 import type { Notification } from "../types/notification";
 
@@ -23,6 +23,8 @@ const AGENT_TONE: Record<Agent["status"], StatusTone> = {
 };
 
 const PROVIDER_OPTIONS = [
+  "minimax/MiniMax builder",
+  "deepseek/DeepSeek V4 reviewer",
   "ollama/llama3.1:8b",
   "ollama/qwen2.5-coder:14b",
   "openai/gpt-4o-mini",
@@ -52,6 +54,8 @@ const DEFAULT_WORKBENCH: IdleWorkbenchState = {
 };
 const RUNNABLE_OPERATOR_ACTIONS = new Set([
   "agents.health.refresh",
+  "code.e2e.readiness.refresh",
+  "code.cli_runners.readiness.refresh",
   "dashboard.snapshot.refresh",
   "source.modules.refresh",
   "source.verify_all",
@@ -106,6 +110,15 @@ export function AgentsTab() {
   const [proofRunBusy, setProofRunBusy] = useState(false);
   const [proofRunMessage, setProofRunMessage] = useState("Hermes Agent Playwright proof runner is ready for observe, smoke, or full UI checks.");
   const [providerDraft, setProviderDraft] = useState("");
+  const [e2eReadiness, setE2eReadiness] = useState<AgentE2EReadiness | null>(null);
+  const [e2eBusy, setE2eBusy] = useState(false);
+  const [e2eMessage, setE2eMessage] = useState("Loading Agent Code Workbench readiness.");
+  const [e2eResult, setE2eResult] = useState<AgentE2EJobResult | null>(null);
+  const [e2eTitle, setE2eTitle] = useState("Hermes Agent E2E code task");
+  const [e2eObjective, setE2eObjective] = useState("Use folder-index context, inspect the listed files, produce a bounded patch plan, and route it through DeepSeek review before any source mutation.");
+  const [e2eFiles, setE2eFiles] = useState("03_implementation/ROADMAP.md\n03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md");
+  const [e2eTargetBranch, setE2eTargetBranch] = useState("");
+  const [e2eCliWorker, setE2eCliWorker] = useState("");
   const selected = agents.find((a) => a.id === selectedId) ?? agents[0] ?? null;
 
   useEffect(() => {
@@ -159,6 +172,14 @@ export function AgentsTab() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    void refreshAgentE2EReadiness(setE2eReadiness, setE2eMessage, () => mounted);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (selectedId && !agents.some((agent) => agent.id === selectedId)) {
       setSelectedId(agents[0]?.id ?? null);
     }
@@ -175,6 +196,99 @@ export function AgentsTab() {
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="agents-root">
       <div className="col-span-12">
         <AgentCommandCenter agents={agents} />
+      </div>
+      <div className="col-span-12">
+        <Panel
+          id="agents.code-workbench"
+          title="AGENT CODE WORKBENCH"
+          dense
+          status={{ tone: e2eReadiness?.ready ? "green" : "amber", label: e2eMessage }}
+          className="min-h-[228px]"
+        >
+          <div className="grid gap-2 text-xs xl:grid-cols-[0.92fr_1.08fr]">
+            <div className="grid gap-2">
+              <div className="rounded border border-border bg-bg/40 p-2">
+                <div className="text-[10px] uppercase text-muted">Truth chain</div>
+                <div className="mt-1 text-fg">{e2eReadiness?.summary ?? "Waiting for backend readiness."}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <MetricPill label="folder docs" value={e2eReadiness?.folder_index.loaded.length ?? 0} />
+                  <MetricPill label="missing" value={e2eReadiness?.folder_index.missing.length ?? 0} warn />
+                  <MetricPill label="sent" value={e2eReadiness?.folder_index.provider_context_files?.length ?? 0} />
+                  <MetricPill label="cli found" value={e2eReadiness?.cli_runners.detected ?? 0} />
+                </div>
+              </div>
+              <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
+                <div className="text-[10px] uppercase text-muted">OpenHands / OpenCode preflight</div>
+                {(e2eReadiness?.cli_runners.runners ?? []).map((runner) => (
+                  <div key={runner.id} className="grid grid-cols-[1fr_auto] gap-2">
+                    <span className="min-w-0 truncate text-fg">{runner.label}</span>
+                    <span className={runner.detected ? "text-accent-green" : "text-accent-amber"}>{runner.detected ? runner.version ?? "detected" : "not on PATH"}</span>
+                  </div>
+                ))}
+                {!e2eReadiness && <div className="text-muted">CLI runner API has not responded yet.</div>}
+              </div>
+              {(e2eReadiness?.blocked_reasons.length ?? 0) > 0 && (
+                <div className="max-h-20 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-2 text-[11px] text-accent-amber">
+                  {e2eReadiness?.blocked_reasons.slice(0, 5).map((reason) => <div key={reason}>- {reason}</div>)}
+                </div>
+              )}
+            </div>
+            <div className="grid gap-2 rounded border border-border bg-bg/40 p-2">
+              <div className="grid gap-2 md:grid-cols-[1fr_0.72fr_0.48fr]">
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">Title</span>
+                  <input value={e2eTitle} onChange={(event) => setE2eTitle(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">Target branch</span>
+                  <input value={e2eTargetBranch} onChange={(event) => setE2eTargetBranch(event.target.value)} placeholder="optional" className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">CLI worker</span>
+                  <select value={e2eCliWorker} onChange={(event) => setE2eCliWorker(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none">
+                    <option value="">none</option>
+                    <option value="opencode">OpenCode</option>
+                    <option value="openhands">OpenHands</option>
+                  </select>
+                </label>
+              </div>
+              <label className="grid gap-1">
+                <span className="text-[10px] uppercase text-muted">Files, one per line</span>
+                <textarea value={e2eFiles} onChange={(event) => setE2eFiles(event.target.value)} className="h-16 resize-y rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+              </label>
+              <label className="grid gap-1">
+                <span className="text-[10px] uppercase text-muted">Objective</span>
+                <textarea value={e2eObjective} onChange={(event) => setE2eObjective(event.target.value)} className="h-20 resize-y rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-muted">
+                  {e2eResult ? `${e2eResult.status}${e2eResult.task_id ? ` · ${e2eResult.task_id}` : ""}` : "Runs planning/review only; patch apply remains separately gated."}
+                </span>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => void refreshAgentE2EReadiness(setE2eReadiness, setE2eMessage)} className="rounded border border-border px-2 py-1 text-[11px] text-fg">Refresh</button>
+                  <button
+                    type="button"
+                    disabled={e2eBusy || !e2eReadiness?.ready}
+                    onClick={() => void runAgentE2EWorkbench({ title: e2eTitle, objective: e2eObjective, files: e2eFiles, targetBranch: e2eTargetBranch, cliWorker: e2eCliWorker }, setE2eBusy, setE2eMessage, setE2eResult, setE2eReadiness)}
+                    className="rounded border border-accent-cyan/50 bg-accent-cyan/10 px-3 py-1 text-[11px] font-semibold text-accent-cyan disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {e2eBusy ? "running" : "Start E2E job"}
+                  </button>
+                </div>
+              </div>
+              {(e2eResult?.blocked_reasons?.length ?? 0) > 0 && (
+                <div className="max-h-24 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-2 text-[11px] text-accent-amber">
+                  {e2eResult?.blocked_reasons?.slice(0, 3).map((reason) => <div key={reason}>- {reason}</div>)}
+                </div>
+              )}
+              {e2eResult?.next_required_steps?.length ? (
+                <div className="rounded border border-border bg-bg/40 p-2 text-[11px] text-muted">
+                  next: {e2eResult.next_required_steps.slice(0, 2).join(" -> ")}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </Panel>
       </div>
       <div className="col-span-12">
         <Panel
@@ -568,6 +682,86 @@ async function runPlaywrightProof(
   } finally {
     setBusy(false);
   }
+}
+
+async function refreshAgentE2EReadiness(
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+  setMessage: (message: string) => void,
+  isMounted: () => boolean = () => true,
+) {
+  try {
+    const readiness = await adapters.getAgentE2EReadiness();
+    if (!isMounted()) return;
+    setReadiness(readiness);
+    const blocked = readiness.blocked_reasons.length;
+    const label = readiness.ready ? "ready" : `${blocked} blocker${blocked === 1 ? "" : "s"}`;
+    setMessage(`Agent Code Workbench ${label}.`);
+  } catch (error) {
+    if (!isMounted()) return;
+    setReadiness(null);
+    setMessage(`Workbench unavailable: ${error instanceof Error ? error.message : "backend error"}`);
+  }
+}
+
+async function runAgentE2EWorkbench(
+  input: { title: string; objective: string; files: string; targetBranch: string; cliWorker: string },
+  setBusy: (busy: boolean) => void,
+  setMessage: (message: string) => void,
+  setResult: (result: AgentE2EJobResult | null) => void,
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+) {
+  const files = parseWorkbenchFiles(input.files);
+  if (files.length === 0) {
+    setMessage("Blocked: add at least one existing project-relative file.");
+    return;
+  }
+  const taskId = `H3D-AGENT-E2E-${Date.now()}`;
+  setBusy(true);
+  setResult(null);
+  setMessage(`Starting ${taskId}.`);
+  try {
+    const result = await adapters.runAgentE2EJob({
+      task_id: taskId,
+      title: input.title.trim() || "Hermes Agent E2E code task",
+      files,
+      objective: input.objective.trim(),
+      target_branch: input.targetBranch.trim() || undefined,
+      role_chain: ["finder", "builder", "reviewer", "tester"],
+      cli_worker: input.cliWorker || undefined,
+      release_on_finish: true,
+    });
+    setResult(result);
+    const proof = proofIdFromResult(result);
+    const blocked = result.blocked_reasons?.length ? ` · ${result.blocked_reasons[0]}` : "";
+    setMessage(`${result.accepted ? "Accepted" : "Blocked"}: ${result.status}${proof}${blocked}`);
+    await adapters.emitProofEvent("agents.e2e_workbench.requested", { task_id: taskId, status: result.status, accepted: result.accepted, files });
+    void adapters.getAgentE2EReadiness().then(setReadiness).catch(() => undefined);
+  } catch (error) {
+    setMessage(`Blocked: ${error instanceof Error ? error.message : "Agent Code Workbench job failed"}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function parseWorkbenchFiles(value: string): string[] {
+  const seen = new Set<string>();
+  return value
+    .split(/[\n,]+/)
+    .map((item) => item.trim().replaceAll("\\", "/"))
+    .filter((item) => item.length > 0)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+}
+
+function proofIdFromResult(result: AgentE2EJobResult): string {
+  const evidence = result.mcp_evidence;
+  if (isRecord(evidence) && typeof evidence.evidence_id === "string") {
+    return ` · proof ${evidence.evidence_id}`;
+  }
+  return "";
 }
 
 function actionAccepted(payload: unknown): boolean {

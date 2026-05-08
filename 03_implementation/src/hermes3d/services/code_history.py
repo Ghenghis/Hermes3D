@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -31,10 +32,26 @@ MAX_SEARCH_RESULTS = 200
 MAX_PROPOSED_TEXT_BYTES = 1024 * 1024
 MAX_COMMIT_MESSAGE_BYTES = 4096
 MAX_PR_BODY_BYTES = 32000
-MAX_PROVIDER_CONTEXT_BYTES = 120_000
+MAX_PROVIDER_CONTEXT_BYTES = 180_000
 MAX_PROVIDER_FILE_BYTES = 32_000
 MAX_PROVIDER_RESPONSE_BYTES = 1_000_000
 ALLOWED_AGENT_BRANCH_PREFIXES = ("codex/", "hermes-agent/")
+FOLDER_INDEX_ROOT = "03_implementation/docs/handoffs/hermes3d-os-folder-index-2026-05-07"
+FOLDER_INDEX_FILES = [
+    f"{FOLDER_INDEX_ROOT}/00_INDEX.md",
+    f"{FOLDER_INDEX_ROOT}/01_TAXONOMY.md",
+    f"{FOLDER_INDEX_ROOT}/02_EXCLUSIONS.md",
+    f"{FOLDER_INDEX_ROOT}/agent-infra/README.md",
+    f"{FOLDER_INDEX_ROOT}/agent-infra/hermes-agent-fresh.md",
+    f"{FOLDER_INDEX_ROOT}/agent-infra/hermes3d-mcp-lock-orchestrator.md",
+    f"{FOLDER_INDEX_ROOT}/core-repos/Hermes3D.md",
+    f"{FOLDER_INDEX_ROOT}/core-repos/h3d-gui-wiring-codex.md",
+]
+SOURCE_OS_FOLDER_INDEX_FILES = [
+    f"{FOLDER_INDEX_ROOT}/source-os-60-apps/README.md",
+    f"{FOLDER_INDEX_ROOT}/source-os-60-apps/REGISTRY.md",
+]
+HERMES_AGENT_E2E_PLAN = "03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md"
 
 DENIED_PARTS = {
     ".git",
@@ -316,6 +333,296 @@ def provider_team_readiness() -> dict[str, Any]:
             "ship branch/PR only after proof",
         ],
         "blocked_reasons": blocked_reasons,
+    }
+
+
+def agent_e2e_readiness() -> dict[str, Any]:
+    programming = programming_readiness()
+    teams = provider_team_readiness()
+    folder_index = folder_index_context([])
+    cli_runners = code_cli_runners()
+    blocked: list[str] = []
+    if not programming.get("ready"):
+        blocked.extend(str(item) for item in programming.get("blocked_reasons", []))
+    if not teams.get("ready"):
+        blocked.extend(str(item) for item in teams.get("blocked_reasons", []))
+    if folder_index.get("missing"):
+        blocked.append("Folder index is incomplete: " + ", ".join(folder_index["missing"]))
+    return {
+        "status": "ready" if not blocked else "blocked",
+        "ready": not blocked,
+        "summary": "MiniMax builder + DeepSeek reviewer coding loop readiness.",
+        "blocked_reasons": blocked,
+        "programming": programming,
+        "provider_teams": teams,
+        "folder_index": folder_index,
+        "cli_runners": cli_runners,
+        "next_required_steps": [
+            "submit task through Agent Code Workbench",
+            "load folder index",
+            "claim task and lock files",
+            "snapshot files",
+            "run MiniMax coding pass",
+            "run DeepSeek review pass",
+            "apply only reviewed bounded patch proposals",
+            "run gates and ship PR with proof",
+        ],
+    }
+
+
+def code_cli_runners() -> dict[str, Any]:
+    runners = [_cli_runner_status("opencode"), _cli_runner_status("openhands")]
+    detected = [item for item in runners if item["detected"]]
+    return {
+        "status": "ready" if detected else "setup_required",
+        "count": len(runners),
+        "detected": len(detected),
+        "runners": runners,
+        "policy": {
+            "write_runs_allowed": False,
+            "reason": "OpenHands/OpenCode CLI write runs stay blocked until sandbox readiness, MCP locks, snapshots, and proof capture are wired.",
+            "allowed_now": ["detect", "version_preflight"],
+        },
+    }
+
+
+def folder_index_context(files: list[str]) -> dict[str, Any]:
+    base_docs = [*FOLDER_INDEX_FILES, *SOURCE_OS_FOLDER_INDEX_FILES, HERMES_AGENT_E2E_PLAN]
+    loaded: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for rel in base_docs:
+        path = PROJECT_ROOT / rel
+        if not path.exists():
+            missing.append(rel)
+            continue
+        loaded.append(_folder_index_doc_payload(rel, path))
+    target_roots = sorted({_top_folder_for_context(item) for item in files if item})
+    provider_files = _folder_index_provider_files(files, loaded)
+    return {
+        "status": "ready" if not missing else "blocked",
+        "loaded": loaded,
+        "missing": missing,
+        "target_roots": target_roots,
+        "provider_context_files": provider_files,
+        "required": base_docs,
+    }
+
+
+def run_agent_e2e_job(
+    *,
+    owner: str,
+    task_id: str,
+    title: str,
+    files: list[str],
+    objective: str,
+    target_branch: str | None = None,
+    role_chain: list[str] | None = None,
+    cli_worker: str | None = None,
+    release_on_finish: bool = True,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    clean_title = _validate_bounded_text(title, "Title", max_chars=180)
+    clean_objective = _validate_bounded_text(objective, "Objective", max_chars=4000)
+    safe_files = _safe_mcp_files(files, must_exist=True)
+    if not safe_files:
+        raise ValueError("At least one existing project-relative file is required.")
+    branch = _validate_git_ref(target_branch) if target_branch else None
+    roles = _validate_role_chain(role_chain or ["finder", "builder", "reviewer", "tester"])
+    cli = _validate_cli_worker(cli_worker)
+    readiness = agent_e2e_readiness()
+    blocked = list(readiness.get("blocked_reasons") or [])
+    if cli:
+        runner = next((item for item in readiness["cli_runners"]["runners"] if item["id"] == cli), None)
+        if not runner or not runner.get("detected"):
+            blocked.append(f"CLI worker {cli} is not detected.")
+        blocked.append(f"CLI worker {cli} is detection/preflight-only until sandbox runner is wired.")
+    if blocked:
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_e2e",
+            summary=f"Blocked Hermes Agent E2E job {task_id}",
+            data={"files": safe_files, "blocked_reasons": blocked, "role_chain": roles, "cli_worker": cli},
+        )
+        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "readiness": readiness, "mcp_evidence": evidence}
+    assignment = assign_provider_team_task(
+        owner=owner,
+        team_id="dual",
+        task_id=task_id,
+        title=clean_title,
+        files=safe_files,
+        objective=clean_objective,
+        target_branch=branch,
+        review_required=True,
+    )
+    locks = lock_mcp_files(
+        owner=owner,
+        files=safe_files,
+        task_id=task_id,
+        reason=f"Hermes Agent E2E coding job: {clean_title}",
+        role="agent-code-workbench",
+        ttl_minutes=120,
+    )
+    heartbeat = heartbeat_mcp_task(owner=owner, task_id=task_id)
+    snapshots = [
+        snapshot_file(
+            rel,
+            agent_id=owner,
+            action_id="code.e2e.pre_snapshot",
+            reason=f"Pre-change snapshot for Hermes Agent E2E task {task_id}",
+        )
+        for rel in safe_files
+    ]
+    index_context = folder_index_context(safe_files)
+    provider_context_files = [*index_context["provider_context_files"], *safe_files]
+    coding = run_provider_team_coding_pass(
+        owner=owner,
+        team_id="minimax-builders",
+        task_id=task_id,
+        title=clean_title,
+        files=provider_context_files,
+        objective=_e2e_objective_with_index(clean_objective, index_context, roles),
+        target_branch=branch,
+    )
+    if not coding.get("accepted"):
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_e2e",
+            summary=f"Blocked MiniMax coding pass for Hermes Agent E2E job {task_id}",
+            data={
+                "title": clean_title,
+                "files": safe_files,
+                "role_chain": roles,
+                "folder_index_context_sent": index_context["provider_context_files"],
+                "pre_snapshot_ids": [item["id"] for item in snapshots],
+                "blocked_reasons": coding.get("blocked_reasons") or ["MiniMax coding pass was blocked."],
+            },
+        )
+        release: dict[str, Any] | None = None
+        task_release: dict[str, Any] | None = None
+        if release_on_finish:
+            release = release_mcp_files(owner=owner, files=safe_files, note="Provider coding pass blocked; no source mutation applied.")
+            task_release = release_mcp_task(owner=owner, task_id=task_id, note="Provider coding pass blocked; fix provider readiness and retry.")
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "task_id": task_id,
+            "title": clean_title,
+            "files": safe_files,
+            "target_branch": branch,
+            "role_chain": roles,
+            "folder_index": index_context,
+            "assignment": assignment,
+            "locks": locks,
+            "heartbeat": heartbeat,
+            "pre_snapshots": snapshots,
+            "coding_pass": coding,
+            "review_pass": None,
+            "blocked_reasons": coding.get("blocked_reasons") or ["MiniMax coding pass was blocked."],
+            "mcp_evidence": evidence,
+            "release": release,
+            "task_release": task_release,
+        }
+    proof_ids = _provider_proof_ids(coding)
+    review = run_provider_team_review_pass(
+        owner=owner,
+        task_id=task_id,
+        summary=f"Review MiniMax coding pass for {clean_title}. Roles: {', '.join(roles)}. Files: {', '.join(safe_files)}.",
+        files=provider_context_files,
+        proof_ids=proof_ids,
+        reviewer_team_id="deepseek-reviewers",
+    )
+    if not review.get("accepted"):
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_e2e",
+            summary=f"Blocked DeepSeek review pass for Hermes Agent E2E job {task_id}",
+            data={
+                "title": clean_title,
+                "files": safe_files,
+                "role_chain": roles,
+                "folder_index_context_sent": index_context["provider_context_files"],
+                "pre_snapshot_ids": [item["id"] for item in snapshots],
+                "coding_artifact_id": (coding.get("artifact") or {}).get("id"),
+                "blocked_reasons": review.get("blocked_reasons") or ["DeepSeek review pass was blocked."],
+            },
+        )
+        release = None
+        task_release = None
+        if release_on_finish:
+            release = release_mcp_files(owner=owner, files=safe_files, note="Provider review pass blocked; no source mutation applied.")
+            task_release = release_mcp_task(owner=owner, task_id=task_id, note="Provider review pass blocked; fix provider readiness and retry.")
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "task_id": task_id,
+            "title": clean_title,
+            "files": safe_files,
+            "target_branch": branch,
+            "role_chain": roles,
+            "folder_index": index_context,
+            "assignment": assignment,
+            "locks": locks,
+            "heartbeat": heartbeat,
+            "pre_snapshots": snapshots,
+            "coding_pass": coding,
+            "review_pass": review,
+            "blocked_reasons": review.get("blocked_reasons") or ["DeepSeek review pass was blocked."],
+            "mcp_evidence": evidence,
+            "release": release,
+            "task_release": task_release,
+        }
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_e2e",
+        summary=f"Completed provider planning/review for Hermes Agent E2E job {task_id}",
+        data={
+            "title": clean_title,
+            "files": safe_files,
+            "role_chain": roles,
+            "folder_index_loaded": [item["path"] for item in index_context["loaded"]],
+            "folder_index_context_sent": index_context["provider_context_files"],
+            "pre_snapshot_ids": [item["id"] for item in snapshots],
+            "coding_artifact_id": (coding.get("artifact") or {}).get("id"),
+            "review_artifact_id": (review.get("artifact") or {}).get("id"),
+            "next_status": "needs_reviewed_patch_proposal",
+        },
+    )
+    release: dict[str, Any] | None = None
+    task_release: dict[str, Any] | None = None
+    if release_on_finish:
+        release = release_mcp_files(owner=owner, files=safe_files, note="Provider planning/review completed; no source mutation applied by this E2E job.")
+        task_release = release_mcp_task(owner=owner, task_id=task_id, note="Provider planning/review completed; next step is reviewed patch proposal/apply.")
+    return {
+        "status": "needs_reviewed_patch_proposal",
+        "accepted": True,
+        "task_id": task_id,
+        "title": clean_title,
+        "files": safe_files,
+        "target_branch": branch,
+        "role_chain": roles,
+        "folder_index": index_context,
+        "assignment": assignment,
+        "locks": locks,
+        "heartbeat": heartbeat,
+        "pre_snapshots": snapshots,
+        "coding_pass": coding,
+        "review_pass": review,
+        "mcp_evidence": evidence,
+        "release": release,
+        "task_release": task_release,
+        "next_required_steps": [
+            "extract or author a bounded patch proposal from the reviewed artifact",
+            "re-claim/re-lock target files before apply",
+            "apply patch proposal under same-owner lock",
+            "run gates",
+            "branch/commit/push/PR with proof",
+        ],
     }
 
 
@@ -1085,15 +1392,32 @@ def run_provider_team_coding_pass(
         )
         return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
     prompt = _coding_pass_prompt(title=clean_title, objective=clean_objective, files=context, target_branch=branch)
-    response = _call_provider_chat(
-        "minimax",
-        [
-            {"role": "system", "content": _provider_system_prompt("coding")},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.1,
-        max_tokens=2400,
-    )
+    try:
+        response = _call_provider_chat(
+            "minimax",
+            [
+                {"role": "system", "content": _provider_system_prompt("coding")},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.1,
+            max_tokens=2400,
+        )
+    except RuntimeError as exc:
+        blocked = [str(exc)]
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider",
+            summary=f"Blocked MiniMax coding pass {task_id}",
+            data={
+                "team_id": team_id,
+                "provider_id": "minimax",
+                "files": [item["path"] for item in context],
+                "target_branch": branch,
+                "blocked_reasons": blocked,
+            },
+        )
+        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
     artifact = _record_provider_run_artifact(
         owner=owner,
         task_id=task_id,
@@ -1162,15 +1486,32 @@ def run_provider_team_review_pass(
         )
         return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
     prompt = _review_pass_prompt(summary=clean_summary, files=context, proof_ids=safe_proofs)
-    response = _call_provider_chat(
-        "deepseek",
-        [
-            {"role": "system", "content": _provider_system_prompt("review")},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.0,
-        max_tokens=2400,
-    )
+    try:
+        response = _call_provider_chat(
+            "deepseek",
+            [
+                {"role": "system", "content": _provider_system_prompt("review")},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.0,
+            max_tokens=2400,
+        )
+    except RuntimeError as exc:
+        blocked = [str(exc)]
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider",
+            summary=f"Blocked DeepSeek review pass {task_id}",
+            data={
+                "reviewer_team_id": reviewer_team_id,
+                "provider_id": "deepseek",
+                "files": [item["path"] for item in context],
+                "proof_ids": safe_proofs,
+                "blocked_reasons": blocked,
+            },
+        )
+        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
     artifact = _record_provider_run_artifact(
         owner=owner,
         task_id=task_id,
@@ -1574,6 +1915,146 @@ def _source_repo_status(source: SourceRepo) -> dict[str, Any]:
         "head": head,
         "missing_required_files": missing_required,
     }
+
+
+def _cli_runner_status(runner_id: str) -> dict[str, Any]:
+    runner = runner_id.strip().lower()
+    command = "opencode" if runner == "opencode" else "openhands"
+    exe = shutil.which(command)
+    version: str | None = None
+    version_status = "not_run"
+    if exe:
+        for args in ([command, "--version"], [command, "version"]):
+            try:
+                result = subprocess.run(args, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                continue
+            output = (result.stdout or result.stderr or "").strip()
+            if output:
+                version = output.splitlines()[0][:160]
+            version_status = "pass" if result.returncode == 0 else f"exit_{result.returncode}"
+            break
+    return {
+        "id": runner,
+        "label": "OpenCode" if runner == "opencode" else "OpenHands",
+        "detected": bool(exe),
+        "executable": exe,
+        "version": version,
+        "version_status": version_status,
+        "write_allowed": False,
+        "blocked_reason": None if exe else f"{command} executable is not on PATH.",
+        "policy": "Detection/version preflight only until sandboxed CLI runner is implemented.",
+    }
+
+
+def _folder_index_doc_payload(rel: str, path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    return {
+        "path": rel,
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size_bytes": len(data),
+    }
+
+
+def _folder_index_provider_files(target_files: list[str], loaded: list[dict[str, Any]]) -> list[str]:
+    loaded_paths = {str(item.get("path") or "") for item in loaded}
+    selected = [
+        f"{FOLDER_INDEX_ROOT}/00_INDEX.md",
+        f"{FOLDER_INDEX_ROOT}/01_TAXONOMY.md",
+        f"{FOLDER_INDEX_ROOT}/02_EXCLUSIONS.md",
+        HERMES_AGENT_E2E_PLAN,
+        f"{FOLDER_INDEX_ROOT}/core-repos/Hermes3D.md",
+        f"{FOLDER_INDEX_ROOT}/core-repos/h3d-gui-wiring-codex.md",
+        f"{FOLDER_INDEX_ROOT}/agent-infra/README.md",
+        f"{FOLDER_INDEX_ROOT}/agent-infra/hermes-agent-fresh.md",
+        f"{FOLDER_INDEX_ROOT}/agent-infra/hermes3d-mcp-lock-orchestrator.md",
+    ]
+    targets = "\n".join(str(item).lower() for item in target_files)
+    if any(token in targets for token in ("source", "modules", "runner", "03_implementation/proof")):
+        selected.extend(SOURCE_OS_FOLDER_INDEX_FILES)
+    deduped: list[str] = []
+    for rel in selected:
+        if rel in loaded_paths and rel not in deduped:
+            deduped.append(rel)
+    return deduped
+
+
+def _top_folder_for_context(relative_path: str) -> str:
+    parts = Path(str(relative_path).replace("\\", "/")).parts
+    if len(parts) >= 2 and parts[0] == "03_implementation":
+        return "/".join(parts[:2])
+    return parts[0] if parts else "."
+
+
+def _validate_role_chain(role_chain: list[str]) -> list[str]:
+    allowed = {
+        "finder",
+        "analyst",
+        "architect",
+        "planner",
+        "builder",
+        "reviewer",
+        "tester",
+        "security",
+        "documenter",
+        "devops",
+        "optimizer",
+    }
+    roles: list[str] = []
+    for item in role_chain:
+        role = str(item or "").strip().lower()
+        if not role:
+            continue
+        if role not in allowed:
+            raise ValueError(f"Unsupported Hermes Agent role: {role}.")
+        if role not in roles:
+            roles.append(role)
+    if "finder" not in roles:
+        roles.insert(0, "finder")
+    for required in ("builder", "reviewer", "tester"):
+        if required not in roles:
+            roles.append(required)
+    return roles
+
+
+def _validate_cli_worker(cli_worker: str | None) -> str | None:
+    worker = str(cli_worker or "").strip().lower()
+    if not worker or worker == "none":
+        return None
+    if worker not in {"openhands", "opencode"}:
+        raise ValueError("CLI worker must be openhands, opencode, or empty.")
+    return worker
+
+
+def _e2e_objective_with_index(objective: str, index_context: dict[str, Any], roles: list[str]) -> str:
+    context_files = index_context.get("provider_context_files") or [item["path"] for item in index_context.get("loaded", [])]
+    loaded = ", ".join(str(item) for item in context_files)
+    roots = ", ".join(index_context.get("target_roots", [])) or "repository root"
+    return (
+        f"{objective}\n\n"
+        "Hermes3D E2E coding rules:\n"
+        f"- Folder-index docs supplied in file context: {loaded}.\n"
+        f"- Target ownership roots: {roots}.\n"
+        f"- Required role chain: {', '.join(roles)}.\n"
+        "- Return a bounded implementation plan and any proposed patch text only as reviewable content.\n"
+        "- Do not claim source was edited, tested, committed, or pushed unless proof ids are supplied by Hermes3D.\n"
+        "- Respect S1 printer lock, secret redaction, no-fake UI, MCP locks, snapshots, gates, and PR proof.\n"
+    )
+
+
+def _provider_proof_ids(coding: dict[str, Any]) -> list[str]:
+    proof_ids: list[str] = []
+    artifact = coding.get("artifact") if isinstance(coding.get("artifact"), dict) else {}
+    artifact_id = artifact.get("id")
+    if isinstance(artifact_id, str) and artifact_id:
+        proof_ids.append(artifact_id)
+    evidence = coding.get("mcp_evidence") if isinstance(coding.get("mcp_evidence"), dict) else {}
+    evidence_id = evidence.get("evidence_id")
+    if isinstance(evidence_id, str) and evidence_id:
+        proof_ids.append(evidence_id)
+    if not proof_ids:
+        raise ValueError("MiniMax coding pass did not return an artifact or evidence id for review.")
+    return proof_ids
 
 
 def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[str, Any]:
