@@ -49,6 +49,10 @@ export interface CodeCliRunner {
   label: string;
   detected: boolean;
   executable: string | null;
+  path_source?: string;
+  configured_path?: string | null;
+  source_path?: string | null;
+  required_env_keys?: string[];
   version: string | null;
   version_status: string;
   write_allowed: boolean;
@@ -56,16 +60,61 @@ export interface CodeCliRunner {
   policy: string;
 }
 
+export interface CodeSandboxReadiness {
+  status: string;
+  ready: boolean;
+  mode: string;
+  docker_executable: string | null;
+  docker_version: string | null;
+  image_configured: boolean;
+  image: string | null;
+  network_mode: string;
+  workspace_mount: string;
+  denied_paths: string[];
+  allowed_command_families: string[];
+  blocked_reasons: string[];
+}
+
 export interface CodeCliRunnerReadiness {
   status: string;
   count: number;
   detected: number;
   runners: CodeCliRunner[];
+  sandbox?: CodeSandboxReadiness;
   policy: {
     write_runs_allowed: boolean;
     reason: string;
     allowed_now: string[];
   };
+}
+
+export interface CodeCliRunnerPreflightResult {
+  status: string;
+  accepted: boolean;
+  runner: CodeCliRunner;
+  mcp_evidence?: unknown;
+  next_required_steps?: string[];
+}
+
+export interface CodeCliRunnerRunRequest {
+  runner_id: string;
+  task_id: string;
+  title: string;
+  files: string[];
+  objective: string;
+  target_branch?: string;
+}
+
+export interface CodeCliRunnerRunResult {
+  status: string;
+  accepted: boolean;
+  runner: CodeCliRunner;
+  sandbox: CodeSandboxReadiness;
+  files: string[];
+  target_branch?: string | null;
+  blocked_reasons: string[];
+  mcp_evidence?: unknown;
+  next_required_steps?: string[];
 }
 
 export interface FolderIndexDoc {

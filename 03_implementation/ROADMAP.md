@@ -298,7 +298,7 @@ Active source inputs:
 - `G:/Github/hermes-agent-fresh` from `https://github.com/NousResearch/hermes-agent.git`: primary runtime, tools, skills, MCP/delegation/terminal/code loop.
 - `G:/Github/atomic-hermes` from `https://github.com/AtomicBot-ai/atomic-hermes.git`: source patterns for file history, approval UX, bridge, local runtime, and file diff/restore UI.
 - `https://github.com/1ilkhamov/opencode-hermes-multiagent`: role/pipeline reference for finder, architect, coder, reviewer, tester, security, documentation, and infrastructure agent chains. Use the pattern behind Hermes3D locks/proof; do not replace the Hermes3D runtime or bypass snapshots/gates.
-- OpenHands and OpenCode CLI usage is allowed for Hermes Agents when needed, but only as registered code-operator CLI runners with detection/version proof, sandbox execution by default, task-scoped env/cwd/files, MCP locks before writes, snapshots before invocation, redacted output artifacts, DeepSeek review, fixed gates, and rollback evidence. No raw unmanaged OpenHands/OpenCode command strings from chat.
+- OpenHands and OpenCode CLI usage is allowed for Hermes Agents when needed, but only as registered code-operator CLI runners with detection/version proof, sandbox execution by default, task-scoped env/cwd/files, MCP locks before writes, snapshots before invocation, redacted output artifacts, DeepSeek review, fixed gates, and rollback evidence. No raw unmanaged OpenHands/OpenCode command strings from chat. Current truth: source checkouts and private env key names exist, but execution stays blocked until real executable paths and a sandbox image pass readiness.
 
 Minimum ecosystem for agents to program Hermes3D without bloat:
 1. Import/launch true Hermes Agent runtime with `HERMES_HOME`, `TERMINAL_CWD`, and `HERMES_WRITE_SAFE_ROOT` scoped to Hermes3D worktrees.
@@ -314,7 +314,7 @@ Minimum ecosystem for agents to program Hermes3D without bloat:
 11. DONE: Add branch/commit/PR lane after gates pass, staging only files from the snapshot ledger and active same-owner MCP locks.
 12. Add task assignment flow so a MiniMax-backed Hermes team and a DeepSeek-backed Hermes team can receive real Hermes3D issues, coordinate through proof, ask each other for review, and fix failures until pass.
 13. Add OpenCode-style role chains as Hermes3D skills without raw tool bypass: finder before edits, builder for the patch, reviewer/tester after every code change, and security reviewer for secrets/auth/MCP/process/printer/network changes.
-14. Add OpenHands/OpenCode CLI runner adapters: `/api/code-operator/cli-runners`, `/preflight`, and gated `/run`; they must fail closed until sandbox readiness, MCP locks, snapshots, allowlisted task type, and proof capture are configured.
+14. IN_PROGRESS: Add OpenHands/OpenCode CLI runner adapters: `/api/code-operator/cli-runners`, `/api/code-operator/sandbox/readiness`, `/api/code-operator/cli-runners/preflight`, and gated `/api/code-operator/cli-runners/run`. The routes now prove source/executable/sandbox state and intentionally fail closed until runnable CLIs, sandbox readiness, MCP locks, snapshots, allowlisted task type, redacted output proof, DeepSeek review, and gate handoff are configured.
 
 First backend slice now tracks this directly:
 - `src/hermes3d/services/code_history.py`

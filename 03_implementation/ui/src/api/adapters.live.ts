@@ -5,7 +5,10 @@ import type {
   AgentE2EJobRequest,
   AgentE2EJobResult,
   AgentE2EReadiness,
+  CodeCliRunnerPreflightResult,
   CodeCliRunnerReadiness,
+  CodeCliRunnerRunRequest,
+  CodeCliRunnerRunResult,
   CodeGateRunRequest,
   CodeGateRunResult,
   GitBranchRequest,
@@ -806,6 +809,25 @@ export function getCodeCliRunnersLive(): Promise<CodeCliRunnerReadiness> {
     runners: [],
     policy: { write_runs_allowed: false, reason: "Hermes Agent CLI runner API returned no payload.", allowed_now: [] },
   });
+}
+
+export async function preflightCodeCliRunnerLive(runnerId: "opencode" | "openhands", taskId: string): Promise<CodeCliRunnerPreflightResult> {
+  const result = await postJsonWithResult("/api/code-operator/cli-runners/preflight", {
+    runner_id: runnerId,
+    task_id: taskId,
+  });
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("CLI runner preflight response was not in the expected shape.");
+  }
+  return result as unknown as CodeCliRunnerPreflightResult;
+}
+
+export async function runCodeCliRunnerLive(request: CodeCliRunnerRunRequest): Promise<CodeCliRunnerRunResult> {
+  const result = await postJsonWithResult("/api/code-operator/cli-runners/run", request);
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("CLI runner run response was not in the expected shape.");
+  }
+  return result as unknown as CodeCliRunnerRunResult;
 }
 
 export async function runAgentE2EJobLive(request: AgentE2EJobRequest): Promise<AgentE2EJobResult> {

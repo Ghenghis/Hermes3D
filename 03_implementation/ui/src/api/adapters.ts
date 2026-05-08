@@ -77,6 +77,8 @@ import {
   runIdleCandidateLive,
   runAgentCatalogActionLive,
   runAgentE2EJobLive,
+  preflightCodeCliRunnerLive,
+  runCodeCliRunnerLive,
   runCodeGateLive,
   runProviderSmokeLive,
   saveVoiceAgentLive,
@@ -97,7 +99,10 @@ import type {
   AgentE2EJobRequest,
   AgentE2EJobResult,
   AgentE2EReadiness,
+  CodeCliRunnerPreflightResult,
   CodeCliRunnerReadiness,
+  CodeCliRunnerRunRequest,
+  CodeCliRunnerRunResult,
   CodeGateRunRequest,
   CodeGateRunResult,
   GitBranchRequest,
@@ -170,6 +175,8 @@ export interface AdapterAPI {
   runAgentCatalogAction(actionId: string, reason?: string, payload?: Record<string, unknown>): Promise<AgentActionRunResult>;
   getAgentE2EReadiness(): Promise<AgentE2EReadiness>;
   runAgentE2EJob(request: AgentE2EJobRequest): Promise<AgentE2EJobResult>;
+  preflightCodeCliRunner(runnerId: "opencode" | "openhands", taskId: string): Promise<CodeCliRunnerPreflightResult>;
+  runCodeCliRunner(request: CodeCliRunnerRunRequest): Promise<CodeCliRunnerRunResult>;
   runProviderSmoke(providerId: "minimax" | "deepseek", taskId: string): Promise<ProviderSmokeResult>;
   applyReviewedPatch(request: ReviewedPatchApplyRequest): Promise<ReviewedPatchApplyResult>;
   runCodeGate(request: CodeGateRunRequest): Promise<CodeGateRunResult>;
@@ -263,6 +270,8 @@ export const adapters: AdapterAPI = {
   runAgentCatalogAction: runAgentCatalogActionLive,
   getAgentE2EReadiness: getAgentE2EReadinessLive,
   runAgentE2EJob: runAgentE2EJobLive,
+  preflightCodeCliRunner: preflightCodeCliRunnerLive,
+  runCodeCliRunner: runCodeCliRunnerLive,
   runProviderSmoke: runProviderSmokeLive,
   applyReviewedPatch: applyReviewedPatchLive,
   runCodeGate: runCodeGateLive,

@@ -52,6 +52,20 @@ SOURCE_OS_FOLDER_INDEX_FILES = [
     f"{FOLDER_INDEX_ROOT}/source-os-60-apps/REGISTRY.md",
 ]
 HERMES_AGENT_E2E_PLAN = "03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md"
+CLI_RUNNER_COMMANDS = {
+    "opencode": {
+        "label": "OpenCode",
+        "command": "opencode",
+        "env_keys": ["HERMES3D_OPENCODE_BIN", "OPENCODE_BIN"],
+        "source_env_keys": ["HERMES3D_OPENCODE_SOURCE", "OPENCODE_SOURCE"],
+    },
+    "openhands": {
+        "label": "OpenHands",
+        "command": "openhands",
+        "env_keys": ["HERMES3D_OPENHANDS_BIN", "OPENHANDS_BIN"],
+        "source_env_keys": ["HERMES3D_OPENHANDS_SOURCE", "OPENHANDS_SOURCE"],
+    },
+}
 
 DENIED_PARTS = {
     ".git",
@@ -373,16 +387,149 @@ def agent_e2e_readiness() -> dict[str, Any]:
 def code_cli_runners() -> dict[str, Any]:
     runners = [_cli_runner_status("opencode"), _cli_runner_status("openhands")]
     detected = [item for item in runners if item["detected"]]
+    sandbox = code_sandbox_readiness()
     return {
         "status": "ready" if detected else "setup_required",
         "count": len(runners),
         "detected": len(detected),
         "runners": runners,
+        "sandbox": sandbox,
         "policy": {
             "write_runs_allowed": False,
-            "reason": "OpenHands/OpenCode CLI write runs stay blocked until sandbox readiness, MCP locks, snapshots, and proof capture are wired.",
-            "allowed_now": ["detect", "version_preflight"],
+            "reason": "OpenHands/OpenCode CLI write runs require sandbox readiness, MCP locks, snapshots, task-scoped env/cwd/files, redacted output proof, review, and gates.",
+            "allowed_now": ["detect", "version_preflight", "fail_closed_run_contract"],
         },
+    }
+
+
+def code_sandbox_readiness() -> dict[str, Any]:
+    private_values = private_env()
+    docker = shutil.which("docker")
+    configured_image = env_value("HERMES3D_AGENT_SANDBOX_IMAGE", private_values).strip()
+    network_mode = env_value("HERMES3D_AGENT_SANDBOX_NETWORK", private_values, "none").strip() or "none"
+    mode = env_value("HERMES3D_AGENT_SANDBOX_MODE", private_values, "docker").strip().lower() or "docker"
+    blocked: list[str] = []
+    docker_version: str | None = None
+    if mode not in {"docker", "container"}:
+        blocked.append("Only docker/container sandbox mode is accepted for OpenHands/OpenCode runner execution.")
+    if not docker:
+        blocked.append("Docker executable is not on PATH.")
+    else:
+        try:
+            result = subprocess.run([docker, "version", "--format", "{{.Server.Version}}"], cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=5, check=False)
+            if result.returncode == 0:
+                docker_version = (result.stdout or "").strip()[:80] or None
+            else:
+                blocked.append("Docker is installed but the daemon/version probe did not pass.")
+        except (OSError, subprocess.TimeoutExpired):
+            blocked.append("Docker version probe could not complete.")
+    if not configured_image:
+        blocked.append("HERMES3D_AGENT_SANDBOX_IMAGE is not configured in private env.")
+    if network_mode not in {"none", "private", "bridge"}:
+        blocked.append("HERMES3D_AGENT_SANDBOX_NETWORK must be none, private, or bridge.")
+    return {
+        "status": "ready" if not blocked else "blocked",
+        "ready": not blocked,
+        "mode": mode,
+        "docker_executable": docker,
+        "docker_version": docker_version,
+        "image_configured": bool(configured_image),
+        "image": configured_image or None,
+        "network_mode": network_mode,
+        "workspace_mount": str(PROJECT_ROOT),
+        "denied_paths": sorted(["G:/private", ".git", "node_modules", "03_implementation/proof", "03_implementation/var"]),
+        "allowed_command_families": ["version", "read_only_analysis", "bounded_patch_proposal", "tests_via_gate_runner"],
+        "blocked_reasons": blocked,
+    }
+
+
+def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> dict[str, Any]:
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    runner = _validate_cli_runner_required(runner_id)
+    status = _cli_runner_status(runner)
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_cli_runner_preflight",
+        summary=f"{status['label']} CLI runner preflight {'passed' if status['detected'] else 'blocked'}",
+        data={
+            "runner_id": runner,
+            "detected": status["detected"],
+            "version_status": status["version_status"],
+            "blocked_reason": status["blocked_reason"],
+            "path_source": status.get("path_source"),
+            "sandbox_ready": code_sandbox_readiness().get("ready"),
+        },
+    )
+    return {
+        "status": "ready" if status["detected"] else "blocked",
+        "accepted": bool(status["detected"]),
+        "runner": status,
+        "mcp_evidence": evidence,
+        "next_required_steps": _cli_runner_next_steps(status),
+    }
+
+
+def run_code_cli_runner(
+    *,
+    runner_id: str,
+    owner: str,
+    task_id: str,
+    title: str,
+    objective: str,
+    files: list[str],
+    target_branch: str | None = None,
+) -> dict[str, Any]:
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    runner = _validate_cli_runner_required(runner_id)
+    clean_title = _validate_bounded_text(title, "Title", max_chars=180)
+    clean_objective = _validate_bounded_text(objective, "Objective", max_chars=4000)
+    safe_files = _safe_mcp_files(files, must_exist=True)
+    if not safe_files:
+        raise ValueError("At least one existing project-relative file is required.")
+    branch = _validate_git_ref(target_branch) if target_branch else None
+    runner_status = _cli_runner_status(runner)
+    sandbox = code_sandbox_readiness()
+    blocked: list[str] = []
+    if not runner_status["detected"]:
+        blocked.append(runner_status["blocked_reason"] or f"{runner} CLI runner is not detected.")
+    if not sandbox["ready"]:
+        blocked.extend(str(item) for item in sandbox["blocked_reasons"])
+    blocked.append("CLI execution is fail-closed until task-scoped container execution, output artifact capture, DeepSeek review, and gate handoff are wired.")
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_cli_runner_run",
+        summary=f"Blocked {runner_status['label']} CLI runner execution contract for {task_id}",
+        data={
+            "runner_id": runner,
+            "title": clean_title,
+            "files": safe_files,
+            "target_branch": branch,
+            "objective_sha256": hashlib.sha256(clean_objective.encode("utf-8")).hexdigest(),
+            "runner_detected": runner_status["detected"],
+            "sandbox_ready": sandbox["ready"],
+            "blocked_reasons": blocked,
+        },
+    )
+    return {
+        "status": "blocked",
+        "accepted": False,
+        "runner": runner_status,
+        "sandbox": sandbox,
+        "files": safe_files,
+        "target_branch": branch,
+        "blocked_reasons": blocked,
+        "mcp_evidence": evidence,
+        "next_required_steps": [
+            "configure MiniMax/DeepSeek provider auth until smoke passes",
+            "install or configure HERMES3D_OPENCODE_BIN / HERMES3D_OPENHANDS_BIN in G:/private/.env",
+            "configure HERMES3D_AGENT_SANDBOX_IMAGE and pass sandbox readiness",
+            "wire task-scoped container execution with redacted output artifacts",
+            "require DeepSeek review + gates before patch apply or PR",
+        ],
     }
 
 
@@ -2053,13 +2200,15 @@ def _source_repo_status(source: SourceRepo) -> dict[str, Any]:
 
 
 def _cli_runner_status(runner_id: str) -> dict[str, Any]:
-    runner = runner_id.strip().lower()
-    command = "opencode" if runner == "opencode" else "openhands"
-    exe = shutil.which(command)
+    runner = _validate_cli_runner_required(runner_id)
+    config = CLI_RUNNER_COMMANDS[runner]
+    command = config["command"]
+    exe, path_source, configured_path = _cli_runner_executable(config)
     version: str | None = None
     version_status = "not_run"
     if exe:
-        for args in ([command, "--version"], [command, "version"]):
+        executable = exe
+        for args in ([executable, "--version"], [executable, "version"]):
             try:
                 result = subprocess.run(args, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False)
             except (OSError, subprocess.TimeoutExpired):
@@ -2069,17 +2218,73 @@ def _cli_runner_status(runner_id: str) -> dict[str, Any]:
                 version = output.splitlines()[0][:160]
             version_status = "pass" if result.returncode == 0 else f"exit_{result.returncode}"
             break
+    source_path = _cli_runner_source_path(config)
+    blocked_reason = None
+    if not exe:
+        if configured_path:
+            blocked_reason = f"{config['env_keys'][0]} is configured but does not point to an executable file."
+        else:
+            blocked_reason = f"{command} executable is not on PATH and no private {config['env_keys'][0]} path is configured."
     return {
         "id": runner,
-        "label": "OpenCode" if runner == "opencode" else "OpenHands",
+        "label": config["label"],
         "detected": bool(exe),
         "executable": exe,
+        "path_source": path_source,
+        "configured_path": configured_path,
+        "source_path": source_path,
+        "required_env_keys": config["env_keys"],
         "version": version,
         "version_status": version_status,
         "write_allowed": False,
-        "blocked_reason": None if exe else f"{command} executable is not on PATH.",
-        "policy": "Detection/version preflight only until sandboxed CLI runner is implemented.",
+        "blocked_reason": blocked_reason,
+        "policy": "Detect/version/preflight are allowed. Write runs require sandbox readiness, MCP locks, snapshots, redacted output proof, review, and gates.",
     }
+
+
+def _validate_cli_runner_required(runner_id: str) -> str:
+    runner = str(runner_id or "").strip().lower()
+    if runner not in CLI_RUNNER_COMMANDS:
+        raise ValueError("CLI runner must be opencode or openhands.")
+    return runner
+
+
+def _cli_runner_executable(config: dict[str, Any]) -> tuple[str | None, str, str | None]:
+    private_values = private_env()
+    for key in config["env_keys"]:
+        configured = env_value(key, private_values).strip()
+        if not configured:
+            continue
+        path = Path(configured)
+        if path.exists() and path.is_file():
+            return str(path), f"private_env:{key}", str(path)
+        return None, f"private_env:{key}", str(path)
+    found = shutil.which(str(config["command"]))
+    return found, "PATH" if found else "not_configured", None
+
+
+def _cli_runner_source_path(config: dict[str, Any]) -> str | None:
+    private_values = private_env()
+    for key in config["source_env_keys"]:
+        configured = env_value(key, private_values).strip()
+        if configured:
+            return configured
+    return None
+
+
+def _cli_runner_next_steps(status: dict[str, Any]) -> list[str]:
+    if status.get("detected"):
+        return [
+            "configure HERMES3D_AGENT_SANDBOX_IMAGE in G:/private/.env",
+            "pass /api/code-operator/sandbox/readiness",
+            "run through gated /api/code-operator/cli-runners/run after provider auth and sandbox proof pass",
+        ]
+    env_key = (status.get("required_env_keys") or ["HERMES3D_OPENCODE_BIN"])[0]
+    return [
+        f"install {status.get('label', 'CLI runner')} or set {env_key}=<absolute executable path> in G:/private/.env",
+        "restart the Hermes3D API launcher so private env/path changes load",
+        "rerun /api/code-operator/cli-runners/preflight",
+    ]
 
 
 def _folder_index_doc_payload(rel: str, path: Path) -> dict[str, Any]:

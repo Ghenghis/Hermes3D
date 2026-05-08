@@ -11,7 +11,15 @@ import { AgentCommandCenter } from "../components/agents/AgentCommandCenter";
 import { NotificationCenter } from "../components/notifications/NotificationCenter";
 import { adapters } from "../api/adapters";
 import type { Agent } from "../types/agent";
-import type { AgentActionCatalog, AgentActionContract, AgentE2EJobResult, AgentE2EReadiness, ProviderSmokeResult } from "../types/agent-actions";
+import type {
+  AgentActionCatalog,
+  AgentActionContract,
+  AgentE2EJobResult,
+  AgentE2EReadiness,
+  CodeCliRunnerPreflightResult,
+  CodeCliRunnerRunResult,
+  ProviderSmokeResult,
+} from "../types/agent-actions";
 import type { IdleWorkbenchState } from "../types/learning";
 import type { Notification } from "../types/notification";
 import type { RuntimeIdentity } from "../types/system";
@@ -120,6 +128,10 @@ export function AgentsTab() {
   const [e2eFiles, setE2eFiles] = useState("03_implementation/ROADMAP.md\n03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md");
   const [e2eTargetBranch, setE2eTargetBranch] = useState("");
   const [e2eCliWorker, setE2eCliWorker] = useState("");
+  const [cliRunnerBusy, setCliRunnerBusy] = useState<string | null>(null);
+  const [cliRunnerMessage, setCliRunnerMessage] = useState("OpenHands/OpenCode can be detected now; write runs stay proof-gated.");
+  const [cliRunnerPreflight, setCliRunnerPreflight] = useState<CodeCliRunnerPreflightResult | null>(null);
+  const [cliRunnerRun, setCliRunnerRun] = useState<CodeCliRunnerRunResult | null>(null);
   const [providerSmokeBusy, setProviderSmokeBusy] = useState<"minimax" | "deepseek" | null>(null);
   const [providerSmokeResult, setProviderSmokeResult] = useState<ProviderSmokeResult | null>(null);
   const [providerSmokeMessage, setProviderSmokeMessage] = useState("Provider smoke calls use private env on the backend and store MCP evidence.");
@@ -235,14 +247,62 @@ export function AgentsTab() {
                 </div>
               </div>
               <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
-                <div className="text-[10px] uppercase text-muted">OpenHands / OpenCode preflight</div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase text-muted">OpenHands / OpenCode runners</div>
+                  <span className={e2eReadiness?.cli_runners.sandbox?.ready ? "text-[10px] uppercase text-accent-green" : "text-[10px] uppercase text-accent-amber"}>
+                    sandbox {e2eReadiness?.cli_runners.sandbox?.status ?? "unknown"}
+                  </span>
+                </div>
                 {(e2eReadiness?.cli_runners.runners ?? []).map((runner) => (
-                  <div key={runner.id} className="grid grid-cols-[1fr_auto] gap-2">
-                    <span className="min-w-0 truncate text-fg">{runner.label}</span>
-                    <span className={runner.detected ? "text-accent-green" : "text-accent-amber"}>{runner.detected ? runner.version ?? "detected" : "not on PATH"}</span>
+                  <div key={runner.id} className="grid gap-1 rounded border border-border/70 bg-surface1/50 p-1.5">
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <span className="min-w-0 truncate text-fg">{runner.label}</span>
+                      <span className={runner.detected ? "text-accent-green" : "text-accent-amber"}>{runner.detected ? runner.version ?? "detected" : "executable missing"}</span>
+                    </div>
+                    <div className="grid gap-x-2 gap-y-0.5 text-[10px] sm:grid-cols-[auto_1fr]">
+                      <span className="text-muted">source</span>
+                      <span className="min-w-0 truncate font-mono text-muted">{runner.source_path ?? "not configured"}</span>
+                      <span className="text-muted">bin key</span>
+                      <span className="min-w-0 truncate font-mono text-muted">{runner.configured_path ?? runner.required_env_keys?.[0] ?? "not configured"}</span>
+                    </div>
+                    {runner.blocked_reason ? <div className="text-[10px] text-accent-amber">{runner.blocked_reason}</div> : null}
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        disabled={cliRunnerBusy != null || !isCliRunnerId(runner.id)}
+                        onClick={() => isCliRunnerId(runner.id) ? void runCliRunnerPreflight(runner.id, setCliRunnerBusy, setCliRunnerPreflight, setCliRunnerMessage, setE2eReadiness) : undefined}
+                        className="rounded border border-border px-2 py-0.5 text-[10px] text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {cliRunnerBusy === `${runner.id}:preflight` ? "checking" : "Preflight"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={cliRunnerBusy != null || !isCliRunnerId(runner.id)}
+                        onClick={() => isCliRunnerId(runner.id) ? void runCliRunnerContract(runner.id, { title: e2eTitle, objective: e2eObjective, files: e2eFiles, targetBranch: e2eTargetBranch }, setCliRunnerBusy, setCliRunnerRun, setCliRunnerMessage, setE2eReadiness) : undefined}
+                        className="rounded border border-accent-amber/50 bg-accent-amber/10 px-2 py-0.5 text-[10px] text-accent-amber disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {cliRunnerBusy === `${runner.id}:run` ? "checking" : "Run contract"}
+                      </button>
+                    </div>
                   </div>
                 ))}
                 {!e2eReadiness && <div className="text-muted">CLI runner API has not responded yet.</div>}
+                <div className="text-[10px] text-muted">{cliRunnerMessage}</div>
+                {cliRunnerPreflight ? (
+                  <div className={cliRunnerPreflight.accepted ? "text-[10px] text-accent-green" : "text-[10px] text-accent-amber"}>
+                    preflight {cliRunnerPreflight.runner.label}: {cliRunnerPreflight.status}
+                  </div>
+                ) : null}
+                {(cliRunnerRun?.blocked_reasons.length ?? 0) > 0 ? (
+                  <div className="max-h-16 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-1.5 text-[10px] text-accent-amber">
+                    {cliRunnerRun?.blocked_reasons.slice(0, 4).map((reason) => <div key={reason}>- {reason}</div>)}
+                  </div>
+                ) : null}
+                {(e2eReadiness?.cli_runners.sandbox?.blocked_reasons.length ?? 0) > 0 ? (
+                  <div className="max-h-16 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-1.5 text-[10px] text-accent-amber">
+                    {e2eReadiness?.cli_runners.sandbox?.blocked_reasons.slice(0, 3).map((reason) => <div key={reason}>- {reason}</div>)}
+                  </div>
+                ) : null}
               </div>
               <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
                 <div className="flex items-center justify-between gap-2">
@@ -889,6 +949,71 @@ async function runAgentE2EWorkbench(
     setMessage(`Blocked: ${error instanceof Error ? error.message : "Agent Code Workbench job failed"}`);
   } finally {
     setBusy(false);
+  }
+}
+
+function isCliRunnerId(value: string): value is "opencode" | "openhands" {
+  return value === "opencode" || value === "openhands";
+}
+
+async function runCliRunnerPreflight(
+  runnerId: "opencode" | "openhands",
+  setBusy: (busy: string | null) => void,
+  setResult: (result: CodeCliRunnerPreflightResult | null) => void,
+  setMessage: (message: string) => void,
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+) {
+  const taskId = `H3D-CLI-PREFLIGHT-${runnerId.toUpperCase()}-${Date.now()}`;
+  setBusy(`${runnerId}:preflight`);
+  setResult(null);
+  setMessage(`Running ${runnerId} preflight through backend private env.`);
+  try {
+    const result = await adapters.preflightCodeCliRunner(runnerId, taskId);
+    setResult(result);
+    const next = result.next_required_steps?.[0] ? ` · ${result.next_required_steps[0]}` : "";
+    setMessage(`${result.runner.label} preflight ${result.accepted ? "ready" : "blocked"}: ${result.status}${next}`);
+    void adapters.getAgentE2EReadiness().then(setReadiness).catch(() => undefined);
+  } catch (error) {
+    setMessage(`Blocked ${runnerId} preflight: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+async function runCliRunnerContract(
+  runnerId: "opencode" | "openhands",
+  input: { title: string; objective: string; files: string; targetBranch: string },
+  setBusy: (busy: string | null) => void,
+  setResult: (result: CodeCliRunnerRunResult | null) => void,
+  setMessage: (message: string) => void,
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+) {
+  const files = parseWorkbenchFiles(input.files);
+  if (files.length === 0) {
+    setMessage("Blocked: add at least one existing project-relative file.");
+    return;
+  }
+  const taskId = `H3D-CLI-RUN-${runnerId.toUpperCase()}-${Date.now()}`;
+  setBusy(`${runnerId}:run`);
+  setResult(null);
+  setMessage(`Checking ${runnerId} run contract; execution stays fail-closed without sandbox proof.`);
+  try {
+    const result = await adapters.runCodeCliRunner({
+      runner_id: runnerId,
+      task_id: taskId,
+      title: input.title.trim() || `${runnerId} Hermes Agent code task`,
+      files,
+      objective: input.objective.trim(),
+      target_branch: input.targetBranch.trim() || undefined,
+    });
+    setResult(result);
+    const reason = result.blocked_reasons?.[0] ? ` · ${result.blocked_reasons[0]}` : "";
+    setMessage(`${result.runner.label} run contract ${result.accepted ? "accepted" : "blocked"}: ${result.status}${reason}`);
+    void adapters.getAgentE2EReadiness().then(setReadiness).catch(() => undefined);
+  } catch (error) {
+    setMessage(`Blocked ${runnerId} run contract: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
   }
 }
 

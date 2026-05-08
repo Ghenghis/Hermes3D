@@ -31,6 +31,10 @@ AGENT_WORKBENCH_REQUIRED_ROUTES = [
     "/api/code-operator/patch/apply-reviewed",
     "/api/code-operator/gates/run",
     "/api/code-operator/git/pr",
+    "/api/code-operator/cli-runners",
+    "/api/code-operator/cli-runners/preflight",
+    "/api/code-operator/cli-runners/run",
+    "/api/code-operator/sandbox/readiness",
 ]
 
 

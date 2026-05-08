@@ -51,7 +51,8 @@ Provider keys stay in `G:/private/.env` only. The UI and proof files may name en
 Current live-smoke result for this branch:
 
 - Folder-index context and MCP locks are now ready.
-- OpenHands/OpenCode CLI runners are detection-only and currently report no local PATH executable.
+- OpenHands/OpenCode source checkouts are detected from private env, but executable paths remain blocked because no runnable OpenCode/OpenHands CLI binary is configured yet.
+- The backend now exposes CLI runner detection, sandbox readiness, preflight, and fail-closed run-contract routes. These prove what is ready and what is blocked instead of marking source-only checkouts runnable.
 - MiniMax execution is currently blocked by live HTTP 401 from the configured endpoint/key; the route records this as a redacted blocked reason instead of crashing or claiming the provider is usable.
 - DeepSeek execution is also currently blocked by live HTTP 401 from the configured private key.
 - Until MiniMax and DeepSeek auth are corrected in `G:/private/.env`, the workbench can prove readiness/context and run blocked-provider smoke proofs, but cannot complete the two-provider build/review pass.
@@ -154,11 +155,26 @@ Blocked CLI pattern:
 - No secret values passed to CLI args; secrets stay in backend/private env and are redacted in logs.
 - No printer/network automation through these CLIs until the task has explicit printer policy approval.
 
+Private env keys required in `G:/private/.env`:
+
+- `HERMES3D_OPENCODE_SOURCE`
+- `HERMES3D_OPENCODE_BIN`
+- `HERMES3D_OPENHANDS_SOURCE`
+- `HERMES3D_OPENHANDS_BIN`
+- `HERMES3D_AGENT_SANDBOX_MODE`
+- `HERMES3D_AGENT_SANDBOX_IMAGE`
+- `HERMES3D_AGENT_SANDBOX_NETWORK`
+- `HERMES3D_AGENT_SANDBOX_TIMEOUT_SECONDS`
+- `HERMES3D_AGENT_SANDBOX_ALLOW_INTERNET`
+
+2026-05-08 status: the key names above now exist in `G:/private/.env` without exposing values. `HERMES3D_OPENCODE_SOURCE` and `HERMES3D_OPENHANDS_SOURCE` point at local source checkouts; `HERMES3D_OPENCODE_BIN`, `HERMES3D_OPENHANDS_BIN`, and `HERMES3D_AGENT_SANDBOX_IMAGE` intentionally remain empty until a real runnable CLI and sandbox image are installed and verified.
+
 Acceptance for CLI usability:
 
 - `/api/code-operator/cli-runners` lists OpenHands/OpenCode detection, version, source path, sandbox support, and blocked reasons.
-- `/api/code-operator/cli-runners/{runner_id}/preflight` proves the CLI can start in read-only/safe mode.
-- `/api/code-operator/cli-runners/{runner_id}/run` refuses execution unless locks, snapshots, sandbox, allowed task type, and output proof are all configured.
+- `/api/code-operator/sandbox/readiness` reports Docker executable/daemon status, required image configuration, network mode, denied host paths, and allowed command families.
+- `/api/code-operator/cli-runners/preflight` records evidence for the current runner state and remains blocked until the configured executable can pass a non-mutating version probe.
+- `/api/code-operator/cli-runners/run` refuses execution unless real executables, locks, snapshots, sandbox, allowed task type, redacted output proof, and review/gate handoff are all configured.
 
 ## E2E Coding Loop
 
@@ -203,7 +219,7 @@ No PR is accepted from an agent if any required gate is skipped, timed out witho
 | --- | --- | --- |
 | Patch proposal/apply is not yet chained from provider artifact | The workbench now gets to reviewed provider artifacts, but it deliberately stops before source mutation. | Add reviewed patch extraction, same-owner lock validation, apply, post-snapshot, gate runner, git branch/stage/commit/push/PR, and rollback proof controls. |
 | Private provider auth is rejected live | MiniMax and DeepSeek env keys exist but both live provider smoke calls return HTTP 401. | Replace the rejected MiniMax/DeepSeek keys in `G:/private/.env`, then rerun `/api/code-operator/providers/smoke` for both providers before trying the first co-developer task. |
-| OpenHands/OpenCode are detection-only | CLI worker rows are visible but cannot run write tasks safely yet. | Add sandbox readiness, read-only preflight route, task-scoped env/cwd/files, output proof capture, and keep write runs blocked until every gate is present. |
+| OpenHands/OpenCode are source-detected but not runnable | Source checkouts and private env key names are present, but no real runnable CLI executable or sandbox image is configured. | DONE for honest runner contracts: `/api/code-operator/cli-runners`, `/sandbox/readiness`, `/cli-runners/preflight`, and `/cli-runners/run` expose exact blockers and append evidence. NEXT: install/build real CLI executables, set `HERMES3D_OPENCODE_BIN` / `HERMES3D_OPENHANDS_BIN`, configure `HERMES3D_AGENT_SANDBOX_IMAGE`, then rerun preflight. |
 | No real co-developer smoke task has passed | There is route smoke for individual pieces, but no full task completed by both agent teams. | Run a small docs or UI patch task through MiniMax + DeepSeek + locks + gates + PR and record proof ids. |
 | Source app runner gaps distract from agent runtime P0 | Runner gaps are useful but secondary while agents cannot co-develop. | Keep runner work queued; prioritize the agent coding loop until it can help complete the runner gaps itself. |
 
@@ -227,8 +243,8 @@ This is the next implementation sequence. Do not resume manual Source OS runner-
    - Remaining: patch proposal, apply, gates, git lane, and rollback proof.
    - Route fails closed at the first missing prerequisite.
 4. OpenHands/OpenCode CLI adapters:
-   - Add detection/preflight routes first.
-   - Keep write-capable CLI runs blocked until sandbox readiness exists.
+   - DONE: add detection, sandbox readiness, preflight, and fail-closed run-contract routes.
+   - Keep write-capable CLI runs blocked until executable paths, sandbox readiness, output artifact capture, DeepSeek review, and gate handoff exist.
    - Share MiniMax/DeepSeek provider pool through backend/private env only.
 5. First real smoke:
    - Use a low-risk Hermes3D file.

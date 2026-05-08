@@ -189,6 +189,20 @@ class AgentE2EJobRequest(StrictBody):
     release_on_finish: bool = True
 
 
+class CliRunnerPreflightRequest(StrictBody):
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+
+
+class CliRunnerRunRequest(StrictBody):
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
+
+
 @router.get("/programming-readiness")
 def programming_readiness() -> dict[str, Any]:
     return code_history.programming_readiness()
@@ -202,6 +216,39 @@ def agent_e2e_readiness() -> dict[str, Any]:
 @router.get("/cli-runners")
 def code_cli_runners() -> dict[str, Any]:
     return code_history.code_cli_runners()
+
+
+@router.get("/sandbox/readiness")
+def code_sandbox_readiness() -> dict[str, Any]:
+    return code_history.code_sandbox_readiness()
+
+
+@router.post("/cli-runners/preflight")
+def preflight_code_cli_runner(body: CliRunnerPreflightRequest) -> dict[str, Any]:
+    try:
+        return code_history.preflight_code_cli_runner(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/cli-runners/run")
+def run_code_cli_runner(body: CliRunnerRunRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_code_cli_runner(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.post("/e2e/jobs")
