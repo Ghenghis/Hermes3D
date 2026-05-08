@@ -118,6 +118,13 @@ class ProofEnvelope:
 
 
 def _file_sha256(path: str | Path) -> str:
+    try:
+        from hermes3d.services.rust_accel import file_sha256_hex
+
+        return file_sha256_hex(path)
+    except Exception as exc:  # pragma: no cover - fallback is the contract
+        LOG.debug("Rust proof hash path unavailable: %s", exc)
+
     h = hashlib.sha256()
     with open(path, "rb") as fp:
         for chunk in iter(lambda: fp.read(1 << 20), b""):

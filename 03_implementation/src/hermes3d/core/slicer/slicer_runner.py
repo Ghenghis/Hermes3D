@@ -160,7 +160,10 @@ _TIME_PATTERNS = (
 )
 _FILAMENT_USED_MM = re.compile(r"; *filament used \[mm\] *= *([0-9.]+)", re.IGNORECASE)
 _FILAMENT_USED_G = re.compile(r"; *filament used \[g\] *= *([0-9.]+)", re.IGNORECASE)
-_LAYER_COUNT = re.compile(r"; *(?:total layer number|num layers) *: *([0-9]+)", re.IGNORECASE)
+_LAYER_COUNT = re.compile(
+    r"; *(?:total layer number|num layers|total layer count) *[:=] *([0-9]+)",
+    re.IGNORECASE,
+)
 
 
 def _hms_to_minutes(text: str) -> float | None:
@@ -194,6 +197,21 @@ def parse_gcode_metadata(
     p = Path(gcode_path)
     if not p.is_file():
         raise FileNotFoundError(f"g-code not found: {p}")
+
+    if head_bytes == 65536 and tail_bytes == 65536:
+        try:
+            from hermes3d.services.rust_accel import parse_gcode_metadata_accel
+
+            accelerated = parse_gcode_metadata_accel(p)
+            if accelerated is not None:
+                return {
+                    "estimated_minutes": accelerated["estimated_minutes"],
+                    "estimated_filament_mm": accelerated["estimated_filament_mm"],
+                    "estimated_filament_g": accelerated["estimated_filament_g"],
+                    "layer_count": accelerated["layer_count"],
+                }
+        except Exception as exc:  # pragma: no cover - fallback is the contract
+            LOG.debug("Rust g-code metadata path unavailable: %s", exc)
 
     size = p.stat().st_size
     with open(p, "rb") as fp:

@@ -20,7 +20,11 @@ def main() -> int:
     sys.path.insert(0, str(IMPLEMENTATION_ROOT / "src"))
     from hermes3d.db.init import connect, init_db
     from hermes3d.db.load_modules import load_modules
-    from hermes3d.services.module_runtime import module_runtime_probe, registered_runtime_probe_ids
+    from hermes3d.services.module_runtime import (
+        module_runner_contract,
+        module_runtime_probe,
+        registered_runtime_probe_ids,
+    )
 
     init_db()
     load_modules()
@@ -39,11 +43,18 @@ def main() -> int:
     finally:
         conn.close()
 
-    rows = [classify_module(module_runtime_probe(module, live=False), module) for module in modules]
+    rows = [classify_module(module_runtime_probe(module, live=False), module, module_runner_contract(module)) for module in modules]
     counts = Counter(row["agent_execution_tier"] for row in rows)
+    contract_counts = Counter(row["runner_contract_status"] for row in rows)
     cli_rows = [row for row in rows if row["agent_execution_tier"] == "verified_agent_cli"]
+    executable_rows = [row for row in rows if row["agent_executable"]]
     launcher_rows = [row for row in rows if row["agent_execution_tier"] == "launcher_metadata_only"]
     gap_rows = [row for row in rows if row["agent_execution_tier"].endswith("_gap")]
+    read_only_rows = [row for row in rows if row["read_only_runner_available"]]
+    executable_path_rows = [row for row in rows if row["executable_path_runner_available"]]
+    python_import_repair_rows = [row for row in rows if row["python_import_repair_available"]]
+    cli_install_config_rows = [row for row in rows if row["cli_install_config_available"]]
+    npm_package_preflight_rows = [row for row in rows if row["npm_package_preflight_available"]]
     audit = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "target": {
@@ -53,15 +64,40 @@ def main() -> int:
         },
         "summary": {
             "by_agent_execution_tier": dict(sorted(counts.items())),
+            "by_runner_contract_status": dict(sorted(contract_counts.items())),
             "verified_agent_cli": len(cli_rows),
+            "agent_executable": len(executable_rows),
+            "read_only_runner_available": len(read_only_rows),
+            "executable_path_runner_available": len(executable_path_rows),
+            "python_import_repair_available": len(python_import_repair_rows),
+            "cli_install_config_available": len(cli_install_config_rows),
+            "npm_package_preflight_available": len(npm_package_preflight_rows),
             "launcher_metadata_only": len(launcher_rows),
             "runner_gaps": len(gap_rows),
             "verified_agent_cli_modules": [row["module_id"] for row in cli_rows],
+            "agent_executable_modules": [row["module_id"] for row in executable_rows],
+            "read_only_runner_modules": [row["module_id"] for row in read_only_rows],
+            "executable_path_runner_modules": [row["module_id"] for row in executable_path_rows],
+            "python_import_repair_modules": [
+                row["module_id"] for row in python_import_repair_rows
+            ],
+            "cli_install_config_modules": [
+                row["module_id"] for row in cli_install_config_rows
+            ],
+            "npm_package_preflight_modules": [
+                row["module_id"] for row in npm_package_preflight_rows
+            ],
             "launcher_metadata_only_modules": [row["module_id"] for row in launcher_rows],
         },
         "rows": rows,
         "next_actions": [
             "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
+            "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
+            "Use /api/modules/{module_id}/runtime/read-only-runner only for read_only_runner_available rows; it appends proof and cannot install, launch, update, write outputs, or touch printers.",
+            "Use /api/modules/{module_id}/runtime/executable-path-runner only for executable_path_runner_available rows; it reads executable metadata/hash only and cannot launch apps or touch printers.",
+            "Use /api/modules/{module_id}/runtime/python-import-repair-runner only for python_import_repair_available rows; it reads source/dependency metadata only and cannot install packages or start workers.",
+            "Use /api/modules/{module_id}/runtime/cli-install-config-runner only for cli_install_config_available rows; it reads Slic3r/SuperSlicer source/schema/profile metadata only and cannot install, launch, slice, write outputs, or touch printers.",
+            "Use /api/modules/{module_id}/runtime/npm-package-runner only for npm_package_preflight_available rows; it reads package.json/script/lockfile metadata only and cannot install packages, run scripts, start processes, write outputs, or touch printers.",
             "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
             "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
             "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -74,7 +110,7 @@ def main() -> int:
     return 0
 
 
-def classify_module(runtime: dict[str, Any], module: dict[str, Any]) -> dict[str, Any]:
+def classify_module(runtime: dict[str, Any], module: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
     runtime_status = str(runtime.get("status") or "blocked")
     kind = str(runtime.get("kind") or module.get("launch_kind") or "unknown")
     proof_gate = str(runtime.get("proof_gate_version") or "")
@@ -111,6 +147,39 @@ def classify_module(runtime: dict[str, Any], module: dict[str, Any]) -> dict[str
         "return_code": runtime.get("return_code"),
         "capabilities": list(runtime.get("capabilities") or []),
         "reason": runtime.get("reason"),
+        "agent_executable": bool(contract.get("agent_executable")),
+        "read_only_runner_available": bool(contract.get("read_only_runner_available")),
+        "read_only_runner_route": f"/api/modules/{module.get('id')}/runtime/read-only-runner"
+        if contract.get("read_only_runner_available")
+        else None,
+        "executable_path_runner_available": bool(
+            contract.get("executable_path_runner_available")
+        ),
+        "executable_path_runner_route": f"/api/modules/{module.get('id')}/runtime/executable-path-runner"
+        if contract.get("executable_path_runner_available")
+        else None,
+        "python_import_repair_available": bool(
+            contract.get("python_import_repair_available")
+        ),
+        "python_import_repair_route": f"/api/modules/{module.get('id')}/runtime/python-import-repair-runner"
+        if contract.get("python_import_repair_available")
+        else None,
+        "cli_install_config_available": bool(
+            contract.get("cli_install_config_available")
+        ),
+        "cli_install_config_route": f"/api/modules/{module.get('id')}/runtime/cli-install-config-runner"
+        if contract.get("cli_install_config_available")
+        else None,
+        "npm_package_preflight_available": bool(
+            contract.get("npm_package_preflight_available")
+        ),
+        "npm_package_preflight_route": f"/api/modules/{module.get('id')}/runtime/npm-package-runner"
+        if contract.get("npm_package_preflight_available")
+        else None,
+        "runner_contract_status": str(contract.get("runner_status") or "blocked"),
+        "required_verifier_family": str(contract.get("required_verifier_family") or ""),
+        "acceptance_gate": str(contract.get("acceptance_gate") or ""),
+        "safe_actions": list(contract.get("safe_actions") or []),
         "next_action": next_action_for(execution_tier, launch_kind, verifier),
     }
 
@@ -126,6 +195,8 @@ def next_action_for(execution_tier: str, launch_kind: str, verifier: str) -> str
         return "Use as read-only reference data; do not expose runnable actions unless a real adapter exists."
     if launch_kind in CLI_PREFERRED_LAUNCH_KINDS:
         return "Locate/install the CLI executable or document no local CLI with proof; keep agent actions disabled."
+    if launch_kind == "npm_package":
+        return "Run npm package metadata preflight; keep install/run disabled until a sandboxed npm runner and node package verifier pass."
     return "Register a safe module-specific verifier and runner before Hermes Agents can execute this app."
 
 

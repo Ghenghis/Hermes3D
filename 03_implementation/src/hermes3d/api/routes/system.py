@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import shutil
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id, rows, utc_now
@@ -23,6 +24,18 @@ from hermes3d.services.local_state import implementation_path, local_printers
 
 router = APIRouter()
 SELF_BRIDGE_PORTS = {8765, 8642}
+AGENT_WORKBENCH_REQUIRED_ROUTES = [
+    "/api/code-operator/e2e/readiness",
+    "/api/code-operator/e2e/jobs",
+    "/api/code-operator/providers/smoke",
+    "/api/code-operator/patch/apply-reviewed",
+    "/api/code-operator/gates/run",
+    "/api/code-operator/git/pr",
+    "/api/code-operator/cli-runners",
+    "/api/code-operator/cli-runners/preflight",
+    "/api/code-operator/cli-runners/run",
+    "/api/code-operator/sandbox/readiness",
+]
 
 
 class ProofEventCreate(BaseModel):
@@ -64,6 +77,31 @@ def system_snapshot() -> dict[str, Any]:
             "running": _count("SELECT COUNT(*) AS count FROM jobs WHERE status = 'running'"),
         },
         "approvals": {"pending": _count("SELECT COUNT(*) AS count FROM approvals WHERE status = 'pending'")},
+    }
+
+
+@router.get("/api/system/runtime-identity")
+def runtime_identity(request: Request) -> dict[str, Any]:
+    route_paths = {str(getattr(route, "path", "")) for route in request.app.routes}
+    repo_root = implementation_path().parent
+    branch = _git_value(repo_root, ["branch", "--show-current"])
+    commit = _git_value(repo_root, ["rev-parse", "--short=12", "HEAD"])
+    dirty = bool(_git_value(repo_root, ["status", "--porcelain"]))
+    missing_agent_routes = [path for path in AGENT_WORKBENCH_REQUIRED_ROUTES if path not in route_paths]
+    return {
+        "status": "fresh" if not missing_agent_routes else "stale",
+        "fresh": not missing_agent_routes,
+        "ts_utc": utc_now(),
+        "pid": os.getpid(),
+        "cwd": os.getcwd(),
+        "backend_source": str(Path(__file__).resolve()),
+        "repo_root": str(repo_root),
+        "branch": branch or "unknown",
+        "commit": commit or "unknown",
+        "dirty": dirty,
+        "agent_workbench_required_routes": AGENT_WORKBENCH_REQUIRED_ROUTES,
+        "missing_agent_workbench_routes": missing_agent_routes,
+        "route_count": len(route_paths),
     }
 
 
@@ -513,3 +551,20 @@ def _gpu_name() -> str | None:
         if candidate and candidate not in {"", "-1"}:
             return candidate
     return None
+
+
+def _git_value(cwd: Path, args: list[str]) -> str:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    if result.returncode != 0:
+        return ""
+    return result.stdout.strip()

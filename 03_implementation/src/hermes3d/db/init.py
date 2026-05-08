@@ -179,10 +179,23 @@ def _seed_module_runtime_verifiers(conn: sqlite3.Connection) -> None:
     ]
     conn.executemany(
         """
-        INSERT OR IGNORE INTO module_runtime_verifiers
+        INSERT INTO module_runtime_verifiers
             (module_id, label, runner_kind, tool_key, executable_path, args,
              capabilities, execute, timeout_s, enabled, proof_gate_version, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(module_id) DO UPDATE SET
+            label = excluded.label,
+            runner_kind = excluded.runner_kind,
+            tool_key = excluded.tool_key,
+            executable_path = excluded.executable_path,
+            args = excluded.args,
+            capabilities = excluded.capabilities,
+            execute = excluded.execute,
+            timeout_s = excluded.timeout_s,
+            enabled = excluded.enabled,
+            proof_gate_version = excluded.proof_gate_version,
+            notes = excluded.notes,
+            updated_at = datetime('now')
         """,
         records,
     )
