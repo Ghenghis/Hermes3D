@@ -66,6 +66,11 @@ def main() -> int:
         for row in readiness_rows
         if isinstance(row, dict) and row.get("executable_path_runner_available")
     ]
+    python_import_repair_rows = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and row.get("python_import_repair_available")
+    ]
     candidate_rows = [
         row
         for row in surface_rows
@@ -104,6 +109,7 @@ def main() -> int:
         f"- Agent-executable runner contracts: {readiness.get('summary', {}).get('agent_executable', len(verified))}",
         f"- Read-only runner smoke rows: {readiness.get('summary', {}).get('read_only_runner_available', len(read_only_runner_rows))}",
         f"- Executable path runner smoke rows: {readiness.get('summary', {}).get('executable_path_runner_available', len(executable_path_runner_rows))}",
+        f"- Python import repair preflight rows: {readiness.get('summary', {}).get('python_import_repair_available', len(python_import_repair_rows))}",
         f"- CLI/service signals needing verifiers: {cli_surface.get('summary', {}).get('candidate_needs_verifier', len(candidate_rows))}",
         f"- Blocked rows: {blocked_rows}",
         "",
@@ -114,6 +120,7 @@ def main() -> int:
         "- Hermes Agents may execute only verifier-backed runners, never raw unreviewed shell commands from docs.",
         "- Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.",
         "- Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.",
+        "- Python import repair preflight is allowed only for failed Python import verifier rows with a local source checkout. It can read source/dependency metadata only; it cannot install packages, create environments, start workers, write output, or touch printers.",
         "- Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.",
         "- S1 remains camera/read-only and action-locked until the user changes printer policy.",
         "",
@@ -174,6 +181,35 @@ def main() -> int:
                     cell(row.get("path")),
                     cell(row.get("proof_gate_version")),
                     cell(row.get("executable_path_runner_route")),
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## Python Import Repair Preflight Rows",
+            "",
+            "These rows now have `/api/modules/{module_id}/runtime/python-import-repair-runner`. The route reads only the failed import proof plus source/dependency manifest metadata and appends evidence. It is not package installation, worker startup, or runtime readiness.",
+            "",
+            "| App | Section | Verifier | Proof gate | Route |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for row in sorted(
+        python_import_repair_rows,
+        key=lambda item: (str(item.get("section")), str(item.get("display"))),
+    ):
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    cell(row.get("display")),
+                    cell(row.get("section")),
+                    cell(row.get("verifier")),
+                    cell(row.get("proof_gate_version")),
+                    cell(row.get("python_import_repair_route")),
                 ]
             )
             + " |"

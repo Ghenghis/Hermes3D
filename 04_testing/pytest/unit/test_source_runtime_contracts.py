@@ -434,6 +434,60 @@ def test_executable_path_runner_accepts_desktop_launcher_metadata(monkeypatch, t
     assert path_smoke["execution_mode"] == "registered_executable_path_metadata_probe"
 
 
+def test_python_import_repair_preflight_reads_source_metadata_only(monkeypatch, tmp_path) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text('[project]\nname = "cadquery"\n', encoding="utf-8")
+    (tmp_path / "cadquery").mkdir()
+
+    def _failed_import(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "setup_required",
+            "kind": "python_import",
+            "verifier": "CadQuery Python import",
+            "path": "C:/Python/python.exe",
+            "detected": True,
+            "executed": True,
+            "return_code": 1,
+            "capabilities": ["parametric_cad_worker"],
+            "reason": "Python module cadquery is not importable in the Hermes3D backend runtime.",
+            "proof_gate_version": "python-import-verifier-v1",
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _failed_import)
+    monkeypatch.setattr(
+        module_runtime,
+        "runtime_probe_config",
+        lambda _module_id: {
+            "args": ["cadquery"],
+            "proof_gate_version": "python-import-verifier-v1",
+        },
+    )
+    mod = {
+        "id": "cadquery",
+        "display_name": "CadQuery",
+        "section": "modelers",
+        "launch_kind": "python_worker",
+        "install_state": "installed",
+        "local_path": str(tmp_path),
+    }
+
+    contract = module_runtime.module_runner_contract(mod)
+    repair = module_runtime.module_python_import_repair_runner_contract(mod)
+
+    assert contract["agent_executable"] is False
+    assert contract["python_import_repair_available"] is True
+    assert "python_import_repair_plan" in contract["safe_actions"]
+    assert repair["accepted"] is True
+    assert repair["runtime_ready"] is False
+    assert repair["install_allowed"] is False
+    assert repair["process_start_allowed"] is False
+    assert repair["printer_action_allowed"] is False
+    assert repair["repair"]["import_module"] == "cadquery"
+    assert repair["repair"]["pyproject_name"] == "cadquery"
+    assert repair["repair"]["manifests"][0]["sha256"]
+    assert repair["execution_mode"] == "registered_python_import_repair_preflight"
+
+
 def test_print_farm_health_probe_requires_configured_local_url(monkeypatch) -> None:
     monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
     monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
@@ -690,6 +744,7 @@ def test_runner_contract_routes_are_registered() -> None:
     assert "/api/modules/{module_id}/runtime/runner-contract" in paths
     assert "/api/modules/{module_id}/runtime/read-only-runner" in paths
     assert "/api/modules/{module_id}/runtime/executable-path-runner" in paths
+    assert "/api/modules/{module_id}/runtime/python-import-repair-runner" in paths
     assert "/api/modules/{module_id}/runtime/start-runner" in paths
     assert "/api/modules/{module_id}/runtime/stop-runner" in paths
 

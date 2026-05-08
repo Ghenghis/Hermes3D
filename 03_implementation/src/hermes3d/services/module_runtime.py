@@ -713,6 +713,7 @@ READ_ONLY_RUNNER_VERIFIER_KINDS = (
     READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS | READ_ONLY_API_RUNNER_VERIFIER_KINDS
 )
 EXECUTABLE_PATH_RUNNER_VERIFIER_KINDS = {"desktop_app"}
+PYTHON_IMPORT_REPAIR_RUNNER_VERIFIER_KINDS = {"python_import"}
 SERVICE_START_RUNNERS: dict[str, dict[str, Any]] = {
     "fdm_monster": {
         "command": ["npm", "run", "start"],
@@ -865,6 +866,12 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
     executable_path_runner_available = _executable_path_runner_available(
         runtime=runtime, verifier_kind=verifier_kind
     )
+    python_import_repair_available = _python_import_repair_runner_available(
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+        launch_kind=launch_kind,
+        local_path=str(mod.get("local_path") or ""),
+    )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
     blocked_reason = (
@@ -885,6 +892,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "agent_executable": agent_executable,
         "read_only_runner_available": read_only_runner_available,
         "executable_path_runner_available": executable_path_runner_available,
+        "python_import_repair_available": python_import_repair_available,
         "runner_status": runner_status,
         "verifier": runtime.get("verifier"),
         "verifier_kind": verifier_kind,
@@ -898,6 +906,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
             agent_executable=agent_executable,
             read_only_runner_available=read_only_runner_available,
             executable_path_runner_available=executable_path_runner_available,
+            python_import_repair_available=python_import_repair_available,
         ),
         "required_verifier_family": required_family,
         "acceptance_gate": _runner_acceptance_gate(
@@ -909,7 +918,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
         "proof_required": True,
         "mutation_allowed": False,
-        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, and executable path smoke may read installed launcher metadata only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
+        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, executable path smoke may read installed launcher metadata only, and Python import repair preflight may read source/dependency metadata only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
     }
 
 
@@ -933,6 +942,9 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "executable_path_runner_available": sum(
             1 for contract in contracts if contract.get("executable_path_runner_available")
         ),
+        "python_import_repair_available": sum(
+            1 for contract in contracts if contract.get("python_import_repair_available")
+        ),
         "runner_gaps": sum(
             1
             for contract in contracts
@@ -948,7 +960,7 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "by_runner_status": dict(sorted(by_status.items())),
         "by_gap_section": dict(sorted(by_section.items())),
         "contracts": contracts,
-        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata. Neither can launch, install, update, or write.",
+        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata; python_import_repair_available rows may only read source/dependency metadata. None can launch, install, update, or write.",
     }
 
 
@@ -1082,6 +1094,80 @@ def module_executable_path_runner_contract(mod: dict[str, Any]) -> dict[str, Any
         if ready
         else "blocked_until_installed_executable_path_is_verified",
         "policy": "This endpoint reads only the configured executable file metadata/hash and appends evidence. It cannot launch apps, start services, install/update source, write output files, or send printer commands.",
+    }
+
+
+def module_python_import_repair_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
+    """Return the Python import repair preflight contract.
+
+    This is for CAD/modeling rows whose registered Python import verifier is
+    real but currently not importable in the backend runtime. It inspects only
+    source checkout/dependency metadata and the failed import proof so agents
+    can plan the repair without running pip, starting workers, writing files,
+    or touching printers.
+    """
+
+    runtime = module_runtime_probe(mod, live=False)
+    module_id = str(mod.get("id") or "")
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    verifier_kind = str(runtime.get("kind") or launch_kind)
+    path_value = str(mod.get("local_path") or runtime.get("path") or "")
+    ready = _python_import_repair_runner_available(
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+        launch_kind=launch_kind,
+        local_path=path_value,
+    )
+    probe = runtime_probe_config(module_id) or {}
+    repair = _python_import_repair_metadata(probe=probe, mod=mod, runtime=runtime)
+    if ready and not repair["source_checkout"]["exists"]:
+        ready = False
+    blocked_reason = None if ready else _python_import_repair_blocked_reason(
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+        launch_kind=launch_kind,
+        repair=repair,
+    )
+    runtime_public = {
+        key: value
+        for key, value in runtime.items()
+        if key not in {"output_head"}
+    }
+    if runtime.get("output_head"):
+        runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
+    return {
+        "module_id": module_id,
+        "display": str(mod.get("display_name") or module_id),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": launch_kind,
+        "status": "repair_ready" if ready else "blocked",
+        "accepted": ready,
+        "runtime_ready": False,
+        "python_import_repair_available": ready,
+        "agent_executable": False,
+        "runner_status": "python_import_repair_preflight_ready" if ready else "blocked",
+        "verifier": runtime.get("verifier"),
+        "verifier_kind": verifier_kind,
+        "proof_gate_version": runtime.get("proof_gate_version"),
+        "path": path_value,
+        "executed": bool(runtime.get("executed")),
+        "return_code": runtime.get("return_code"),
+        "capabilities": list(runtime.get("capabilities") or []),
+        "runtime": runtime_public,
+        "repair": repair,
+        "safe_actions": ["verify", "setup_plan", "read_metadata", "python_import_repair_plan"]
+        if ready
+        else ["verify", "setup_plan"],
+        "blocked_reason": blocked_reason,
+        "proof_required": True,
+        "mutation_allowed": False,
+        "install_allowed": False,
+        "process_start_allowed": False,
+        "printer_action_allowed": False,
+        "execution_mode": "registered_python_import_repair_preflight"
+        if ready
+        else "blocked_until_source_and_failed_import_proof_exist",
+        "policy": "This endpoint reads only Python import failure proof plus local source/dependency metadata and appends evidence. It cannot install packages, create environments, start workers, write output files, or send printer commands.",
     }
 
 
@@ -2159,6 +2245,25 @@ def _executable_path_runner_available(*, runtime: dict[str, Any], verifier_kind:
     )
 
 
+def _python_import_repair_runner_available(
+    *,
+    runtime: dict[str, Any],
+    verifier_kind: str,
+    launch_kind: str,
+    local_path: str,
+) -> bool:
+    return (
+        str(runtime.get("status") or "") == "setup_required"
+        and verifier_kind in PYTHON_IMPORT_REPAIR_RUNNER_VERIFIER_KINDS
+        and launch_kind in {"python_worker", "cli_or_python_worker"}
+        and bool(runtime.get("executed"))
+        and runtime.get("return_code") not in {0, None}
+        and bool(str(runtime.get("proof_gate_version") or "").strip())
+        and bool(local_path)
+        and Path(local_path).is_dir()
+    )
+
+
 def _read_only_runner_family(verifier_kind: str) -> str:
     if verifier_kind in READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS:
         return "metadata"
@@ -2203,12 +2308,42 @@ def _executable_path_runner_blocked_reason(
     return "Executable path smoke is blocked until the launcher file can be verified."
 
 
+def _python_import_repair_blocked_reason(
+    *,
+    runtime: dict[str, Any],
+    verifier_kind: str,
+    launch_kind: str,
+    repair: dict[str, Any],
+) -> str:
+    runtime_reason = str(runtime.get("reason") or "").strip()
+    if verifier_kind not in PYTHON_IMPORT_REPAIR_RUNNER_VERIFIER_KINDS:
+        return (
+            "Python import repair preflight is available only for registered Python import "
+            f"verifier rows; this row uses verifier kind {verifier_kind}."
+        )
+    if launch_kind not in {"python_worker", "cli_or_python_worker"}:
+        return (
+            "Python import repair preflight is available only for Python worker rows; "
+            f"this row uses launch kind {launch_kind}."
+        )
+    if str(runtime.get("status") or "") == "ready":
+        return "The Python import already verifies; use the read-only runner smoke instead."
+    if not bool(runtime.get("executed")):
+        return "Python import repair preflight requires an executed failed import proof."
+    if not str(runtime.get("proof_gate_version") or "").strip():
+        return "Python import repair preflight requires a registered proof gate version."
+    if not repair.get("source_checkout", {}).get("exists"):
+        return "Python import repair preflight requires a local source checkout to inspect."
+    return runtime_reason or "Python import repair preflight is blocked until source metadata exists."
+
+
 def _safe_runner_actions(
     runtime: dict[str, Any],
     *,
     agent_executable: bool,
     read_only_runner_available: bool = False,
     executable_path_runner_available: bool = False,
+    python_import_repair_available: bool = False,
 ) -> list[str]:
     actions = ["verify", "setup_plan"]
     if agent_executable:
@@ -2217,6 +2352,8 @@ def _safe_runner_actions(
         actions.extend(["read_metadata", "read_only_runner_smoke"])
     elif executable_path_runner_available:
         actions.extend(["read_metadata", "executable_path_smoke"])
+    elif python_import_repair_available:
+        actions.extend(["read_metadata", "python_import_repair_plan"])
     elif runtime.get("status") == "ready":
         actions.append("read_metadata")
     return actions
@@ -2258,6 +2395,89 @@ def _executable_file_metadata(path: Path | None) -> dict[str, Any]:
         "mtime_ns": stat.st_mtime_ns,
         "sha256": _sha256_file(path),
     }
+
+
+def _python_import_repair_metadata(
+    *, probe: dict[str, Any], mod: dict[str, Any], runtime: dict[str, Any]
+) -> dict[str, Any]:
+    module_name = str((probe.get("args") or [""])[0] or "").strip()
+    root_value = str(mod.get("local_path") or runtime.get("path") or "")
+    root = Path(root_value) if root_value else None
+    manifests: list[dict[str, Any]] = []
+    package_paths: list[str] = []
+    if root and root.is_dir():
+        for name in (
+            "pyproject.toml",
+            "setup.py",
+            "setup.cfg",
+            "requirements.txt",
+            "requirements-dev.txt",
+            "environment.yml",
+            "environment.yaml",
+            "CMakeLists.txt",
+        ):
+            item = root / name
+            if item.is_file():
+                manifests.append(_source_metadata_file(item))
+        search_names = [module_name, module_name.replace("-", "_")]
+        if module_name == "stl":
+            search_names.append("numpy_stl")
+        for search_name in dict.fromkeys(name for name in search_names if name):
+            for candidate in (
+                root / search_name,
+                root / "src" / search_name,
+                root / "python" / search_name,
+                root / "python" / "open3d" / search_name,
+            ):
+                if candidate.is_dir():
+                    package_paths.append(str(candidate))
+    pyproject_name = _pyproject_project_name(root / "pyproject.toml") if root else None
+    return {
+        "import_module": module_name,
+        "source_checkout": {
+            "exists": bool(root and root.is_dir()),
+            "path": str(root) if root else "",
+        },
+        "pyproject_name": pyproject_name,
+        "manifests": manifests,
+        "package_paths": sorted(set(package_paths)),
+        "import_failure_reason": runtime.get("reason"),
+        "repair_plan": [
+            f"Create/select a Hermes3D Python environment for {module_name}.",
+            "Install dependencies from the recorded manifest(s) or package README.",
+            f"Run `/api/modules/{mod.get('id')}/runtime/verify` until the Python import verifier returns ready.",
+            "Only then promote to read-only runner smoke or a bounded worker dry-run.",
+        ],
+    }
+
+
+def _source_metadata_file(path: Path) -> dict[str, Any]:
+    try:
+        stat = path.stat()
+    except OSError as exc:
+        return {"path": str(path), "exists": False, "reason": type(exc).__name__}
+    return {
+        "exists": True,
+        "path": str(path),
+        "name": path.name,
+        "size_bytes": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+        "sha256": _sha256_file(path),
+    }
+
+
+def _pyproject_project_name(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    try:
+        import tomllib
+
+        payload = tomllib.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return None
+    project = payload.get("project") if isinstance(payload, dict) else None
+    name = project.get("name") if isinstance(project, dict) else None
+    return str(name) if name else None
 
 
 def _sha256_file(path: Path) -> str:
