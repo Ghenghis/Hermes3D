@@ -25,6 +25,7 @@ from hermes3d.services.agent_runtime import env_value, private_env
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 PROJECT_ROOT = IMPLEMENTATION_ROOT.parent
 HISTORY_ROOT = IMPLEMENTATION_ROOT / "var" / "code-history"
+PROVIDER_SMOKE_STATUS_FILE = HISTORY_ROOT / "provider-smoke-status.json"
 MAX_SNAPSHOT_BYTES = 5 * 1024 * 1024
 MAX_DIFF_BYTES = 1024 * 1024
 MAX_FILE_VIEW_BYTES = 512 * 1024
@@ -52,6 +53,20 @@ SOURCE_OS_FOLDER_INDEX_FILES = [
     f"{FOLDER_INDEX_ROOT}/source-os-60-apps/REGISTRY.md",
 ]
 HERMES_AGENT_E2E_PLAN = "03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md"
+CLI_RUNNER_COMMANDS = {
+    "opencode": {
+        "label": "OpenCode",
+        "command": "opencode",
+        "env_keys": ["HERMES3D_OPENCODE_BIN", "OPENCODE_BIN"],
+        "source_env_keys": ["HERMES3D_OPENCODE_SOURCE", "OPENCODE_SOURCE"],
+    },
+    "openhands": {
+        "label": "OpenHands",
+        "command": "openhands",
+        "env_keys": ["HERMES3D_OPENHANDS_BIN", "OPENHANDS_BIN"],
+        "source_env_keys": ["HERMES3D_OPENHANDS_SOURCE", "OPENHANDS_SOURCE"],
+    },
+}
 
 DENIED_PARTS = {
     ".git",
@@ -246,6 +261,11 @@ def programming_readiness() -> dict[str, Any]:
     missing_sources = [item["id"] for item in source_results if item["status"] == "missing"]
     source_warnings = [item["id"] for item in source_results if item["status"] == "source_tree"]
     missing_providers = [item["id"] for item in provider_results if item["status"] != "ready"]
+    provider_blockers = [
+        f"{item['id']}: {item.get('blocked_reason') or item['status']}"
+        for item in provider_results
+        if item["status"] != "ready"
+    ]
     ready = not missing_sources and not missing_providers and lock_status["ready"]
     return {
         "status": "ready" if ready else "partial",
@@ -273,6 +293,11 @@ def programming_readiness() -> dict[str, Any]:
             "mcp_locks": [] if lock_status["ready"] else [lock_status["blocked_reason"]],
             "code_history": _code_history_status(),
         },
+        "blocked_reasons": [
+            *[f"Source input {source_id} is missing." for source_id in missing_sources],
+            *provider_blockers,
+            *([] if lock_status["ready"] else [str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready.")]),
+        ],
     }
 
 
@@ -293,7 +318,9 @@ def provider_team_readiness() -> dict[str, Any]:
         if source.get("status") == "missing":
             team_blockers.append(f"Source input {config['source_input']} is missing.")
         if provider.get("status") != "ready":
-            team_blockers.append(f"Provider {config['provider_id']} is not configured.")
+            team_blockers.append(
+                str(provider.get("blocked_reason") or f"Provider {config['provider_id']} status is {provider.get('status', 'not_ready')}.")
+            )
         if not lock_status["ready"]:
             team_blockers.append(str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready."))
         ready = not team_blockers
@@ -373,16 +400,183 @@ def agent_e2e_readiness() -> dict[str, Any]:
 def code_cli_runners() -> dict[str, Any]:
     runners = [_cli_runner_status("opencode"), _cli_runner_status("openhands")]
     detected = [item for item in runners if item["detected"]]
+    sandbox = code_sandbox_readiness()
     return {
         "status": "ready" if detected else "setup_required",
         "count": len(runners),
         "detected": len(detected),
         "runners": runners,
+        "sandbox": sandbox,
         "policy": {
             "write_runs_allowed": False,
-            "reason": "OpenHands/OpenCode CLI write runs stay blocked until sandbox readiness, MCP locks, snapshots, and proof capture are wired.",
-            "allowed_now": ["detect", "version_preflight"],
+            "reason": "OpenHands/OpenCode CLI write runs require sandbox readiness, MCP locks, snapshots, task-scoped env/cwd/files, redacted output proof, review, and gates.",
+            "allowed_now": ["detect", "version_preflight", "fail_closed_run_contract"],
         },
+    }
+
+
+def code_sandbox_readiness() -> dict[str, Any]:
+    private_values = private_env()
+    docker = shutil.which("docker")
+    configured_image = env_value("HERMES3D_AGENT_SANDBOX_IMAGE", private_values).strip()
+    network_mode = env_value("HERMES3D_AGENT_SANDBOX_NETWORK", private_values, "none").strip() or "none"
+    mode = env_value("HERMES3D_AGENT_SANDBOX_MODE", private_values, "docker").strip().lower() or "docker"
+    blocked: list[str] = []
+    docker_version: str | None = None
+    image_status = "not_configured"
+    image_id: str | None = None
+    image_size_bytes: int | None = None
+    if mode not in {"docker", "container"}:
+        blocked.append("Only docker/container sandbox mode is accepted for OpenHands/OpenCode runner execution.")
+    if not docker:
+        blocked.append("Docker executable is not on PATH.")
+    else:
+        try:
+            result = subprocess.run([docker, "version", "--format", "{{.Server.Version}}"], cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=5, check=False)
+            if result.returncode == 0:
+                docker_version = (result.stdout or "").strip()[:80] or None
+            else:
+                blocked.append("Docker is installed but the daemon/version probe did not pass.")
+        except (OSError, subprocess.TimeoutExpired):
+            blocked.append("Docker version probe could not complete.")
+    if not configured_image:
+        blocked.append("HERMES3D_AGENT_SANDBOX_IMAGE is not configured in private env.")
+    elif not docker:
+        image_status = "unverified"
+    elif docker:
+        try:
+            result = subprocess.run(
+                [docker, "image", "inspect", configured_image, "--format", "{{.Id}} {{.Size}}"],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=8,
+                check=False,
+            )
+            output = (result.stdout or "").strip()
+            parts = output.split()
+            if result.returncode == 0 and parts:
+                image_status = "present"
+                image_id = parts[0][:160]
+                if len(parts) > 1:
+                    try:
+                        image_size_bytes = int(parts[1])
+                    except ValueError:
+                        image_size_bytes = None
+            else:
+                image_status = "missing"
+                blocked.append("Configured sandbox image is not present locally or cannot be inspected.")
+        except (OSError, subprocess.TimeoutExpired):
+            image_status = "missing"
+            blocked.append("Configured sandbox image inspect probe could not complete.")
+    if network_mode not in {"none", "private", "bridge"}:
+        blocked.append("HERMES3D_AGENT_SANDBOX_NETWORK must be none, private, or bridge.")
+    return {
+        "status": "ready" if not blocked else "blocked",
+        "ready": not blocked,
+        "mode": mode,
+        "docker_executable": docker,
+        "docker_version": docker_version,
+        "image_configured": bool(configured_image),
+        "image": configured_image or None,
+        "image_status": image_status,
+        "image_id": image_id,
+        "image_size_bytes": image_size_bytes,
+        "network_mode": network_mode,
+        "workspace_mount": str(PROJECT_ROOT),
+        "denied_paths": sorted(["G:/private", ".git", "node_modules", "03_implementation/proof", "03_implementation/var"]),
+        "allowed_command_families": ["version", "read_only_analysis", "bounded_patch_proposal", "tests_via_gate_runner"],
+        "blocked_reasons": blocked,
+    }
+
+
+def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> dict[str, Any]:
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    runner = _validate_cli_runner_required(runner_id)
+    status = _cli_runner_status(runner)
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_cli_runner_preflight",
+        summary=f"{status['label']} CLI runner preflight {'passed' if status['detected'] else 'blocked'}",
+        data={
+            "runner_id": runner,
+            "detected": status["detected"],
+            "version_status": status["version_status"],
+            "blocked_reason": status["blocked_reason"],
+            "path_source": status.get("path_source"),
+            "sandbox_ready": code_sandbox_readiness().get("ready"),
+        },
+    )
+    return {
+        "status": "ready" if status["detected"] else "blocked",
+        "accepted": bool(status["detected"]),
+        "runner": status,
+        "mcp_evidence": evidence,
+        "next_required_steps": _cli_runner_next_steps(status),
+    }
+
+
+def run_code_cli_runner(
+    *,
+    runner_id: str,
+    owner: str,
+    task_id: str,
+    title: str,
+    objective: str,
+    files: list[str],
+    target_branch: str | None = None,
+) -> dict[str, Any]:
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    runner = _validate_cli_runner_required(runner_id)
+    clean_title = _validate_bounded_text(title, "Title", max_chars=180)
+    clean_objective = _validate_bounded_text(objective, "Objective", max_chars=4000)
+    safe_files = _safe_mcp_files(files, must_exist=True)
+    if not safe_files:
+        raise ValueError("At least one existing project-relative file is required.")
+    branch = _validate_git_ref(target_branch) if target_branch else None
+    runner_status = _cli_runner_status(runner)
+    sandbox = code_sandbox_readiness()
+    blocked: list[str] = []
+    if not runner_status["detected"]:
+        blocked.append(runner_status["blocked_reason"] or f"{runner} CLI runner is not detected.")
+    if not sandbox["ready"]:
+        blocked.extend(str(item) for item in sandbox["blocked_reasons"])
+    blocked.append("CLI execution is fail-closed until task-scoped container execution, output artifact capture, DeepSeek review, and gate handoff are wired.")
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_cli_runner_run",
+        summary=f"Blocked {runner_status['label']} CLI runner execution contract for {task_id}",
+        data={
+            "runner_id": runner,
+            "title": clean_title,
+            "files": safe_files,
+            "target_branch": branch,
+            "objective_sha256": hashlib.sha256(clean_objective.encode("utf-8")).hexdigest(),
+            "runner_detected": runner_status["detected"],
+            "sandbox_ready": sandbox["ready"],
+            "blocked_reasons": blocked,
+        },
+    )
+    return {
+        "status": "blocked",
+        "accepted": False,
+        "runner": runner_status,
+        "sandbox": sandbox,
+        "files": safe_files,
+        "target_branch": branch,
+        "blocked_reasons": blocked,
+        "mcp_evidence": evidence,
+        "next_required_steps": [
+            "configure MiniMax/DeepSeek provider auth until smoke passes",
+            "install or configure HERMES3D_OPENCODE_BIN / HERMES3D_OPENHANDS_BIN in G:/private/.env",
+            "configure HERMES3D_AGENT_SANDBOX_IMAGE and pass sandbox readiness",
+            "wire task-scoped container execution with redacted output artifacts",
+            "require DeepSeek review + gates before patch apply or PR",
+        ],
     }
 
 
@@ -1148,6 +1342,48 @@ def apply_patch_proposal(
     }
 
 
+def apply_reviewed_patch_proposal(
+    proposal_id: str,
+    *,
+    agent_id: str,
+    task_id: str,
+    review_proof_ids: list[str],
+    reason: str | None = None,
+) -> dict[str, Any]:
+    safe_proofs = [_validate_proof_ref(item) for item in review_proof_ids]
+    if not safe_proofs:
+        raise ValueError("Reviewed patch apply requires at least one review proof id.")
+    apply_result = apply_patch_proposal(
+        proposal_id,
+        agent_id=agent_id,
+        task_id=task_id,
+        reason=reason or "Reviewed Hermes Agent patch apply",
+    )
+    evidence = append_mcp_evidence(
+        owner=agent_id,
+        task_id=task_id,
+        kind="code_patch_reviewed_apply",
+        summary=f"Applied reviewed Hermes Agent patch {proposal_id[:12]}",
+        data={
+            "proposal_id": proposal_id,
+            "relative_path": apply_result.get("relative_path"),
+            "review_proof_ids": safe_proofs,
+            "apply_proof_event_id": apply_result.get("proof_event_id"),
+            "apply_evidence_id": (apply_result.get("mcp_evidence") or {}).get("evidence_id")
+            if isinstance(apply_result.get("mcp_evidence"), dict)
+            else None,
+        },
+    )
+    return {
+        "status": "reviewed_applied",
+        "accepted": True,
+        "proposal_id": proposal_id,
+        "review_proof_ids": safe_proofs,
+        "apply": apply_result,
+        "mcp_evidence": evidence,
+    }
+
+
 def list_mcp_gates() -> dict[str, Any]:
     _require_mcp_locks_ready()
     payload = _call_mcp_tool("hermes_list_gates", {})
@@ -1403,7 +1639,7 @@ def run_provider_team_coding_pass(
             max_tokens=2400,
         )
     except RuntimeError as exc:
-        blocked = [str(exc)]
+        blocked = [_provider_error_summary("minimax", str(exc))]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
@@ -1497,7 +1733,7 @@ def run_provider_team_review_pass(
             max_tokens=2400,
         )
     except RuntimeError as exc:
-        blocked = [str(exc)]
+        blocked = [_provider_error_summary("deepseek", str(exc))]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
@@ -1544,6 +1780,124 @@ def run_provider_team_review_pass(
         "provider": response["provider"],
         "artifact": artifact,
         "response": _provider_response_public(response),
+        "mcp_evidence": evidence,
+    }
+
+
+def provider_execution_smoke(
+    provider_id: str,
+    *,
+    owner: str,
+    task_id: str,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    provider = str(provider_id or "").strip().lower()
+    if provider not in PROVIDER_DEFAULT_BASE_URLS:
+        raise ValueError("Provider id must be minimax or deepseek.")
+    config = _provider_chat_config(provider, require_ready=False)
+    auth_contract = {
+        "provider_id": provider,
+        "base_url_label": config["base_url_label"],
+        "chat_path": _provider_chat_path(str(config["base_url"])),
+        "auth_scheme": "Authorization: Bearer <redacted>",
+        "api_key_configured": config["api_key_configured"],
+        "model": config["model"],
+        "model_configured": config["model_configured"],
+    }
+    if not config["api_key_configured"] or not config["model_configured"]:
+        missing = []
+        if not config["api_key_configured"]:
+            missing.append(f"{provider.upper()}_API_KEY")
+        if not config["model_configured"]:
+            missing.append(f"{provider.upper()}_MODEL")
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider_smoke",
+            summary=f"Blocked {provider} provider smoke: missing private env",
+            data={"provider_id": provider, "missing": missing, "auth_contract": auth_contract},
+        )
+        _write_provider_smoke_status(
+            provider,
+            accepted=False,
+            status="missing_config",
+            blocked_reasons=["Missing private env: " + ", ".join(missing)],
+            auth_contract=auth_contract,
+            evidence=evidence,
+        )
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "provider_id": provider,
+            "blocked_reasons": ["Missing private env: " + ", ".join(missing)],
+            "auth_contract": auth_contract,
+            "mcp_evidence": evidence,
+        }
+    try:
+        response = _call_provider_chat(
+            provider,
+            [
+                {"role": "system", "content": "You are a provider health probe. Reply with exactly: HERMES3D_PROVIDER_SMOKE_OK"},
+                {"role": "user", "content": "Return the exact smoke token and no secrets."},
+            ],
+            temperature=0.0,
+            max_tokens=256,
+        )
+    except RuntimeError as exc:
+        blocked = [_provider_error_summary(provider, str(exc))]
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider_smoke",
+            summary=f"Blocked {provider} provider smoke",
+            data={"provider_id": provider, "blocked_reasons": blocked, "auth_contract": auth_contract},
+        )
+        _write_provider_smoke_status(
+            provider,
+            accepted=False,
+            status="blocked",
+            blocked_reasons=blocked,
+            auth_contract=auth_contract,
+            evidence=evidence,
+        )
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "provider_id": provider,
+            "blocked_reasons": blocked,
+            "auth_contract": auth_contract,
+            "mcp_evidence": evidence,
+        }
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_provider_smoke",
+        summary=f"Passed {provider} provider smoke",
+        data={
+            "provider_id": provider,
+            "provider": response["provider"],
+            "content_sha256": response["content_sha256"],
+            "auth_contract": auth_contract,
+        },
+    )
+    _write_provider_smoke_status(
+        provider,
+        accepted=True,
+        status="ready",
+        blocked_reasons=[],
+        auth_contract=auth_contract,
+        content_sha256=str(response["content_sha256"]),
+        evidence=evidence,
+    )
+    return {
+        "status": "ready",
+        "accepted": True,
+        "provider_id": provider,
+        "provider": response["provider"],
+        "content_sha256": response["content_sha256"],
+        "auth_contract": auth_contract,
         "mcp_evidence": evidence,
     }
 
@@ -1918,13 +2272,15 @@ def _source_repo_status(source: SourceRepo) -> dict[str, Any]:
 
 
 def _cli_runner_status(runner_id: str) -> dict[str, Any]:
-    runner = runner_id.strip().lower()
-    command = "opencode" if runner == "opencode" else "openhands"
-    exe = shutil.which(command)
+    runner = _validate_cli_runner_required(runner_id)
+    config = CLI_RUNNER_COMMANDS[runner]
+    command = config["command"]
+    exe, path_source, configured_path = _cli_runner_executable(config)
     version: str | None = None
     version_status = "not_run"
     if exe:
-        for args in ([command, "--version"], [command, "version"]):
+        executable = exe
+        for args in ([executable, "--version"], [executable, "version"]):
             try:
                 result = subprocess.run(args, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False)
             except (OSError, subprocess.TimeoutExpired):
@@ -1934,17 +2290,80 @@ def _cli_runner_status(runner_id: str) -> dict[str, Any]:
                 version = output.splitlines()[0][:160]
             version_status = "pass" if result.returncode == 0 else f"exit_{result.returncode}"
             break
+    source_path = _cli_runner_source_path(config)
+    blocked_reason = None
+    if not exe:
+        if configured_path:
+            blocked_reason = f"{config['env_keys'][0]} is configured but does not point to an executable file."
+        else:
+            blocked_reason = f"{command} executable is not on PATH and no private {config['env_keys'][0]} path is configured."
     return {
         "id": runner,
-        "label": "OpenCode" if runner == "opencode" else "OpenHands",
+        "label": config["label"],
         "detected": bool(exe),
         "executable": exe,
+        "path_source": path_source,
+        "configured_path": configured_path,
+        "source_path": source_path,
+        "required_env_keys": config["env_keys"],
         "version": version,
         "version_status": version_status,
         "write_allowed": False,
-        "blocked_reason": None if exe else f"{command} executable is not on PATH.",
-        "policy": "Detection/version preflight only until sandboxed CLI runner is implemented.",
+        "blocked_reason": blocked_reason,
+        "policy": "Detect/version/preflight are allowed. Write runs require sandbox readiness, MCP locks, snapshots, redacted output proof, review, and gates.",
     }
+
+
+def _validate_cli_runner_required(runner_id: str) -> str:
+    runner = str(runner_id or "").strip().lower()
+    if runner not in CLI_RUNNER_COMMANDS:
+        raise ValueError("CLI runner must be opencode or openhands.")
+    return runner
+
+
+def _cli_runner_executable(config: dict[str, Any]) -> tuple[str | None, str, str | None]:
+    private_values = private_env()
+    for key in config["env_keys"]:
+        configured = env_value(key, private_values).strip()
+        if not configured:
+            continue
+        path = Path(configured)
+        if path.exists() and path.is_file():
+            return str(path), f"private_env:{key}", str(path)
+        return None, f"private_env:{key}", str(path)
+    found = shutil.which(str(config["command"]))
+    return found, "PATH" if found else "not_configured", None
+
+
+def _cli_runner_source_path(config: dict[str, Any]) -> str | None:
+    private_values = private_env()
+    for key in config["source_env_keys"]:
+        configured = env_value(key, private_values).strip()
+        if configured:
+            return configured
+    return None
+
+
+def _cli_runner_next_steps(status: dict[str, Any]) -> list[str]:
+    if status.get("detected"):
+        sandbox = code_sandbox_readiness()
+        if sandbox.get("ready"):
+            return [
+                "rerun MiniMax and DeepSeek provider smokes; fix private provider auth if either returns blocked",
+                "use /api/code-operator/cli-runners/run only after provider smoke, review handoff, and output proof pass",
+                "ship through reviewed patch apply, gates, git branch/stage/commit/push/PR, and rollback proof",
+            ]
+        return [
+            "configure HERMES3D_AGENT_SANDBOX_IMAGE in G:/private/.env",
+            "pass /api/code-operator/sandbox/readiness",
+            "run through gated /api/code-operator/cli-runners/run after provider auth and sandbox proof pass",
+        ]
+    env_key = (status.get("required_env_keys") or ["HERMES3D_OPENCODE_BIN"])[0]
+    return [
+        f"install {status.get('label', 'CLI runner')} or set {env_key}=<absolute executable path> in G:/private/.env",
+        "restart the Hermes3D API launcher so private env/path changes load",
+        "rerun /api/code-operator/cli-runners/preflight",
+    ]
 
 
 def _folder_index_doc_payload(rel: str, path: Path) -> dict[str, Any]:
@@ -2059,15 +2478,130 @@ def _provider_proof_ids(coding: dict[str, Any]) -> list[str]:
 
 def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[str, Any]:
     config = _provider_chat_config(provider_id, private_values, require_ready=False)
+    auth_contract = {
+        "provider_id": provider_id,
+        "base_url_label": config["base_url_label"],
+        "chat_path": _provider_chat_path(str(config["base_url"])),
+        "auth_scheme": "Authorization: Bearer <redacted>",
+        "api_key_configured": config["api_key_configured"],
+        "model": config["model"],
+        "model_configured": config["model_configured"],
+    }
+    smoke = _provider_smoke_status(provider_id)
+    status = "missing_config"
+    live_status = "not_probed"
+    blocked_reason = "Provider private env is missing API key or model."
+    if config["api_key_configured"] and config["model_configured"]:
+        status = "smoke_required"
+        blocked_reason = "Provider is configured but has not passed a live smoke proof."
+        if smoke:
+            smoke_contract = smoke.get("auth_contract") if isinstance(smoke.get("auth_contract"), dict) else {}
+            same_contract = (
+                smoke_contract.get("base_url_label") == auth_contract["base_url_label"]
+                and smoke_contract.get("chat_path") == auth_contract["chat_path"]
+                and smoke_contract.get("model") == auth_contract["model"]
+            )
+            if same_contract and smoke.get("accepted") is True:
+                status = "ready"
+                live_status = "passed"
+                blocked_reason = None
+            elif same_contract:
+                reason_text = " ".join(str(item) for item in smoke.get("blocked_reasons") or [])
+                status = "auth_failed" if _provider_smoke_auth_failed(reason_text) else "smoke_failed"
+                live_status = "failed"
+                blocked_reason = f"Last live smoke failed: {reason_text[:240] or status}"
+            else:
+                live_status = "stale_smoke"
+                blocked_reason = "Provider config changed or smoke proof is stale; rerun provider smoke."
     return {
         "id": provider_id,
-        "status": "ready" if config["api_key_configured"] and config["model_configured"] else "missing_config",
+        "status": status,
         "api_key_configured": config["api_key_configured"],
         "base_url_configured": config["base_url_configured"],
         "model_configured": config["model_configured"],
         "base_url_label": config["base_url_label"],
         "model": config["model"],
+        "auth_scheme": "bearer",
+        "chat_path": _provider_chat_path(str(config["base_url"])),
+        "live_status": live_status,
+        "blocked_reason": blocked_reason,
+        "last_smoke": smoke,
     }
+
+
+def _provider_smoke_status(provider_id: str) -> dict[str, Any] | None:
+    statuses = _provider_smoke_statuses()
+    record = statuses.get(str(provider_id or "").strip().lower())
+    return record if isinstance(record, dict) else None
+
+
+def _provider_smoke_statuses() -> dict[str, Any]:
+    try:
+        raw = json.loads(PROVIDER_SMOKE_STATUS_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    providers = raw.get("providers") if isinstance(raw, dict) else None
+    return providers if isinstance(providers, dict) else {}
+
+
+def _write_provider_smoke_status(
+    provider_id: str,
+    *,
+    accepted: bool,
+    status: str,
+    blocked_reasons: list[str],
+    auth_contract: dict[str, Any],
+    content_sha256: str | None = None,
+    evidence: dict[str, Any] | None = None,
+) -> None:
+    provider = str(provider_id or "").strip().lower()
+    if provider not in PROVIDER_DEFAULT_BASE_URLS:
+        return
+    existing = _provider_smoke_statuses()
+    record = {
+        "provider_id": provider,
+        "accepted": bool(accepted),
+        "status": str(status or ("ready" if accepted else "blocked")),
+        "ts_utc": utc_now(),
+        "blocked_reasons": [_redact_provider_text(str(item)) for item in blocked_reasons][:5],
+        "auth_contract": {
+            "provider_id": auth_contract.get("provider_id"),
+            "base_url_label": auth_contract.get("base_url_label"),
+            "chat_path": auth_contract.get("chat_path"),
+            "auth_scheme": "Authorization: Bearer <redacted>",
+            "api_key_configured": bool(auth_contract.get("api_key_configured")),
+            "model": auth_contract.get("model"),
+            "model_configured": bool(auth_contract.get("model_configured")),
+        },
+        "content_sha256": content_sha256,
+        "evidence_id": (evidence or {}).get("evidence_id"),
+    }
+    existing[provider] = record
+    payload = {"schema": 1, "updated_at": utc_now(), "providers": existing}
+    PROVIDER_SMOKE_STATUS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = PROVIDER_SMOKE_STATUS_FILE.with_suffix(
+        PROVIDER_SMOKE_STATUS_FILE.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}"
+    )
+    tmp_path.write_text(as_json(payload), encoding="utf-8")
+    os.replace(tmp_path, PROVIDER_SMOKE_STATUS_FILE)
+
+
+def _provider_smoke_auth_failed(reason_text: str) -> bool:
+    normalized = reason_text.lower()
+    return any(
+        token in normalized
+        for token in (
+            "401",
+            "unauthorized",
+            "authorized_error",
+            "authentication fails",
+            "authentication_error",
+            "invalid api",
+            "invalid key",
+            "login fail",
+            "forbidden",
+        )
+    )
 
 
 def _provider_chat_config(provider_id: str, private_values: dict[str, str] | None = None, *, require_ready: bool = True) -> dict[str, Any]:
@@ -2141,7 +2675,7 @@ def _call_provider_chat(
         data=body,
         headers={
             "Accept": "application/json",
-            "Authorization": f"Bearer {config['api_key']}",
+            "Authorization": _provider_auth_header(str(config["api_key"])),
             "Content-Type": "application/json",
         },
     )
@@ -2183,6 +2717,20 @@ def _provider_chat_url(base_url: str) -> str:
     if base.endswith("/chat/completions"):
         return base
     return f"{base}/chat/completions"
+
+
+def _provider_chat_path(base_url: str) -> str:
+    url = _provider_chat_url(base_url)
+    match = re.match(r"^https?://[^/]+(/.*)$", url, re.IGNORECASE)
+    return match.group(1) if match else "/chat/completions"
+
+
+def _provider_auth_header(api_key: str) -> str:
+    value = api_key.strip()
+    if value.lower().startswith("bearer "):
+        parts = value.split(None, 1)
+        return f"Bearer {parts[1].strip()}" if len(parts) == 2 else "Bearer "
+    return f"Bearer {value}"
 
 
 def _provider_response_content(payload: Any) -> str:
@@ -2342,9 +2890,20 @@ def _record_provider_run_artifact(
 
 def _redact_provider_text(text: str) -> str:
     redacted = text
+    redacted = re.sub(r"(?i)(your\s+api\s+key\s*:\s*)[^\"',}]+", r"\1<redacted>", redacted)
+    redacted = re.sub(r"(?i)(authorization\s*[=:]\s*)[^\"',}]+", r"\1<redacted>", redacted)
+    redacted = re.sub(r"(?i)(api\s+secret\s+key\s+in\s+the\s+')[^']+", r"\1<redacted>", redacted)
     for key in ("api_key", "apikey", "authorization", "bearer"):
         redacted = re.sub(rf"(?i){key}[^,\\n]{{0,80}}", f"{key}=<redacted>", redacted)
     return redacted[:2000]
+
+
+def _provider_error_summary(provider_id: str, text: str) -> str:
+    http = re.search(r"HTTP\s+(\d{3})", text, re.IGNORECASE)
+    status = f"HTTP {http.group(1)}" if http else "request failure"
+    if _provider_smoke_auth_failed(text):
+        return f"Provider {provider_id} returned {status}: authentication failed; verify private API key, base URL, and model."
+    return f"Provider {provider_id} returned {status}: {_redact_provider_text(text)[:300]}"
 
 
 def _code_history_status() -> dict[str, Any]:

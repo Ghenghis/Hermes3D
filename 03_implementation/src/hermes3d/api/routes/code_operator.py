@@ -60,6 +60,10 @@ class PatchApplyRequest(StrictBody):
     reason: str | None = None
 
 
+class ReviewedPatchApplyRequest(PatchApplyRequest):
+    review_proof_ids: list[str] = Field(min_length=1)
+
+
 class GateRunRequest(StrictBody):
     gate_id: str
     cwd: str | None = None
@@ -169,6 +173,11 @@ class ProviderReviewPassRequest(StrictBody):
     reviewer_team_id: str = "deepseek-reviewers"
 
 
+class ProviderSmokeRequest(StrictBody):
+    provider_id: str
+    task_id: str
+
+
 class AgentE2EJobRequest(StrictBody):
     task_id: str
     title: str = Field(min_length=1, max_length=180)
@@ -178,6 +187,20 @@ class AgentE2EJobRequest(StrictBody):
     role_chain: list[str] = Field(default_factory=lambda: ["finder", "builder", "reviewer", "tester"])
     cli_worker: str | None = None
     release_on_finish: bool = True
+
+
+class CliRunnerPreflightRequest(StrictBody):
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+
+
+class CliRunnerRunRequest(StrictBody):
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
 
 
 @router.get("/programming-readiness")
@@ -193,6 +216,39 @@ def agent_e2e_readiness() -> dict[str, Any]:
 @router.get("/cli-runners")
 def code_cli_runners() -> dict[str, Any]:
     return code_history.code_cli_runners()
+
+
+@router.get("/sandbox/readiness")
+def code_sandbox_readiness() -> dict[str, Any]:
+    return code_history.code_sandbox_readiness()
+
+
+@router.post("/cli-runners/preflight")
+def preflight_code_cli_runner(body: CliRunnerPreflightRequest) -> dict[str, Any]:
+    try:
+        return code_history.preflight_code_cli_runner(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/cli-runners/run")
+def run_code_cli_runner(body: CliRunnerRunRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_code_cli_runner(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.post("/e2e/jobs")
@@ -216,6 +272,18 @@ def run_agent_e2e_job(body: AgentE2EJobRequest) -> dict[str, Any]:
 @router.get("/teams/readiness")
 def provider_team_readiness() -> dict[str, Any]:
     return code_history.provider_team_readiness()
+
+
+@router.post("/providers/smoke")
+def provider_smoke(body: ProviderSmokeRequest) -> dict[str, Any]:
+    try:
+        return code_history.provider_execution_smoke(
+            body.provider_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.post("/teams/assign-task")
@@ -427,6 +495,22 @@ def apply_patch(body: PatchApplyRequest) -> dict[str, Any]:
             body.proposal_id,
             agent_id=CODE_OPERATOR_ACTOR,
             task_id=body.task_id,
+            reason=body.reason,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/patch/apply-reviewed")
+def apply_reviewed_patch(body: ReviewedPatchApplyRequest) -> dict[str, Any]:
+    try:
+        return code_history.apply_reviewed_patch_proposal(
+            body.proposal_id,
+            agent_id=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            review_proof_ids=body.review_proof_ids,
             reason=body.reason,
         )
     except FileNotFoundError as exc:

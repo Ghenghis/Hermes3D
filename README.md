@@ -42,6 +42,10 @@
   commits, pushes, and PRs when the user assigns that work. Missing
   data means ask or block; never invent printer state, slicer output,
   generated models, proof events, setup status, or remote-host state.
+- **Keeps OpenCode/OpenHands honest.** Hermes3D detects their source
+  checkouts, private executable-path keys, and sandbox readiness separately.
+  Agent CLI runs stay blocked until a real executable, Docker sandbox image,
+  MCP locks, snapshots, redacted output proof, review, and gates are present.
 
 ---
 

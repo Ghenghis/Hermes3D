@@ -4,7 +4,9 @@ import {
   attachEvidenceLive,
   cancelJobLive,
   applyJobRepairLive,
+  applyReviewedPatchLive,
   emitProofEventLive,
+  createCodeBranchLive,
   getActiveWorkflowsLive,
   getAgentActionCatalogLive,
   getAgentE2EReadinessLive,
@@ -45,6 +47,7 @@ import {
   getSourceOSModulesLive,
   getModuleRuntimeSetupQueueLive,
   getModuleUpdateReadinessLive,
+  getRuntimeIdentityLive,
   getRuntimeReadinessLive,
   getSystemSnapshotLive,
   getVoiceAgentsLive,
@@ -74,15 +77,43 @@ import {
   runIdleCandidateLive,
   runAgentCatalogActionLive,
   runAgentE2EJobLive,
+  preflightCodeCliRunnerLive,
+  runCodeCliRunnerLive,
+  runCodeGateLive,
+  runProviderSmokeLive,
   saveVoiceAgentLive,
+  stageOwnedCodeFilesLive,
   retryJobLive,
   testPrinterLive,
+  commitOwnedCodeFilesLive,
   updatePrinterStatusLive,
   updateHermesAgentStagedLive,
+  pushCodeBranchLive,
+  openCodePullRequestLive,
   uploadGcodeLive,
 } from "./adapters.live";
 import type { Agent } from "../types/agent";
-import type { AgentActionCatalog, AgentActionRunResult, AgentE2EJobRequest, AgentE2EJobResult, AgentE2EReadiness, CodeCliRunnerReadiness } from "../types/agent-actions";
+import type {
+  AgentActionCatalog,
+  AgentActionRunResult,
+  AgentE2EJobRequest,
+  AgentE2EJobResult,
+  AgentE2EReadiness,
+  CodeCliRunnerPreflightResult,
+  CodeCliRunnerReadiness,
+  CodeCliRunnerRunRequest,
+  CodeCliRunnerRunResult,
+  CodeGateRunRequest,
+  CodeGateRunResult,
+  GitBranchRequest,
+  GitCommitRequest,
+  GitPullRequestRequest,
+  GitPushRequest,
+  GitStageRequest,
+  ProviderSmokeResult,
+  ReviewedPatchApplyRequest,
+  ReviewedPatchApplyResult,
+} from "../types/agent-actions";
 import type { Approval } from "../types/approval";
 import type { Artifact, EvidenceForm } from "../types/artifact";
 import type { AutopilotCheck, GuardrailPolicy } from "../types/autopilot";
@@ -102,7 +133,7 @@ import type { RoadmapItem, RoadmapTabCompletion } from "../types/roadmap";
 import type { ServiceHealthEntry } from "../types/serviceHealth";
 import type { AppSettings } from "../types/settings";
 import type { SourceModuleRuntimeSetupQueue, SourceModuleUpdateReadiness, SourceOSModule } from "../types/source-os";
-import type { RuntimeReadiness, SystemSnapshot } from "../types/system";
+import type { RuntimeIdentity, RuntimeReadiness, SystemSnapshot } from "../types/system";
 import type { ToolchainStatus } from "../types/toolchain";
 import type { VoiceAgent, VoiceCatalog, VoicePreviewResult, VoiceTranscript, VoiceProofEvent } from "../types/voice";
 import type { Workflow } from "../types/workflow";
@@ -144,6 +175,16 @@ export interface AdapterAPI {
   runAgentCatalogAction(actionId: string, reason?: string, payload?: Record<string, unknown>): Promise<AgentActionRunResult>;
   getAgentE2EReadiness(): Promise<AgentE2EReadiness>;
   runAgentE2EJob(request: AgentE2EJobRequest): Promise<AgentE2EJobResult>;
+  preflightCodeCliRunner(runnerId: "opencode" | "openhands", taskId: string): Promise<CodeCliRunnerPreflightResult>;
+  runCodeCliRunner(request: CodeCliRunnerRunRequest): Promise<CodeCliRunnerRunResult>;
+  runProviderSmoke(providerId: "minimax" | "deepseek", taskId: string): Promise<ProviderSmokeResult>;
+  applyReviewedPatch(request: ReviewedPatchApplyRequest): Promise<ReviewedPatchApplyResult>;
+  runCodeGate(request: CodeGateRunRequest): Promise<CodeGateRunResult>;
+  createCodeBranch(request: GitBranchRequest): Promise<unknown>;
+  stageOwnedCodeFiles(request: GitStageRequest): Promise<unknown>;
+  commitOwnedCodeFiles(request: GitCommitRequest): Promise<unknown>;
+  pushCodeBranch(request: GitPushRequest): Promise<unknown>;
+  openCodePullRequest(request: GitPullRequestRequest): Promise<unknown>;
   getCodeCliRunners(): Promise<CodeCliRunnerReadiness>;
   getActiveWorkflows(): Promise<Workflow[]>;
   getRecentJobs(): Promise<Job[]>;
@@ -151,6 +192,7 @@ export interface AdapterAPI {
   getLatestProofBundle(): Promise<ProofBundle | null>;
   getSystemSnapshot(): Promise<SystemSnapshot | null>;
   getRuntimeReadiness(): Promise<RuntimeReadiness | null>;
+  getRuntimeIdentity(): Promise<RuntimeIdentity | null>;
   getDimensionalReports(): Promise<DimensionalAccuracyReport[]>;
   getLogs(): Promise<LogEntry[]>;
   getNotifications(): Promise<Notification[]>;
@@ -228,6 +270,16 @@ export const adapters: AdapterAPI = {
   runAgentCatalogAction: runAgentCatalogActionLive,
   getAgentE2EReadiness: getAgentE2EReadinessLive,
   runAgentE2EJob: runAgentE2EJobLive,
+  preflightCodeCliRunner: preflightCodeCliRunnerLive,
+  runCodeCliRunner: runCodeCliRunnerLive,
+  runProviderSmoke: runProviderSmokeLive,
+  applyReviewedPatch: applyReviewedPatchLive,
+  runCodeGate: runCodeGateLive,
+  createCodeBranch: createCodeBranchLive,
+  stageOwnedCodeFiles: stageOwnedCodeFilesLive,
+  commitOwnedCodeFiles: commitOwnedCodeFilesLive,
+  pushCodeBranch: pushCodeBranchLive,
+  openCodePullRequest: openCodePullRequestLive,
   getCodeCliRunners: getCodeCliRunnersLive,
   getActiveWorkflows: getActiveWorkflowsLive,
   getRecentJobs: getRecentJobsLive,
@@ -235,6 +287,7 @@ export const adapters: AdapterAPI = {
   getLatestProofBundle: getLatestProofBundleLive,
   getSystemSnapshot: getSystemSnapshotLive,
   getRuntimeReadiness: getRuntimeReadinessLive,
+  getRuntimeIdentity: getRuntimeIdentityLive,
   getDimensionalReports: getDimensionalReportsLive,
   getLogs: getLogsLive,
   getNotifications: getNotificationsLive,
