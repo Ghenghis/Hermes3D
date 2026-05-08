@@ -60,9 +60,45 @@ class PatchApplyRequest(StrictBody):
     reason: str | None = None
 
 
+class ReviewedPatchApplyRequest(PatchApplyRequest):
+    review_proof_ids: list[str] = Field(min_length=1)
+
+
 class GateRunRequest(StrictBody):
     gate_id: str
     cwd: str | None = None
+
+
+class GitBranchRequest(StrictBody):
+    task_id: str
+    branch_name: str
+    base_ref: str | None = None
+    reason: str = ""
+
+
+class GitStageRequest(StrictBody):
+    task_id: str
+    files: list[str] = Field(min_length=1)
+
+
+class GitCommitRequest(StrictBody):
+    task_id: str
+    files: list[str] = Field(min_length=1)
+    message: str = Field(min_length=1, max_length=4096)
+    proof_ids: list[str] = Field(default_factory=list)
+
+
+class GitPushRequest(StrictBody):
+    task_id: str
+    remote: str = "origin"
+
+
+class GitPullRequestRequest(StrictBody):
+    task_id: str
+    base_ref: str
+    title: str = Field(min_length=1, max_length=180)
+    body: str = Field(default="", max_length=32000)
+    draft: bool = True
 
 
 class McpTaskClaimRequest(StrictBody):
@@ -102,9 +138,215 @@ class McpEvidenceRequest(StrictBody):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+class ProviderTeamAssignmentRequest(StrictBody):
+    team_id: str
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=1600)
+    target_branch: str | None = None
+    review_required: bool = True
+
+
+class ProviderTeamReviewRequest(StrictBody):
+    task_id: str
+    summary: str = Field(min_length=1, max_length=1200)
+    files: list[str] = Field(min_length=1)
+    proof_ids: list[str] = Field(min_length=1)
+    reviewer_team_id: str = "deepseek-reviewers"
+
+
+class ProviderCodingPassRequest(StrictBody):
+    team_id: str = "minimax-builders"
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
+
+
+class ProviderReviewPassRequest(StrictBody):
+    task_id: str
+    summary: str = Field(min_length=1, max_length=2000)
+    files: list[str] = Field(min_length=1)
+    proof_ids: list[str] = Field(min_length=1)
+    reviewer_team_id: str = "deepseek-reviewers"
+
+
+class ProviderSmokeRequest(StrictBody):
+    provider_id: str
+    task_id: str
+
+
+class AgentE2EJobRequest(StrictBody):
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
+    role_chain: list[str] = Field(default_factory=lambda: ["finder", "builder", "reviewer", "tester"])
+    cli_worker: str | None = None
+    release_on_finish: bool = True
+
+
+class CliRunnerPreflightRequest(StrictBody):
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+
+
+class CliRunnerRunRequest(StrictBody):
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=2400)
+    target_branch: str | None = None
+
+
 @router.get("/programming-readiness")
 def programming_readiness() -> dict[str, Any]:
     return code_history.programming_readiness()
+
+
+@router.get("/e2e/readiness")
+def agent_e2e_readiness() -> dict[str, Any]:
+    return code_history.agent_e2e_readiness()
+
+
+@router.get("/cli-runners")
+def code_cli_runners() -> dict[str, Any]:
+    return code_history.code_cli_runners()
+
+
+@router.get("/sandbox/readiness")
+def code_sandbox_readiness() -> dict[str, Any]:
+    return code_history.code_sandbox_readiness()
+
+
+@router.post("/cli-runners/preflight")
+def preflight_code_cli_runner(body: CliRunnerPreflightRequest) -> dict[str, Any]:
+    try:
+        return code_history.preflight_code_cli_runner(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/cli-runners/run")
+def run_code_cli_runner(body: CliRunnerRunRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_code_cli_runner(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/e2e/jobs")
+def run_agent_e2e_job(body: AgentE2EJobRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_agent_e2e_job(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+            role_chain=body.role_chain,
+            cli_worker=body.cli_worker,
+            release_on_finish=body.release_on_finish,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.get("/teams/readiness")
+def provider_team_readiness() -> dict[str, Any]:
+    return code_history.provider_team_readiness()
+
+
+@router.post("/providers/smoke")
+def provider_smoke(body: ProviderSmokeRequest) -> dict[str, Any]:
+    try:
+        return code_history.provider_execution_smoke(
+            body.provider_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/assign-task")
+def provider_team_assign_task(body: ProviderTeamAssignmentRequest) -> dict[str, Any]:
+    try:
+        return code_history.assign_provider_team_task(
+            owner=CODE_OPERATOR_ACTOR,
+            team_id=body.team_id,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+            review_required=body.review_required,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/request-review")
+def provider_team_request_review(body: ProviderTeamReviewRequest) -> dict[str, Any]:
+    try:
+        return code_history.request_provider_team_review(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            summary=body.summary,
+            files=body.files,
+            proof_ids=body.proof_ids,
+            reviewer_team_id=body.reviewer_team_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/run-coding-pass")
+def provider_team_run_coding_pass(body: ProviderCodingPassRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_provider_team_coding_pass(
+            owner=CODE_OPERATOR_ACTOR,
+            team_id=body.team_id,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/run-review-pass")
+def provider_team_run_review_pass(body: ProviderReviewPassRequest) -> dict[str, Any]:
+    try:
+        return code_history.run_provider_team_review_pass(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            summary=body.summary,
+            files=body.files,
+            proof_ids=body.proof_ids,
+            reviewer_team_id=body.reviewer_team_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.get("/mcp-locks/readiness")
@@ -261,6 +503,22 @@ def apply_patch(body: PatchApplyRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
+@router.post("/patch/apply-reviewed")
+def apply_reviewed_patch(body: ReviewedPatchApplyRequest) -> dict[str, Any]:
+    try:
+        return code_history.apply_reviewed_patch_proposal(
+            body.proposal_id,
+            agent_id=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            review_proof_ids=body.review_proof_ids,
+            reason=body.reason,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
 @router.get("/gates")
 def list_gates() -> dict[str, Any]:
     try:
@@ -277,6 +535,70 @@ def run_gate(body: GateRunRequest) -> dict[str, Any]:
         return code_history.run_mcp_gate(body.gate_id, owner=CODE_OPERATOR_ACTOR, cwd=body.cwd)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.get("/git/readiness")
+def git_readiness() -> dict[str, Any]:
+    return code_history.git_ship_readiness()
+
+
+@router.post("/git/branch")
+def git_branch(body: GitBranchRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_create_branch(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            branch_name=body.branch_name,
+            base_ref=body.base_ref,
+            reason=body.reason,
+        )
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/stage-owned")
+def git_stage_owned(body: GitStageRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_stage_owned_files(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, files=body.files)
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/commit-owned")
+def git_commit_owned(body: GitCommitRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_commit_owned_files(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            files=body.files,
+            message=body.message,
+            proof_ids=body.proof_ids,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/push")
+def git_push(body: GitPushRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_push_current_branch(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, remote=body.remote)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/git/pr")
+def git_pr(body: GitPullRequestRequest) -> dict[str, Any]:
+    try:
+        return code_history.git_open_pull_request(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            base_ref=body.base_ref,
+            title=body.title,
+            body=body.body,
+            draft=body.draft,
+        )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 

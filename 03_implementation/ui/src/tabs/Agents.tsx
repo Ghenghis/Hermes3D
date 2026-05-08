@@ -11,9 +11,18 @@ import { AgentCommandCenter } from "../components/agents/AgentCommandCenter";
 import { NotificationCenter } from "../components/notifications/NotificationCenter";
 import { adapters } from "../api/adapters";
 import type { Agent } from "../types/agent";
-import type { AgentActionCatalog, AgentActionContract } from "../types/agent-actions";
+import type {
+  AgentActionCatalog,
+  AgentActionContract,
+  AgentE2EJobResult,
+  AgentE2EReadiness,
+  CodeCliRunnerPreflightResult,
+  CodeCliRunnerRunResult,
+  ProviderSmokeResult,
+} from "../types/agent-actions";
 import type { IdleWorkbenchState } from "../types/learning";
 import type { Notification } from "../types/notification";
+import type { RuntimeIdentity } from "../types/system";
 
 const AGENT_TONE: Record<Agent["status"], StatusTone> = {
   active: "green",
@@ -23,6 +32,8 @@ const AGENT_TONE: Record<Agent["status"], StatusTone> = {
 };
 
 const PROVIDER_OPTIONS = [
+  "minimax/MiniMax builder",
+  "deepseek/DeepSeek V4 reviewer",
   "ollama/llama3.1:8b",
   "ollama/qwen2.5-coder:14b",
   "openai/gpt-4o-mini",
@@ -52,6 +63,8 @@ const DEFAULT_WORKBENCH: IdleWorkbenchState = {
 };
 const RUNNABLE_OPERATOR_ACTIONS = new Set([
   "agents.health.refresh",
+  "code.e2e.readiness.refresh",
+  "code.cli_runners.readiness.refresh",
   "dashboard.snapshot.refresh",
   "source.modules.refresh",
   "source.verify_all",
@@ -106,6 +119,34 @@ export function AgentsTab() {
   const [proofRunBusy, setProofRunBusy] = useState(false);
   const [proofRunMessage, setProofRunMessage] = useState("Hermes Agent Playwright proof runner is ready for observe, smoke, or full UI checks.");
   const [providerDraft, setProviderDraft] = useState("");
+  const [e2eReadiness, setE2eReadiness] = useState<AgentE2EReadiness | null>(null);
+  const [e2eBusy, setE2eBusy] = useState(false);
+  const [e2eMessage, setE2eMessage] = useState("Loading Agent Code Workbench readiness.");
+  const [e2eResult, setE2eResult] = useState<AgentE2EJobResult | null>(null);
+  const [e2eTitle, setE2eTitle] = useState("Hermes Agent E2E code task");
+  const [e2eObjective, setE2eObjective] = useState("Use folder-index context, inspect the listed files, produce a bounded patch plan, and route it through DeepSeek review before any source mutation.");
+  const [e2eFiles, setE2eFiles] = useState("03_implementation/ROADMAP.md\n03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md");
+  const [e2eTargetBranch, setE2eTargetBranch] = useState("");
+  const [e2eCliWorker, setE2eCliWorker] = useState("");
+  const [cliRunnerBusy, setCliRunnerBusy] = useState<string | null>(null);
+  const [cliRunnerMessage, setCliRunnerMessage] = useState("OpenHands/OpenCode can be detected now; write runs stay proof-gated.");
+  const [cliRunnerPreflight, setCliRunnerPreflight] = useState<CodeCliRunnerPreflightResult | null>(null);
+  const [cliRunnerRun, setCliRunnerRun] = useState<CodeCliRunnerRunResult | null>(null);
+  const [providerSmokeBusy, setProviderSmokeBusy] = useState<"minimax" | "deepseek" | null>(null);
+  const [providerSmokeResult, setProviderSmokeResult] = useState<ProviderSmokeResult | null>(null);
+  const [providerSmokeMessage, setProviderSmokeMessage] = useState("Provider smoke calls use private env on the backend and store MCP evidence.");
+  const [runtimeIdentity, setRuntimeIdentity] = useState<RuntimeIdentity | null>(null);
+  const [shipTaskId, setShipTaskId] = useState("H3D-AGENT-SHIP");
+  const [shipProposalId, setShipProposalId] = useState("");
+  const [shipReviewProofs, setShipReviewProofs] = useState("");
+  const [shipGateId, setShipGateId] = useState("git-diff-check");
+  const [shipFiles, setShipFiles] = useState("03_implementation/ROADMAP.md");
+  const [shipBranch, setShipBranch] = useState("hermes-agent/reviewed-workbench-change");
+  const [shipBase, setShipBase] = useState("codex/hermes-agent-e2e-workbench");
+  const [shipCommitMessage, setShipCommitMessage] = useState("feat(agents): ship reviewed workbench patch");
+  const [shipPrTitle, setShipPrTitle] = useState("feat(agents): ship reviewed workbench patch");
+  const [shipMessage, setShipMessage] = useState("Reviewed ship lane is gated: proposal + review proof + lock + gate + PR.");
+  const [shipBusy, setShipBusy] = useState<string | null>(null);
   const selected = agents.find((a) => a.id === selectedId) ?? agents[0] ?? null;
 
   useEffect(() => {
@@ -159,6 +200,15 @@ export function AgentsTab() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    void refreshRuntimeIdentity(setRuntimeIdentity, setE2eMessage, () => mounted);
+    void refreshAgentE2EReadiness(setE2eReadiness, setE2eMessage, () => mounted);
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (selectedId && !agents.some((agent) => agent.id === selectedId)) {
       setSelectedId(agents[0]?.id ?? null);
     }
@@ -175,6 +225,260 @@ export function AgentsTab() {
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="agents-root">
       <div className="col-span-12">
         <AgentCommandCenter agents={agents} />
+      </div>
+      <div className="col-span-12">
+        <Panel
+          id="agents.code-workbench"
+          title="AGENT CODE WORKBENCH"
+          dense
+          status={{ tone: e2eReadiness?.ready ? "green" : "amber", label: e2eMessage }}
+          className="min-h-[228px]"
+        >
+          <div className="grid gap-2 text-xs xl:grid-cols-[0.92fr_1.08fr]">
+            <div className="grid gap-2">
+              <div className="rounded border border-border bg-bg/40 p-2">
+                <div className="text-[10px] uppercase text-muted">Truth chain</div>
+                <div className="mt-1 text-fg">{e2eReadiness?.summary ?? "Waiting for backend readiness."}</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  <MetricPill label="folder docs" value={e2eReadiness?.folder_index.loaded.length ?? 0} />
+                  <MetricPill label="missing" value={e2eReadiness?.folder_index.missing.length ?? 0} warn />
+                  <MetricPill label="sent" value={e2eReadiness?.folder_index.provider_context_files?.length ?? 0} />
+                  <MetricPill label="cli found" value={e2eReadiness?.cli_runners.detected ?? 0} />
+                </div>
+              </div>
+              <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase text-muted">OpenHands / OpenCode runners</div>
+                  <span className={e2eReadiness?.cli_runners.sandbox?.ready ? "text-[10px] uppercase text-accent-green" : "text-[10px] uppercase text-accent-amber"}>
+                    sandbox {e2eReadiness?.cli_runners.sandbox?.status ?? "unknown"}
+                  </span>
+                </div>
+                {(e2eReadiness?.cli_runners.runners ?? []).map((runner) => (
+                  <div key={runner.id} className="grid gap-1 rounded border border-border/70 bg-surface1/50 p-1.5">
+                    <div className="grid grid-cols-[1fr_auto] gap-2">
+                      <span className="min-w-0 truncate text-fg">{runner.label}</span>
+                      <span className={runner.detected ? "text-accent-green" : "text-accent-amber"}>{runner.detected ? runner.version ?? "detected" : "executable missing"}</span>
+                    </div>
+                    <div className="grid gap-x-2 gap-y-0.5 text-[10px] sm:grid-cols-[auto_1fr]">
+                      <span className="text-muted">source</span>
+                      <span className="min-w-0 truncate font-mono text-muted">{runner.source_path ?? "not configured"}</span>
+                      <span className="text-muted">bin key</span>
+                      <span className="min-w-0 truncate font-mono text-muted">{runner.configured_path ?? runner.required_env_keys?.[0] ?? "not configured"}</span>
+                    </div>
+                    {runner.blocked_reason ? <div className="text-[10px] text-accent-amber">{runner.blocked_reason}</div> : null}
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        disabled={cliRunnerBusy != null || !isCliRunnerId(runner.id)}
+                        onClick={() => isCliRunnerId(runner.id) ? void runCliRunnerPreflight(runner.id, setCliRunnerBusy, setCliRunnerPreflight, setCliRunnerMessage, setE2eReadiness) : undefined}
+                        className="rounded border border-border px-2 py-0.5 text-[10px] text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {cliRunnerBusy === `${runner.id}:preflight` ? "checking" : "Preflight"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={cliRunnerBusy != null || !isCliRunnerId(runner.id)}
+                        onClick={() => isCliRunnerId(runner.id) ? void runCliRunnerContract(runner.id, { title: e2eTitle, objective: e2eObjective, files: e2eFiles, targetBranch: e2eTargetBranch }, setCliRunnerBusy, setCliRunnerRun, setCliRunnerMessage, setE2eReadiness) : undefined}
+                        className="rounded border border-accent-amber/50 bg-accent-amber/10 px-2 py-0.5 text-[10px] text-accent-amber disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {cliRunnerBusy === `${runner.id}:run` ? "checking" : "Run contract"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {!e2eReadiness && <div className="text-muted">CLI runner API has not responded yet.</div>}
+                <div className="text-[10px] text-muted">{cliRunnerMessage}</div>
+                {cliRunnerPreflight ? (
+                  <div className={cliRunnerPreflight.accepted ? "text-[10px] text-accent-green" : "text-[10px] text-accent-amber"}>
+                    preflight {cliRunnerPreflight.runner.label}: {cliRunnerPreflight.status}
+                  </div>
+                ) : null}
+                {(cliRunnerRun?.blocked_reasons.length ?? 0) > 0 ? (
+                  <div className="max-h-16 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-1.5 text-[10px] text-accent-amber">
+                    {cliRunnerRun?.blocked_reasons.slice(0, 4).map((reason) => <div key={reason}>- {reason}</div>)}
+                  </div>
+                ) : null}
+                {(e2eReadiness?.cli_runners.sandbox?.blocked_reasons.length ?? 0) > 0 ? (
+                  <div className="max-h-16 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-1.5 text-[10px] text-accent-amber">
+                    {e2eReadiness?.cli_runners.sandbox?.blocked_reasons.slice(0, 3).map((reason) => <div key={reason}>- {reason}</div>)}
+                  </div>
+                ) : null}
+              </div>
+              <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase text-muted">Runtime freshness</div>
+                  <span className={runtimeIdentity?.fresh ? "text-[11px] text-accent-green" : "text-[11px] text-accent-amber"}>
+                    {runtimeIdentity ? runtimeIdentity.status : "checking"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+                  <span className="text-muted">branch</span>
+                  <span className="min-w-0 truncate font-mono text-fg">{runtimeIdentity?.branch ?? "unknown"}</span>
+                  <span className="text-muted">commit</span>
+                  <span className="font-mono text-fg">{runtimeIdentity?.commit ?? "unknown"}</span>
+                  <span className="text-muted">routes</span>
+                  <span className={runtimeIdentity?.missing_agent_workbench_routes.length ? "text-accent-amber" : "text-accent-green"}>
+                    {runtimeIdentity ? `${runtimeIdentity.agent_workbench_required_routes.length - runtimeIdentity.missing_agent_workbench_routes.length}/${runtimeIdentity.agent_workbench_required_routes.length}` : "unknown"}
+                  </span>
+                </div>
+                {runtimeIdentity?.missing_agent_workbench_routes.length ? (
+                  <div className="max-h-14 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-1.5 font-mono text-[10px] text-accent-amber">
+                    stale backend missing: {runtimeIdentity.missing_agent_workbench_routes.join(", ")}
+                  </div>
+                ) : null}
+              </div>
+              <div className="grid gap-2 rounded border border-border bg-bg/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] uppercase text-muted">Provider live smoke</div>
+                    <div className="mt-0.5 text-[11px] text-muted">{providerSmokeMessage}</div>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      disabled={providerSmokeBusy != null}
+                      onClick={() => void runProviderSmoke("minimax", setProviderSmokeBusy, setProviderSmokeResult, setProviderSmokeMessage)}
+                      className="rounded border border-border px-2 py-1 text-[11px] text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {providerSmokeBusy === "minimax" ? "probing" : "MiniMax"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={providerSmokeBusy != null}
+                      onClick={() => void runProviderSmoke("deepseek", setProviderSmokeBusy, setProviderSmokeResult, setProviderSmokeMessage)}
+                      className="rounded border border-border px-2 py-1 text-[11px] text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {providerSmokeBusy === "deepseek" ? "probing" : "DeepSeek"}
+                    </button>
+                  </div>
+                </div>
+                {providerSmokeResult && (
+                  <div className={providerSmokeResult.accepted ? "text-[11px] text-accent-green" : "text-[11px] text-accent-amber"}>
+                    {providerSmokeResult.provider_id}: {providerSmokeResult.status}
+                    {providerSmokeResult.blocked_reasons?.[0] ? ` · ${providerSmokeResult.blocked_reasons[0]}` : ""}
+                  </div>
+                )}
+              </div>
+              {(e2eReadiness?.blocked_reasons.length ?? 0) > 0 && (
+                <div className="max-h-20 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-2 text-[11px] text-accent-amber">
+                  {e2eReadiness?.blocked_reasons.slice(0, 5).map((reason) => <div key={reason}>- {reason}</div>)}
+                </div>
+              )}
+            </div>
+            <div className="grid gap-2 rounded border border-border bg-bg/40 p-2">
+              <div className="grid gap-2 md:grid-cols-[1fr_0.72fr_0.48fr]">
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">Title</span>
+                  <input value={e2eTitle} onChange={(event) => setE2eTitle(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">Target branch</span>
+                  <input value={e2eTargetBranch} onChange={(event) => setE2eTargetBranch(event.target.value)} placeholder="optional" className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+                </label>
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">CLI worker</span>
+                  <select value={e2eCliWorker} onChange={(event) => setE2eCliWorker(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none">
+                    <option value="">none</option>
+                    <option value="opencode">OpenCode</option>
+                    <option value="openhands">OpenHands</option>
+                  </select>
+                </label>
+              </div>
+              <label className="grid gap-1">
+                <span className="text-[10px] uppercase text-muted">Files, one per line</span>
+                <textarea value={e2eFiles} onChange={(event) => setE2eFiles(event.target.value)} className="h-16 resize-y rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+              </label>
+              <label className="grid gap-1">
+                <span className="text-[10px] uppercase text-muted">Objective</span>
+                <textarea value={e2eObjective} onChange={(event) => setE2eObjective(event.target.value)} className="h-20 resize-y rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-[11px] text-muted">
+                  {e2eResult ? `${e2eResult.status}${e2eResult.task_id ? ` · ${e2eResult.task_id}` : ""}` : "Runs planning/review only; patch apply remains separately gated."}
+                </span>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => void refreshAgentE2EReadiness(setE2eReadiness, setE2eMessage)} className="rounded border border-border px-2 py-1 text-[11px] text-fg">Refresh</button>
+                  <button
+                    type="button"
+                    disabled={e2eBusy || !e2eReadiness?.ready}
+                    onClick={() => void runAgentE2EWorkbench({ title: e2eTitle, objective: e2eObjective, files: e2eFiles, targetBranch: e2eTargetBranch, cliWorker: e2eCliWorker }, setE2eBusy, setE2eMessage, setE2eResult, setE2eReadiness)}
+                    className="rounded border border-accent-cyan/50 bg-accent-cyan/10 px-3 py-1 text-[11px] font-semibold text-accent-cyan disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {e2eBusy ? "running" : "Start E2E job"}
+                  </button>
+                </div>
+              </div>
+              {(e2eResult?.blocked_reasons?.length ?? 0) > 0 && (
+                <div className="max-h-24 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-2 text-[11px] text-accent-amber">
+                  {e2eResult?.blocked_reasons?.slice(0, 3).map((reason) => <div key={reason}>- {reason}</div>)}
+                </div>
+              )}
+              {e2eResult?.next_required_steps?.length ? (
+                <div className="rounded border border-border bg-bg/40 p-2 text-[11px] text-muted">
+                  next: {e2eResult.next_required_steps.slice(0, 2).join(" -> ")}
+                </div>
+              ) : null}
+              <div className="grid gap-2 rounded border border-border bg-surface1/60 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-[10px] uppercase text-muted">Reviewed patch to gates to PR</div>
+                    <div className="mt-0.5 text-[11px] text-muted">{shipMessage}</div>
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-3">
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Task ID</span>
+                    <input value={shipTaskId} onChange={(event) => setShipTaskId(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Proposal ID</span>
+                    <input value={shipProposalId} onChange={(event) => setShipProposalId(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Gate</span>
+                    <input value={shipGateId} onChange={(event) => setShipGateId(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+                  </label>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Files</span>
+                    <textarea value={shipFiles} onChange={(event) => setShipFiles(event.target.value)} className="h-14 resize-y rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Review proof IDs</span>
+                    <textarea value={shipReviewProofs} onChange={(event) => setShipReviewProofs(event.target.value)} className="h-14 resize-y rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+                  </label>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Branch</span>
+                    <input value={shipBranch} onChange={(event) => setShipBranch(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-[10px] uppercase text-muted">Base</span>
+                    <input value={shipBase} onChange={(event) => setShipBase(event.target.value)} className="rounded border border-border bg-surface2 px-2 py-1 font-mono text-[11px] text-fg outline-none" />
+                  </label>
+                </div>
+                <label className="grid gap-1">
+                  <span className="text-[10px] uppercase text-muted">Commit / PR title</span>
+                  <input value={shipCommitMessage} onChange={(event) => {
+                    setShipCommitMessage(event.target.value);
+                    setShipPrTitle((current) => current === shipCommitMessage ? event.target.value : current);
+                  }} className="rounded border border-border bg-surface2 px-2 py-1 text-fg outline-none" />
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  <ShipButton id="apply" busy={shipBusy} label="Apply reviewed" onClick={() => void runReviewedPatchApply({ shipTaskId, shipProposalId, shipReviewProofs }, setShipBusy, setShipMessage)} />
+                  <ShipButton id="gate" busy={shipBusy} label="Run gate" onClick={() => void runCodeGateStep({ shipGateId }, setShipBusy, setShipMessage)} />
+                  <ShipButton id="branch" busy={shipBusy} label="Branch" onClick={() => void runGitStep("branch", { shipTaskId, shipBranch, shipBase }, setShipBusy, setShipMessage)} />
+                  <ShipButton id="stage" busy={shipBusy} label="Stage" onClick={() => void runGitStep("stage", { shipTaskId, shipFiles }, setShipBusy, setShipMessage)} />
+                  <ShipButton id="commit" busy={shipBusy} label="Commit" onClick={() => void runGitStep("commit", { shipTaskId, shipFiles, shipCommitMessage, shipReviewProofs }, setShipBusy, setShipMessage)} />
+                  <ShipButton id="push" busy={shipBusy} label="Push" onClick={() => void runGitStep("push", { shipTaskId }, setShipBusy, setShipMessage)} />
+                  <ShipButton id="pr" busy={shipBusy} label="PR" onClick={() => void runGitStep("pr", { shipTaskId, shipBase, shipPrTitle }, setShipBusy, setShipMessage)} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </Panel>
       </div>
       <div className="col-span-12">
         <Panel
@@ -568,6 +872,318 @@ async function runPlaywrightProof(
   } finally {
     setBusy(false);
   }
+}
+
+async function refreshAgentE2EReadiness(
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+  setMessage: (message: string) => void,
+  isMounted: () => boolean = () => true,
+) {
+  try {
+    const readiness = await adapters.getAgentE2EReadiness();
+    if (!isMounted()) return;
+    setReadiness(readiness);
+    const blocked = readiness.blocked_reasons.length;
+    const label = readiness.ready ? "ready" : `${blocked} blocker${blocked === 1 ? "" : "s"}`;
+    setMessage(`Agent Code Workbench ${label}.`);
+  } catch (error) {
+    if (!isMounted()) return;
+    setReadiness(null);
+    setMessage(`Workbench unavailable: ${error instanceof Error ? error.message : "backend error"}`);
+  }
+}
+
+async function refreshRuntimeIdentity(
+  setIdentity: (identity: RuntimeIdentity | null) => void,
+  setMessage: (message: string) => void,
+  isMounted: () => boolean = () => true,
+) {
+  try {
+    const identity = await adapters.getRuntimeIdentity();
+    if (!isMounted()) return;
+    setIdentity(identity);
+    if (identity && !identity.fresh) {
+      setMessage(`Backend is stale: missing ${identity.missing_agent_workbench_routes.length} Agent Workbench route${identity.missing_agent_workbench_routes.length === 1 ? "" : "s"}.`);
+    }
+  } catch (error) {
+    if (!isMounted()) return;
+    setIdentity(null);
+    setMessage(`Runtime freshness unavailable: ${error instanceof Error ? error.message : "backend error"}`);
+  }
+}
+
+async function runAgentE2EWorkbench(
+  input: { title: string; objective: string; files: string; targetBranch: string; cliWorker: string },
+  setBusy: (busy: boolean) => void,
+  setMessage: (message: string) => void,
+  setResult: (result: AgentE2EJobResult | null) => void,
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+) {
+  const files = parseWorkbenchFiles(input.files);
+  if (files.length === 0) {
+    setMessage("Blocked: add at least one existing project-relative file.");
+    return;
+  }
+  const taskId = `H3D-AGENT-E2E-${Date.now()}`;
+  setBusy(true);
+  setResult(null);
+  setMessage(`Starting ${taskId}.`);
+  try {
+    const result = await adapters.runAgentE2EJob({
+      task_id: taskId,
+      title: input.title.trim() || "Hermes Agent E2E code task",
+      files,
+      objective: input.objective.trim(),
+      target_branch: input.targetBranch.trim() || undefined,
+      role_chain: ["finder", "builder", "reviewer", "tester"],
+      cli_worker: input.cliWorker || undefined,
+      release_on_finish: true,
+    });
+    setResult(result);
+    const proof = proofIdFromResult(result);
+    const blocked = result.blocked_reasons?.length ? ` · ${result.blocked_reasons[0]}` : "";
+    setMessage(`${result.accepted ? "Accepted" : "Blocked"}: ${result.status}${proof}${blocked}`);
+    await adapters.emitProofEvent("agents.e2e_workbench.requested", { task_id: taskId, status: result.status, accepted: result.accepted, files });
+    void adapters.getAgentE2EReadiness().then(setReadiness).catch(() => undefined);
+  } catch (error) {
+    setMessage(`Blocked: ${error instanceof Error ? error.message : "Agent Code Workbench job failed"}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function isCliRunnerId(value: string): value is "opencode" | "openhands" {
+  return value === "opencode" || value === "openhands";
+}
+
+async function runCliRunnerPreflight(
+  runnerId: "opencode" | "openhands",
+  setBusy: (busy: string | null) => void,
+  setResult: (result: CodeCliRunnerPreflightResult | null) => void,
+  setMessage: (message: string) => void,
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+) {
+  const taskId = `H3D-CLI-PREFLIGHT-${runnerId.toUpperCase()}-${Date.now()}`;
+  setBusy(`${runnerId}:preflight`);
+  setResult(null);
+  setMessage(`Running ${runnerId} preflight through backend private env.`);
+  try {
+    const result = await adapters.preflightCodeCliRunner(runnerId, taskId);
+    setResult(result);
+    const next = result.next_required_steps?.[0] ? ` · ${result.next_required_steps[0]}` : "";
+    setMessage(`${result.runner.label} preflight ${result.accepted ? "ready" : "blocked"}: ${result.status}${next}`);
+    void adapters.getAgentE2EReadiness().then(setReadiness).catch(() => undefined);
+  } catch (error) {
+    setMessage(`Blocked ${runnerId} preflight: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+async function runCliRunnerContract(
+  runnerId: "opencode" | "openhands",
+  input: { title: string; objective: string; files: string; targetBranch: string },
+  setBusy: (busy: string | null) => void,
+  setResult: (result: CodeCliRunnerRunResult | null) => void,
+  setMessage: (message: string) => void,
+  setReadiness: (readiness: AgentE2EReadiness | null) => void,
+) {
+  const files = parseWorkbenchFiles(input.files);
+  if (files.length === 0) {
+    setMessage("Blocked: add at least one existing project-relative file.");
+    return;
+  }
+  const taskId = `H3D-CLI-RUN-${runnerId.toUpperCase()}-${Date.now()}`;
+  setBusy(`${runnerId}:run`);
+  setResult(null);
+  setMessage(`Checking ${runnerId} run contract; execution stays fail-closed without sandbox proof.`);
+  try {
+    const result = await adapters.runCodeCliRunner({
+      runner_id: runnerId,
+      task_id: taskId,
+      title: input.title.trim() || `${runnerId} Hermes Agent code task`,
+      files,
+      objective: input.objective.trim(),
+      target_branch: input.targetBranch.trim() || undefined,
+    });
+    setResult(result);
+    const reason = result.blocked_reasons?.[0] ? ` · ${result.blocked_reasons[0]}` : "";
+    setMessage(`${result.runner.label} run contract ${result.accepted ? "accepted" : "blocked"}: ${result.status}${reason}`);
+    void adapters.getAgentE2EReadiness().then(setReadiness).catch(() => undefined);
+  } catch (error) {
+    setMessage(`Blocked ${runnerId} run contract: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+function ShipButton(props: { id: string; busy: string | null; label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={props.busy != null}
+      onClick={props.onClick}
+      className="rounded border border-border px-2 py-1 text-[11px] text-fg disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {props.busy === props.id ? "running" : props.label}
+    </button>
+  );
+}
+
+async function runProviderSmoke(
+  providerId: "minimax" | "deepseek",
+  setBusy: (provider: "minimax" | "deepseek" | null) => void,
+  setResult: (result: ProviderSmokeResult | null) => void,
+  setMessage: (message: string) => void,
+) {
+  const taskId = `H3D-PROVIDER-SMOKE-${providerId.toUpperCase()}-${Date.now()}`;
+  setBusy(providerId);
+  setMessage(`Running ${providerId} live smoke through backend private env.`);
+  try {
+    const result = await adapters.runProviderSmoke(providerId, taskId);
+    setResult(result);
+    const blocked = result.blocked_reasons?.[0] ? ` · ${result.blocked_reasons[0]}` : "";
+    setMessage(`${result.accepted ? "Passed" : "Blocked"} ${providerId} smoke: ${result.status}${blocked}`);
+  } catch (error) {
+    setMessage(`Blocked ${providerId} smoke: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+async function runReviewedPatchApply(
+  input: { shipTaskId: string; shipProposalId: string; shipReviewProofs: string },
+  setBusy: (busy: string | null) => void,
+  setMessage: (message: string) => void,
+) {
+  const reviewProofs = parseProofIds(input.shipReviewProofs);
+  if (!input.shipTaskId.trim() || !input.shipProposalId.trim() || reviewProofs.length === 0) {
+    setMessage("Blocked: task id, proposal id, and at least one review proof id are required.");
+    return;
+  }
+  setBusy("apply");
+  setMessage("Applying reviewed patch through same-owner MCP lock checks.");
+  try {
+    const result = await adapters.applyReviewedPatch({
+      task_id: input.shipTaskId.trim(),
+      proposal_id: input.shipProposalId.trim(),
+      review_proof_ids: reviewProofs,
+      reason: "Operator requested reviewed patch apply from Agent Code Workbench.",
+    });
+    setMessage(`${result.accepted ? "Applied" : "Blocked"} reviewed patch: ${result.status}`);
+  } catch (error) {
+    setMessage(`Blocked reviewed apply: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+async function runCodeGateStep(
+  input: { shipGateId: string },
+  setBusy: (busy: string | null) => void,
+  setMessage: (message: string) => void,
+) {
+  const gateId = input.shipGateId.trim();
+  if (!gateId) {
+    setMessage("Blocked: gate id is required.");
+    return;
+  }
+  setBusy("gate");
+  setMessage(`Running Hermes MCP gate ${gateId}.`);
+  try {
+    const result = await adapters.runCodeGate({ gate_id: gateId });
+    setMessage(`${result.ok ? "Passed" : "Failed"} gate ${gateId}: ${result.status}`);
+  } catch (error) {
+    setMessage(`Gate blocked: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+async function runGitStep(
+  step: "branch" | "stage" | "commit" | "push" | "pr",
+  input: {
+    shipTaskId: string;
+    shipFiles?: string;
+    shipBranch?: string;
+    shipBase?: string;
+    shipCommitMessage?: string;
+    shipReviewProofs?: string;
+    shipPrTitle?: string;
+  },
+  setBusy: (busy: string | null) => void,
+  setMessage: (message: string) => void,
+) {
+  const taskId = input.shipTaskId.trim();
+  if (!taskId) {
+    setMessage("Blocked: task id is required for git shipping.");
+    return;
+  }
+  const files = parseWorkbenchFiles(input.shipFiles ?? "");
+  setBusy(step);
+  setMessage(`Running git ${step} through code-operator policy.`);
+  try {
+    if (step === "branch") {
+      await adapters.createCodeBranch({
+        task_id: taskId,
+        branch_name: String(input.shipBranch ?? "").trim(),
+        base_ref: String(input.shipBase ?? "").trim() || undefined,
+        reason: "Operator requested reviewed workbench shipping branch.",
+      });
+    } else if (step === "stage") {
+      await adapters.stageOwnedCodeFiles({ task_id: taskId, files });
+    } else if (step === "commit") {
+      await adapters.commitOwnedCodeFiles({
+        task_id: taskId,
+        files,
+        message: String(input.shipCommitMessage ?? "").trim(),
+        proof_ids: parseProofIds(input.shipReviewProofs ?? ""),
+      });
+    } else if (step === "push") {
+      await adapters.pushCodeBranch({ task_id: taskId });
+    } else {
+      await adapters.openCodePullRequest({
+        task_id: taskId,
+        base_ref: String(input.shipBase ?? "").trim(),
+        title: String(input.shipPrTitle ?? input.shipCommitMessage ?? "Hermes Agent reviewed workbench patch").trim(),
+        body: "Hermes Agent reviewed workbench PR opened through proof-gated code-operator APIs.",
+        draft: true,
+      });
+    }
+    setMessage(`Git ${step} accepted.`);
+  } catch (error) {
+    setMessage(`Git ${step} blocked: ${error instanceof Error ? error.message : "backend error"}`);
+  } finally {
+    setBusy(null);
+  }
+}
+
+function parseProofIds(value: string): string[] {
+  return value
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseWorkbenchFiles(value: string): string[] {
+  const seen = new Set<string>();
+  return value
+    .split(/[\n,]+/)
+    .map((item) => item.trim().replaceAll("\\", "/"))
+    .filter((item) => item.length > 0)
+    .filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+}
+
+function proofIdFromResult(result: AgentE2EJobResult): string {
+  const evidence = result.mcp_evidence;
+  if (isRecord(evidence) && typeof evidence.evidence_id === "string") {
+    return ` · proof ${evidence.evidence_id}`;
+  }
+  return "";
 }
 
 function actionAccepted(payload: unknown): boolean {

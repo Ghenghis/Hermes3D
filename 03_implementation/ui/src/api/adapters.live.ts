@@ -1,10 +1,30 @@
 import type { Agent, AgentStatus } from "../types/agent";
-import type { AgentActionCatalog, AgentActionRunResult } from "../types/agent-actions";
+import type {
+  AgentActionCatalog,
+  AgentActionRunResult,
+  AgentE2EJobRequest,
+  AgentE2EJobResult,
+  AgentE2EReadiness,
+  CodeCliRunnerPreflightResult,
+  CodeCliRunnerReadiness,
+  CodeCliRunnerRunRequest,
+  CodeCliRunnerRunResult,
+  CodeGateRunRequest,
+  CodeGateRunResult,
+  GitBranchRequest,
+  GitCommitRequest,
+  GitPullRequestRequest,
+  GitPushRequest,
+  GitStageRequest,
+  ProviderSmokeResult,
+  ReviewedPatchApplyRequest,
+  ReviewedPatchApplyResult,
+} from "../types/agent-actions";
 import type { DimensionalAccuracyReport } from "../types/dimensional";
 import type { LogEntry } from "../types/log";
 import type { Notification } from "../types/notification";
 import type { ProofBundle } from "../types/proof";
-import type { RuntimeReadiness, SystemSnapshot } from "../types/system";
+import type { RuntimeIdentity, RuntimeReadiness, SystemSnapshot } from "../types/system";
 import type { Workflow } from "../types/workflow";
 import type { TaskDAG, TaskEdge, TaskNode } from "../types/dag";
 import type { Printer, PrinterAdapter, PrinterDataSource, PrinterOnboardRequest, PrinterOnboardResult, PrinterStatus } from "../types/printer";
@@ -52,6 +72,12 @@ const LIVE_PLAN_PREVIEW_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/plan/pre
 const LIVE_PROVIDER_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/providers/health`;
 const LIVE_SERVICE_HEALTH_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}/api/health/services`;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
+const API_BASE_URLS = Array.from(new Set([
+  LIVE_BASE_URL,
+  `http://127.0.0.1:${DEFAULT_BRIDGE_PORT}`,
+  "http://127.0.0.1:8766",
+  "http://127.0.0.1:8767",
+]));
 
 export type AgentConfigPayload = Record<string, unknown>;
 
@@ -355,6 +381,10 @@ export function getSystemSnapshotLive(): Promise<SystemSnapshot | null> {
 
 export function getRuntimeReadinessLive(): Promise<RuntimeReadiness | null> {
   return fetchNullable("/api/system/runtime-readiness");
+}
+
+export function getRuntimeIdentityLive(): Promise<RuntimeIdentity | null> {
+  return fetchNullable("/api/system/runtime-identity");
 }
 
 export function getDimensionalReportsLive(): Promise<DimensionalAccuracyReport[]> {
@@ -763,6 +793,102 @@ export async function runAgentCatalogActionLive(actionId: string, reason = "oper
     throw new Error("Hermes Agent action result was not in the expected shape.");
   }
   return result as unknown as AgentActionRunResult;
+}
+
+export function getAgentE2EReadinessLive(): Promise<AgentE2EReadiness> {
+  return fetchJson<AgentE2EReadiness>("/api/code-operator/e2e/readiness").then((payload) => payload ?? {
+    status: "blocked",
+    ready: false,
+    summary: "Hermes Agent E2E readiness API is unavailable from the local backend.",
+    blocked_reasons: ["Hermes Agent E2E readiness API returned no payload."],
+    folder_index: { status: "blocked", loaded: [], missing: [], target_roots: [], required: [] },
+    cli_runners: { status: "blocked", count: 0, detected: 0, runners: [], policy: { write_runs_allowed: false, reason: "unavailable", allowed_now: [] } },
+    next_required_steps: [],
+  });
+}
+
+export function getCodeCliRunnersLive(): Promise<CodeCliRunnerReadiness> {
+  return fetchJson<CodeCliRunnerReadiness>("/api/code-operator/cli-runners").then((payload) => payload ?? {
+    status: "blocked",
+    count: 0,
+    detected: 0,
+    runners: [],
+    policy: { write_runs_allowed: false, reason: "Hermes Agent CLI runner API returned no payload.", allowed_now: [] },
+  });
+}
+
+export async function preflightCodeCliRunnerLive(runnerId: "opencode" | "openhands", taskId: string): Promise<CodeCliRunnerPreflightResult> {
+  const result = await postJsonWithResult("/api/code-operator/cli-runners/preflight", {
+    runner_id: runnerId,
+    task_id: taskId,
+  });
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("CLI runner preflight response was not in the expected shape.");
+  }
+  return result as unknown as CodeCliRunnerPreflightResult;
+}
+
+export async function runCodeCliRunnerLive(request: CodeCliRunnerRunRequest): Promise<CodeCliRunnerRunResult> {
+  const result = await postJsonWithResult("/api/code-operator/cli-runners/run", request);
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("CLI runner run response was not in the expected shape.");
+  }
+  return result as unknown as CodeCliRunnerRunResult;
+}
+
+export async function runAgentE2EJobLive(request: AgentE2EJobRequest): Promise<AgentE2EJobResult> {
+  const result = await postJsonWithResult("/api/code-operator/e2e/jobs", request);
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("Hermes Agent E2E job response was not in the expected shape.");
+  }
+  return result as unknown as AgentE2EJobResult;
+}
+
+export async function runProviderSmokeLive(providerId: "minimax" | "deepseek", taskId: string): Promise<ProviderSmokeResult> {
+  const result = await postJsonWithResult("/api/code-operator/providers/smoke", {
+    provider_id: providerId,
+    task_id: taskId,
+  });
+  if (!isRecord(result) || !isString(result.status) || !isString(result.provider_id)) {
+    throw new Error("Provider smoke response was not in the expected shape.");
+  }
+  return result as unknown as ProviderSmokeResult;
+}
+
+export async function applyReviewedPatchLive(request: ReviewedPatchApplyRequest): Promise<ReviewedPatchApplyResult> {
+  const result = await postJsonWithResult("/api/code-operator/patch/apply-reviewed", request);
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("Reviewed patch apply response was not in the expected shape.");
+  }
+  return result as unknown as ReviewedPatchApplyResult;
+}
+
+export async function runCodeGateLive(request: CodeGateRunRequest): Promise<CodeGateRunResult> {
+  const result = await postJsonWithResult("/api/code-operator/gates/run", request);
+  if (!isRecord(result) || !isString(result.status) || typeof result.ok !== "boolean") {
+    throw new Error("Code gate response was not in the expected shape.");
+  }
+  return result as unknown as CodeGateRunResult;
+}
+
+export function createCodeBranchLive(request: GitBranchRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/branch", request);
+}
+
+export function stageOwnedCodeFilesLive(request: GitStageRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/stage-owned", request);
+}
+
+export function commitOwnedCodeFilesLive(request: GitCommitRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/commit-owned", request);
+}
+
+export function pushCodeBranchLive(request: GitPushRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/push", request);
+}
+
+export function openCodePullRequestLive(request: GitPullRequestRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/pr", request);
 }
 
 export async function uploadAgentAttachmentLive(personaId: string, file: File): Promise<AgentAttachmentUpload> {
@@ -1225,7 +1351,7 @@ export function getCameraObserverStatusLive(): Promise<{ status: string; reason:
 
 async function fetchJson<T>(path: string): Promise<T | null> {
   try {
-    const response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    const response = await fetchApiResponse(path, {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
@@ -1246,7 +1372,7 @@ async function fetchArray<T>(path: string): Promise<T[]> {
 
 async function fetchNullable<T>(path: string): Promise<T | null> {
   try {
-    const response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    const response = await fetchApiResponse(path, {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
@@ -1262,7 +1388,7 @@ async function fetchNullable<T>(path: string): Promise<T | null> {
 
 async function postBinary(path: string, body: Blob): Promise<unknown | null> {
   try {
-    const response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    const response = await fetchApiResponse(path, {
       method: "POST",
       headers: { Accept: "application/json" },
       body,
@@ -1280,7 +1406,7 @@ async function postBinary(path: string, body: Blob): Promise<unknown | null> {
 async function postJsonWithResult(path: string, body: unknown): Promise<unknown> {
   let response: Response;
   try {
-    response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    response = await fetchApiResponse(path, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -1290,7 +1416,7 @@ async function postJsonWithResult(path: string, body: unknown): Promise<unknown>
       cache: "no-store",
     });
   } catch (error) {
-    throw new Error(`${path} is unreachable at ${LIVE_BASE_URL}: ${errorMessage(error)}`);
+    throw new Error(`${path} is unreachable at ${apiBaseSummary()}: ${errorMessage(error)}`);
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -1311,7 +1437,7 @@ async function postJobTransition(path: string, body: unknown): Promise<JobTransi
 async function postVoid(path: string, body?: unknown): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    response = await fetchApiResponse(path, {
       method: "POST",
       headers: body === undefined ? { Accept: "application/json" } : {
         Accept: "application/json",
@@ -1321,7 +1447,7 @@ async function postVoid(path: string, body?: unknown): Promise<void> {
       cache: "no-store",
     });
   } catch (error) {
-    throw new Error(`${path} is unreachable at ${LIVE_BASE_URL}: ${errorMessage(error)}`);
+    throw new Error(`${path} is unreachable at ${apiBaseSummary()}: ${errorMessage(error)}`);
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
@@ -1332,7 +1458,7 @@ async function postVoid(path: string, body?: unknown): Promise<void> {
 async function putVoid(path: string, body: unknown): Promise<void> {
   let response: Response;
   try {
-    response = await fetch(`${LIVE_BASE_URL}${path}`, {
+    response = await fetchApiResponse(path, {
       method: "PUT",
       headers: {
         Accept: "application/json",
@@ -1342,12 +1468,40 @@ async function putVoid(path: string, body: unknown): Promise<void> {
       cache: "no-store",
     });
   } catch (error) {
-    throw new Error(`${path} is unreachable at ${LIVE_BASE_URL}: ${errorMessage(error)}`);
+    throw new Error(`${path} is unreachable at ${apiBaseSummary()}: ${errorMessage(error)}`);
   }
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(httpFailureReason(payload, response, path));
   }
+}
+
+async function fetchApiResponse(path: string, init: RequestInit): Promise<Response> {
+  let lastError: unknown = null;
+  let lastResponse: Response | null = null;
+  for (const baseUrl of API_BASE_URLS) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`, init);
+      if (response.ok || !isRetryableApiMiss(response)) {
+        return response;
+      }
+      lastResponse = response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  if (lastResponse) {
+    return lastResponse;
+  }
+  throw new Error(lastError instanceof Error ? lastError.message : "all API base URLs failed");
+}
+
+function isRetryableApiMiss(response: Response): boolean {
+  return response.status === 404 || response.status === 405 || response.status === 502 || response.status === 503;
+}
+
+function apiBaseSummary(): string {
+  return API_BASE_URLS.join(", ");
 }
 
 function parseAutopilotCheck(value: unknown): AutopilotCheck | null {

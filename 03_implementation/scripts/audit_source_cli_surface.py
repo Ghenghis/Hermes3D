@@ -17,7 +17,7 @@ AGENT_CLI_VERIFIER_KINDS = {"cli", "python_module_cli"}
 ROOT_DOC_NAMES = ("README.md", "README.rst", "README.txt", "readme.md", "readme.rst")
 ROOT_CONFIG_NAMES = ("package.json", "pyproject.toml", "setup.py", "setup.cfg", "Makefile", "makefile", "Cargo.toml")
 README_SIGNAL_RE = re.compile(
-    r"(?i)\b(command[- ]line|cli|usage|python\s+-m|npm\s+run|pnpm\s+run|yarn\s+run|uv\s+run|console_scripts?)\b"
+    r"(?i)\b(command[- ]line|cli|usage:\s*\S+|python\s+-m|npm\s+run|pnpm\s+run|yarn\s+run|uv\s+run|console_scripts?)\b"
 )
 
 
@@ -108,13 +108,13 @@ def classify_cli_surface(module: dict[str, Any], runtime: dict[str, Any]) -> dic
         surface_status = "service_or_setup_candidate_needs_verifier"
         next_action = "Add a health/version/setup verifier before exposing service or setup actions."
         agent_enabled = False
-    elif any(signal["kind"] == "readme_cli_signal" for signal in source_signals):
-        surface_status = "documentation_cli_signal_needs_verifier"
-        next_action = "Confirm the documented command in the local runtime and register a verifier."
-        agent_enabled = False
     elif agent_tier in {"source_reference_ready", "package_or_import_ready", "service_api_ready"}:
         surface_status = f"{agent_tier}_not_cli"
         next_action = "Use the existing proof tier; add a separate runner smoke before any write actions."
+        agent_enabled = False
+    elif any(signal["kind"] == "readme_cli_signal" for signal in source_signals):
+        surface_status = "documentation_cli_signal_needs_verifier"
+        next_action = "Confirm the documented command in the local runtime and register a verifier."
         agent_enabled = False
     else:
         surface_status = "no_local_cli_signal"
@@ -152,7 +152,7 @@ def agent_execution_tier(module: dict[str, Any], runtime: dict[str, Any]) -> str
         return "launcher_metadata_only"
     if runtime_status == "ready" and kind in {"python_import", "python_source_import", "node_package"}:
         return "package_or_import_ready"
-    if runtime_status == "ready" and kind == "moonraker_fleet":
+    if runtime_status == "ready" and kind in {"local_http_health", "moonraker_fleet"}:
         return "service_api_ready"
     if runtime_status == "ready" and kind == "source_inventory":
         return "source_reference_ready"

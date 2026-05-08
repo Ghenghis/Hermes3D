@@ -15,7 +15,7 @@
   "by_state": {
     "installed": 60
   },
-  "generated_at_utc": "2026-05-06T15:58:24.161689+00:00",
+  "generated_at_utc": "2026-05-07T20:09:45.708542+00:00",
   "modules": [
     {
       "detected_version": "5b9eb492df2d",
@@ -724,7 +724,7 @@
       "id": "strec3d",
       "install_progress": 100,
       "install_state": "installed",
-      "launch_kind": "cli_worker",
+      "launch_kind": "desktop_app",
       "license": "unknown",
       "local_path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Strecs3D",
       "priority": "research",

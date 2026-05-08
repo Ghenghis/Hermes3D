@@ -81,7 +81,7 @@ LAUNCH_KIND_OVERRIDES = {
     "bambustudio": "desktop_or_cli",
     "mattercontrol": "desktop_app",
     "slic3r": "desktop_or_cli",
-    "strec3d": "cli_worker",
+    "strec3d": "desktop_app",
     "superslicer": "desktop_or_cli",
     "firmware_klipper": "service",
     "marlin": "firmware_source",
