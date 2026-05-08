@@ -38,14 +38,16 @@
     </a>
     <nav class="nav__links" aria-label="Primary">
       <a href="#catalog">60 apps</a>
-      <a href="#stacks">Custom Stacks</a>
       <a href="#image-to-print">Image→Print</a>
       <a href="#safety">Safety</a>
-      <a href="#hermes-teams">Hermes Teams</a>
+      <a href="#hermes-teams">Teams</a>
+      <a href="#always-on">24/7</a>
       <a href="#pipeline">Pipeline</a>
       <a href="#truth-gate">Truth Gate</a>
-      <a href="#fleet">Fleet</a>
+      <a href="#proof">Proof</a>
+      <a href="#gpu-stack">GPU Stack</a>
       <a href="#mcp">MCP</a>
+      <a href="#roadmap">Roadmap</a>
       <a href="#install">Install</a>
       <a href="https://github.com/Ghenghis/Hermes3D">GitHub</a>
     </nav>
@@ -323,6 +325,68 @@
   </div>
 </section>
 
+<!-- ================= ALWAYS-ON 24/7 ================= -->
+<section id="always-on" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker" data-section="agents">Always-on · 24/7 · Proof-gated</span>
+      <h2>Agents work while you sleep.</h2>
+      <p class="lead">Hermes3D-OS is not a chatbot you open and close. It is an always-running OS layer. When there is no active user job, the two Hermes Agent teams use idle time to improve the system — and every change they ship is proved before you ever see it.</p>
+    </div>
+    <div class="grid grid--2 reveal">
+      <div class="card card--purple">
+        <h3>Idle-time activities</h3>
+        <ul style="list-style:none;padding:0;margin:0;font-size:.9em;line-height:2;">
+          <li>🔍 Research safe improvements · draft setup plans</li>
+          <li>🐛 Propose bug fixes and refactors via patch proposals</li>
+          <li>✅ Run the full test suite on candidate patches</li>
+          <li>📦 Add new Source OS apps to the catalog</li>
+          <li>📝 Update documentation with signed proof</li>
+          <li>⚡ Optimize performance and speed</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>What agents never do without you</h3>
+        <ul style="list-style:none;padding:0;margin:0;font-size:.9em;line-height:2;">
+          <li>🚫 Merge a PR (GitHub branch protection blocks it)</li>
+          <li>🚫 Install packages not in the dependency manifest</li>
+          <li>🚫 Flash firmware or issue motion commands</li>
+          <li>🚫 Start a print on S1 (read-only by policy)</li>
+          <li>🚫 Expose provider keys in any artifact</li>
+          <li>🚫 Self-approve patches (Team B must review)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="grid grid--3 reveal" style="margin-top:1.5rem;">
+      <div class="card">
+        <h4>Proof before you see it</h4>
+        <p>Every feature agents ship walks the 9-stage pipeline: draft → Team B review → apply (lock-checked) → run 17 gates → PR open → CI green → evidence chain closed. You only see a feature when it has a green proof attached.</p>
+      </div>
+      <div class="card">
+        <h4>Giving you updates</h4>
+        <p>The Agents tab streams a live picture: which task is active, which file is locked, which provider is mid-pass, which evidence ID was just appended. You can pause, stop, or take over at any boundary.</p>
+      </div>
+      <div class="card">
+        <h4>Recall any interaction</h4>
+        <p>Every agent interaction is logged in the transcript history. Filter by task, by team, by date. Resume from any prior interaction. Voice replies and text are always both stored.</p>
+      </div>
+    </div>
+
+    <div class="reveal" style="margin-top:1.5rem; background:rgba(168,85,247,0.07); border:1px solid rgba(168,85,247,0.25); border-radius:.75rem; padding:1.25rem; font-family:monospace; font-size:.85em;">
+      <p style="margin:0 0 .5rem; color:#a855f7; font-weight:700;">Check what agents are doing right now</p>
+      <pre style="margin:0; background:none; border:none; padding:0;"><code>curl -s http://127.0.0.1:8765/api/anonymous/state | jq
+{
+  "claims": [
+    {"role": "BUILDER",  "task": "h3d-meshlab-cli-verifier", "ttl_s": 3540},
+    {"role": "CRITIC",   "task": "review-pr-104",             "ttl_s": 5012},
+    {"role": "SCRIBE",   "task": "evidence-chain-replay",     "ttl_s": 1801}
+  ]
+}</code></pre>
+    </div>
+  </div>
+</section>
+
 <!-- ================= PIPELINE ================= -->
 <section id="pipeline" class="section">
   <div class="container">
@@ -391,6 +455,61 @@
   </div>
 </section>
 
+<!-- ================= PROOF GALLERY ================= -->
+<section id="proof" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker" data-section="research">Visual Truth · No fakes</span>
+      <h2>Every step proved. Every claim checked.</h2>
+      <p class="lead">Hermes3D treats proof as a first-class artifact — HMAC-sealed, hash-chained, and archived at every pipeline stage. <code>scan_active_ui_no_fake.py</code> confirms <strong>81 production files, zero fake/mock markers</strong> on every CI push.</p>
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>Mesh generation proof</h4>
+        <p>Raw mesh + render thumbnail archived to <code>05_proof/meshes/</code>. Source engine, GPU time, and model version recorded per artifact.</p>
+        <p style="margin-top:.5rem; font-size:.8em;"><span class="pill pill--green" style="font-size:.75em;">CURRENT</span></p>
+      </div>
+      <div class="card">
+        <h4>Truth gate envelope</h4>
+        <p>Six-check matrix + HMAC seal stored in <code>05_proof/gates/</code>. Verdict bound to source mesh hash + run timestamp. Tampering invalidates the seal.</p>
+        <p style="margin-top:.5rem; font-size:.8em;"><span class="pill pill--green" style="font-size:.75em;">CURRENT</span></p>
+      </div>
+      <div class="card">
+        <h4>Patch review proof</h4>
+        <p>Team B signed verdict + diff hash in <code>05_proof/patches/</code>. Apply route checks the same MCP owner token that locked the files — no self-approval possible.</p>
+        <p style="margin-top:.5rem; font-size:.8em;"><span class="pill pill--green" style="font-size:.75em;">CURRENT</span></p>
+      </div>
+      <div class="card">
+        <h4>Print proof (camera)</h4>
+        <p>Camera frame (plate-clear confirmation) + printer lock record before any heater turns on. Filament used · duration · quality scores on completion.</p>
+        <p style="margin-top:.5rem; font-size:.8em;"><span class="pill pill--green" style="font-size:.75em;">CURRENT</span></p>
+      </div>
+      <div class="card">
+        <h4>CI proof bundle</h4>
+        <p>17 truth gates re-sign <code>PROOF/latest.json</code> with Sigstore keyless OIDC on every push to <code>main</code>. GitHub native build-provenance attestation published on every release tag.</p>
+        <p style="margin-top:.5rem; font-size:.8em;"><span class="pill pill--green" style="font-size:.75em;">CURRENT</span></p>
+      </div>
+      <div class="card">
+        <h4>Playwright screenshot archival</h4>
+        <p>Layer D CI is wired. Automated screenshot → <code>05_proof/</code> archival and proof gallery display on this page are in progress.</p>
+        <p style="margin-top:.5rem; font-size:.8em;"><span class="pill pill--purple" style="font-size:.75em;">IN-PROGRESS</span></p>
+      </div>
+    </div>
+    <div class="reveal" style="margin-top:1.5rem; padding:1.25rem; background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); border-radius:.75rem;">
+      <h4 style="margin-top:0; color:#22c55e;">Visual proof chain — the promise</h4>
+      <p style="margin:0; font-size:.9em; font-family:monospace; line-height:2;">
+        LAUNCH launcher → OPEN Agents tab → CLAIM task [📸]<br/>
+        LOCK files → BUILDER pass → REVIEWER pass [📸]<br/>
+        GATE run [📸] → PR open [📸] → EVIDENCE closed → lock released [📸]
+      </p>
+      <p style="margin:.75rem 0 0; font-size:.8em; color: var(--text-faint);">Each screenshot is archived with the proof bundle. You see every gate that passed — not just a green badge.</p>
+    </div>
+    <p class="reveal" style="text-align:center; margin-top:1.5rem; color: var(--text-faint);">
+      <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/PROOF_E2E_REPORT.md">Latest proof report →</a> · <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/PROOF/latest.json">PROOF/latest.json →</a>
+    </p>
+  </div>
+</section>
+
 <!-- ================= FLEET ================= -->
 <section id="fleet" class="section">
   <div class="container">
@@ -443,6 +562,58 @@
         <h4>Atomic handoffs</h4>
         <p>Need to hand a task from Codex to Claude for review? Single tool call, evidence-emitting, ownership-tracked, blocked-handoff fallback for safe failure.</p>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= GPU + API ROUTING ================= -->
+<section id="gpu-stack" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker" data-section="gen3d">Local GPU · Cloud API · Smart routing</span>
+      <h2>RTX 3090 Ti first. Cloud overflow when needed.</h2>
+      <p class="lead">Hermes routes every task to the cheapest capable resource. Local GPU for generation. MiniMax for building. DeepSeek for reviewing. Azure for voice. Cloud overflow when local is unavailable — always within cost caps you set.</p>
+    </div>
+    <div class="grid grid--3 reveal">
+      <div class="card">
+        <h4>RTX 3090 Ti · local GPU broker</h4>
+        <p>One-job-at-a-time queue. TRELLIS.2 · Hunyuan3D 2.1 · ComfyUI · TripoSR share the same card. Yields to OS on idle. No cloud bill for generation when the card is available.</p>
+        <p style="margin-top:.5rem; font-size:.8em; color:var(--text-faint);">Status: <strong style="color:#22c55e;">CURRENT</strong></p>
+      </div>
+      <div class="card">
+        <h4>Ollama 0.5 · local LLM</h4>
+        <p>Cost-zero inference for research, documentation, and low-stakes completions. Used as builder fallback when MiniMax key is absent. Reviewer never falls back — independence is the point.</p>
+        <p style="margin-top:.5rem; font-size:.8em; color:var(--text-faint);">Status: <strong style="color:#22c55e;">CURRENT</strong></p>
+      </div>
+      <div class="card">
+        <h4>MiniMax M2.7 · builder LLM</h4>
+        <p>High-speed cloud builder. Reads folder index, drafts patch proposals, runs scaffolding. Requires API key in <code>G:/private/.env</code>. Falls back to Ollama if key absent.</p>
+        <p style="margin-top:.5rem; font-size:.8em; color:var(--text-faint);">Status: <strong style="color:#f59e0b;">BLOCKED · awaiting key</strong></p>
+      </div>
+      <div class="card">
+        <h4>DeepSeek V4 · reviewer LLM</h4>
+        <p>Independent reviewer. Validates safety risks, checks proof IDs, signs off on patches. Never shares a provider with the builder — independence is enforced architecturally, not by policy.</p>
+        <p style="margin-top:.5rem; font-size:.8em; color:var(--text-faint);">Status: <strong style="color:#f59e0b;">BLOCKED · awaiting key</strong></p>
+      </div>
+      <div class="card">
+        <h4>Azure STT · Azure TTS</h4>
+        <p>Voice tab: mic input → Azure STT → agent prompt. Agent reply → Azure TTS → voice playback with mute toggle. Transcript always displayed for history. Silent fallback when key absent.</p>
+        <p style="margin-top:.5rem; font-size:.8em; color:var(--text-faint);">Status: <strong style="color:#a855f7;">PLANNED</strong></p>
+      </div>
+      <div class="card">
+        <h4>Cloud overflow</h4>
+        <p>OpenAI · Anthropic · OpenRouter as cost-capped overflow when local GPU is unavailable. <code>llm_policy.yaml</code> allowlist + cost caps. Keys in private env, never on disk in this repo.</p>
+        <p style="margin-top:.5rem; font-size:.8em; color:var(--text-faint);">Status: <strong style="color:#22c55e;">CURRENT</strong></p>
+      </div>
+    </div>
+    <div class="reveal" style="margin-top:1.5rem; background:rgba(6,182,212,0.07); border:1px solid rgba(6,182,212,0.25); border-radius:.75rem; padding:1.25rem;">
+      <h4 style="margin-top:0; color:#06b6d4;">Model routing policy</h4>
+      <pre style="margin:0; font-size:.8em; background:none; border:none; padding:0;"><code>mesh generation   → GPU broker (TRELLIS.2 / Hunyuan3D / TripoSR, priority)
+builder pass      → MiniMax-M2.7 (cloud) → Ollama fallback if key absent
+reviewer pass     → DeepSeek-V4 (cloud) → no fallback (must be independent)
+research / docs   → Ollama first → cloud overflow if incomplete
+voice → text      → Azure STT → no local fallback
+text → voice      → Azure TTS → silent fallback (text always shown)</code></pre>
     </div>
   </div>
 </section>
@@ -617,6 +788,64 @@ winget install Hermes3D</code></pre>
   </div>
 </section>
 
+<!-- ================= ROADMAP / STATUS ================= -->
+<section id="roadmap" class="section">
+  <div class="container">
+    <div class="section__head reveal">
+      <span class="kicker" data-section="pipeline">Roadmap · Current Status</span>
+      <h2>Honest markers. No vaporware.</h2>
+      <p class="lead">Every capability is tagged: <strong>CURRENT</strong> = working now · <strong>IN-PROGRESS</strong> = being built · <strong>PLANNED</strong> = designed, not yet started · <strong>BLOCKED</strong> = waiting on external dependency.</p>
+    </div>
+    <div class="grid grid--2 reveal">
+      <div class="card card--green">
+        <h3>Tier 0 · User actions today <span class="pill pill--green" style="font-size:.7em;vertical-align:middle;">CURRENT</span></h3>
+        <ul style="list-style:none;padding:0;margin:0;font-size:.9em;line-height:1.8;">
+          <li>✓ Quickstart + base launcher (<code>localhost:7860</code>)</li>
+          <li>✓ Truth Gate (6 checks + HMAC seal)</li>
+          <li>✓ 17 CI truth gates (re-sign <code>PROOF/latest.json</code>)</li>
+          <li>✓ 44 MCP tools (v0.7.0, stdio tested)</li>
+          <li>✓ 1,034 tests (752 unit · 169 safety · 64 integration)</li>
+          <li>✓ Print farm (15 adapters, 3 printer policies)</li>
+          <li>✓ Anonymous role tokens</li>
+          <li>✓ Sigstore keyless signing on release tags</li>
+        </ul>
+      </div>
+      <div class="card card--blue">
+        <h3>Tier 1 · Provider wiring <span class="pill pill--cyan" style="font-size:.7em;vertical-align:middle;">BLOCKED</span></h3>
+        <p>Dual-Hermes coding loop routes, locks, sandbox, and PR lane are all wired. Provider auth is <strong>BLOCKED</strong> on valid API keys — user must supply MiniMax + DeepSeek credentials in <code>G:/private/.env</code>. Once keyed, the loop runs end-to-end.</p>
+        <ul style="list-style:none;padding:0;margin:.5rem 0 0;font-size:.9em;line-height:1.8;">
+          <li>✓ Routes, locks, sandbox wired</li>
+          <li>⚠ MiniMax + DeepSeek keys needed</li>
+          <li>✓ OpenHands / OpenCode sandbox ready</li>
+        </ul>
+      </div>
+      <div class="card card--purple">
+        <h3>Tier 2 · Visual proof chain <span class="pill pill--purple" style="font-size:.7em;vertical-align:middle;">IN-PROGRESS</span></h3>
+        <ul style="list-style:none;padding:0;margin:0;font-size:.9em;line-height:1.8;">
+          <li>✓ Playwright Layer D CI wired</li>
+          <li>⏳ Screenshot archival → <code>05_proof/</code> automation</li>
+          <li>⏳ Proof gallery on this GitHub Pages site</li>
+          <li>⏳ <code>scan_active_ui_no_fake.py</code> as hard CI gate</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Tier 3 + 4 · Voice + Release <span style="font-size:.7em;opacity:.6;vertical-align:middle;">PLANNED</span></h3>
+        <ul style="list-style:none;padding:0;margin:0;font-size:.9em;line-height:1.8;">
+          <li>📋 Azure STT/TTS · mute toggle · transcript history</li>
+          <li>📋 Idle-time autopilot guardrails hardened</li>
+          <li>📋 Signed Windows binary (Velopack auto-update)</li>
+          <li>📋 <code>winget install Hermes3D</code></li>
+          <li>📋 Hostinger VPS deploy bundle</li>
+        </ul>
+        <p style="margin:.75rem 0 0; font-size:.8em; color: var(--text-faint);">Source OS wiring: 7 agent_cli_ready → close 24 runner gaps → retire 18 source_reference_only stubs.</p>
+      </div>
+    </div>
+    <p class="reveal" style="text-align:center; margin-top:1.5rem; color: var(--text-faint);">
+      Full milestone ledger: <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/03_implementation/ROADMAP.md">ROADMAP.md →</a> · live claim audit: <a href="https://github.com/Ghenghis/Hermes3D/blob/develop/00_overview/contract/HONESTY_LEDGER.md">HONESTY_LEDGER.md →</a>
+    </p>
+  </div>
+</section>
+
 <!-- ================= GOVERNANCE STORY ================= -->
 <section id="governance" class="section">
   <div class="container">
@@ -649,7 +878,7 @@ winget install Hermes3D</code></pre>
         <span class="brand__mark" aria-hidden="true"></span>
         <span>Hermes3D-OS</span>
       </a>
-      <p style="margin-top:0.5rem; max-width: 480px;">The first agentic 3D printing emporium. 60 apps. Two Hermes teams (MiniMax M2.7 + DeepSeek V4). GPU-backed image-to-print. Autonomous safety-gated printing. Anonymous to use. MIT-licensed.</p>
+      <p style="margin-top:0.5rem; max-width: 480px;">The first always-on, agentic 3D printing emporium. 60 apps. Two Hermes teams (MiniMax M2.7 + DeepSeek V4) working 24/7. GPU-backed image-to-print on RTX 3090 Ti. Autonomous safety-gated printing. Every change proved before you see it. Anonymous to use. MIT-licensed.</p>
     </div>
     <div>
       <h4>Project</h4>

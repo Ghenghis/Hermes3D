@@ -294,6 +294,52 @@ $ curl -s http://127.0.0.1:8765/api/anonymous/state | jq
 
 ---
 
+## ✦ Always-On Hermes Agents 24/7
+
+> *Agents work while you sleep. Every change they ship is proved before you see it.*
+
+Hermes3D-OS is not a chatbot you open and close. It is an always-running OS layer. Two Hermes Agent teams stay resident — and when there is no active user job, they use idle time to improve the system itself.
+
+### What agents do in idle time
+
+| Activity | Who | Gate required |
+| --- | --- | --- |
+| Research safe improvements · draft setup plans · write candidate reports | Both teams | None — research only, no source files touched |
+| Propose a bug fix, refactor, or new feature via patch proposal | Team A (Builders) | Requires Team B (Reviewers) approval before any source file is written |
+| Run the full test suite + all 17 truth gates on a candidate patch | Both teams | Must pass all gates before a PR is opened |
+| Add a new Source OS app to the catalog | Team A | Requires review + `scan_active_ui_no_fake.py` clean pass |
+| Update documentation or a proof bundle | Team A | Requires Team B sign-off + evidence chain append |
+
+### What agents **never** do without explicit user approval
+
+- Merge a PR (GitHub branch protection blocks it without human review)
+- Install a package not already in the dependency manifest
+- Flash firmware or issue motion commands to any printer
+- Start a print on S1 (read-only by policy, no override)
+- Expose provider keys or private paths in any artifact
+
+### The proof-gated feature promise
+
+Every feature agents ship walks the same 9-stage pipeline users run for meshes:
+
+```text
+DRAFT patch → Team B review → apply-reviewed (lock-checked) → run 17 gates
+→ git branch → push → PR open → CI green → evidence chain closed → lock released
+```
+
+The evidence chain is HMAC-sealed per task. If CI fails, the patch rolls back automatically and the failure is logged. **You only see a feature when it has a green proof attached.**
+
+```bash
+# Check that the always-on loop is ready to run
+curl -s http://127.0.0.1:8765/api/code-operator/e2e/readiness | jq .ready
+# true  ← when both provider keys are valid
+
+# See what the agents are doing right now
+curl -s http://127.0.0.1:8765/api/anonymous/state | jq
+```
+
+---
+
 ## ✦ The pipeline
 
 Every print walks the same orchestrator state machine. Nine stages, one source of truth, structured evidence at every transition.
@@ -383,6 +429,50 @@ Every push to `main` re-proves the chain. The latest run lives at [`PROOF_E2E_RE
 
 ---
 
+## ✦ Visual Truth + Proof System
+
+> *No claim without a proof bundle. No feature without a screenshot. No print without a signed envelope.*
+
+Hermes3D-OS treats proof as a first-class artifact — not a log entry, not a comment, but a structured, HMAC-sealed, hash-chained bundle that follows every action from intent to completion.
+
+### What "proof" means at each step
+
+| Step | Proof type | Where it lives |
+| --- | --- | --- |
+| Mesh generation | Raw mesh + render thumbnail | `05_proof/meshes/` |
+| Truth gate pass | 6-check matrix + HMAC envelope | `05_proof/gates/` |
+| Patch review | Team B signed verdict + diff hash | `05_proof/patches/` |
+| Test run | pytest stdout + coverage % | `05_proof/tests/` |
+| Print start | Camera frame (plate clear) + printer lock record | `05_proof/prints/` |
+| Print complete | Filament used · duration · quality scores | `05_proof/prints/` |
+| CI gate pass | GitHub Actions artifact + `PROOF/latest.json` | Published to branch |
+| Sigstore seal | Cosign bundle + OIDC token | GitHub Releases |
+
+### Visual proof chain (in progress)
+
+```text
+LAUNCH launcher → OPEN Agents tab → CLAIM task    → [screenshot]
+LOCK files      → BUILDER pass    → REVIEWER pass → [screenshot]
+GATE run        → [screenshot]    → PR open        → [screenshot]
+EVIDENCE closed → lock released   → proof bundle   → [screenshot]
+```
+
+`scan_active_ui_no_fake.py` runs on every CI push and confirms **81 active production files, zero fake/mock markers**. Any `TODO`, `FIXME`, `PLACEHOLDER`, or `MOCK` in active production files is a CI failure.
+
+### Honest status of the proof chain
+
+| Component | Status |
+| --- | --- |
+| 17 CI truth gates (re-sign `PROOF/latest.json`) | `CURRENT` |
+| pytest visual output (1,034 tests) | `CURRENT` |
+| Playwright E2E (Layer D wired) | `CURRENT` |
+| Playwright screenshot → `05_proof/` automation | `IN-PROGRESS` |
+| Sigstore keyless signing on release tags | `CURRENT` |
+| Build-plate camera proof before heat gate | `CURRENT` |
+| Proof gallery on GitHub Pages | `PLANNED` |
+
+---
+
 ## ✦ Print farm
 
 Fleet-wide orchestration with per-file locks and atomic handoffs. Multiple agents, multiple printers, no clobber.
@@ -440,6 +530,60 @@ QUEUE            hermes_enqueue_task
 Each tool ships with MCP `2025-11-25` annotations (`readOnlyHint` · `destructiveHint` · `idempotentHint` · `openWorldHint`) so clients render approval prompts that match the actual blast radius — read-only listing tools auto-allow; destructive ones always confirm.
 
 The backend FastAPI process exposes **220 HTTP routes** including the 10 required Agent Workbench routes (`/api/code-operator/e2e/readiness`, `/api/code-operator/e2e/jobs`, `/api/code-operator/providers/smoke`, `/api/code-operator/patch/apply-reviewed`, `/api/code-operator/gates/run`, `/api/code-operator/git/pr`, `/api/code-operator/cli-runners`, `/api/code-operator/cli-runners/preflight`, `/api/code-operator/cli-runners/run`, `/api/code-operator/sandbox/readiness`).
+
+---
+
+## ✦ Developer + Agent Workflow
+
+### For human developers
+
+```bash
+# 1. Start from develop
+git checkout develop && git pull
+
+# 2. Create a feature branch
+git checkout -b feat/your-area/your-desc
+
+# 3. Install + verify
+pip install -e ".[ui,dev]"
+pytest -q --tb=short                      # 1,034 tests, must stay green
+
+# 4. Make changes — then confirm nothing broke
+python scripts/scaffolding/doctor.py --json
+hermes3d truth-gate ./test.stl            # for any mesh you touched
+
+# 5. Open a PR into develop — all 10 CI layers must pass before merge
+```
+
+**Before touching any file that an agent might be working on** — run `hermes_list_locks` via MCP or check the Agents tab. If a file is locked, wait for the agent to release it. Never force-push a branch that has an active agent claim.
+
+### For agents running the coding loop
+
+Each agent turn follows this exact protocol:
+
+```text
+ 1. hermes_list_locks          ← check for conflicts before claiming
+ 2. hermes_claim_task          ← claim the task (generates owner token)
+ 3. hermes_lock_files          ← lock ONLY the files this task touches
+ 4. [builder pass]             ← Team A drafts patch proposal
+ 5. [reviewer pass]            ← Team B reviews; must accept before apply
+ 6. patch/apply-reviewed       ← apply with same-owner lock check
+ 7. hermes_run_gate            ← run gates (tests + lint + scan)
+    ├── FAIL → history/restore (rollback) → loop back to step 4
+    └── PASS → continue
+ 8. git/branch + commit + push ← agent-prefixed branch (hermes-agent/*)
+ 9. gh pr create               ← PR into develop
+10. hermes_append_evidence     ← close the evidence chain
+11. hermes_release_files       ← release file locks
+12. hermes_release_task        ← release the task claim
+```
+
+**Idle-time rules for agents:**
+
+- Research and draft without locking any files
+- Lock files only when about to write
+- Never write to `05_proof/`, `G:/private/`, `.git/`, or `node_modules/` from inside the sandbox
+- Every write must have a corresponding `hermes_append_evidence` entry
 
 ---
 
@@ -516,6 +660,39 @@ HERMES3D_AGENT_SANDBOX_NETWORK=none
 ```
 
 Then restart and click **Smoke MiniMax** + **Smoke DeepSeek** in the Agents tab. Both must pass before the dual-team loop runs.
+
+---
+
+## ✦ Supported AI/Compute Stack
+
+| Layer | Provider / Tool | Role | Status |
+| --- | --- | --- | --- |
+| **Builder LLM** | MiniMax M2.7 | Draft patches, propose code, generate scaffolding | `CURRENT` — wired; requires valid key in `G:/private/.env` |
+| **Reviewer LLM** | DeepSeek V4 | Review patches, validate safety, check proof IDs | `CURRENT` — wired; requires valid key in `G:/private/.env` |
+| **Local LLM** | Ollama 0.5 (RTX 3090 Ti) | Offline inference, cost-zero passes | `CURRENT` — wired via `llm_policy.yaml` allowlist |
+| **Text → 3D** | TRELLIS.2 (RTX 3090 Ti) | Text-to-3D mesh generation | `CURRENT` — GPU broker wired |
+| **Image → mesh** | Hunyuan3D 2.1 (RTX 3090 Ti) | High-quality image-to-mesh | `CURRENT` — GPU broker wired |
+| **Fast preview** | TripoSR | Low-latency mesh preview from image | `CURRENT` — wired |
+| **Render pipeline** | ComfyUI (RTX 3090 Ti) | Custom node workflows, image pipelines | `CURRENT` — Source OS catalog |
+| **Speech → text** | Azure STT | Mic input → agent prompt | `PLANNED` — Voice tab UI exists; Azure route `IN-PROGRESS` |
+| **Text → speech** | Azure TTS | Agent replies → voice playback with mute | `PLANNED` — Voice tab UI exists; Azure route `IN-PROGRESS` |
+| **Code sandbox** | OpenHands CLI 1.16.0 | Agent file/terminal/browser execution | `CURRENT` — Docker `network=none` |
+| **Code sandbox** | OpenCode 1.4.3-hermes3d | Alternative agent code executor | `CURRENT` — wired |
+| **GPU broker** | RTX 3090 Ti (local) | Shared card across all generation engines | `CURRENT` — one-job-at-a-time queue, yields on idle |
+| **Cloud overflow** | OpenAI · Anthropic · OpenRouter | Cost-capped overflow when local GPU unavailable | `CURRENT` — `llm_policy.yaml` allowlist + cost caps |
+
+### Model routing policy
+
+```text
+task: mesh generation     → GPU broker (TRELLIS.2 / Hunyuan3D / TripoSR, priority order)
+task: builder pass        → MiniMax-M2.7 (cloud) → Ollama fallback if key absent
+task: reviewer pass       → DeepSeek-V4 (cloud) → no fallback (reviewer must be independent)
+task: research / docs     → Ollama first (cost-zero) → cloud overflow if answer incomplete
+task: voice → text        → Azure STT → no local fallback
+task: text → voice        → Azure TTS → silent fallback (text always shown in history)
+```
+
+API keys never live in this repository. All secrets go in `G:/private/.env` (Windows) or `~/.config/hermes3d/private.env` (Linux/macOS). The Docker sandbox explicitly denies the private-env path.
 
 ---
 
@@ -634,9 +811,91 @@ Latest release: <https://github.com/Ghenghis/Hermes3D/releases>
 
 ---
 
+## ✦ Roadmap
+
+| Tier | Label | What ships | Status |
+| --- | --- | --- | --- |
+| **Tier 0** | User actions today | Quickstart + launcher + 17 CI gates + Truth Gate + 3 print-policy printers + MCP 44 tools | `CURRENT` |
+| **Tier 1** | Provider wiring | Valid MiniMax + DeepSeek keys → dual-Hermes coding loop runs end-to-end | First run after valid API keys in `G:/private/.env` |
+| **Tier 2** | Visual proof chain | Playwright screenshots archived to `05_proof/` on every CI run · proof gallery on GitHub Pages · `scan_active_ui_no_fake` as hard CI gate | `IN-PROGRESS` |
+| **Tier 3** | Voice + Autopilot | Azure STT/TTS in Voice tab · mute toggle · transcript history · idle-time autopilot guardrails hardened | `PLANNED` |
+| **Tier 4** | Release + distribution | Signed Windows binary (Velopack) · `winget install Hermes3D` · Hostinger VPS bundle | `PLANNED` |
+
+Source OS wiring cadence: **7** `agent_cli_ready` now → close **24** `runner_gap` apps → retire **18** `source_reference_only` stubs.
+
+Full milestone ledger: [`03_implementation/ROADMAP.md`](./03_implementation/ROADMAP.md) · live claim audit: [`00_overview/contract/HONESTY_LEDGER.md`](./00_overview/contract/HONESTY_LEDGER.md)
+
+---
+
+## ✦ Current Status
+
+> Honest markers: `CURRENT` = working now · `IN-PROGRESS` = being built · `PLANNED` = designed, not yet started · `BLOCKED` = waiting on external dependency
+
+| Capability | Status | Notes |
+| --- | --- | --- |
+| MCP server (44 tools, v0.7.0) | `CURRENT` | stdio round-trip tested, all tools connected |
+| Truth Gate (6 checks + HMAC seal) | `CURRENT` | runs on every STL drop |
+| 17 CI truth gates | `CURRENT` | re-sign `PROOF/latest.json` on every push to `main` |
+| pytest suite (1,034 tests) | `CURRENT` | 752 unit · 169 safety · 64 integration · 49 conformance |
+| Print farm adapters (15) | `CURRENT` | OrcaSlicer · PrusaSlicer · Moonraker · OctoPrint · Fluidd · Mainsail + more |
+| React control plane (18 tabs) | `CURRENT` UI shells / `IN-PROGRESS` backend wiring | Most tabs have real UI; several routes still being wired |
+| Source OS 60-app catalog | `CURRENT` — 7 `agent_cli_ready` | 24 runner gaps · 18 source_reference_only · full wiring `IN-PROGRESS` |
+| Dual Hermes teams (MiniMax + DeepSeek) | `CURRENT` routes/locks/sandbox · `BLOCKED` provider auth | Routes, locks, sandbox all wired; user must supply valid API keys |
+| OpenHands / OpenCode sandbox | `CURRENT` | Docker `network=none`, denied paths enforced |
+| Anonymous role tokens | `CURRENT` | `hermes_anonymous_claim` / `_release` / `_state` tested |
+| Azure Voice (STT + TTS) | `PLANNED` | Voice tab UI exists; Azure integration `IN-PROGRESS` |
+| Playwright visual proof archival | `IN-PROGRESS` | Layer D CI wired; screenshot → `05_proof/` automation pending |
+| Proof gallery (GitHub Pages) | `PLANNED` | Design complete; implementation not started |
+| Sigstore keyless signing | `CURRENT` | on every GitHub release tag |
+| `scan_active_ui_no_fake.py` in CI | `IN-PROGRESS` | Script exists and passes (Layer F); hard CI gate not yet enforced |
+| Windows binary (Velopack auto-update) | `PLANNED` | PyInstaller spec written; signing pipeline `IN-PROGRESS` |
+| Hostinger VPS deploy bundle | `PLANNED` | Architecture documented; deploy scripts `IN-PROGRESS` |
+| `winget install Hermes3D` | `PLANNED` | Phase 2 target |
+
+---
+
+## ✦ Safety Disclaimer
+
+Hermes3D-OS can dispatch autonomous print jobs. Read this before enabling autonomous mode.
+
+**Hard limits — no agent or operator can override these:**
+
+1. **No heat without a clear build plate.** The camera observer must confirm the plate is free of previous prints, brims, and debris. Any uncertainty fires a HARD STOP and keeps all heaters off.
+2. **No print on S1.** The FLSUN S1 is read-only by user policy. No firmware command, no motion, no print, no autonomous action of any kind.
+3. **No merge without CI green.** GitHub branch protection + 10 CI layers block any merge that doesn't carry a green proof bundle.
+4. **No provider keys in any artifact.** Secrets stay in `G:/private/.env`. The sandbox explicitly denies that path. Nothing in the proof bundle, nothing in the frontend, nothing in any log.
+5. **No source mutation without Team B approval.** Team A (Builders) cannot apply a patch without a signed Team B (Reviewers) verdict. The apply route checks the same MCP owner token that locked the files.
+
+**Autonomous-mode operating limits (Autopilot tab):**
+
+- S1 lock always enforced (policy, not configuration)
+- Each autonomous print on T1 / V400 requires a *Print Approved* click in the Approvals tab (default on; configurable per printer profile)
+- Truth Gate must pass before any slicer is invoked
+- Maximum N retry loops on truth-gate fail (default 3; configurable)
+- Every heater activation is logged as a signed proof event
+
+**Emergency stop:** Open the Approvals tab → **Emergency Stop** — fires `hermes_release_task` on all active claims, halts all queued prints, releases all file locks. No in-flight heater command continues.
+
+---
+
 ## ✦ Contributing
 
 Direct pushes to `main` are blocked at three layers — local pre-push hook, `branch-guard` CI workflow, and branch-protection rules. Open a feature branch and PR into `develop`. Full contributor guide at [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+
+### Agent rules — what agents may and may not do
+
+Agents operating in this repo follow the MCP lock protocol without exception:
+
+| Rule | Detail |
+| --- | --- |
+| **Lock before write** | `hermes_lock_files` must precede any file write; write without a lock is a protocol violation |
+| **Claim before lock** | `hermes_claim_task` must precede `hermes_lock_files`; orphan locks are stale by definition |
+| **Check before claim** | `hermes_list_locks` + `hermes_list_pending_tasks` before every new claim — no clobber |
+| **Evidence before release** | `hermes_append_evidence` closes the chain; `hermes_release_files` and `hermes_release_task` follow |
+| **Team B must review** | Builders never self-approve; the reviewer pass uses an independent provider (DeepSeek, never MiniMax) |
+| **No sandbox escape** | `network=none`; denied paths (`05_proof/`, `G:/private/`, `.git/`, `node_modules/`) enforced at Docker level |
+| **No force push** | Agent branches must carry `codex/` or `hermes-agent/` prefix; no agent may push to `main` or `develop` directly |
+| **Stale lock recovery** | If a claim expires without `hermes_release_task`, `hermes_recover_stale_locks` frees the files; the next agent picks up from the last evidence snapshot |
 
 <details>
 <summary><strong>Branch model + 10-layer CI gate map (dev-internal)</strong></summary>
@@ -702,6 +961,6 @@ MIT — see [`LICENSE`](./LICENSE).
 <div align="center">
 
 **Built honestly. Proved continuously. Coordinated by [HermesProof](https://github.com/Ghenghis/HermesProof).**
-**60 apps. Two Hermes teams. One truth-gated emporium.**
+**60 apps. Two Hermes teams. Always-on Hermes agents. One truth-gated, 24/7 agentic emporium.**
 
 </div>
