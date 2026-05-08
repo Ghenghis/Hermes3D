@@ -53,7 +53,8 @@ Current live-smoke result for this branch:
 - Folder-index context and MCP locks are now ready.
 - OpenHands/OpenCode CLI runners are detection-only and currently report no local PATH executable.
 - MiniMax execution is currently blocked by live HTTP 401 from the configured endpoint/key; the route records this as a redacted blocked reason instead of crashing or claiming the provider is usable.
-- Until MiniMax auth is corrected in `G:/private/.env`, the workbench can prove readiness/context but cannot complete the two-provider build/review pass.
+- DeepSeek execution is also currently blocked by live HTTP 401 from the configured private key.
+- Until MiniMax and DeepSeek auth are corrected in `G:/private/.env`, the workbench can prove readiness/context and run blocked-provider smoke proofs, but cannot complete the two-provider build/review pass.
 
 Shared provider rule:
 
@@ -123,8 +124,8 @@ Hermes3D already has provider-team readiness, MCP locks, snapshots, patch propos
 | Role-chain registry | OpenCode-style multiagent work needs primary/subagent roles, but Hermes3D must enforce roles through proof. | Task records list finder, builder, reviewer, tester, security roles with provider/team and evidence ids. |
 | Hermes skill pack | Agents need reusable project-specific skills rather than huge prompts. | Source OS runner, printer safety, no-fake UI, code patch, evidence, PR shipping, and rollback skills exist and are referenced by task records. |
 | Folder-index boot loader | Agents must know the repo layout before editing. | DONE for planning/review: the E2E route loads the PR #86 folder index path, sends selected index docs as provider file context, and records loaded docs plus target ownership path. |
-| Provider execution loop | MiniMax and DeepSeek currently create artifacts, but do not drive one closed workflow. | PARTIAL: `/api/code-operator/e2e/jobs` links readiness -> folder-index context -> assignment -> locks -> pre-snapshots -> MiniMax coding artifact -> DeepSeek review artifact -> evidence/release. Patch apply, gates, and PR are still the next slice. |
-| UI Agent Code Workbench | The user needs to launch and inspect the agent workflow from Hermes3D OS, not through Codex hidden execution. | PARTIAL: Agents tab has the workbench form, readiness proof, CLI runner preflight state, and provider artifact result view. Apply/rollback/gates/PR controls remain blocked until the next slice. |
+| Provider execution loop | MiniMax and DeepSeek currently create artifacts only after live auth succeeds, and provider auth cannot be assumed from env presence. | PARTIAL: `/api/code-operator/providers/smoke` proves MiniMax/DeepSeek live auth through the same bounded chat path used by coding/review passes, records MCP evidence, and returns redacted HTTP/auth blockers. `/api/code-operator/e2e/jobs` links readiness -> folder-index context -> assignment -> locks -> pre-snapshots -> MiniMax coding artifact -> DeepSeek review artifact -> evidence/release, but live private keys must pass before this closes. |
+| UI Agent Code Workbench | The user needs to launch and inspect the agent workflow from Hermes3D OS, not through Codex hidden execution. | PARTIAL: Agents tab has the workbench form, readiness proof, provider smoke buttons, CLI runner preflight state, provider artifact result view, and reviewed patch -> gate -> branch/stage/commit/push/PR controls. Source mutation still fails closed unless proposal, review proof, same-owner MCP lock, snapshots, gates, and git policy are all satisfied. |
 | Policy bridge | OpenHands/OpenCode patterns can run powerful tools; Hermes3D must apply printer, secret, and path policy first. | S1/printer actions, secrets, destructive git, env writes, and denied paths fail closed before sandbox/provider execution. |
 
 No adapter is considered complete without a route probe, test, proof event, and visible UI state or explicit blocked reason.
@@ -200,6 +201,7 @@ No PR is accepted from an agent if any required gate is skipped, timed out witho
 | Gap | Why it blocks "working agents" | Required completion |
 | --- | --- | --- |
 | Patch proposal/apply is not yet chained from provider artifact | The workbench now gets to reviewed provider artifacts, but it deliberately stops before source mutation. | Add reviewed patch extraction, same-owner lock validation, apply, post-snapshot, gate runner, git branch/stage/commit/push/PR, and rollback proof controls. |
+| Private provider auth is rejected live | MiniMax and DeepSeek env keys exist but both live provider smoke calls return HTTP 401. | Replace the rejected MiniMax/DeepSeek keys in `G:/private/.env`, then rerun `/api/code-operator/providers/smoke` for both providers before trying the first co-developer task. |
 | OpenHands/OpenCode are detection-only | CLI worker rows are visible but cannot run write tasks safely yet. | Add sandbox readiness, read-only preflight route, task-scoped env/cwd/files, output proof capture, and keep write runs blocked until every gate is present. |
 | No real co-developer smoke task has passed | There is route smoke for individual pieces, but no full task completed by both agent teams. | Run a small docs or UI patch task through MiniMax + DeepSeek + locks + gates + PR and record proof ids. |
 | Source app runner gaps distract from agent runtime P0 | Runner gaps are useful but secondary while agents cannot co-develop. | Keep runner work queued; prioritize the agent coding loop until it can help complete the runner gaps itself. |
@@ -211,12 +213,14 @@ This is the next implementation sequence. Do not resume manual Source OS runner-
 1. Provider truth:
    - Probe MiniMax and DeepSeek readiness from `G:/private/.env`.
    - Prove both providers are visible only through backend/private env.
-   - Show blocked reasons if either is unavailable.
+   - DONE for route/UI truth: `/api/code-operator/providers/smoke` and the Agents-tab provider smoke buttons return pass or redacted HTTP/auth blockers and append MCP evidence.
+   - CURRENT BLOCKER: both configured provider keys are rejected live with HTTP 401; replace keys in `G:/private/.env` and rerun smoke before E2E execution.
 2. Agent Code Workbench:
    - DONE for planning/review: add a visible Agents-tab workbench for coding tasks.
    - Inputs: title, objective, file list, target branch, role chain, provider policy, and optional OpenHands/OpenCode CLI worker preference.
    - Current output: task id, loaded folder-index docs, provider artifacts, snapshots, evidence, and next-required-step list.
-   - Remaining output: gates, branch, PR URL, rollback ids.
+   - DONE for manual ship controls: reviewed patch apply, gate run, branch, stage, commit, push, and PR buttons are visible in the workbench and call the code-operator APIs.
+   - Remaining output: one automatic closed E2E task that produces gates, branch, PR URL, rollback ids, and provider artifacts after private auth passes.
 3. E2E orchestration route:
    - PARTIAL: one route coordinates folder-index context, assignment, locks, snapshots, MiniMax pass, DeepSeek pass, evidence, and release.
    - Remaining: patch proposal, apply, gates, git lane, and rollback proof.

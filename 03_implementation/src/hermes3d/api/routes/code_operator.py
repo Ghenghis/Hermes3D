@@ -60,6 +60,10 @@ class PatchApplyRequest(StrictBody):
     reason: str | None = None
 
 
+class ReviewedPatchApplyRequest(PatchApplyRequest):
+    review_proof_ids: list[str] = Field(min_length=1)
+
+
 class GateRunRequest(StrictBody):
     gate_id: str
     cwd: str | None = None
@@ -169,6 +173,11 @@ class ProviderReviewPassRequest(StrictBody):
     reviewer_team_id: str = "deepseek-reviewers"
 
 
+class ProviderSmokeRequest(StrictBody):
+    provider_id: str
+    task_id: str
+
+
 class AgentE2EJobRequest(StrictBody):
     task_id: str
     title: str = Field(min_length=1, max_length=180)
@@ -216,6 +225,18 @@ def run_agent_e2e_job(body: AgentE2EJobRequest) -> dict[str, Any]:
 @router.get("/teams/readiness")
 def provider_team_readiness() -> dict[str, Any]:
     return code_history.provider_team_readiness()
+
+
+@router.post("/providers/smoke")
+def provider_smoke(body: ProviderSmokeRequest) -> dict[str, Any]:
+    try:
+        return code_history.provider_execution_smoke(
+            body.provider_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.post("/teams/assign-task")
@@ -427,6 +448,22 @@ def apply_patch(body: PatchApplyRequest) -> dict[str, Any]:
             body.proposal_id,
             agent_id=CODE_OPERATOR_ACTOR,
             task_id=body.task_id,
+            reason=body.reason,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/patch/apply-reviewed")
+def apply_reviewed_patch(body: ReviewedPatchApplyRequest) -> dict[str, Any]:
+    try:
+        return code_history.apply_reviewed_patch_proposal(
+            body.proposal_id,
+            agent_id=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            review_proof_ids=body.review_proof_ids,
             reason=body.reason,
         )
     except FileNotFoundError as exc:

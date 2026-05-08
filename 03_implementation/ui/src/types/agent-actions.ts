@@ -117,3 +117,73 @@ export interface AgentE2EJobResult {
   review_pass?: unknown;
   next_required_steps?: string[];
 }
+
+export interface ProviderSmokeResult {
+  status: string;
+  accepted: boolean;
+  provider_id: string;
+  blocked_reasons?: string[];
+  provider?: unknown;
+  auth_contract?: unknown;
+  mcp_evidence?: unknown;
+}
+
+export interface ReviewedPatchApplyRequest {
+  proposal_id: string;
+  task_id: string;
+  review_proof_ids: string[];
+  reason?: string;
+}
+
+export interface ReviewedPatchApplyResult {
+  status: string;
+  accepted: boolean;
+  proposal_id?: string;
+  review_proof_ids?: string[];
+  apply?: unknown;
+  mcp_evidence?: unknown;
+}
+
+export interface CodeGateRunRequest {
+  gate_id: string;
+  cwd?: string;
+}
+
+export interface CodeGateRunResult {
+  status: string;
+  ok: boolean;
+  gate_id: string;
+  result?: unknown;
+}
+
+export interface GitBranchRequest {
+  task_id: string;
+  branch_name: string;
+  base_ref?: string;
+  reason?: string;
+}
+
+export interface GitStageRequest {
+  task_id: string;
+  files: string[];
+}
+
+export interface GitCommitRequest {
+  task_id: string;
+  files: string[];
+  message: string;
+  proof_ids?: string[];
+}
+
+export interface GitPushRequest {
+  task_id: string;
+  remote?: string;
+}
+
+export interface GitPullRequestRequest {
+  task_id: string;
+  base_ref: string;
+  title: string;
+  body?: string;
+  draft?: boolean;
+}

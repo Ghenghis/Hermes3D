@@ -1,5 +1,22 @@
 import type { Agent, AgentStatus } from "../types/agent";
-import type { AgentActionCatalog, AgentActionRunResult, AgentE2EJobRequest, AgentE2EJobResult, AgentE2EReadiness, CodeCliRunnerReadiness } from "../types/agent-actions";
+import type {
+  AgentActionCatalog,
+  AgentActionRunResult,
+  AgentE2EJobRequest,
+  AgentE2EJobResult,
+  AgentE2EReadiness,
+  CodeCliRunnerReadiness,
+  CodeGateRunRequest,
+  CodeGateRunResult,
+  GitBranchRequest,
+  GitCommitRequest,
+  GitPullRequestRequest,
+  GitPushRequest,
+  GitStageRequest,
+  ProviderSmokeResult,
+  ReviewedPatchApplyRequest,
+  ReviewedPatchApplyResult,
+} from "../types/agent-actions";
 import type { DimensionalAccuracyReport } from "../types/dimensional";
 import type { LogEntry } from "../types/log";
 import type { Notification } from "../types/notification";
@@ -793,6 +810,53 @@ export async function runAgentE2EJobLive(request: AgentE2EJobRequest): Promise<A
     throw new Error("Hermes Agent E2E job response was not in the expected shape.");
   }
   return result as unknown as AgentE2EJobResult;
+}
+
+export async function runProviderSmokeLive(providerId: "minimax" | "deepseek", taskId: string): Promise<ProviderSmokeResult> {
+  const result = await postJsonWithResult("/api/code-operator/providers/smoke", {
+    provider_id: providerId,
+    task_id: taskId,
+  });
+  if (!isRecord(result) || !isString(result.status) || !isString(result.provider_id)) {
+    throw new Error("Provider smoke response was not in the expected shape.");
+  }
+  return result as unknown as ProviderSmokeResult;
+}
+
+export async function applyReviewedPatchLive(request: ReviewedPatchApplyRequest): Promise<ReviewedPatchApplyResult> {
+  const result = await postJsonWithResult("/api/code-operator/patch/apply-reviewed", request);
+  if (!isRecord(result) || !isString(result.status)) {
+    throw new Error("Reviewed patch apply response was not in the expected shape.");
+  }
+  return result as unknown as ReviewedPatchApplyResult;
+}
+
+export async function runCodeGateLive(request: CodeGateRunRequest): Promise<CodeGateRunResult> {
+  const result = await postJsonWithResult("/api/code-operator/gates/run", request);
+  if (!isRecord(result) || !isString(result.status) || typeof result.ok !== "boolean") {
+    throw new Error("Code gate response was not in the expected shape.");
+  }
+  return result as unknown as CodeGateRunResult;
+}
+
+export function createCodeBranchLive(request: GitBranchRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/branch", request);
+}
+
+export function stageOwnedCodeFilesLive(request: GitStageRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/stage-owned", request);
+}
+
+export function commitOwnedCodeFilesLive(request: GitCommitRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/commit-owned", request);
+}
+
+export function pushCodeBranchLive(request: GitPushRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/push", request);
+}
+
+export function openCodePullRequestLive(request: GitPullRequestRequest): Promise<unknown> {
+  return postJsonWithResult("/api/code-operator/git/pr", request);
 }
 
 export async function uploadAgentAttachmentLive(personaId: string, file: File): Promise<AgentAttachmentUpload> {

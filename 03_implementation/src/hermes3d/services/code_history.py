@@ -1148,6 +1148,48 @@ def apply_patch_proposal(
     }
 
 
+def apply_reviewed_patch_proposal(
+    proposal_id: str,
+    *,
+    agent_id: str,
+    task_id: str,
+    review_proof_ids: list[str],
+    reason: str | None = None,
+) -> dict[str, Any]:
+    safe_proofs = [_validate_proof_ref(item) for item in review_proof_ids]
+    if not safe_proofs:
+        raise ValueError("Reviewed patch apply requires at least one review proof id.")
+    apply_result = apply_patch_proposal(
+        proposal_id,
+        agent_id=agent_id,
+        task_id=task_id,
+        reason=reason or "Reviewed Hermes Agent patch apply",
+    )
+    evidence = append_mcp_evidence(
+        owner=agent_id,
+        task_id=task_id,
+        kind="code_patch_reviewed_apply",
+        summary=f"Applied reviewed Hermes Agent patch {proposal_id[:12]}",
+        data={
+            "proposal_id": proposal_id,
+            "relative_path": apply_result.get("relative_path"),
+            "review_proof_ids": safe_proofs,
+            "apply_proof_event_id": apply_result.get("proof_event_id"),
+            "apply_evidence_id": (apply_result.get("mcp_evidence") or {}).get("evidence_id")
+            if isinstance(apply_result.get("mcp_evidence"), dict)
+            else None,
+        },
+    )
+    return {
+        "status": "reviewed_applied",
+        "accepted": True,
+        "proposal_id": proposal_id,
+        "review_proof_ids": safe_proofs,
+        "apply": apply_result,
+        "mcp_evidence": evidence,
+    }
+
+
 def list_mcp_gates() -> dict[str, Any]:
     _require_mcp_locks_ready()
     payload = _call_mcp_tool("hermes_list_gates", {})
@@ -1544,6 +1586,99 @@ def run_provider_team_review_pass(
         "provider": response["provider"],
         "artifact": artifact,
         "response": _provider_response_public(response),
+        "mcp_evidence": evidence,
+    }
+
+
+def provider_execution_smoke(
+    provider_id: str,
+    *,
+    owner: str,
+    task_id: str,
+) -> dict[str, Any]:
+    _require_mcp_locks_ready()
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    provider = str(provider_id or "").strip().lower()
+    if provider not in PROVIDER_DEFAULT_BASE_URLS:
+        raise ValueError("Provider id must be minimax or deepseek.")
+    config = _provider_chat_config(provider, require_ready=False)
+    auth_contract = {
+        "provider_id": provider,
+        "base_url_label": config["base_url_label"],
+        "chat_path": _provider_chat_path(str(config["base_url"])),
+        "auth_scheme": "Authorization: Bearer <redacted>",
+        "api_key_configured": config["api_key_configured"],
+        "model": config["model"],
+        "model_configured": config["model_configured"],
+    }
+    if not config["api_key_configured"] or not config["model_configured"]:
+        missing = []
+        if not config["api_key_configured"]:
+            missing.append(f"{provider.upper()}_API_KEY")
+        if not config["model_configured"]:
+            missing.append(f"{provider.upper()}_MODEL")
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider_smoke",
+            summary=f"Blocked {provider} provider smoke: missing private env",
+            data={"provider_id": provider, "missing": missing, "auth_contract": auth_contract},
+        )
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "provider_id": provider,
+            "blocked_reasons": ["Missing private env: " + ", ".join(missing)],
+            "auth_contract": auth_contract,
+            "mcp_evidence": evidence,
+        }
+    try:
+        response = _call_provider_chat(
+            provider,
+            [
+                {"role": "system", "content": "You are a provider health probe. Reply with exactly: HERMES3D_PROVIDER_SMOKE_OK"},
+                {"role": "user", "content": "Return the exact smoke token and no secrets."},
+            ],
+            temperature=0.0,
+            max_tokens=256,
+        )
+    except RuntimeError as exc:
+        blocked = [str(exc)]
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_provider_smoke",
+            summary=f"Blocked {provider} provider smoke",
+            data={"provider_id": provider, "blocked_reasons": blocked, "auth_contract": auth_contract},
+        )
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "provider_id": provider,
+            "blocked_reasons": blocked,
+            "auth_contract": auth_contract,
+            "mcp_evidence": evidence,
+        }
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_provider_smoke",
+        summary=f"Passed {provider} provider smoke",
+        data={
+            "provider_id": provider,
+            "provider": response["provider"],
+            "content_sha256": response["content_sha256"],
+            "auth_contract": auth_contract,
+        },
+    )
+    return {
+        "status": "ready",
+        "accepted": True,
+        "provider_id": provider,
+        "provider": response["provider"],
+        "content_sha256": response["content_sha256"],
+        "auth_contract": auth_contract,
         "mcp_evidence": evidence,
     }
 
@@ -2067,6 +2202,9 @@ def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[s
         "model_configured": config["model_configured"],
         "base_url_label": config["base_url_label"],
         "model": config["model"],
+        "auth_scheme": "bearer",
+        "chat_path": _provider_chat_path(str(config["base_url"])),
+        "live_status": "not_probed",
     }
 
 
@@ -2141,7 +2279,7 @@ def _call_provider_chat(
         data=body,
         headers={
             "Accept": "application/json",
-            "Authorization": f"Bearer {config['api_key']}",
+            "Authorization": _provider_auth_header(str(config["api_key"])),
             "Content-Type": "application/json",
         },
     )
@@ -2183,6 +2321,20 @@ def _provider_chat_url(base_url: str) -> str:
     if base.endswith("/chat/completions"):
         return base
     return f"{base}/chat/completions"
+
+
+def _provider_chat_path(base_url: str) -> str:
+    url = _provider_chat_url(base_url)
+    match = re.match(r"^https?://[^/]+(/.*)$", url, re.IGNORECASE)
+    return match.group(1) if match else "/chat/completions"
+
+
+def _provider_auth_header(api_key: str) -> str:
+    value = api_key.strip()
+    if value.lower().startswith("bearer "):
+        parts = value.split(None, 1)
+        return f"Bearer {parts[1].strip()}" if len(parts) == 2 else "Bearer "
+    return f"Bearer {value}"
 
 
 def _provider_response_content(payload: Any) -> str:

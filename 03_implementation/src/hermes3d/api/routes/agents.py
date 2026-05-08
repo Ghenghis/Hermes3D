@@ -671,6 +671,14 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         from hermes3d.services import code_history
 
         return code_history.provider_team_readiness()
+    if handler == "code.providers.smoke":
+        from hermes3d.services import code_history
+
+        return code_history.provider_execution_smoke(
+            _required_payload_text(payload, "provider_id"),
+            owner=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+        )
     if handler == "code.e2e.readiness":
         from hermes3d.services import code_history
 
@@ -830,6 +838,19 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
             agent_id=actor,
             task_id=_required_payload_text(payload, "task_id"),
             reason=str(payload.get("reason") or "Hermes Agent patch apply"),
+        )
+    if handler == "code.patch.apply_reviewed":
+        from hermes3d.services import code_history
+
+        review_proofs = payload.get("review_proof_ids")
+        if not isinstance(review_proofs, list) or not review_proofs:
+            raise ValueError("Payload field review_proof_ids must be a non-empty list.")
+        return code_history.apply_reviewed_patch_proposal(
+            _required_payload_text(payload, "proposal_id"),
+            agent_id=actor,
+            task_id=_required_payload_text(payload, "task_id"),
+            review_proof_ids=[str(item) for item in review_proofs],
+            reason=str(payload.get("reason") or "Hermes Agent reviewed patch apply"),
         )
     if handler == "code.gates.list":
         from hermes3d.services import code_history
@@ -1348,6 +1369,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("agents.health.refresh", "Refresh Hermes Agent runtime health", "agents", "ready" if runtime.get("hermes_agent_runtime") == "ready" else "blocked", "read", "low", "GET /api/agents/health", "agents.health", "Checks the configured local/private agent runtime bridge."),
         _contract("code.programming_readiness.refresh", "Refresh Hermes Agent programming readiness", "agents", "ready", "read", "low", "GET /api/code-operator/programming-readiness", "code.programming_readiness", "Checks true source inputs from Nous Hermes Agent and Atomic Hermes plus MiniMax/DeepSeek provider readiness."),
         _contract("code.teams.readiness.refresh", "Refresh Hermes Agent team readiness", "agents", str(provider_teams.get("status") or "blocked"), "read", "low", "GET /api/code-operator/teams/readiness", "code.teams.readiness", "Checks MiniMax builder and DeepSeek reviewer team readiness without exposing provider secrets.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
+        _contract("code.providers.smoke", "Run live provider smoke proof", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/providers/smoke", "code.providers.smoke", "Calls MiniMax or DeepSeek through the same bounded OpenAI-compatible chat path used by coding/review passes and records pass/blocked evidence without exposing secrets.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for provider proof.")),
         _contract("code.e2e.readiness.refresh", "Refresh Agent Code Workbench readiness", "agents", "ready" if e2e_readiness.get("ready") else "blocked", "read", "low", "GET /api/code-operator/e2e/readiness", "code.e2e.readiness", "Checks folder index, MCP locks, MiniMax builder, DeepSeek reviewer, snapshots, and proof prerequisites for Hermes Agents coding alongside Codex.", None if e2e_readiness.get("ready") else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready.")),
         _contract("code.cli_runners.readiness.refresh", "Refresh OpenHands/OpenCode CLI readiness", "agents", "ready", "read", "low", "GET /api/code-operator/cli-runners", "code.cli_runners.readiness", f"Detects OpenHands and OpenCode CLI binaries for future sandboxed agent delegation; current contract is detection/version only, no writes. Detected now: {cli_runner_count}."),
         _contract("code.e2e.run", "Run proof-gated Agent Code Workbench job", "agents", "ready" if e2e_readiness.get("ready") else "blocked", "artifact", "high", "POST /api/code-operator/e2e/jobs", "code.e2e.run", "Runs the real folder-index -> task claim -> file lock -> pre-snapshot -> MiniMax coding pass -> DeepSeek review pass loop and returns a reviewed patch-planning artifact. It does not mutate source directly.", None if e2e_readiness.get("ready") else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready.")),
@@ -1365,6 +1387,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("code.file.read", "Read bounded Hermes3D source slice", "agents", "ready", "read", "low", "POST /api/code-operator/files/read", "code.file.read", "Reads a bounded line slice from an allowed project text file with a content hash for proof."),
         _contract("code.patch.propose", "Propose a Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/patch/proposals", "code.patch.propose", "Creates a pre-snapshot, hash-checks the target, writes a reviewable patch proposal artifact, and appends proof without mutating source files.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch proposals.")),
         _contract("code.patch.apply", "Apply MCP-locked Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply", "code.patch.apply", "Applies an existing patch proposal only with a same-owner Hermes MCP file lock for the target, records pre/post snapshots, and appends chained MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch apply.")),
+        _contract("code.patch.apply_reviewed", "Apply reviewed MCP-locked patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply-reviewed", "code.patch.apply_reviewed", "Applies a patch proposal only after same-owner MCP lock checks and at least one review/proof id, then records reviewed-apply evidence for gate/PR shipping.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for reviewed patch apply.")),
         _contract("code.gates.list.refresh", "List Hermes MCP code gates", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/gates", "code.gates.list", "Lists gates exposed by the exact-worktree hermes3d-locks MCP server; no arbitrary shell is exposed.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
         _contract("code.gate.run", "Run Hermes MCP allowlisted gate", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/gates/run", "code.gate.run", "Runs one allowlisted hermes3d-locks MCP gate in the exact edit worktree and stores the gate result in the MCP evidence ledger.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
         _contract("code.git.readiness.refresh", "Refresh Hermes Agent git shipping readiness", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/git/readiness", "code.git.readiness", "Shows whether the current branch, dirty files, snapshots, and MCP lock prerequisites allow agent branch/commit/push/PR work.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
@@ -1518,6 +1541,11 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
             "optional": {"reviewer_team_id": "defaults to deepseek-reviewers"},
             "safety": "Review requests require at least one proof/evidence id and route through the proof ledger; no provider secret values are returned.",
         },
+        "code.providers.smoke": {
+            "required": ["provider_id", "task_id"],
+            "optional": {},
+            "safety": "Provider id must be minimax or deepseek. The smoke call uses private env only server-side, redacts auth failures, and appends MCP evidence.",
+        },
         "code.teams.run_coding_pass": {
             "required": ["task_id", "title", "files", "objective"],
             "optional": {"team_id": "defaults to minimax-builders; dual is accepted", "target_branch": "safe git ref"},
@@ -1539,6 +1567,7 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "code.file.read": {"required": ["relative_path"], "optional": {"start_line": "1-based start line", "line_count": "1-240"}, "safety": "Text file slices only; secrets, binaries, generated files, .git, node_modules, and printer config writes are blocked."},
         "code.patch.propose": {"required": ["relative_path", "proposed_text"], "optional": {"base_sha256": "current file hash for stale-write protection", "reason": "why this patch is proposed"}, "safety": "Creates a review artifact and proof only; it does not mutate source files. Apply remains a separate gated action."},
         "code.patch.apply": {"required": ["proposal_id", "task_id"], "optional": {"reason": "why this proposal is being applied"}, "safety": "Requires matching base sha256, active same-owner Hermes MCP file lock, pre/post snapshots, proof event, and chained MCP evidence."},
+        "code.patch.apply_reviewed": {"required": ["proposal_id", "task_id", "review_proof_ids"], "optional": {"reason": "why this reviewed proposal is being applied"}, "safety": "Requires at least one review proof id in addition to the same base sha256, active same-owner lock, snapshots, proof event, and chained evidence required by patch apply."},
         "code.gate.run": {"required": ["gate_id"], "optional": {"cwd": "project-relative directory; defaults to repository root"}, "safety": "Calls hermes3d-locks hermes_run_gate only. Arbitrary commands and cwd outside the edit workspace are blocked."},
         "code.git.branch": {"required": ["task_id", "branch_name"], "optional": {"base_ref": "safe git ref", "reason": "why this branch is needed"}, "safety": "Only codex/ and hermes-agent/ branch prefixes are accepted; worktree must be clean."},
         "code.git.stage_owned": {"required": ["task_id", "files"], "optional": {}, "safety": "Every file must be changed, snapshotted by the same agent, source-allowed, and locked by the same owner/task."},
