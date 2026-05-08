@@ -28,6 +28,7 @@ def test_action_catalog_hides_internal_handlers_and_exposes_code_actions() -> No
     assert "source.runner_contract.refresh" in by_id
     assert "source.read_only_runner.smoke" in by_id
     assert "source.executable_path_runner.smoke" in by_id
+    assert "source.python_import_repair.preflight" in by_id
     assert all("handler" not in contract for contract in contracts)
     assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {"files", "task_id"}
 
@@ -105,6 +106,7 @@ def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> No
     single = by_id["source.runner_contract.refresh"]
     smoke = by_id["source.read_only_runner.smoke"]
     executable = by_id["source.executable_path_runner.smoke"]
+    python_repair = by_id["source.python_import_repair.preflight"]
 
     assert matrix["kind"] == "read"
     assert matrix["risk"] == "low"
@@ -132,3 +134,10 @@ def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> No
     assert executable["rollback_required"] is False
     assert set(executable["payload_schema"]["required"]) == {"module_id"}
     assert "no app launch, setup, install, update" in executable["payload_schema"]["safety"]
+
+    assert python_repair["kind"] == "proof"
+    assert python_repair["risk"] == "low"
+    assert python_repair["approval_required"] is False
+    assert python_repair["rollback_required"] is False
+    assert set(python_repair["payload_schema"]["required"]) == {"module_id"}
+    assert "no package install" in python_repair["payload_schema"]["safety"]

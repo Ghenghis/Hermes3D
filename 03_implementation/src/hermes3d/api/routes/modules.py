@@ -22,6 +22,7 @@ from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
 from hermes3d.services.module_runtime import (
     module_executable_path_runner_contract,
+    module_python_import_repair_runner_contract,
     module_read_only_runner_contract,
     module_runner_contract,
     module_runner_contracts,
@@ -103,6 +104,10 @@ class ModuleRuntimeReadOnlyRunnerRequest(BaseModel):
 
 
 class ModuleRuntimeExecutablePathRunnerRequest(BaseModel):
+    actor: str = "operator"
+
+
+class ModuleRuntimePythonImportRepairRunnerRequest(BaseModel):
     actor: str = "operator"
 
 
@@ -730,7 +735,7 @@ def module_runtime_runner_contracts(section: str | None = None) -> dict[str, Any
         **contracts,
         "section": section,
         "execution_mode": "contract_only_until_registered_runner_passes",
-        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; executable_path_runner_available rows may read executable metadata only; every other row remains Verify/Setup Plan only.",
+        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; executable_path_runner_available rows may read executable metadata only; python_import_repair_available rows may read source/dependency metadata only; every other row remains Verify/Setup Plan only.",
     }
 
 
@@ -811,6 +816,11 @@ def module_agent_cli_readiness() -> dict[str, Any]:
         for record in records
         if record["executable_path_runner_available"]
     ]
+    python_import_repair_runners = [
+        record["module_id"]
+        for record in records
+        if record["python_import_repair_available"]
+    ]
     return {
         "status": "ready",
         "count": len(records),
@@ -819,11 +829,13 @@ def module_agent_cli_readiness() -> dict[str, Any]:
         "verified_agent_cli": len(verified_cli),
         "read_only_runner_available": len(read_only_runners),
         "executable_path_runner_available": len(executable_path_runners),
+        "python_import_repair_available": len(python_import_repair_runners),
         "launcher_metadata_only": len(launcher_only),
         "runner_gaps": len(runner_gaps),
         "verified_agent_cli_modules": verified_cli,
         "read_only_runner_modules": read_only_runners,
         "executable_path_runner_modules": executable_path_runners,
+        "python_import_repair_modules": python_import_repair_runners,
         "launcher_metadata_only_modules": launcher_only,
         "records": records,
     }
@@ -882,6 +894,12 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
         ),
         "executable_path_runner_route": f"/api/modules/{mod['id']}/runtime/executable-path-runner"
         if contract.get("executable_path_runner_available")
+        else None,
+        "python_import_repair_available": bool(
+            contract.get("python_import_repair_available")
+        ),
+        "python_import_repair_route": f"/api/modules/{mod['id']}/runtime/python-import-repair-runner"
+        if contract.get("python_import_repair_available")
         else None,
         "next_action": _agent_cli_next_action(
             execution_tier, launch_kind, str(runtime.get("verifier") or "")
@@ -1022,6 +1040,46 @@ def create_module_runtime_executable_path_runner(
             "verifier_kind": contract["verifier_kind"],
             "proof_gate_version": contract.get("proof_gate_version"),
             "executable_sha256": (contract.get("executable") or {}).get("sha256"),
+            "contract": contract,
+        },
+    )
+    return {
+        "module_id": module_id,
+        "accepted": bool(contract["accepted"]),
+        "status": str(contract["status"]),
+        "runtime_ready": bool(contract["runtime_ready"]),
+        "execution_mode": str(contract["execution_mode"]),
+        "contract": contract,
+        "proof_event_id": proof_event_id,
+    }
+
+
+@router.post("/api/modules/{module_id}/runtime/python-import-repair-runner")
+def create_module_runtime_python_import_repair_runner(
+    module_id: str,
+    body: ModuleRuntimePythonImportRepairRunnerRequest | None = None,
+) -> dict[str, Any]:
+    mod = _sync_module_status(_module_or_404(module_id))
+    actor = _safe_actor(body.actor if body else "operator")
+    contract = module_python_import_repair_runner_contract(mod)
+    manifest_hashes = [
+        item.get("sha256")
+        for item in contract.get("repair", {}).get("manifests", [])
+        if item.get("sha256")
+    ]
+    proof_event_id = _append_module_proof(
+        "source_module.runtime_python_import_repair.preflighted"
+        if contract["accepted"]
+        else "source_module.runtime_python_import_repair.blocked",
+        actor,
+        {
+            "module_id": module_id,
+            "accepted": contract["accepted"],
+            "status": contract["status"],
+            "verifier_kind": contract["verifier_kind"],
+            "proof_gate_version": contract.get("proof_gate_version"),
+            "import_module": contract.get("repair", {}).get("import_module"),
+            "manifest_hashes": manifest_hashes,
             "contract": contract,
         },
     )
