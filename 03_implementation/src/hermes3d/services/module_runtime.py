@@ -39,6 +39,7 @@ CLI_INSTALL_CONFIG_EXTRA_PATHS = {
     "slic3r": ["C:/Program Files/Slic3r/slic3r.exe"],
     "superslicer": ["C:/Program Files/SuperSlicer/superslicer.exe"],
 }
+NPM_PACKAGE_PREFLIGHT_RUNNER_MODULE_IDS = {"azure_speech_sdk_js"}
 
 BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     "prusaslicer": {
@@ -886,6 +887,10 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         runtime=runtime,
         verifier_kind=verifier_kind,
     )
+    npm_package_preflight_available = _npm_package_preflight_runner_available(
+        mod=mod,
+        runtime=runtime,
+    )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
     blocked_reason = (
@@ -893,6 +898,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         if read_only_runner_available
         or executable_path_runner_available
         or cli_install_config_available
+        or npm_package_preflight_available
         else _runner_blocked_reason(
             runtime=runtime, runner_status=runner_status, required_family=required_family
         )
@@ -910,6 +916,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "executable_path_runner_available": executable_path_runner_available,
         "python_import_repair_available": python_import_repair_available,
         "cli_install_config_available": cli_install_config_available,
+        "npm_package_preflight_available": npm_package_preflight_available,
         "runner_status": runner_status,
         "verifier": runtime.get("verifier"),
         "verifier_kind": verifier_kind,
@@ -925,6 +932,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
             executable_path_runner_available=executable_path_runner_available,
             python_import_repair_available=python_import_repair_available,
             cli_install_config_available=cli_install_config_available,
+            npm_package_preflight_available=npm_package_preflight_available,
         ),
         "required_verifier_family": required_family,
         "acceptance_gate": _runner_acceptance_gate(
@@ -936,7 +944,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
         "proof_required": True,
         "mutation_allowed": False,
-        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, executable path smoke may read installed launcher metadata only, Python import repair preflight may read source/dependency metadata only, and CLI install/config preflight may read Slic3r/SuperSlicer source/schema/profile metadata only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
+        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, executable path smoke may read installed launcher metadata only, Python import repair preflight may read source/dependency metadata only, CLI install/config preflight may read Slic3r/SuperSlicer source/schema/profile metadata only, and npm package preflight may read package metadata/script names only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
     }
 
 
@@ -966,6 +974,9 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "cli_install_config_available": sum(
             1 for contract in contracts if contract.get("cli_install_config_available")
         ),
+        "npm_package_preflight_available": sum(
+            1 for contract in contracts if contract.get("npm_package_preflight_available")
+        ),
         "runner_gaps": sum(
             1
             for contract in contracts
@@ -981,7 +992,7 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "by_runner_status": dict(sorted(by_status.items())),
         "by_gap_section": dict(sorted(by_section.items())),
         "contracts": contracts,
-        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata; python_import_repair_available rows may only read source/dependency metadata; cli_install_config_available rows may only read Slic3r/SuperSlicer source/schema/profile metadata. None can launch, install, update, or write.",
+        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata; python_import_repair_available rows may only read source/dependency metadata; cli_install_config_available rows may only read Slic3r/SuperSlicer source/schema/profile metadata; npm_package_preflight_available rows may only read package metadata/script names. None can launch, install, update, or write.",
     }
 
 
@@ -1267,6 +1278,71 @@ def module_cli_install_config_runner_contract(mod: dict[str, Any]) -> dict[str, 
         if ready
         else "blocked_until_source_schema_or_executable_config_proof_exists",
         "policy": "This endpoint reads only Slic3r/SuperSlicer source checkout, adapter schema, profile/config, and candidate executable metadata. It cannot install packages, start apps, slice files, write outputs, update source, or send printer commands.",
+    }
+
+
+def module_npm_package_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
+    """Return the npm package metadata/script preflight contract.
+
+    This is for source-backed npm package rows such as Azure Speech SDK JS. It
+    reads package metadata, script names, lockfile/manifests, and local node/npm
+    executable presence only. It never runs npm, installs dependencies, starts
+    a process, writes output, or touches printers.
+    """
+
+    runtime = module_runtime_probe(mod, live=False)
+    module_id = str(mod.get("id") or "")
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    verifier_kind = str(runtime.get("kind") or launch_kind)
+    metadata = _npm_package_preflight_metadata(mod=mod, runtime=runtime)
+    ready = _npm_package_preflight_runner_available(mod=mod, runtime=runtime)
+    if ready and not metadata.get("package_json", {}).get("exists"):
+        ready = False
+    blocked_reason = None if ready else _npm_package_preflight_blocked_reason(
+        mod=mod,
+        runtime=runtime,
+        metadata=metadata,
+    )
+    runtime_public = {
+        key: value
+        for key, value in runtime.items()
+        if key not in {"output_head"}
+    }
+    if runtime.get("output_head"):
+        runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
+    return {
+        "module_id": module_id,
+        "display": str(mod.get("display_name") or module_id),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": launch_kind,
+        "status": "package_preflight_ready" if ready else "blocked",
+        "accepted": ready,
+        "runtime_ready": False,
+        "npm_package_preflight_available": ready,
+        "agent_executable": False,
+        "runner_status": "npm_package_preflight_ready" if ready else "blocked",
+        "verifier": runtime.get("verifier"),
+        "verifier_kind": verifier_kind,
+        "proof_gate_version": runtime.get("proof_gate_version"),
+        "path": runtime.get("path") or mod.get("local_path") or "",
+        "executed": bool(runtime.get("executed")),
+        "return_code": runtime.get("return_code"),
+        "capabilities": list(runtime.get("capabilities") or []),
+        "runtime": runtime_public,
+        "package": metadata,
+        "safe_actions": ["verify", "setup_plan", "read_metadata", "npm_package_metadata_plan"]
+        if ready
+        else ["verify", "setup_plan"],
+        "blocked_reason": blocked_reason,
+        "proof_required": True,
+        "mutation_allowed": False,
+        "install_allowed": False,
+        "process_start_allowed": False,
+        "printer_action_allowed": False,
+        "execution_mode": "registered_npm_package_metadata_preflight"
+        if ready
+        else "blocked_until_package_metadata_proof_exists",
+        "policy": "This endpoint reads only npm package metadata, script names, lockfile/manifests, and local node/npm executable presence. It cannot run npm scripts, install packages, start services, write outputs, update source, or send printer commands.",
     }
 
 
@@ -2378,6 +2454,21 @@ def _cli_install_config_runner_available(
     )
 
 
+def _npm_package_preflight_runner_available(
+    *, mod: dict[str, Any], runtime: dict[str, Any]
+) -> bool:
+    module_id = str(mod.get("id") or "")
+    local_path = str(mod.get("local_path") or "")
+    launch_kind = str(mod.get("launch_kind") or "")
+    return (
+        module_id in NPM_PACKAGE_PREFLIGHT_RUNNER_MODULE_IDS
+        and launch_kind == "npm_package"
+        and str(runtime.get("status") or "") != "ready"
+        and bool(local_path)
+        and Path(local_path).is_dir()
+    )
+
+
 def _read_only_runner_family(verifier_kind: str) -> str:
     if verifier_kind in READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS:
         return "metadata"
@@ -2484,6 +2575,24 @@ def _cli_install_config_blocked_reason(
     return str(runtime.get("reason") or "CLI install/config preflight is blocked.")
 
 
+def _npm_package_preflight_blocked_reason(
+    *, mod: dict[str, Any], runtime: dict[str, Any], metadata: dict[str, Any]
+) -> str:
+    module_id = str(mod.get("id") or "")
+    launch_kind = str(mod.get("launch_kind") or "")
+    if module_id not in NPM_PACKAGE_PREFLIGHT_RUNNER_MODULE_IDS:
+        return "npm package metadata preflight is scoped only to registered npm package rows."
+    if launch_kind != "npm_package":
+        return f"npm package metadata preflight requires launch kind npm_package; this row uses {launch_kind}."
+    if str(runtime.get("status") or "") == "ready":
+        return "The node package already verifies; use the read-only runner smoke instead."
+    if not metadata.get("source_checkout", {}).get("exists"):
+        return "npm package metadata preflight requires the local source checkout to exist."
+    if not metadata.get("package_json", {}).get("exists"):
+        return "npm package metadata preflight requires package.json in the source checkout."
+    return str(runtime.get("reason") or "npm package metadata preflight is blocked.")
+
+
 def _safe_runner_actions(
     runtime: dict[str, Any],
     *,
@@ -2492,6 +2601,7 @@ def _safe_runner_actions(
     executable_path_runner_available: bool = False,
     python_import_repair_available: bool = False,
     cli_install_config_available: bool = False,
+    npm_package_preflight_available: bool = False,
 ) -> list[str]:
     actions = ["verify", "setup_plan"]
     if agent_executable:
@@ -2504,6 +2614,8 @@ def _safe_runner_actions(
         actions.extend(["read_metadata", "python_import_repair_plan"])
     elif cli_install_config_available:
         actions.extend(["read_metadata", "cli_install_config_plan"])
+    elif npm_package_preflight_available:
+        actions.extend(["read_metadata", "npm_package_metadata_plan"])
     elif runtime.get("status") == "ready":
         actions.append("read_metadata")
     return actions
@@ -2681,6 +2793,107 @@ def _cli_install_config_metadata(
             "Keep adapter schema/profile metadata under versioned Hermes3D source control.",
             f"Run `/api/modules/{module_id}/runtime/verify` until the CLI help/version verifier returns ready.",
             "Only then promote to a bounded slicer CLI runner; never infer readiness from source presence alone.",
+        ],
+    }
+
+
+def _npm_package_preflight_metadata(
+    *, mod: dict[str, Any], runtime: dict[str, Any]
+) -> dict[str, Any]:
+    module_id = str(mod.get("id") or "")
+    root_value = str(mod.get("local_path") or runtime.get("path") or "")
+    root = Path(root_value) if root_value else None
+    package_json = root / "package.json" if root else None
+    package_file: dict[str, Any] = (
+        _source_metadata_file(package_json)
+        if package_json and package_json.exists()
+        else {
+            "exists": False,
+            "path": str(package_json) if package_json else "",
+            "reason": "missing",
+        }
+    )
+    package_payload: dict[str, Any] = {}
+    parse_error: str | None = None
+    if package_json and package_json.is_file():
+        try:
+            parsed = json.loads(package_json.read_text(encoding="utf-8", errors="replace"))
+            if isinstance(parsed, dict):
+                package_payload = parsed
+        except json.JSONDecodeError as exc:
+            parse_error = f"{type(exc).__name__}: {exc.msg}"
+    scripts = package_payload.get("scripts") if isinstance(package_payload, dict) else None
+    dependencies = package_payload.get("dependencies") if isinstance(package_payload, dict) else None
+    dev_dependencies = package_payload.get("devDependencies") if isinstance(package_payload, dict) else None
+    peer_dependencies = package_payload.get("peerDependencies") if isinstance(package_payload, dict) else None
+    optional_dependencies = (
+        package_payload.get("optionalDependencies") if isinstance(package_payload, dict) else None
+    )
+    manifests: list[dict[str, Any]] = []
+    lockfiles: list[dict[str, Any]] = []
+    if root and root.is_dir():
+        for name in ("README.md", "LICENSE", "tsconfig.json", "gulpfile.cjs"):
+            item = root / name
+            if item.is_file():
+                manifests.append(_source_metadata_file(item))
+        for name in ("package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock"):
+            item = root / name
+            if item.is_file():
+                lockfiles.append(_source_metadata_file(item))
+    node_path = shutil.which("node")
+    npm_path = shutil.which("npm")
+    package_file.update(
+        {
+            "parse_error": parse_error,
+            "name": str(package_payload.get("name") or "") if package_payload else "",
+            "version": str(package_payload.get("version") or "") if package_payload else "",
+            "main": str(package_payload.get("main") or "") if package_payload else "",
+            "module": str(package_payload.get("module") or "") if package_payload else "",
+            "types": str(package_payload.get("types") or "") if package_payload else "",
+            "package_manager": str(package_payload.get("packageManager") or "")
+            if package_payload
+            else "",
+            "script_names": sorted(str(key) for key in scripts.keys())
+            if isinstance(scripts, dict)
+            else [],
+            "dependency_counts": {
+                "dependencies": len(dependencies) if isinstance(dependencies, dict) else 0,
+                "devDependencies": len(dev_dependencies)
+                if isinstance(dev_dependencies, dict)
+                else 0,
+                "peerDependencies": len(peer_dependencies)
+                if isinstance(peer_dependencies, dict)
+                else 0,
+                "optionalDependencies": len(optional_dependencies)
+                if isinstance(optional_dependencies, dict)
+                else 0,
+            },
+        }
+    )
+    return {
+        "source_checkout": {
+            "exists": bool(root and root.is_dir()),
+            "path": str(root) if root else "",
+        },
+        "package_json": package_file,
+        "source_manifests": manifests,
+        "lockfiles": lockfiles,
+        "node_candidate": _executable_file_metadata(Path(node_path)) if node_path else {
+            "exists": False,
+            "value": "node",
+            "reason": "not_on_path",
+        },
+        "npm_candidate": _executable_file_metadata(Path(npm_path)) if npm_path else {
+            "exists": False,
+            "value": "npm",
+            "reason": "not_on_path",
+        },
+        "current_runtime_reason": runtime.get("reason"),
+        "setup_plan": [
+            f"Use the recorded package.json metadata for {mod.get('display_name') or module_id}.",
+            "Run dependency install/build only in the sandboxed npm runner lane with backup, smoke, proof, and rollback.",
+            f"Run `/api/modules/{module_id}/runtime/verify` after a real node package verifier is registered.",
+            "Only then promote to read-only runner smoke; never infer runtime readiness from package.json alone.",
         ],
     }
 

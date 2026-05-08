@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 from hermes3d.api.routes import modules
 from hermes3d.services import module_runtime, source_service_supervisor
@@ -561,6 +563,66 @@ def test_slicer_cli_install_config_preflight_keeps_runtime_blocked(
     assert preflight["execution_mode"] == "registered_cli_install_config_preflight"
 
 
+def test_npm_package_preflight_reads_package_metadata_only(monkeypatch, tmp_path) -> None:
+    package_json = tmp_path / "package.json"
+    package_json.write_text(
+        json.dumps(
+            {
+                "name": "microsoft-cognitiveservices-speech-sdk",
+                "version": "1.50.0-alpha.1",
+                "main": "distrib/lib/microsoft.cognitiveservices.speech.sdk.js",
+                "scripts": {"build": "gulp build", "test": "jest"},
+                "dependencies": {"ws": "^8.18.2"},
+                "devDependencies": {"typescript": "4.5"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "README.md").write_text("# Azure Speech SDK JS\n", encoding="utf-8")
+
+    def _source_ready(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "source_ready",
+            "kind": "npm_package",
+            "verifier": "source checkout",
+            "path": str(tmp_path),
+            "detected": True,
+            "executed": False,
+            "return_code": None,
+            "capabilities": [],
+            "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
+            "proof_gate_version": None,
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _source_ready)
+    mod = {
+        "id": "azure_speech_sdk_js",
+        "display_name": "Azure Speech SDK JS",
+        "section": "agents",
+        "launch_kind": "npm_package",
+        "install_state": "installed",
+        "local_path": str(tmp_path),
+    }
+
+    contract = module_runtime.module_runner_contract(mod)
+    preflight = module_runtime.module_npm_package_runner_contract(mod)
+
+    assert contract["agent_executable"] is False
+    assert contract["runtime_ready"] is False
+    assert contract["npm_package_preflight_available"] is True
+    assert "npm_package_metadata_plan" in contract["safe_actions"]
+    assert preflight["accepted"] is True
+    assert preflight["runtime_ready"] is False
+    assert preflight["install_allowed"] is False
+    assert preflight["process_start_allowed"] is False
+    assert preflight["printer_action_allowed"] is False
+    assert preflight["package"]["package_json"]["name"] == "microsoft-cognitiveservices-speech-sdk"
+    assert preflight["package"]["package_json"]["script_names"] == ["build", "test"]
+    assert preflight["package"]["package_json"]["dependency_counts"]["dependencies"] == 1
+    assert preflight["package"]["package_json"]["sha256"]
+    assert preflight["execution_mode"] == "registered_npm_package_metadata_preflight"
+
+
 def test_print_farm_health_probe_requires_configured_local_url(monkeypatch) -> None:
     monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
     monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
@@ -819,6 +881,7 @@ def test_runner_contract_routes_are_registered() -> None:
     assert "/api/modules/{module_id}/runtime/executable-path-runner" in paths
     assert "/api/modules/{module_id}/runtime/python-import-repair-runner" in paths
     assert "/api/modules/{module_id}/runtime/cli-install-config-runner" in paths
+    assert "/api/modules/{module_id}/runtime/npm-package-runner" in paths
     assert "/api/modules/{module_id}/runtime/start-runner" in paths
     assert "/api/modules/{module_id}/runtime/stop-runner" in paths
 

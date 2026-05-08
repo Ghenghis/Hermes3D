@@ -30,6 +30,7 @@ def test_action_catalog_hides_internal_handlers_and_exposes_code_actions() -> No
     assert "source.executable_path_runner.smoke" in by_id
     assert "source.python_import_repair.preflight" in by_id
     assert "source.cli_install_config.preflight" in by_id
+    assert "source.npm_package.preflight" in by_id
     assert all("handler" not in contract for contract in contracts)
     assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {"files", "task_id"}
 
@@ -109,6 +110,7 @@ def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> No
     executable = by_id["source.executable_path_runner.smoke"]
     python_repair = by_id["source.python_import_repair.preflight"]
     cli_config = by_id["source.cli_install_config.preflight"]
+    npm_package = by_id["source.npm_package.preflight"]
 
     assert matrix["kind"] == "read"
     assert matrix["risk"] == "low"
@@ -150,3 +152,10 @@ def test_source_runner_contract_actions_are_read_only_and_payload_scoped() -> No
     assert cli_config["rollback_required"] is False
     assert set(cli_config["payload_schema"]["required"]) == {"module_id"}
     assert "no install, launch, slicing" in cli_config["payload_schema"]["safety"]
+
+    assert npm_package["kind"] == "proof"
+    assert npm_package["risk"] == "low"
+    assert npm_package["approval_required"] is False
+    assert npm_package["rollback_required"] is False
+    assert set(npm_package["payload_schema"]["required"]) == {"module_id"}
+    assert "no npm install" in npm_package["payload_schema"]["safety"]
