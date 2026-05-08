@@ -15,6 +15,9 @@ def test_code_operator_routes_are_registered() -> None:
     paths = {route.path for route in app.routes}
 
     assert "/api/code-operator/programming-readiness" in paths
+    assert "/api/code-operator/teams/readiness" in paths
+    assert "/api/code-operator/teams/assign-task" in paths
+    assert "/api/code-operator/teams/request-review" in paths
     assert "/api/code-operator/patch/apply" in paths
     assert "/api/code-operator/git/commit-owned" in paths
     assert "/api/code-operator/history/restore" in paths
@@ -82,6 +85,137 @@ def test_git_commit_rejects_spoofed_actor_fields() -> None:
     )
 
     assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/code-operator/teams/assign-task",
+        "/api/code-operator/teams/request-review",
+    ],
+)
+def test_provider_team_routes_reject_spoofed_actor_fields(path: str) -> None:
+    client = TestClient(create_gui_app())
+    payload = {
+        "team_id": "dual",
+        "reviewer_team_id": "deepseek-reviewers",
+        "task_id": "TASK-1",
+        "title": "Fix a tab",
+        "summary": "Review a tab fix",
+        "files": ["README.md"],
+        "objective": "Make the tab real-backed.",
+        "proof_ids": ["ev_test_1"],
+        "owner": "other-agent",
+    }
+
+    response = client.post(path, json=payload)
+
+    assert response.status_code == 422
+
+
+def test_provider_team_readiness_uses_mocked_inputs_not_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(code_history, "private_env", lambda: {})
+    monkeypatch.setattr(
+        code_history,
+        "_source_repo_status",
+        lambda source: {
+            "id": source.id,
+            "status": "ready",
+            "exists": True,
+            "missing_required_files": [],
+        },
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_provider_status",
+        lambda provider_id, _private_values: {
+            "id": provider_id,
+            "status": "ready",
+            "api_key_configured": True,
+            "base_url_configured": True,
+            "model_configured": True,
+            "base_url_label": "local-or-private",
+            "model": f"{provider_id}-test",
+        },
+    )
+    monkeypatch.setattr(
+        code_history,
+        "mcp_lock_readiness",
+        lambda _private_values=None: {
+            "status": "ready",
+            "ready": True,
+            "blocked_reason": None,
+            "required_workflow": [],
+        },
+    )
+
+    response = TestClient(create_gui_app()).get("/api/code-operator/teams/readiness")
+    payload = response.json()
+
+    assert response.status_code == 200
+    assert payload["ready"] is True
+    assert {team["id"] for team in payload["teams"]} == {"minimax-builders", "deepseek-reviewers"}
+    assert all("api_key" not in str(team["provider"].get("base_url_label", "")).lower() for team in payload["teams"])
+
+
+def test_provider_team_assignment_blocks_when_provider_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(code_history, "private_env", lambda: {})
+    monkeypatch.setattr(
+        code_history,
+        "_source_repo_status",
+        lambda source: {"id": source.id, "status": "ready", "exists": True, "missing_required_files": []},
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_provider_status",
+        lambda provider_id, _private_values: {
+            "id": provider_id,
+            "status": "ready" if provider_id == "minimax" else "missing_config",
+            "api_key_configured": provider_id == "minimax",
+            "base_url_configured": False,
+            "model_configured": provider_id == "minimax",
+            "base_url_label": None,
+            "model": f"{provider_id}-test" if provider_id == "minimax" else None,
+        },
+    )
+    monkeypatch.setattr(
+        code_history,
+        "mcp_lock_readiness",
+        lambda _private_values=None: {"status": "ready", "ready": True, "blocked_reason": None, "required_workflow": []},
+    )
+    monkeypatch.setattr(
+        code_history,
+        "append_mcp_evidence",
+        lambda **kwargs: {"status": "recorded", "evidence_id": "ev_team_blocked", "kwargs": kwargs},
+    )
+
+    result = code_history.assign_provider_team_task(
+        owner="hermes-agent",
+        team_id="dual",
+        task_id="TASK-1",
+        title="Fix dashboard truth",
+        files=["README.md"],
+        objective="Make dashboard proof-backed.",
+    )
+
+    assert result["accepted"] is False
+    assert result["status"] == "blocked"
+    assert "deepseek-reviewers" in result["blocked_reasons"][0]
+    assert result["mcp_evidence"]["evidence_id"] == "ev_team_blocked"
+
+
+def test_provider_team_review_requires_proof_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+
+    with pytest.raises(ValueError, match="proof"):
+        code_history.request_provider_team_review(
+            owner="hermes-agent",
+            task_id="TASK-1",
+            summary="Review the fix.",
+            files=["README.md"],
+            proof_ids=[],
+        )
 
 
 @pytest.mark.parametrize(

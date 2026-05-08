@@ -134,9 +134,64 @@ class McpEvidenceRequest(StrictBody):
     data: dict[str, Any] = Field(default_factory=dict)
 
 
+class ProviderTeamAssignmentRequest(StrictBody):
+    team_id: str
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1)
+    objective: str = Field(min_length=1, max_length=1600)
+    target_branch: str | None = None
+    review_required: bool = True
+
+
+class ProviderTeamReviewRequest(StrictBody):
+    task_id: str
+    summary: str = Field(min_length=1, max_length=1200)
+    files: list[str] = Field(min_length=1)
+    proof_ids: list[str] = Field(min_length=1)
+    reviewer_team_id: str = "deepseek-reviewers"
+
+
 @router.get("/programming-readiness")
 def programming_readiness() -> dict[str, Any]:
     return code_history.programming_readiness()
+
+
+@router.get("/teams/readiness")
+def provider_team_readiness() -> dict[str, Any]:
+    return code_history.provider_team_readiness()
+
+
+@router.post("/teams/assign-task")
+def provider_team_assign_task(body: ProviderTeamAssignmentRequest) -> dict[str, Any]:
+    try:
+        return code_history.assign_provider_team_task(
+            owner=CODE_OPERATOR_ACTOR,
+            team_id=body.team_id,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
+            objective=body.objective,
+            target_branch=body.target_branch,
+            review_required=body.review_required,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/teams/request-review")
+def provider_team_request_review(body: ProviderTeamReviewRequest) -> dict[str, Any]:
+    try:
+        return code_history.request_provider_team_review(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            summary=body.summary,
+            files=body.files,
+            proof_ids=body.proof_ids,
+            reviewer_team_id=body.reviewer_team_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
 @router.get("/mcp-locks/readiness")
