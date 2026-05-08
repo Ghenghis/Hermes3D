@@ -91,12 +91,21 @@ def observe_status() -> dict:
 def cameras() -> list[dict]:
     printers = local_printers(live=False)
     plates = {plate["printer_id"]: plate for plate in build_plate_clearance_rows(printers)}
-    return [
-        {
+    result = []
+    for printer in printers:
+        configured_state = _configured_camera_state(printer)
+        # Probe the real camera endpoint so health reflects actual connectivity,
+        # not just whether a URL is set. This prevents the UI from showing
+        # "CONNECTING" indefinitely when the camera is actually unreachable.
+        if configured_state == "configured":
+            real_health, _http_status, _ms = _probe_camera_timed(printer.get("camera_url"))
+        else:
+            real_health = configured_state  # "not_configured"
+        result.append({
             "printer_id": printer["id"],
             "printer_name": printer["name"],
             "camera_url": printer["camera_url"],
-            "health": _configured_camera_state(printer),
+            "health": real_health,
             "is_locked": _camera_is_locked(printer),
             "printer_locked": is_s1_target(printer["id"]),
             "camera_kind": _camera_kind(printer),
@@ -105,9 +114,8 @@ def cameras() -> list[dict]:
             "snapshot_url": f"/api/observe/cameras/{printer['id']}/snapshot",
             "view_settings": camera_view_settings(str(printer["id"])),
             "plate_clearance": plates.get(str(printer["id"])),
-        }
-        for printer in printers
-    ]
+        })
+    return result
 
 
 @router.get("/api/observe/build-plate-clearance")

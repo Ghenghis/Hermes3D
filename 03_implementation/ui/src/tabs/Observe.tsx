@@ -777,7 +777,18 @@ function isObserverAvailable(status: string): boolean {
 }
 
 function initialFeedState(cameras: CameraFeed[]): Record<string, "loading" | "online" | "error"> {
-  return Object.fromEntries(cameras.map((camera) => [camera.printer_id, camera.camera_url ? "loading" : "error"]));
+  return Object.fromEntries(cameras.map((camera) => {
+    if (!camera.camera_url) {
+      return [camera.printer_id, "error"];
+    }
+    // Use real health from the backend probe — "unreachable" means the camera
+    // is confirmed offline, so start in error state rather than "loading"
+    // (which would make the UI appear to be trying to connect to a known-dead feed).
+    if (camera.health === "unreachable") {
+      return [camera.printer_id, "error"];
+    }
+    return [camera.printer_id, "loading"];
+  }));
 }
 
 async function fetchCameras(): Promise<CameraFeed[]> {

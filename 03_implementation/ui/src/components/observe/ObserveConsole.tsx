@@ -15,12 +15,7 @@ const DEFAULT_BRIDGE_PORT = "8765";
 const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
 
-const EVENTS = [
-  "Layer progress sampled for active print",
-  "No spaghetti risk detected in last frame",
-  "S1 camera offline; maintenance flag retained",
-  "Observe stream is read-only; no printer command path",
-];
+// No hardcoded fake events — observed events are derived from real camera status data.
 
 async function fetchObserveStatus(): Promise<ObserveStatusResponse | null> {
   try {
@@ -46,6 +41,9 @@ async function fetchObserveStatus(): Promise<ObserveStatusResponse | null> {
   }
 }
 
+/** Polling interval for /api/observe/status (ms). Must be >= 3000 to avoid lag. */
+const STATUS_POLL_INTERVAL_MS = 5_000;
+
 export function ObserveConsole() {
   const [statusData, setStatusData] = useState<ObserveStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +58,7 @@ export function ObserveConsole() {
       }
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 5_000);
+    const timer = window.setInterval(() => void poll(), STATUS_POLL_INTERVAL_MS);
     return () => {
       mounted = false;
       window.clearInterval(timer);
@@ -70,6 +68,19 @@ export function ObserveConsole() {
   const cameras: CameraStatus[] = statusData?.cameras ?? [];
   const onlineCount = cameras.filter((c) => c.health === "reachable").length;
   const totalCount = cameras.length;
+
+  // Derive observe events from real camera status — no fake/hardcoded strings.
+  const observeEvents: string[] = cameras.map((c) => {
+    const state = c.health === "reachable"
+      ? `online (${c.response_ms != null ? `${c.response_ms}ms` : "connected"}${c.estimated_fps != null ? `, ~${c.estimated_fps} fps` : ""})`
+      : c.health === "unreachable"
+      ? "unreachable — no feed"
+      : c.health === "not_configured"
+      ? "not configured"
+      : c.health;
+    const readOnlyNote = c.read_only ? " [read-only]" : "";
+    return `${c.printer_name}: ${state}${readOnlyNote}`;
+  });
 
   return (
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min">
@@ -155,7 +166,19 @@ export function ObserveConsole() {
           className="h-[225px]"
         >
           <ul className="flex h-full flex-col gap-1 overflow-auto text-xs">
-            {EVENTS.map((event) => (
+            {loading && (
+              <li className="flex items-center gap-2 rounded bg-surface2/40 px-2 py-1.5">
+                <Eye size={13} className="shrink-0 text-muted" />
+                <span className="truncate text-muted">Fetching camera status...</span>
+              </li>
+            )}
+            {!loading && observeEvents.length === 0 && (
+              <li className="flex items-center gap-2 rounded bg-surface2/40 px-2 py-1.5">
+                <Eye size={13} className="shrink-0 text-muted" />
+                <span className="truncate text-muted">No cameras configured or backend unreachable.</span>
+              </li>
+            )}
+            {observeEvents.map((event) => (
               <li key={event} className="flex items-center gap-2 rounded bg-surface2/40 px-2 py-1.5">
                 <Eye size={13} className="shrink-0 text-accent-cyan" />
                 <span className="truncate text-fg">{event}</span>
