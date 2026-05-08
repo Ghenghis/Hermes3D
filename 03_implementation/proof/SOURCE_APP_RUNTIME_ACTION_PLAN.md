@@ -1,20 +1,20 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-07T11:28:22.689690+00:00
+Generated: 2026-05-07T12:41:02.270802+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
 ## Current Truth
 
 - Source-backed apps: 60
-- Runtime-ready apps: 31
-- Runner-not-registered rows: 22
+- Runtime-ready apps: 32
+- Runner-not-registered rows: 21
 - Runtime-repair-required rows: 5
 - Source-install-available rows: 0
-- Open P0 runner/repair rows: 29
+- Open P0 runner/repair rows: 28
 - Verified Hermes Agent CLIs: 7
 - Agent-executable runner contracts: 7
-- CLI/service signals needing verifiers: 33
+- CLI/service signals needing verifiers: 24
 - Blocked rows: 2
 
 ## Correction Rules
@@ -41,21 +41,20 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 
 These rows are installed/source-ready but not Hermes Agent runnable yet. They must remain disabled or plan-only until the acceptance gate passes.
 
-Open P0 rows: 29
+Open P0 rows: 28
 
-### Cli Preferred Gap (3)
+### Cli Preferred Gap (2)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
 | Slic3r | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/slic3r/runtime/verify` must return ready with proof before any agent execution. |
-| Strec3D | slicers | cli_worker | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/strec3d/runtime/verify` must return ready with proof before any agent execution. |
 | SuperSlicer | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/superslicer/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Desktop App Gap (3)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| FreeCAD | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/freecad/runtime/verify` must return ready with proof before any agent execution. |
+| FreeCAD | modelers | desktop_app | no_local_cli_signal | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/freecad/runtime/verify` must return ready with proof before any agent execution. |
 | SolveSpace | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/solvespace/runtime/verify` must return ready with proof before any agent execution. |
 | MatterControl | slicers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/mattercontrol/runtime/verify` must return ready with proof before any agent execution. |
 
@@ -64,8 +63,8 @@ Open P0 rows: 29
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
 | Microsoft TRELLIS.2 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/trellis/runtime/verify` must return ready with proof before any agent execution. |
-| Tencent Hunyuan3D 2.1 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/hunyuan3d_2_1/runtime/verify` must return ready with proof before any agent execution. |
-| TripoSR | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/triposr/runtime/verify` must return ready with proof before any agent execution. |
+| Tencent Hunyuan3D 2.1 | three_d_generation | gpu_worker | no_local_cli_signal | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/hunyuan3d_2_1/runtime/verify` must return ready with proof before any agent execution. |
+| TripoSR | three_d_generation | gpu_worker | no_local_cli_signal | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/triposr/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Npm Package Gap (1)
 
@@ -79,7 +78,7 @@ Open P0 rows: 29
 | --- | --- | --- | --- | --- | --- |
 | CadQuery | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/cadquery/runtime/verify` must return ready with proof before any agent execution. |
 | Open3D | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/open3d/runtime/verify` must return ready with proof before any agent execution. |
-| build123d | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/build123d/runtime/verify` must return ready with proof before any agent execution. |
+| build123d | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/build123d/runtime/verify` must return ready with proof before any agent execution. |
 | numpy-stl | modelers | python_worker | cli_candidate_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/numpy_stl/runtime/verify` must return ready with proof before any agent execution. |
 | pymesh | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/pymesh/runtime/verify` must return ready with proof before any agent execution. |
 
@@ -118,7 +117,6 @@ Open P0 rows: 29
 
 - agent_cli_ready: 7
 - blocked: 2
-- cli_runner_gap: 1
 - desktop_app_runner_gap: 3
 - gpu_worker_runner_gap: 3
 - launcher_metadata_only: 3
@@ -128,7 +126,7 @@ Open P0 rows: 29
 - runner_not_registered: 5
 - runtime_repair_required: 5
 - service_runner_gap: 6
-- source_reference_only: 13
+- source_reference_only: 14
 - web_app_runner_gap: 3
 
 ## P1 CLI/Service Signals Needing Verifiers
@@ -139,19 +137,13 @@ These include some rows that are already source/reference/package ready. They st
 | --- | --- | --- | --- | --- |
 | Azure Speech SDK JS | agents | documentation_cli_signal_needs_verifier | npm_package_gap | Confirm the documented command in the local runtime and register a verifier. |
 | Blender MCP Candidates | agents | cli_candidate_needs_verifier | package_or_import_ready | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
-| Kiln | agents | documentation_cli_signal_needs_verifier | source_reference_ready | Confirm the documented command in the local runtime and register a verifier. |
 | Manyfold | library | documentation_cli_signal_needs_verifier | service_gap | Confirm the documented command in the local runtime and register a verifier. |
 | Open Filament Database | materials | cli_candidate_needs_verifier | service_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
 | CadQuery | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
-| FreeCAD | modelers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
-| Manifold | modelers | documentation_cli_signal_needs_verifier | package_or_import_ready | Confirm the documented command in the local runtime and register a verifier. |
-| MeshLab | modelers | documentation_cli_signal_needs_verifier | package_or_import_ready | Confirm the documented command in the local runtime and register a verifier. |
 | Open3D | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
 | SolveSpace | modelers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
-| build123d | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
 | numpy-stl | modelers | cli_candidate_needs_verifier | python_worker_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
 | trimesh | modelers | cli_candidate_needs_verifier | package_or_import_ready | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
-| truck | modelers | documentation_cli_signal_needs_verifier | source_reference_ready | Confirm the documented command in the local runtime and register a verifier. |
 | FDM Monster | print_farm | cli_candidate_needs_verifier | service_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
 | Fluidd | print_farm | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
 | Mainsail | print_farm | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
@@ -161,14 +153,11 @@ These include some rows that are already source/reference/package ready. They st
 | Kiri:Moto / GridSpace | slicers | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
 | MatterControl | slicers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
 | Slic3r | slicers | documentation_cli_signal_needs_verifier | cli_preferred_gap | Confirm the documented command in the local runtime and register a verifier. |
-| Strec3D | slicers | documentation_cli_signal_needs_verifier | cli_preferred_gap | Confirm the documented command in the local runtime and register a verifier. |
 | SuperSlicer | slicers | documentation_cli_signal_needs_verifier | cli_preferred_gap | Confirm the documented command in the local runtime and register a verifier. |
 | ComfyUI | three_d_generation | documentation_cli_signal_needs_verifier | service_gap | Confirm the documented command in the local runtime and register a verifier. |
 | ComfyUI Frontend | three_d_generation | service_or_setup_candidate_needs_verifier | source_reference_ready | Add a health/version/setup verifier before exposing service or setup actions. |
 | ComfyUI TRELLIS.2 Wrapper | three_d_generation | documentation_cli_signal_needs_verifier | service_gap | Confirm the documented command in the local runtime and register a verifier. |
 | Microsoft TRELLIS.2 | three_d_generation | documentation_cli_signal_needs_verifier | gpu_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
-| Tencent Hunyuan3D 2.1 | three_d_generation | documentation_cli_signal_needs_verifier | gpu_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
-| TripoSR | three_d_generation | documentation_cli_signal_needs_verifier | gpu_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
 | 3D Box Generator | utilities | service_or_setup_candidate_needs_verifier | source_reference_ready | Add a health/version/setup verifier before exposing service or setup actions. |
 
 ## Launcher Metadata Only
@@ -185,7 +174,7 @@ These can prove local desktop app presence, but they are not Hermes Agent CLI ru
 
 ### Runner Gap Tiers
 
-- cli_preferred_gap: 3
+- cli_preferred_gap: 2
 - desktop_app_gap: 3
 - gpu_worker_gap: 3
 - npm_package_gap: 1
@@ -197,7 +186,7 @@ These can prove local desktop app presence, but they are not Hermes Agent CLI ru
 ### CLI Surface Candidate Tiers
 
 - cli_candidate_needs_verifier: 7
-- documentation_cli_signal_needs_verifier: 20
+- documentation_cli_signal_needs_verifier: 11
 - service_or_setup_candidate_needs_verifier: 6
 
 ## Verification Commands

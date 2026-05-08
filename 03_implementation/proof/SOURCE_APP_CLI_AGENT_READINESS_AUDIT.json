@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-07T11:21:40.548420+00:00",
+  "generated_at_utc": "2026-05-07T12:24:27.917221+00:00",
   "next_actions": [
     "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
     "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
@@ -1414,29 +1414,34 @@
       "verifier_kind": "cli"
     },
     {
-      "acceptance_gate": "Register cli_version_help_or_dry_run; then `/api/modules/strec3d/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/strec3d/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "cli_preferred_gap",
-      "capabilities": [],
+      "agent_execution_tier": "source_reference_ready",
+      "capabilities": [
+        "structural_infill_reference",
+        "desktop_preprocessor_source",
+        "cmake_build_reference"
+      ],
       "display": "Strec3D",
       "executed": false,
-      "launch_kind": "cli_worker",
+      "launch_kind": "desktop_app",
       "module_id": "strec3d",
-      "next_action": "Locate/install the CLI executable or document no local CLI with proof; keep agent actions disabled.",
+      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\slicers\\Strecs3D",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "cli_version_help_or_dry_run",
-      "return_code": null,
-      "runner_contract_status": "cli_runner_gap",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "source-inventory-v1",
+      "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
+      "return_code": 0,
+      "runner_contract_status": "source_reference_only",
+      "runtime_status": "ready",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata"
       ],
       "section": "slicers",
-      "verifier": "source checkout",
-      "verifier_kind": "cli_worker"
+      "verifier": "Strec3D source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
       "acceptance_gate": "Register cli_version_help_or_dry_run; then `/api/modules/superslicer/runtime/verify` must return ready with proof before any agent execution.",
@@ -1693,7 +1698,7 @@
       "prusaslicer"
     ],
     "by_agent_execution_tier": {
-      "cli_preferred_gap": 3,
+      "cli_preferred_gap": 2,
       "desktop_app_gap": 3,
       "gpu_worker_gap": 3,
       "launcher_metadata_only": 3,
@@ -1703,14 +1708,13 @@
       "runner_gap": 5,
       "service_api_ready": 3,
       "service_gap": 6,
-      "source_reference_ready": 13,
+      "source_reference_ready": 14,
       "verified_agent_cli": 7,
       "web_app_gap": 3
     },
     "by_runner_contract_status": {
       "agent_cli_ready": 7,
       "blocked": 2,
-      "cli_runner_gap": 1,
       "desktop_app_runner_gap": 3,
       "gpu_worker_runner_gap": 3,
       "launcher_metadata_only": 3,
@@ -1720,7 +1724,7 @@
       "runner_not_registered": 5,
       "runtime_repair_required": 5,
       "service_runner_gap": 6,
-      "source_reference_only": 13,
+      "source_reference_only": 14,
       "web_app_runner_gap": 3
     },
     "launcher_metadata_only": 3,
@@ -1729,7 +1733,7 @@
       "bambustudio",
       "cura"
     ],
-    "runner_gaps": 29,
+    "runner_gaps": 28,
     "verified_agent_cli": 7,
     "verified_agent_cli_modules": [
       "hermes_agent",
@@ -1742,7 +1746,7 @@
     ]
   },
   "target": {
-    "registered_verifiers": 38,
+    "registered_verifiers": 39,
     "rule": "If an app offers a CLI, Hermes3D must prefer a bounded CLI verifier and Hermes Agent runner; desktop launcher metadata is not agent CLI readiness.",
     "source_backed_apps": 60
   }

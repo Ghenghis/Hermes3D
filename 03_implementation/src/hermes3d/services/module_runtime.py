@@ -136,6 +136,18 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "timeout_s": 12,
         "proof_gate_version": "runtime-verifier-v1",
     },
+    "strec3d": {
+        "tool_key": "source_inventory",
+        "label": "Strec3D source inventory",
+        "path": "",
+        "args": ["README.md", "CMakeLists.txt"],
+        "capabilities": ["structural_infill_reference", "desktop_preprocessor_source", "cmake_build_reference"],
+        "kind": "source_inventory",
+        "execute": False,
+        "timeout_s": 1,
+        "proof_gate_version": "source-inventory-v1",
+        "notes": "README documents a GUI preprocessing workflow; no safe CLI runner is registered.",
+    },
     "cura": {
         "tool_key": "ultimaker_cura_windows",
         "label": "UltiMaker Cura Windows launcher",
@@ -650,6 +662,14 @@ def _source_inventory_probe(probe: dict[str, Any], mod: dict[str, Any]) -> dict[
         missing = expected
     top_level = _top_level_inventory(root)
     ready = bool(root and root.is_dir()) and not missing
+    setup_steps = (
+        [
+            "Source inventory is verified; keep this row reference-only until a real adapter or runner is implemented.",
+            "If execution is required, add a bounded verifier that proves a non-destructive CLI, API, or desktop bridge.",
+        ]
+        if ready
+        else [f"Restore required source files in {path_value}.", "Run Verify again from Source OS."]
+    )
     return {
         "status": "ready" if ready else "source_ready",
         "label": "Source inventory ready" if ready else "Source inventory incomplete",
@@ -661,7 +681,7 @@ def _source_inventory_probe(probe: dict[str, Any], mod: dict[str, Any]) -> dict[
         "return_code": 0 if ready else None,
         "capabilities": list(probe.get("capabilities") or []),
         "reason": None if ready else f"{probe.get('label')} is missing required source files: {', '.join(missing)}.",
-        "setup_steps": [] if ready else [f"Restore required source files in {path_value}.", "Run Verify again from Source OS."],
+        "setup_steps": setup_steps,
         "proof_source": str(SOURCE_REGISTRY_AUDIT_PATH),
         "output_head": [
             f"expected={','.join(expected)}",
