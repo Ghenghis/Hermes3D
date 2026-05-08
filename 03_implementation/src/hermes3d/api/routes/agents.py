@@ -980,6 +980,21 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
 
         module_id = _required_payload_text(payload, "module_id")
         return modules_route.get_module_runtime_runner_contract(module_id)
+    if handler == "source.service_runner.start":
+        from hermes3d.api.routes import modules as modules_route
+
+        module_id = _required_payload_text(payload, "module_id")
+        body = modules_route.ModuleRuntimeStartRunnerRequest(
+            actor=actor,
+            execute=bool(payload.get("execute", False)),
+        )
+        return modules_route.create_module_runtime_start_runner(module_id, body)
+    if handler == "source.service_runner.stop":
+        from hermes3d.api.routes import modules as modules_route
+
+        module_id = _required_payload_text(payload, "module_id")
+        body = modules_route.ModuleRuntimeStartRunnerRequest(actor=actor, execute=False)
+        return modules_route.stop_module_runtime_runner(module_id, body)
     if handler == "source.agent_cli_readiness":
         from hermes3d.api.routes import modules as modules_route
 
@@ -1304,6 +1319,8 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("source.runtime_gaps.refresh", "Refresh Source OS runner gaps", "source_os", "ready", "read", "low", "GET /api/modules/runtime/gaps", "source.runtime_gaps", f"Shows {source_gaps} source-app runner gaps that still block full agent app operation."),
         _contract("source.runner_contracts.refresh", "Refresh Source OS runner contracts", "source_os", "ready", "read", "low", "GET /api/modules/runtime/runner-contracts", "source.runner_contracts", "Returns the 60-row Hermes Agent execution contract matrix; only rows with agent_executable=true may run agent actions."),
         _contract("source.runner_contract.refresh", "Refresh one Source OS runner contract", "source_os", "ready", "read", "low", "GET /api/modules/{module_id}/runtime/runner-contract", "source.runner_contract", "Returns the proof gate, safe actions, and exact blocked reason for one source-backed app."),
+        _contract("source.service_runner.start", "Start supervised Source OS service runner", "source_os", "partial", "mutate", "high", "POST /api/modules/{module_id}/runtime/start-runner", "source.service_runner.start", "Runs only a registered local/private service command through the Source OS supervisor, then requires live health proof before runtime-ready.", "Per-module start still blocks unless its runner contract preflight passes; use execute=false for proof-only preflight."),
+        _contract("source.service_runner.stop", "Stop supervised Source OS service runner", "source_os", "ready", "mutate", "medium", "POST /api/modules/{module_id}/runtime/stop-runner", "source.service_runner.stop", "Stops only a PID that the Source OS supervisor previously recorded for the same module."),
         _contract("source.verifiers.refresh", "Refresh Source OS verifier registry", "source_os", "ready", "read", "low", "GET /api/modules/runtime/verifiers", "source.verifiers", "Shows registered safe runtime verifier rows."),
         _contract("source.agent_cli_readiness.refresh", "Refresh agent CLI readiness", "source_os", "ready", "read", "low", "GET /api/modules/runtime/agent-cli-readiness", "source.agent_cli_readiness", f"Shows {agent_cli} verified agent CLI runners and {cli_candidates} CLI/service signals needing verifiers."),
         _contract("source.cli_surface.refresh", "Refresh Source OS CLI surface audit", "source_os", "ready", "read", "low", "GET /api/modules/runtime/cli-surface", "source.cli_surface", "Returns the proof-backed CLI/service surface audit."),
@@ -1390,6 +1407,8 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "source.runtime_gaps.refresh": {"required": [], "optional": {"section": "source registry section id"}},
         "source.runner_contracts.refresh": {"required": [], "optional": {"section": "source registry section id"}, "safety": "Read-only contract matrix; does not run setup, install, update, or launch commands."},
         "source.runner_contract.refresh": {"required": ["module_id"], "optional": {}, "safety": "Read-only single-module contract; no source or runtime mutation."},
+        "source.service_runner.start": {"required": ["module_id"], "optional": {"execute": "boolean; false writes a preflight proof only, true attempts supervised local start"}, "safety": "No arbitrary command input is accepted. Only registered service/web rows with local/private URL, source checkout, available command, and post-start health proof may start."},
+        "source.service_runner.stop": {"required": ["module_id"], "optional": {}, "safety": "Stops only PIDs previously started and tracked by the Source OS supervisor."},
         "printers.upload_start": {
             "required": ["printer_id", "gcode_path"],
             "optional": {

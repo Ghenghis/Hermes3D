@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from hermes3d.api.routes import modules
-from hermes3d.services import module_runtime
+from hermes3d.services import module_runtime, source_service_supervisor
 
 
 def test_verified_cli_contract_is_agent_executable(monkeypatch) -> None:
@@ -413,7 +413,7 @@ def test_local_http_health_probes_declare_default_urls_and_setup_steps() -> None
         ),
     ],
 )
-def test_service_start_runner_contracts_are_safe_preflight_only(
+def test_service_start_runner_contracts_are_safe_supervised_starts(
     monkeypatch,
     tmp_path,
     module_id: str,
@@ -445,20 +445,20 @@ def test_service_start_runner_contracts_are_safe_preflight_only(
         }
     )
 
-    assert (
-        contract["execution_mode"] == "preflight_and_proof_only_until_process_supervisor_is_enabled"
-    )
     assert contract["mutation_allowed"] is False
-    assert contract["agent_can_execute_start_now"] is False
+    assert contract["agent_can_execute_start_now"] == (module_id != "comfyui_trellis_wrapper")
     assert contract["env_name"] == env_name
     assert contract["url_guard"] == "local_private_only"
-    assert contract["safe_actions"] == ["verify", "setup_plan", "start_runner_preflight"]
     if module_id == "comfyui_trellis_wrapper":
         assert contract["status"] == "setup_required"
         assert "not a standalone service" in contract["blocked_reason"]
+        assert contract["execution_mode"] == "supervised_local_process_blocked_by_preflight"
+        assert "start_supervised_runner" not in contract["safe_actions"]
     else:
         assert contract["status"] == "ready_to_start"
+        assert contract["execution_mode"] == "supervised_local_process_with_post_start_health_proof"
         assert contract["start_preflight_passed"] is True
+        assert "start_supervised_runner" in contract["safe_actions"]
 
 
 def test_service_start_runner_rejects_public_url(monkeypatch, tmp_path) -> None:
@@ -507,3 +507,96 @@ def test_runner_contract_routes_are_registered() -> None:
     assert "/api/modules/runtime/runner-contracts" in paths
     assert "/api/modules/{module_id}/runtime/runner-contract" in paths
     assert "/api/modules/{module_id}/runtime/start-runner" in paths
+    assert "/api/modules/{module_id}/runtime/stop-runner" in paths
+
+
+def test_source_service_supervisor_blocks_failed_preflight() -> None:
+    result = source_service_supervisor.start_source_service_runner(
+        {"id": "fluidd", "display_name": "Fluidd"},
+        {
+            "module_id": "fluidd",
+            "status": "setup_required",
+            "start_preflight_passed": False,
+            "blocked_reason": "HERMES3D_SOURCE_FLUIDD_URL is not configured.",
+        },
+        actor="pytest",
+    )
+
+    assert result["accepted"] is False
+    assert result["status"] == "blocked"
+    assert result["execution_mode"] == "supervised_local_process_blocked_by_preflight"
+
+
+def test_source_service_supervisor_starts_registered_command_and_proves_health(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    class FakeProcess:
+        pid = 4242
+
+        def poll(self) -> None:
+            return None
+
+    started: dict[str, object] = {}
+
+    def fake_popen(command, **kwargs):  # noqa: ANN001
+        started["command"] = command
+        started["kwargs"] = kwargs
+        return FakeProcess()
+
+    monkeypatch.setattr(source_service_supervisor, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr(source_service_supervisor, "LOG_DIR", tmp_path / "logs")
+    monkeypatch.setattr(source_service_supervisor.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(
+        source_service_supervisor,
+        "module_runtime_probe",
+        lambda _mod, *, live=False: {
+            "status": "ready",
+            "kind": "local_http_health",
+            "executed": True,
+            "proof_gate_version": "local-http-health-verifier-v1",
+        },
+    )
+
+    local_script = tmp_path / "serve.cmd"
+    local_script.write_text("@echo off\n", encoding="utf-8")
+    contract = {
+        "module_id": "fluidd",
+        "status": "ready_to_start",
+        "start_preflight_passed": True,
+        "local_path": str(tmp_path),
+        "configured_url": "http://127.0.0.1:8083",
+        "runner": {
+            "command_preview": ["serve.cmd", "--host", "127.0.0.1"],
+            "command_family": "test_service",
+            "env": {"TEST_SERVICE_PORT": "8083"},
+        },
+    }
+
+    result = source_service_supervisor.start_source_service_runner(
+        {"id": "fluidd", "display_name": "Fluidd"},
+        contract,
+        actor="pytest",
+        post_start_probe_attempts=1,
+    )
+
+    assert result["accepted"] is True
+    assert result["status"] == "started_verified"
+    assert result["runtime_ready"] is True
+    assert result["process"]["pid"] == 4242
+    assert started["command"][0] == str(local_script)
+    kwargs = started["kwargs"]
+    assert kwargs["shell"] is False
+    assert kwargs["cwd"] == str(tmp_path)
+    assert kwargs["env"]["TEST_SERVICE_PORT"] == "8083"
+
+
+def test_source_service_supervisor_sanitizes_secret_env(monkeypatch) -> None:
+    monkeypatch.setenv("MINIMAX_API_KEY", "secret")
+    monkeypatch.setenv("PATH", "C:/Tools")
+
+    env = source_service_supervisor._safe_process_env({"env": {"SERVICE_PORT": "1234"}})
+
+    assert env["PATH"] == "C:/Tools"
+    assert env["SERVICE_PORT"] == "1234"
+    assert "MINIMAX_API_KEY" not in env

@@ -863,10 +863,10 @@ def module_service_start_runner_contract(
 ) -> dict[str, Any]:
     """Return the bounded setup/start contract for a service/web Source OS row.
 
-    This is a preflight contract, not an arbitrary command launcher. It records
-    the known start family, local URL guard, checkout presence, command
-    availability, and port state so Hermes Agents can plan safely without
-    falsely marking a service ready.
+    This is a registered-runner contract, not an arbitrary command launcher. It
+    records the known start family, local URL guard, checkout presence, command
+    availability, and port state so Hermes Agents can start only bounded local
+    services and still require a post-start health proof before runtime-ready.
     """
 
     module_id = str(mod.get("id") or "")
@@ -947,9 +947,12 @@ def module_service_start_runner_contract(
         "runtime_status": runtime_status,
         "runtime_reason": runtime.get("reason"),
         "start_preflight_passed": preflight_passed,
-        "agent_can_execute_start_now": False,
+        "agent_can_execute_start_now": preflight_passed,
         "mutation_allowed": False,
-        "execution_mode": "preflight_and_proof_only_until_process_supervisor_is_enabled",
+        "process_start_allowed": preflight_passed,
+        "execution_mode": "supervised_local_process_with_post_start_health_proof"
+        if preflight_passed or runtime_ready
+        else "supervised_local_process_blocked_by_preflight",
         "env_name": env_name,
         "configured_url": _redact_text(configured_url) if configured_url else "",
         "default_url": default_url,
@@ -965,7 +968,12 @@ def module_service_start_runner_contract(
             "notes": runner.get("notes"),
         },
         "port_state": port_state,
-        "safe_actions": ["verify", "setup_plan", "start_runner_preflight"],
+        "safe_actions": [
+            "verify",
+            "setup_plan",
+            *(["start_supervised_runner"] if preflight_passed else []),
+            "stop_supervised_runner",
+        ],
         "blocked_reasons": blockers,
         "blocked_reason": "; ".join(blockers) if blockers else None,
         "acceptance_gate": f"`/api/modules/{module_id}/runtime/verify` must return ready after startup before this service is marked runtime-ready.",
