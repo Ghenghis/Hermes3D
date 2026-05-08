@@ -251,6 +251,14 @@ def run_code_cli_runner(body: CliRunnerRunRequest) -> dict[str, Any]:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
 
+@router.get("/e2e/jobs")
+def list_e2e_jobs(limit: int = 100) -> dict[str, Any]:
+    try:
+        return code_history.list_e2e_jobs(limit=limit)
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
 @router.post("/e2e/jobs")
 def run_agent_e2e_job(body: AgentE2EJobRequest) -> dict[str, Any]:
     try:

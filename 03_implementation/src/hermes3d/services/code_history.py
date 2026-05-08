@@ -602,6 +602,68 @@ def folder_index_context(files: list[str]) -> dict[str, Any]:
     }
 
 
+def list_e2e_jobs(limit: int = 100) -> dict[str, Any]:
+    """Return recent E2E code-loop job events recorded in proof_events.
+
+    Each entry reflects the final proof_event written per task_id by
+    run_agent_e2e_job (kind='code_e2e').  Status values:
+      - needs_reviewed_patch_proposal  — planning/review completed, patch apply next
+      - blocked                        — job was blocked at coding or review pass
+    """
+    safe_limit = max(1, min(int(limit), 500))
+    records = rows(
+        """
+        SELECT id, event_type, source_agent, payload, created_at
+        FROM proof_events
+        WHERE event_type LIKE 'code_e2e%' OR event_type LIKE 'code_patch%'
+           OR event_type LIKE 'code_git%'
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (safe_limit,),
+    )
+    jobs: list[dict[str, Any]] = []
+    seen_task_ids: set[str] = set()
+    for record in records:
+        raw_payload = record.get("payload") or "{}"
+        try:
+            payload = json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
+        except json.JSONDecodeError:
+            payload = {}
+        task_id = str(payload.get("task_id") or "")
+        status = str(payload.get("next_status") or payload.get("status") or "")
+        entry: dict[str, Any] = {
+            "proof_event_id": record["id"],
+            "event_type": record["event_type"],
+            "source_agent": record["source_agent"],
+            "task_id": task_id,
+            "title": str(payload.get("title") or ""),
+            "files": payload.get("files") or [],
+            "status": status,
+            "blocked_reasons": payload.get("blocked_reasons") or [],
+            "created_at": record["created_at"],
+        }
+        jobs.append(entry)
+        if task_id:
+            seen_task_ids.add(task_id)
+    return {
+        "status": "ready",
+        "workspace": str(PROJECT_ROOT),
+        "count": len(jobs),
+        "unique_task_ids": len(seen_task_ids),
+        "limit": safe_limit,
+        "jobs": jobs,
+        "state_legend": {
+            "needs_reviewed_patch_proposal": "Planning/review done — patch apply + git ship next",
+            "blocked": "Blocked at coding or review pass — check provider keys",
+            "code_patch.applied": "Patch applied to file under MCP lock",
+            "code_git.committed": "Files committed with proof evidence",
+            "code_git.pushed": "Branch pushed to origin",
+            "code_git.pr_opened": "Pull request opened",
+        },
+    }
+
+
 def run_agent_e2e_job(
     *,
     owner: str,

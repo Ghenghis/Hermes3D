@@ -22,9 +22,15 @@ def test_code_operator_routes_are_registered() -> None:
     assert "/api/code-operator/teams/run-coding-pass" in paths
     assert "/api/code-operator/teams/run-review-pass" in paths
     assert "/api/code-operator/patch/apply" in paths
+    assert "/api/code-operator/patch/apply-reviewed" in paths
+    assert "/api/code-operator/gates/run" in paths
+    assert "/api/code-operator/git/branch" in paths
     assert "/api/code-operator/git/commit-owned" in paths
+    assert "/api/code-operator/git/push" in paths
+    assert "/api/code-operator/git/pr" in paths
     assert "/api/code-operator/history/restore" in paths
     assert "/api/code-operator/mcp-locks/evidence" in paths
+    assert "/api/code-operator/e2e/jobs" in paths
 
 
 @pytest.mark.parametrize(
@@ -538,3 +544,51 @@ def test_git_stage_rejects_unsnapshotted_file(monkeypatch: pytest.MonkeyPatch) -
 
     with pytest.raises(ValueError, match="no pre-change snapshot"):
         code_history.git_stage_owned_files(owner="hermes-agent", task_id="TASK-1", files=["README.md"])
+
+
+def test_list_e2e_jobs_returns_proof_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    """GET /e2e/jobs returns proof_events filtered to code_e2e/patch/git event types."""
+    import json as _json
+
+    fake_records = [
+        {
+            "id": "ev_e2e_1",
+            "event_type": "code_e2e",
+            "source_agent": "hermes-agent",
+            "payload": _json.dumps({"task_id": "TASK-1", "title": "Wire gate", "files": ["README.md"], "next_status": "needs_reviewed_patch_proposal"}),
+            "created_at": "2026-05-08T22:00:00",
+        },
+        {
+            "id": "ev_patch_1",
+            "event_type": "code_patch.applied",
+            "source_agent": "hermes-agent",
+            "payload": _json.dumps({"task_id": "TASK-1", "relative_path": "README.md"}),
+            "created_at": "2026-05-08T22:01:00",
+        },
+    ]
+    monkeypatch.setattr(code_history, "rows", lambda sql, params=(): fake_records)
+
+    result = code_history.list_e2e_jobs(limit=50)
+
+    assert result["status"] == "ready"
+    assert result["count"] == 2
+    assert result["unique_task_ids"] == 1
+    assert result["jobs"][0]["task_id"] == "TASK-1"
+    assert result["jobs"][0]["status"] == "needs_reviewed_patch_proposal"
+    assert "needs_reviewed_patch_proposal" in result["state_legend"]
+
+
+def test_list_e2e_jobs_route_returns_200() -> None:
+    """GET /api/code-operator/e2e/jobs route is registered and returns 200."""
+    import json as _json
+
+    app = create_gui_app()
+    client = TestClient(app)
+
+    response = client.get("/api/code-operator/e2e/jobs?limit=10")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert "jobs" in payload
+    assert "state_legend" in payload
