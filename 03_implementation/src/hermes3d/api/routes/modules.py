@@ -7,20 +7,24 @@ import re
 import subprocess
 import zipfile
 from collections import Counter
-from datetime import datetime, timezone
 from collections.abc import AsyncIterator
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from hermes3d.adapters.printrun import PrintrunAdapter
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
-from hermes3d.services.module_runtime import module_runtime_probe, module_setup_steps, registered_runtime_probe_ids
+from hermes3d.services.module_runtime import (
+    module_runtime_probe,
+    module_setup_steps,
+    registered_runtime_probe_ids,
+)
 
 router = APIRouter()
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[4]

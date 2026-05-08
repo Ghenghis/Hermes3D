@@ -11,7 +11,6 @@ Key invariants proven here:
 
 from __future__ import annotations
 
-import ipaddress
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,11 +20,9 @@ from fastapi.testclient import TestClient
 # ---------------------------------------------------------------------------
 # Import the module under test
 # ---------------------------------------------------------------------------
-
 from hermes3d.api.routes.printers import (
     CAMERA_ONLY_IPS,
     CameraValidateRequest,
-    PrinterProbeRequest,
     _validate_onboard_moonraker_url,
     _validated_onboard_printer_id,
     router,
@@ -206,8 +203,6 @@ def test_validate_camera_uses_head_request(monkeypatch):
 
         def get(self, key, default=""):
             return self.headers.get(key, default)
-
-    original_urlopen = _urllib_request.urlopen
 
     def mock_urlopen(request, timeout=None):
         captured_requests.append(request.method if hasattr(request, "method") else "GET")

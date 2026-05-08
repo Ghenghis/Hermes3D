@@ -10,9 +10,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from hermes3d.api.routes._common import as_json, execute, new_id, rows
-from hermes3d.services.local_state import port_reachable, service_url, set_service_url as save_service_url
 from hermes3d.core.printability_truth_gate import GATE_DEFINITIONS, run_core_truth_gate
-from hermes3d.services.local_state import implementation_path
+from hermes3d.services.local_state import implementation_path, port_reachable, service_url
+from hermes3d.services.local_state import set_service_url as save_service_url
 
 # Path to Lane 04 (H3D-CLAUDE-SOURCE-GEN3D) proof file — read-only
 _LANE04_PROOF_PATH = (
@@ -279,6 +279,7 @@ def _resolve_generation_template(prompt: str) -> str:
 
 def _execute_generation_template(request: GenerationRun, template_id: str) -> dict[str, Any]:
     import trimesh
+
     from hermes3d.core.proof import write_proof
 
     size_mm = _constraint_float(request.constraints, "size_mm", 20.0, minimum=5.0, maximum=80.0)

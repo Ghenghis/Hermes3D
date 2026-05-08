@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-import platform
-import os
 import hashlib
 import ipaddress
 import json
+import os
+import platform
 import shutil
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import urlparse
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel

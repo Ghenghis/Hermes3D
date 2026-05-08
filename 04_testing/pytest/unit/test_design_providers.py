@@ -11,11 +11,8 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import shutil
-from types import ModuleType
-from typing import Any
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Import the module under test.  If the hermes3d package is not installed we
@@ -25,8 +22,8 @@ import pytest
 try:
     from hermes3d.api.routes.design import (
         _discover_templates,
-        _probe_providers,
         _probe_cli_provider,
+        _probe_providers,
         _probe_python_provider,
     )
     _MODULE_AVAILABLE = True

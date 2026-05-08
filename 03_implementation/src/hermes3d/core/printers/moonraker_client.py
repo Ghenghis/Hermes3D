@@ -29,10 +29,10 @@ combination Dave runs on the fleet.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import time
-import ipaddress
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path

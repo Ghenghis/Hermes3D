@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import os
 import json
+import os
 import socket
 import tomllib
 import urllib.error
@@ -332,7 +332,7 @@ def _moonraker_snapshot(url: str | None, *, locked: bool) -> dict[str, Any]:
     extruder = raw_status.get("extruder", {}) if isinstance(raw_status.get("extruder"), dict) else {}
     bed = raw_status.get("heater_bed", {}) if isinstance(raw_status.get("heater_bed"), dict) else {}
     print_state = state.state.lower()
-    if not info.klippy_connected or info.klippy_state.lower() != "ready":
+    if str(printer_info_state).lower() != "ready":
         status = "offline"
     elif print_state == "printing":
         status = "printing"

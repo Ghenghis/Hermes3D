@@ -23,9 +23,7 @@ rulesets); regressions in the YAML pattern files will fail here at PR time.
 from __future__ import annotations
 
 import pytest
-
 from hermes3d.core.security import InjectionScanner, ScanResult
-
 
 # --------------------------------------------------------------------------- #
 # Fixtures

@@ -18,7 +18,6 @@ from .base import SkeletonAdapter
 from .registry import register
 from .types import AdapterState, DetectResult, LaunchResult
 
-
 APPS_ROOT = Path(os.environ.get("HERMES3D_APPS_ROOT", "G:/Github/apps"))
 SOURCE_ROOT = APPS_ROOT / "Printrun-printrun-2.2.0"
 _LAUNCHED_PROCESS: subprocess.Popen[bytes] | subprocess.Popen[str] | None = None

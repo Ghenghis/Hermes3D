@@ -21,7 +21,13 @@ _IMPL_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS_DIR = _IMPL_ROOT / "scripts"
 sys.path.insert(0, str(_SCRIPTS_DIR))
 
-from verify_slicers import _PROBES, _extract_version, _resolve_exe, probe_slicer, run_all_probes  # noqa: E402
+from verify_slicers import (  # noqa: E402
+    _PROBES,
+    _extract_version,
+    _resolve_exe,
+    probe_slicer,
+    run_all_probes,
+)
 
 _PROOF_FILE = _IMPL_ROOT / "proof" / "SLICERS_VERIFY_2026-05-06.json"
 

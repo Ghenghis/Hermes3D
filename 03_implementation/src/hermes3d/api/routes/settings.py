@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import ipaddress
+from typing import Any
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException
-from typing import Any
-
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import execute, rows

@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
 import time
 import urllib.request
 from datetime import datetime, timezone
@@ -23,7 +22,7 @@ from typing import Any
 
 from fastapi import APIRouter
 
-from hermes3d.api.routes._common import execute, new_id, as_json
+from hermes3d.api.routes._common import as_json, execute, new_id
 
 router = APIRouter()
 
@@ -128,7 +127,7 @@ def _component_backup_available(component: str) -> dict[str, Any]:
             "component": component,
             "backup_available": False,
             "latest_backup": None,
-            "rollback_action": f"POST /api/desktop/update/backup" if component == "hermes-desktop" else "POST /api/agents/update/backup",
+            "rollback_action": "POST /api/desktop/update/backup" if component == "hermes-desktop" else "POST /api/agents/update/backup",
         }
     backups = sorted(backup_root.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not backups:
@@ -136,7 +135,7 @@ def _component_backup_available(component: str) -> dict[str, Any]:
             "component": component,
             "backup_available": False,
             "latest_backup": None,
-            "rollback_action": f"POST /api/desktop/update/backup" if component == "hermes-desktop" else "POST /api/agents/update/backup",
+            "rollback_action": "POST /api/desktop/update/backup" if component == "hermes-desktop" else "POST /api/agents/update/backup",
         }
     try:
         meta = json.loads(backups[0].read_text(encoding="utf-8"))
