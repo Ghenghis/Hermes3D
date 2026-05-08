@@ -1,6 +1,6 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-06T18:25:12.069421+00:00
+Generated: 2026-05-07T10:25:05.233701+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
@@ -10,6 +10,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Runtime-ready apps: 30
 - Runner gaps: 30
 - Verified Hermes Agent CLIs: 7
+- Agent-executable runner contracts: 7
 - CLI/service signals needing verifiers: 33
 - Blocked rows: 0
 
@@ -43,71 +44,90 @@ Open P0 rows: 30
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| MeshLab | modelers | desktop_or_cli | documentation_cli_signal_needs_verifier | Locate or install the real CLI, then register a bounded version/help/dry-run verifier. | `/api/modules/meshlab/runtime/verify` returns ready with executed=true and proof gate. |
-| Slic3r | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | Locate or install the real CLI, then register a bounded version/help/dry-run verifier. | `/api/modules/slic3r/runtime/verify` returns ready with executed=true and proof gate. |
-| Strec3D | slicers | cli_worker | documentation_cli_signal_needs_verifier | Locate or install the real CLI, then register a bounded version/help/dry-run verifier. | `/api/modules/strec3d/runtime/verify` returns ready with executed=true and proof gate. |
-| SuperSlicer | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | Locate or install the real CLI, then register a bounded version/help/dry-run verifier. | `/api/modules/superslicer/runtime/verify` returns ready with executed=true and proof gate. |
+| MeshLab | modelers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/meshlab/runtime/verify` must return ready with proof before any agent execution. |
+| Slic3r | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/slic3r/runtime/verify` must return ready with proof before any agent execution. |
+| Strec3D | slicers | cli_worker | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/strec3d/runtime/verify` must return ready with proof before any agent execution. |
+| SuperSlicer | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/superslicer/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Desktop App Gap (3)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| FreeCAD | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | `/api/modules/freecad/runtime/verify` returns ready with executed=true and proof gate. |
-| SolveSpace | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | `/api/modules/solvespace/runtime/verify` returns ready with executed=true and proof gate. |
-| MatterControl | slicers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | `/api/modules/mattercontrol/runtime/verify` returns ready with executed=true and proof gate. |
+| FreeCAD | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/freecad/runtime/verify` must return ready with proof before any agent execution. |
+| SolveSpace | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/solvespace/runtime/verify` must return ready with proof before any agent execution. |
+| MatterControl | slicers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/mattercontrol/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Gpu Worker Gap (3)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| Microsoft TRELLIS.2 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | Add a lightweight dependency/model-cache verifier before any GPU job launch. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| Tencent Hunyuan3D 2.1 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | Add a lightweight dependency/model-cache verifier before any GPU job launch. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| TripoSR | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | Add a lightweight dependency/model-cache verifier before any GPU job launch. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
+| Microsoft TRELLIS.2 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/trellis/runtime/verify` must return ready with proof before any agent execution. |
+| Tencent Hunyuan3D 2.1 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/hunyuan3d_2_1/runtime/verify` must return ready with proof before any agent execution. |
+| TripoSR | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/triposr/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Npm Package Gap (1)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| Azure Speech SDK JS | agents | npm_package | documentation_cli_signal_needs_verifier | Run a package metadata/build verifier without secrets, then add a safe node runner. | `/api/modules/azure_speech_sdk_js/runtime/verify` returns ready with executed=true and proof gate. |
+| Azure Speech SDK JS | agents | npm_package | documentation_cli_signal_needs_verifier | node_package_metadata_or_script_help | Register node_package_metadata_or_script_help; then `/api/modules/azure_speech_sdk_js/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Python Worker Gap (5)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| CadQuery | modelers | python_worker | documentation_cli_signal_needs_verifier | Create an isolated Python env/import or module --help verifier before runner exposure. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| Open3D | modelers | python_worker | documentation_cli_signal_needs_verifier | Create an isolated Python env/import or module --help verifier before runner exposure. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| build123d | modelers | python_worker | documentation_cli_signal_needs_verifier | Create an isolated Python env/import or module --help verifier before runner exposure. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| numpy-stl | modelers | python_worker | cli_candidate_needs_verifier | Create an isolated Python env/import or module --help verifier before runner exposure. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| pymesh | modelers | python_worker | no_local_cli_signal | Create an isolated Python env/import or module --help verifier before runner exposure. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
+| CadQuery | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/cadquery/runtime/verify` must return ready with proof before any agent execution. |
+| Open3D | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/open3d/runtime/verify` must return ready with proof before any agent execution. |
+| build123d | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/build123d/runtime/verify` must return ready with proof before any agent execution. |
+| numpy-stl | modelers | python_worker | cli_candidate_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/numpy_stl/runtime/verify` must return ready with proof before any agent execution. |
+| pymesh | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/pymesh/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Runner Gap (5)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| Marlin | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Document no-runtime/reference-only or register safe version/build metadata verifier. |
-| Prusa Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Document no-runtime/reference-only or register safe version/build metadata verifier. |
-| RepRapFirmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Document no-runtime/reference-only or register safe version/build metadata verifier. |
-| Repetier Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Document no-runtime/reference-only or register safe version/build metadata verifier. |
-| Smoothieware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Document no-runtime/reference-only or register safe version/build metadata verifier. |
+| Marlin | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/marlin/runtime/verify` must return ready with proof before any agent execution. |
+| Prusa Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/prusa_firmware/runtime/verify` must return ready with proof before any agent execution. |
+| RepRapFirmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/reprapfirmware/runtime/verify` must return ready with proof before any agent execution. |
+| Repetier Firmware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/repetier_firmware/runtime/verify` must return ready with proof before any agent execution. |
+| Smoothieware | firmware | firmware_source | no_local_cli_signal | Use source/reference proof only until a safe compile/version verifier is defined. | Register read_only_firmware_source_inventory; then `/api/modules/smoothieware/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Service Gap (6)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| Manyfold | library | service | documentation_cli_signal_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| Open Filament Database | materials | service | cli_candidate_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| FDM Monster | print_farm | service | cli_candidate_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| OctoPrint | print_farm | service | cli_candidate_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| ComfyUI | three_d_generation | service | documentation_cli_signal_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| ComfyUI TRELLIS.2 Wrapper | three_d_generation | service | documentation_cli_signal_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
+| Manyfold | library | service | documentation_cli_signal_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/manyfold/runtime/verify` must return ready with proof before any agent execution. |
+| Open Filament Database | materials | service | cli_candidate_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/open_filament_database/runtime/verify` must return ready with proof before any agent execution. |
+| FDM Monster | print_farm | service | cli_candidate_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/fdm_monster/runtime/verify` must return ready with proof before any agent execution. |
+| OctoPrint | print_farm | service | cli_candidate_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/octoprint/runtime/verify` must return ready with proof before any agent execution. |
+| ComfyUI | three_d_generation | service | documentation_cli_signal_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/comfyui/runtime/verify` must return ready with proof before any agent execution. |
+| ComfyUI TRELLIS.2 Wrapper | three_d_generation | service | documentation_cli_signal_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/comfyui_trellis_wrapper/runtime/verify` must return ready with proof before any agent execution. |
 
 ### Web App Gap (3)
 
 | App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
 | --- | --- | --- | --- | --- | --- |
-| Fluidd | print_farm | web_app | service_or_setup_candidate_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| Mainsail | print_farm | web_app | service_or_setup_candidate_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
-| Kiri:Moto / GridSpace | slicers | web_app | service_or_setup_candidate_needs_verifier | Add a non-mutating local health/version endpoint smoke before start/stop controls. | Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason. |
+| Fluidd | print_farm | web_app | service_or_setup_candidate_needs_verifier | local_http_health_or_route_smoke | Register local_http_health_or_route_smoke; then `/api/modules/fluidd/runtime/verify` must return ready with proof before any agent execution. |
+| Mainsail | print_farm | web_app | service_or_setup_candidate_needs_verifier | local_http_health_or_route_smoke | Register local_http_health_or_route_smoke; then `/api/modules/mainsail/runtime/verify` must return ready with proof before any agent execution. |
+| Kiri:Moto / GridSpace | slicers | web_app | service_or_setup_candidate_needs_verifier | local_http_health_or_route_smoke | Register local_http_health_or_route_smoke; then `/api/modules/kirimoto_gridspace/runtime/verify` must return ready with proof before any agent execution. |
+
+## Runner Contract Status
+
+/api/modules/runtime/runner-contracts is the canonical execution matrix for Hermes Agents. A row is executable only when its contract says `agent_executable=true`; all other rows stay Verify/Setup Plan only.
+
+- agent_cli_ready: 7
+- blocked: 2
+- cli_runner_gap: 2
+- desktop_app_runner_gap: 3
+- gpu_worker_runner_gap: 3
+- launcher_metadata_only: 3
+- metadata_ready_needs_runner: 4
+- npm_package_runner_gap: 1
+- python_worker_runner_gap: 5
+- readonly_api_ready: 3
+- runner_not_registered: 5
+- service_runner_gap: 6
+- source_reference_only: 13
+- web_app_runner_gap: 3
 
 ## P1 CLI/Service Signals Needing Verifiers
 

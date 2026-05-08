@@ -970,6 +970,16 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
 
         section = str(payload.get("section") or "").strip() or None
         return modules_route.module_runtime_gaps(section)
+    if handler == "source.runner_contracts":
+        from hermes3d.api.routes import modules as modules_route
+
+        section = str(payload.get("section") or "").strip() or None
+        return modules_route.module_runtime_runner_contracts(section)
+    if handler == "source.runner_contract":
+        from hermes3d.api.routes import modules as modules_route
+
+        module_id = _required_payload_text(payload, "module_id")
+        return modules_route.get_module_runtime_runner_contract(module_id)
     if handler == "source.agent_cli_readiness":
         from hermes3d.api.routes import modules as modules_route
 
@@ -1292,6 +1302,8 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("source.plan_setup_queue", "Plan Source OS setup queue", "source_os", "ready", "plan", "low", "POST /api/modules/runtime/setup-queue", "source.plan_setup_queue", "Creates a proof-backed plan; it does not run unregistered installers."),
         _contract("source.update_readiness.refresh", "Refresh Source OS update readiness", "source_os", "ready", "read", "low", "GET /api/modules/update/readiness", "source.update_readiness", "Reads update readiness without fetch, pull, build, install, or update side effects."),
         _contract("source.runtime_gaps.refresh", "Refresh Source OS runner gaps", "source_os", "ready", "read", "low", "GET /api/modules/runtime/gaps", "source.runtime_gaps", f"Shows {source_gaps} source-app runner gaps that still block full agent app operation."),
+        _contract("source.runner_contracts.refresh", "Refresh Source OS runner contracts", "source_os", "ready", "read", "low", "GET /api/modules/runtime/runner-contracts", "source.runner_contracts", "Returns the 60-row Hermes Agent execution contract matrix; only rows with agent_executable=true may run agent actions."),
+        _contract("source.runner_contract.refresh", "Refresh one Source OS runner contract", "source_os", "ready", "read", "low", "GET /api/modules/{module_id}/runtime/runner-contract", "source.runner_contract", "Returns the proof gate, safe actions, and exact blocked reason for one source-backed app."),
         _contract("source.verifiers.refresh", "Refresh Source OS verifier registry", "source_os", "ready", "read", "low", "GET /api/modules/runtime/verifiers", "source.verifiers", "Shows registered safe runtime verifier rows."),
         _contract("source.agent_cli_readiness.refresh", "Refresh agent CLI readiness", "source_os", "ready", "read", "low", "GET /api/modules/runtime/agent-cli-readiness", "source.agent_cli_readiness", f"Shows {agent_cli} verified agent CLI runners and {cli_candidates} CLI/service signals needing verifiers."),
         _contract("source.cli_surface.refresh", "Refresh Source OS CLI surface audit", "source_os", "ready", "read", "low", "GET /api/modules/runtime/cli-surface", "source.cli_surface", "Returns the proof-backed CLI/service surface audit."),
@@ -1376,6 +1388,8 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "source.modules.refresh": {"required": [], "optional": {"section": "source registry section id"}},
         "source.update_readiness.refresh": {"required": [], "optional": {"section": "source registry section id", "deep": "boolean non-mutating deep check"}},
         "source.runtime_gaps.refresh": {"required": [], "optional": {"section": "source registry section id"}},
+        "source.runner_contracts.refresh": {"required": [], "optional": {"section": "source registry section id"}, "safety": "Read-only contract matrix; does not run setup, install, update, or launch commands."},
+        "source.runner_contract.refresh": {"required": ["module_id"], "optional": {}, "safety": "Read-only single-module contract; no source or runtime mutation."},
         "printers.upload_start": {
             "required": ["printer_id", "gcode_path"],
             "optional": {

@@ -382,6 +382,10 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     },
 }
 
+CLI_PREFERRED_LAUNCH_KINDS = {"cli_worker", "cli_or_python_worker", "desktop_or_cli"}
+CLI_POSSIBLE_LAUNCH_KINDS = {"desktop_app", "python_worker", "gpu_worker", "service", "web_app", "npm_package"}
+AGENT_EXECUTABLE_VERIFIER_KINDS = {"cli", "python_module_cli"}
+
 
 def module_runtime_probe(mod: dict[str, Any], *, live: bool = False) -> dict[str, Any]:
     module_id = str(mod["id"])
@@ -435,6 +439,74 @@ def registered_runtime_probe_ids() -> list[str]:
     if available and index:
         return sorted(index)
     return sorted(BUILTIN_RUNTIME_PROBES)
+
+
+def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
+    """Return the Hermes Agent runner contract for a Source OS module.
+
+    The contract is intentionally separate from runtime detection. A local
+    checkout, README command, or desktop launcher can prove source presence, but
+    only a registered non-destructive verifier can make the module executable
+    by Hermes Agents.
+    """
+
+    runtime = module_runtime_probe(mod, live=False)
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    runtime_status = str(runtime.get("status") or "blocked")
+    verifier_kind = str(runtime.get("kind") or launch_kind)
+    executed = bool(runtime.get("executed"))
+    agent_executable = runtime_status == "ready" and verifier_kind in AGENT_EXECUTABLE_VERIFIER_KINDS and executed
+    runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
+    required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
+    blocked_reason = _runner_blocked_reason(runtime=runtime, runner_status=runner_status, required_family=required_family)
+    return {
+        "module_id": str(mod.get("id") or ""),
+        "display": str(mod.get("display_name") or mod.get("id") or ""),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": launch_kind,
+        "install_state": str(mod.get("install_state") or "unknown"),
+        "runtime_status": runtime_status,
+        "runtime_ready": runtime_status == "ready",
+        "agent_executable": agent_executable,
+        "runner_status": runner_status,
+        "verifier": runtime.get("verifier"),
+        "verifier_kind": verifier_kind,
+        "proof_gate_version": runtime.get("proof_gate_version"),
+        "path": runtime.get("path") or mod.get("local_path") or "",
+        "executed": executed,
+        "return_code": runtime.get("return_code"),
+        "capabilities": list(runtime.get("capabilities") or []),
+        "safe_actions": _safe_runner_actions(runtime, agent_executable=agent_executable),
+        "required_verifier_family": required_family,
+        "acceptance_gate": _runner_acceptance_gate(str(mod.get("id") or "module"), runner_status, required_family),
+        "blocked_reason": blocked_reason,
+        "setup_steps": [] if agent_executable else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
+        "proof_required": True,
+        "mutation_allowed": False,
+        "policy": "Hermes Agents may run only registered non-destructive verifiers here; setup/install/update remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
+    }
+
+
+def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
+    contracts = [module_runner_contract(mod) for mod in modules]
+    by_status: dict[str, int] = {}
+    by_section: dict[str, int] = {}
+    for contract in contracts:
+        status = str(contract["runner_status"])
+        section = str(contract["section"] or "unknown")
+        by_status[status] = by_status.get(status, 0) + 1
+        if not contract["agent_executable"]:
+            by_section[section] = by_section.get(section, 0) + 1
+    return {
+        "status": "ready",
+        "count": len(contracts),
+        "agent_executable": sum(1 for contract in contracts if contract["agent_executable"]),
+        "runner_gaps": sum(1 for contract in contracts if contract["runner_status"].endswith("_gap") or contract["runner_status"] in {"runner_not_registered", "runtime_repair_required", "source_install_available", "blocked"}),
+        "by_runner_status": dict(sorted(by_status.items())),
+        "by_gap_section": dict(sorted(by_section.items())),
+        "contracts": contracts,
+        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate.",
+    }
 
 
 def runtime_probe_config(module_id: str) -> dict[str, Any] | None:
@@ -964,6 +1036,88 @@ def _source_runtime_state(mod: dict[str, Any]) -> dict[str, Any]:
         "proof_source": None,
         "output_head": [],
     }
+
+
+def _runner_status(*, runtime: dict[str, Any], mod: dict[str, Any], agent_executable: bool) -> str:
+    if agent_executable:
+        return "agent_cli_ready"
+    runtime_status = str(runtime.get("status") or "blocked")
+    verifier_kind = str(runtime.get("kind") or mod.get("launch_kind") or "unknown")
+    proof_gate = str(runtime.get("proof_gate_version") or "")
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    if runtime_status == "ready" and (proof_gate == "desktop-launcher-metadata-v1" or verifier_kind == "desktop_app"):
+        return "launcher_metadata_only"
+    if runtime_status == "ready" and verifier_kind in {"python_import", "python_source_import", "node_package"}:
+        return "metadata_ready_needs_runner"
+    if runtime_status == "ready" and verifier_kind == "moonraker_fleet":
+        return "readonly_api_ready"
+    if runtime_status == "ready" and verifier_kind == "source_inventory":
+        return "source_reference_only"
+    if runtime_status == "setup_required":
+        return "runtime_repair_required"
+    if runtime_status == "not_installed":
+        return "source_install_available"
+    if runtime_status == "source_ready" and launch_kind in CLI_PREFERRED_LAUNCH_KINDS:
+        return "cli_runner_gap"
+    if runtime_status == "source_ready" and launch_kind in CLI_POSSIBLE_LAUNCH_KINDS:
+        return f"{launch_kind}_runner_gap"
+    if runtime_status == "source_ready":
+        return "runner_not_registered"
+    return "blocked"
+
+
+def _required_verifier_family(launch_kind: str, verifier_kind: str, runner_status: str) -> str:
+    if runner_status == "agent_cli_ready":
+        return "registered_agent_cli"
+    if runner_status == "launcher_metadata_only":
+        return "cli_api_or_desktop_bridge_smoke"
+    if runner_status == "metadata_ready_needs_runner":
+        return "dry_run_worker_smoke"
+    if runner_status == "readonly_api_ready":
+        return "read_only_api_runner_contract"
+    if runner_status == "source_reference_only":
+        return "reference_parser_or_adapter_contract"
+    if launch_kind in CLI_PREFERRED_LAUNCH_KINDS:
+        return "cli_version_help_or_dry_run"
+    if launch_kind == "python_worker":
+        return "python_import_or_module_cli"
+    if launch_kind == "npm_package":
+        return "node_package_metadata_or_script_help"
+    if launch_kind == "service":
+        return "local_health_endpoint_or_process_probe"
+    if launch_kind == "web_app":
+        return "local_http_health_or_route_smoke"
+    if launch_kind == "gpu_worker":
+        return "dependency_model_cache_gpu_probe"
+    if launch_kind == "firmware_source":
+        return "read_only_firmware_source_inventory"
+    if verifier_kind == "source_inventory":
+        return "reference_parser_or_adapter_contract"
+    return "module_specific_safe_verifier"
+
+
+def _runner_blocked_reason(*, runtime: dict[str, Any], runner_status: str, required_family: str) -> str | None:
+    if runner_status == "agent_cli_ready":
+        return None
+    reason = str(runtime.get("reason") or "").strip()
+    if reason:
+        return reason
+    return f"Runner contract needs {required_family} before Hermes Agents can execute this app."
+
+
+def _safe_runner_actions(runtime: dict[str, Any], *, agent_executable: bool) -> list[str]:
+    actions = ["verify", "setup_plan"]
+    if agent_executable:
+        actions.extend(["version_or_help", "dry_run_smoke_plan"])
+    elif runtime.get("status") == "ready":
+        actions.append("read_metadata")
+    return actions
+
+
+def _runner_acceptance_gate(module_id: str, runner_status: str, required_family: str) -> str:
+    if runner_status == "agent_cli_ready":
+        return f"`/api/modules/{module_id}/runtime/verify` returns ready with executed=true and a registered proof gate."
+    return f"Register {required_family}; then `/api/modules/{module_id}/runtime/verify` must return ready with proof before any agent execution."
 
 
 def _local_tooling_record(tool_key: str) -> dict[str, Any]:

@@ -21,6 +21,8 @@ from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
 from hermes3d.services.module_runtime import (
+    module_runner_contract,
+    module_runner_contracts,
     module_runtime_probe,
     module_setup_steps,
     registered_runtime_probe_ids,
@@ -632,6 +634,23 @@ def module_runtime_gaps(section: str | None = None) -> dict[str, Any]:
     }
 
 
+@router.get("/api/modules/runtime/runner-contracts")
+def module_runtime_runner_contracts(section: str | None = None) -> dict[str, Any]:
+    """Return proof-backed Hermes Agent runner contracts for Source OS modules."""
+    _sync_registry_once()
+    result = rows(
+        "SELECT * FROM modules WHERE (? IS NULL OR section = ?) ORDER BY section, display_name",
+        (section, section),
+    )
+    contracts = module_runner_contracts([_sync_module_status(mod) for mod in result])
+    return {
+        **contracts,
+        "section": section,
+        "execution_mode": "contract_only_until_registered_runner_passes",
+        "agent_gate": "Hermes Agents may execute only rows with agent_executable=true; every other row remains Verify/Setup Plan only.",
+    }
+
+
 @router.get("/api/modules/runtime/verifiers")
 def module_runtime_verifiers() -> dict[str, Any]:
     _sync_registry_once()
@@ -812,6 +831,16 @@ def verify_module_runtime(module_id: str, body: dict[str, Any] | None = None) ->
         "status": runtime["status"],
         "runtime": runtime,
         "proof_event_id": proof_event_id,
+    }
+
+
+@router.get("/api/modules/{module_id}/runtime/runner-contract")
+def get_module_runtime_runner_contract(module_id: str) -> dict[str, Any]:
+    mod = _sync_module_status(_module_or_404(module_id))
+    return {
+        "status": "ready",
+        "module_id": module_id,
+        "contract": module_runner_contract(mod),
     }
 
 

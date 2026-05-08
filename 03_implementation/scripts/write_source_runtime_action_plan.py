@@ -58,6 +58,7 @@ def main() -> int:
         f"- Runtime-ready apps: {completion_counts.get('runtime_ready', readiness.get('target', {}).get('registered_verifiers', 'unknown'))}",
         f"- Runner gaps: {completion_counts.get('runner_not_registered', readiness.get('summary', {}).get('runner_gaps', 'unknown'))}",
         f"- Verified Hermes Agent CLIs: {readiness.get('summary', {}).get('verified_agent_cli', len(verified))}",
+        f"- Agent-executable runner contracts: {readiness.get('summary', {}).get('agent_executable', len(verified))}",
         f"- CLI/service signals needing verifiers: {cli_surface.get('summary', {}).get('candidate_needs_verifier', len(candidate_rows))}",
         f"- Blocked rows: {completion_counts.get('blocked', 0)}",
         "",
@@ -121,12 +122,25 @@ def main() -> int:
                         cell(row.get("launch_kind")),
                         cell(surface.get("cli_surface_status", "not scanned")),
                         cell(required_correction(row, surface)),
-                        cell(acceptance_gate(row, surface)),
+                        cell(row.get("acceptance_gate") or acceptance_gate(row, surface)),
                     ]
                 )
                 + " |"
             )
         lines.append("")
+
+    contract_counts = readiness.get("summary", {}).get("by_runner_contract_status", {})
+    if isinstance(contract_counts, dict) and contract_counts:
+        lines.extend(
+            [
+                "## Runner Contract Status",
+                "",
+                "/api/modules/runtime/runner-contracts is the canonical execution matrix for Hermes Agents. A row is executable only when its contract says `agent_executable=true`; all other rows stay Verify/Setup Plan only.",
+                "",
+                *[f"- {key}: {value}" for key, value in sorted(contract_counts.items())],
+                "",
+            ]
+        )
 
     lines.extend(
         [
@@ -235,15 +249,15 @@ def required_correction(row: dict[str, Any], surface: dict[str, Any]) -> str:
     tier = str(row.get("agent_execution_tier") or "")
     launch_kind = str(row.get("launch_kind") or "")
     if tier == "cli_preferred_gap":
-        return "Locate or install the real CLI, then register a bounded version/help/dry-run verifier."
+        return row.get("required_verifier_family") or "Locate or install the real CLI, then register a bounded version/help/dry-run verifier."
     if tier == "python_worker_gap":
-        return "Create an isolated Python env/import or module --help verifier before runner exposure."
+        return row.get("required_verifier_family") or "Create an isolated Python env/import or module --help verifier before runner exposure."
     if tier == "npm_package_gap":
-        return "Run a package metadata/build verifier without secrets, then add a safe node runner."
+        return row.get("required_verifier_family") or "Run a package metadata/build verifier without secrets, then add a safe node runner."
     if tier in {"service_gap", "web_app_gap"}:
-        return "Add a non-mutating local health/version endpoint smoke before start/stop controls."
+        return row.get("required_verifier_family") or "Add a non-mutating local health/version endpoint smoke before start/stop controls."
     if tier == "gpu_worker_gap":
-        return "Add a lightweight dependency/model-cache verifier before any GPU job launch."
+        return row.get("required_verifier_family") or "Add a lightweight dependency/model-cache verifier before any GPU job launch."
     if tier == "desktop_app_gap":
         return "Find a safe CLI/headless mode or add an explicit desktop bridge smoke."
     if launch_kind == "firmware_source":
@@ -257,7 +271,7 @@ def acceptance_gate(row: dict[str, Any], surface: dict[str, Any]) -> str:
     if tier in {"cli_preferred_gap", "desktop_app_gap", "npm_package_gap"}:
         return f"`/api/modules/{module_id}/runtime/verify` returns ready with executed=true and proof gate."
     if tier in {"python_worker_gap", "service_gap", "web_app_gap", "gpu_worker_gap"}:
-        return f"Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason."
+        return "Safe verifier returns ready and Source OS shows Agent CLI/API runner or precise blocked reason."
     if str(row.get("launch_kind") or "") == "firmware_source":
         return "Document no-runtime/reference-only or register safe version/build metadata verifier."
     return cell(surface.get("next_action") or row.get("next_action"))
