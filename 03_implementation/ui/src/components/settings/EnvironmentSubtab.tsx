@@ -20,6 +20,8 @@ type EnvVar = {
   description: string;
   set: boolean;
   sensitive: boolean;
+  source?: string | null;
+  aliases?: string[];
 };
 
 export function EnvironmentSubtab() {
@@ -192,6 +194,11 @@ export function EnvironmentSubtab() {
               <span className="text-fg font-mono text-[11px] truncate">{v.name}</span>
             </span>
             <span className="text-muted text-[10px] flex-1 truncate">{v.description}</span>
+            {v.source && (
+              <span className="hidden max-w-44 truncate font-mono text-[10px] text-muted 2xl:inline">
+                {v.source}
+              </span>
+            )}
             <span
               data-testid={`settings-environment-status-${v.name}`}
               className="font-mono text-[11px] text-fg"
@@ -238,5 +245,7 @@ function parseEnvVar(value: unknown): EnvVar | null {
     description: typeof record.description === "string" ? record.description : "",
     set: record.set === true,
     sensitive: record.sensitive === true,
+    source: typeof record.source === "string" ? record.source : null,
+    aliases: Array.isArray(record.aliases) ? record.aliases.filter((item): item is string => typeof item === "string") : [],
   };
 }

@@ -123,12 +123,39 @@ export interface FolderIndexDoc {
   size_bytes: number;
 }
 
+export interface AgentProviderLane {
+  id: string;
+  status: string;
+  api_key_configured: boolean;
+  api_key_source?: string | null;
+  accepted_api_key_env?: string[];
+  base_url_configured: boolean;
+  base_url_source?: string | null;
+  model_configured: boolean;
+  model_source?: string | null;
+  base_url_label: string;
+  model: string | null;
+  auth_scheme: string;
+  chat_path: string;
+  live_status: string;
+  blocked_reason: string | null;
+  last_smoke?: unknown;
+}
+
+export interface AgentProgrammingReadiness {
+  status: string;
+  ready: boolean;
+  provider_lanes: AgentProviderLane[];
+  blocked_reasons: string[];
+  [key: string]: unknown;
+}
+
 export interface AgentE2EReadiness {
   status: string;
   ready: boolean;
   summary: string;
   blocked_reasons: string[];
-  programming?: unknown;
+  programming: AgentProgrammingReadiness;
   provider_teams?: unknown;
   folder_index: {
     status: string;
