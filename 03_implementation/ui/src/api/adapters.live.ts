@@ -801,6 +801,7 @@ export function getAgentE2EReadinessLive(): Promise<AgentE2EReadiness> {
     ready: false,
     summary: "Hermes Agent E2E readiness API is unavailable from the local backend.",
     blocked_reasons: ["Hermes Agent E2E readiness API returned no payload."],
+    programming: { status: "blocked", ready: false, provider_lanes: [], blocked_reasons: ["Hermes Agent provider readiness API returned no payload."] },
     folder_index: { status: "blocked", loaded: [], missing: [], target_roots: [], required: [] },
     cli_runners: { status: "blocked", count: 0, detected: 0, runners: [], policy: { write_runs_allowed: false, reason: "unavailable", allowed_now: [] } },
     next_required_steps: [],

@@ -227,12 +227,13 @@ def provider_health() -> dict[str, list[dict[str, Any]]]:
             "/api/tags",
         ),
     ]
-    for provider_id, key_name in [
-        ("minimax", "HERMES3D_MINIMAX_API_KEY"),
-        ("deepseek", "HERMES3D_DEEPSEEK_API_KEY"),
-        ("openrouter", "HERMES3D_LLM_API_KEY"),
+    for provider_id, key_names in [
+        ("minimax", ("HERMES3D_MINIMAX_API_KEY", "MINIMAX_API_KEY")),
+        ("deepseek", ("HERMES3D_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY")),
+        ("openrouter", ("HERMES3D_LLM_API_KEY",)),
     ]:
-        if _env_value(key_name, private_env):
+        binding = _env_binding(private_env, *key_names)
+        if binding["set"]:
             providers.append(
                 {
                     "provider_id": provider_id,
@@ -250,28 +251,37 @@ def provider_health() -> dict[str, list[dict[str, Any]]]:
 def env_status() -> dict[str, list[dict[str, Any]]]:
     private_env = _private_env()
     variables = [
-        ("HERMES3D_ENV_FILE", False, "Path to the private runtime .env file."),
-        ("HERMES3D_PROFILE", False, "Active runtime profile."),
-        ("HERMES3D_LM_STUDIO_BASE_URL", False, "Local LM Studio base URL."),
-        ("OLLAMA_BASE_URL", False, "Local Ollama base URL."),
-        ("HERMES3D_MINIMAX_API_KEY", True, "MiniMax API key."),
-        ("HERMES3D_DEEPSEEK_API_KEY", True, "DeepSeek API key."),
-        ("AZURE_SPEECH_KEY", True, "Azure Speech key for local voice runtime."),
-        ("AZURE_SPEECH_REGION", False, "Azure Speech region."),
-        ("HERMES3D_PROOF_KEY", True, "Proof envelope HMAC key."),
-        ("HERMES3D_AGENT_RUNTIME_URL", False, "Trusted local/private OpenAI-compatible agent runtime URL."),
-        ("HERMES3D_AGENT_RUNTIME_MODEL", False, "Concrete local model used for Hermes Agent personas."),
-        ("HERMES3D_LEARNING_RUNNER_ENABLED", False, "Enables idle learning report execution after runtime gates pass."),
+        ("HERMES3D_ENV_FILE", (), False, "Path to the private runtime .env file."),
+        ("HERMES3D_PROFILE", (), False, "Active runtime profile."),
+        ("HERMES3D_LM_STUDIO_BASE_URL", (), False, "Local LM Studio base URL."),
+        ("OLLAMA_BASE_URL", (), False, "Local Ollama base URL."),
+        ("HERMES3D_MINIMAX_API_KEY", ("MINIMAX_API_KEY",), True, "MiniMax API key. Alias accepted: MINIMAX_API_KEY."),
+        ("HERMES3D_MINIMAX_BASE_URL", ("MINIMAX_BASE_URL",), False, "MiniMax OpenAI-compatible base URL. Alias accepted: MINIMAX_BASE_URL."),
+        ("HERMES3D_MINIMAX_MODEL", ("MINIMAX_MODEL",), False, "MiniMax model name. Alias accepted: MINIMAX_MODEL."),
+        ("HERMES3D_DEEPSEEK_API_KEY", ("DEEPSEEK_API_KEY",), True, "DeepSeek API key. Alias accepted: DEEPSEEK_API_KEY."),
+        ("HERMES3D_DEEPSEEK_BASE_URL", ("DEEPSEEK_BASE_URL",), False, "DeepSeek OpenAI-compatible base URL. Alias accepted: DEEPSEEK_BASE_URL."),
+        ("HERMES3D_DEEPSEEK_MODEL", ("DEEPSEEK_MODEL",), False, "DeepSeek model name. Alias accepted: DEEPSEEK_MODEL."),
+        ("AZURE_SPEECH_KEY", (), True, "Azure Speech key for local voice runtime."),
+        ("AZURE_SPEECH_REGION", (), False, "Azure Speech region."),
+        ("HERMES3D_PROOF_KEY", (), True, "Proof envelope HMAC key."),
+        ("HERMES3D_AGENT_RUNTIME_URL", (), False, "Trusted local/private OpenAI-compatible agent runtime URL."),
+        ("HERMES3D_AGENT_RUNTIME_MODEL", (), False, "Concrete local model used for Hermes Agent personas."),
+        ("HERMES3D_OPENCODE_BIN", ("OPENCODE_BIN",), False, "OpenCode CLI executable path. Alias accepted: OPENCODE_BIN."),
+        ("HERMES3D_OPENHANDS_BIN", ("OPENHANDS_BIN",), False, "OpenHands CLI executable path. Alias accepted: OPENHANDS_BIN."),
+        ("HERMES3D_LEARNING_RUNNER_ENABLED", (), False, "Enables idle learning report execution after runtime gates pass."),
     ]
     return {
         "variables": [
             {
                 "name": name,
-                "set": bool(_env_value(name, private_env)),
+                "set": bool(binding["set"]),
                 "sensitive": sensitive,
                 "description": description,
+                "source": binding["source"],
+                "aliases": list(aliases),
             }
-            for name, sensitive, description in variables
+            for name, aliases, sensitive, description in variables
+            for binding in [_env_binding(private_env, name, *aliases)]
         ]
     }
 
@@ -445,6 +455,19 @@ def _private_env() -> dict[str, str]:
 
 def _env_value(name: str, private_env: dict[str, str], default: str = "") -> str:
     return os.environ.get(name) or private_env.get(name) or default
+
+
+def _env_binding(private_env: dict[str, str], *names: str, default: str = "") -> dict[str, Any]:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return {"set": True, "source": f"environment:{name}", "name": name}
+        value = private_env.get(name)
+        if value:
+            return {"set": True, "source": f"private_env:{name}", "name": name}
+    if default:
+        return {"set": True, "source": "default", "name": None}
+    return {"set": False, "source": None, "name": None}
 
 
 def _runtime_row(

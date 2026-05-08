@@ -1803,15 +1803,19 @@ def provider_execution_smoke(
         "chat_path": _provider_chat_path(str(config["base_url"])),
         "auth_scheme": "Authorization: Bearer <redacted>",
         "api_key_configured": config["api_key_configured"],
+        "api_key_source": config["api_key_source"],
+        "accepted_api_key_env": config["accepted_api_key_env"],
         "model": config["model"],
         "model_configured": config["model_configured"],
+        "model_source": config["model_source"],
+        "base_url_source": config["base_url_source"],
     }
     if not config["api_key_configured"] or not config["model_configured"]:
         missing = []
         if not config["api_key_configured"]:
-            missing.append(f"{provider.upper()}_API_KEY")
+            missing.append(f"HERMES3D_{provider.upper()}_API_KEY or {provider.upper()}_API_KEY")
         if not config["model_configured"]:
-            missing.append(f"{provider.upper()}_MODEL")
+            missing.append(f"HERMES3D_{provider.upper()}_MODEL or {provider.upper()}_MODEL")
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
@@ -2484,8 +2488,12 @@ def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[s
         "chat_path": _provider_chat_path(str(config["base_url"])),
         "auth_scheme": "Authorization: Bearer <redacted>",
         "api_key_configured": config["api_key_configured"],
+        "api_key_source": config["api_key_source"],
+        "accepted_api_key_env": config["accepted_api_key_env"],
         "model": config["model"],
         "model_configured": config["model_configured"],
+        "model_source": config["model_source"],
+        "base_url_source": config["base_url_source"],
     }
     smoke = _provider_smoke_status(provider_id)
     status = "missing_config"
@@ -2517,8 +2525,12 @@ def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[s
         "id": provider_id,
         "status": status,
         "api_key_configured": config["api_key_configured"],
+        "api_key_source": config["api_key_source"],
+        "accepted_api_key_env": config["accepted_api_key_env"],
         "base_url_configured": config["base_url_configured"],
+        "base_url_source": config["base_url_source"],
         "model_configured": config["model_configured"],
+        "model_source": config["model_source"],
         "base_url_label": config["base_url_label"],
         "model": config["model"],
         "auth_scheme": "bearer",
@@ -2570,8 +2582,12 @@ def _write_provider_smoke_status(
             "chat_path": auth_contract.get("chat_path"),
             "auth_scheme": "Authorization: Bearer <redacted>",
             "api_key_configured": bool(auth_contract.get("api_key_configured")),
+            "api_key_source": auth_contract.get("api_key_source"),
+            "accepted_api_key_env": auth_contract.get("accepted_api_key_env") or [],
             "model": auth_contract.get("model"),
             "model_configured": bool(auth_contract.get("model_configured")),
+            "model_source": auth_contract.get("model_source"),
+            "base_url_source": auth_contract.get("base_url_source"),
         },
         "content_sha256": content_sha256,
         "evidence_id": (evidence or {}).get("evidence_id"),
@@ -2610,8 +2626,8 @@ def _provider_chat_config(provider_id: str, private_values: dict[str, str] | Non
         raise ValueError("Unsupported provider id.")
     values = private_values if private_values is not None else private_env()
     prefix = "MINIMAX" if provider == "minimax" else "DEEPSEEK"
-    api_key = _first_env_value(values, f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY")
-    base_url = _first_env_value(
+    api_key_binding = _first_env_binding(values, f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY")
+    base_url_binding = _first_env_binding(
         values,
         f"HERMES3D_{prefix}_BASE_URL",
         f"HERMES3D_{prefix}_API_BASE",
@@ -2620,24 +2636,31 @@ def _provider_chat_config(provider_id: str, private_values: dict[str, str] | Non
         f"{prefix}_API_BASE",
         f"{prefix}_API_URL",
     )
-    model = _first_env_value(values, f"HERMES3D_{prefix}_MODEL", f"{prefix}_MODEL")
+    model_binding = _first_env_binding(values, f"HERMES3D_{prefix}_MODEL", f"{prefix}_MODEL")
+    api_key = str(api_key_binding["value"])
+    base_url = str(base_url_binding["value"])
+    model = str(model_binding["value"])
     effective_base = (base_url or PROVIDER_DEFAULT_BASE_URLS[provider]).strip().rstrip("/")
     config = {
         "id": provider,
         "api_key": api_key,
         "api_key_configured": bool(api_key),
+        "api_key_source": api_key_binding["source"],
+        "accepted_api_key_env": [f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY"],
         "base_url": effective_base,
         "base_url_configured": bool(base_url),
+        "base_url_source": base_url_binding["source"] or "default",
         "base_url_label": _host_label(effective_base),
         "model": model or None,
         "model_configured": bool(model),
+        "model_source": model_binding["source"],
     }
     if require_ready:
         missing: list[str] = []
         if not api_key:
-            missing.append(f"{prefix}_API_KEY")
+            missing.append(f"HERMES3D_{prefix}_API_KEY or {prefix}_API_KEY")
         if not model:
-            missing.append(f"{prefix}_MODEL")
+            missing.append(f"HERMES3D_{prefix}_MODEL or {prefix}_MODEL")
         if missing:
             raise ValueError(f"Provider {provider} is missing required private env keys: {', '.join(missing)}.")
     return config
@@ -2651,6 +2674,17 @@ def _first_env_value(private_values: dict[str, str], *names: str) -> str:
     return ""
 
 
+def _first_env_binding(private_values: dict[str, str], *names: str) -> dict[str, Any]:
+    for name in names:
+        value = os.environ.get(name)
+        if value:
+            return {"value": value.strip(), "source": f"environment:{name}", "name": name}
+        value = private_values.get(name)
+        if value:
+            return {"value": value.strip(), "source": f"private_env:{name}", "name": name}
+    return {"value": "", "source": None, "name": None}
+
+
 def _call_provider_chat(
     provider_id: str,
     messages: list[dict[str, str]],
@@ -2660,13 +2694,13 @@ def _call_provider_chat(
 ) -> dict[str, Any]:
     config = _provider_chat_config(provider_id)
     body = json.dumps(
-        {
-            "model": config["model"],
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": max(256, min(int(max_tokens), 4096)),
-            "stream": False,
-        },
+        _provider_chat_payload(
+            provider_id,
+            config=config,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ),
         separators=(",", ":"),
     ).encode("utf-8")
     request = urllib.request.Request(
@@ -2710,6 +2744,29 @@ def _call_provider_chat(
         "content_sha256": hashlib.sha256(content.encode("utf-8")).hexdigest(),
         "raw_usage": payload.get("usage") if isinstance(payload.get("usage"), dict) else {},
     }
+
+
+def _provider_chat_payload(
+    provider_id: str,
+    *,
+    config: dict[str, Any],
+    messages: list[dict[str, str]],
+    temperature: float,
+    max_tokens: int,
+) -> dict[str, Any]:
+    token_limit = max(256, min(int(max_tokens), 4096))
+    payload: dict[str, Any] = {
+        "model": config["model"],
+        "messages": messages,
+        "temperature": temperature,
+        "stream": False,
+    }
+    if str(provider_id).strip().lower() == "minimax":
+        payload["temperature"] = max(0.01, min(float(temperature), 2.0))
+        payload["max_completion_tokens"] = token_limit
+    else:
+        payload["max_tokens"] = token_limit
+    return payload
 
 
 def _provider_chat_url(base_url: str) -> str:

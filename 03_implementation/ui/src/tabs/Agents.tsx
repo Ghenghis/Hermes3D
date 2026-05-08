@@ -247,6 +247,23 @@ export function AgentsTab() {
                 </div>
               </div>
               <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
+                <div className="text-[10px] uppercase text-muted">Provider auth from private env</div>
+                {(e2eReadiness?.programming.provider_lanes ?? []).map((provider) => (
+                  <div key={provider.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded border border-border/70 bg-surface1/50 px-2 py-1">
+                    <span className="font-semibold uppercase text-fg">{provider.id}</span>
+                    <span className="min-w-0 truncate font-mono text-[10px] text-muted">
+                      {provider.api_key_source ?? (provider.api_key_configured ? "private env detected" : provider.accepted_api_key_env?.join(" or ") ?? "missing key")}
+                    </span>
+                    <span className={provider.status === "ready" ? "text-[10px] uppercase text-accent-green" : "text-[10px] uppercase text-accent-amber"}>
+                      {provider.live_status ?? provider.status}
+                    </span>
+                    {provider.blocked_reason && (
+                      <div className="col-span-3 text-[10px] text-muted">{provider.blocked_reason}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[10px] uppercase text-muted">OpenHands / OpenCode runners</div>
                   <span className={e2eReadiness?.cli_runners.sandbox?.ready ? "text-[10px] uppercase text-accent-green" : "text-[10px] uppercase text-accent-amber"}>

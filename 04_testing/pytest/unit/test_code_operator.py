@@ -291,6 +291,39 @@ def test_provider_status_requires_live_smoke_proof(monkeypatch: pytest.MonkeyPat
     assert "smoke proof" in status["blocked_reason"]
 
 
+def test_provider_status_accepts_private_env_aliases(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+
+    status = code_history._provider_status(
+        "minimax",
+        {
+            "MINIMAX_API_KEY": "configured-through-user-env",
+            "MINIMAX_BASE_URL": "https://api.minimax.io/v1",
+            "MINIMAX_MODEL": "MiniMax-M2.7",
+        },
+    )
+
+    assert status["api_key_configured"] is True
+    assert status["api_key_source"] == "private_env:MINIMAX_API_KEY"
+    assert status["base_url_source"] == "private_env:MINIMAX_BASE_URL"
+    assert status["model_source"] == "private_env:MINIMAX_MODEL"
+    assert status["accepted_api_key_env"] == ["HERMES3D_MINIMAX_API_KEY", "MINIMAX_API_KEY"]
+
+
+def test_minimax_chat_payload_uses_current_openai_compatible_fields() -> None:
+    payload = code_history._provider_chat_payload(
+        "minimax",
+        config={"model": "MiniMax-M2.7"},
+        messages=[{"role": "user", "content": "hi"}],
+        temperature=0.0,
+        max_tokens=128,
+    )
+
+    assert payload["temperature"] == 0.01
+    assert payload["max_completion_tokens"] == 256
+    assert "max_tokens" not in payload
+
+
 def test_provider_status_blocks_after_failed_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
     auth_contract = {
