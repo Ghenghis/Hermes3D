@@ -893,12 +893,25 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
     )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
+    runner_family = _contract_runner_family(
+        runner_status=runner_status,
+        read_only_runner_available=read_only_runner_available,
+        executable_path_runner_available=executable_path_runner_available,
+        python_import_repair_available=python_import_repair_available,
+        cli_install_config_available=cli_install_config_available,
+        npm_package_preflight_available=npm_package_preflight_available,
+    )
+    # Always surface a blocked_reason for blocked rows, even when a limited
+    # preflight runner (cli_install_config, npm_package_preflight) is available;
+    # the preflight runner does not resolve the underlying gap.
+    has_non_blocked_runner = (
+        read_only_runner_available
+        or executable_path_runner_available
+        or python_import_repair_available
+    )
     blocked_reason = (
         None
-        if read_only_runner_available
-        or executable_path_runner_available
-        or cli_install_config_available
-        or npm_package_preflight_available
+        if has_non_blocked_runner or runner_status == "agent_cli_ready"
         else _runner_blocked_reason(
             runtime=runtime, runner_status=runner_status, required_family=required_family
         )
@@ -918,6 +931,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "cli_install_config_available": cli_install_config_available,
         "npm_package_preflight_available": npm_package_preflight_available,
         "runner_status": runner_status,
+        "runner_family": runner_family,
         "verifier": runtime.get("verifier"),
         "verifier_kind": verifier_kind,
         "proof_gate_version": runtime.get("proof_gate_version"),
@@ -2625,6 +2639,64 @@ def _runner_acceptance_gate(module_id: str, runner_status: str, required_family:
     if runner_status == "agent_cli_ready":
         return f"`/api/modules/{module_id}/runtime/verify` returns ready with executed=true and a registered proof gate."
     return f"Register {required_family}; then `/api/modules/{module_id}/runtime/verify` must return ready with proof before any agent execution."
+
+
+def _contract_runner_family(
+    *,
+    runner_status: str,
+    read_only_runner_available: bool,
+    executable_path_runner_available: bool,
+    python_import_repair_available: bool,
+    cli_install_config_available: bool,
+    npm_package_preflight_available: bool,
+) -> str:
+    """Return the canonical runner_family string for a runner contract row.
+
+    Valid families: agent_cli_ready, read_only_runner, executable_path,
+    python_import_repair, cli_install_config, npm_package_preflight,
+    desktop_app_runner_gap, gpu_worker_runner_gap, runtime_repair_required,
+    source_reference_only, blocked, metadata_ready_needs_runner.
+    """
+    if runner_status == "agent_cli_ready":
+        return "agent_cli_ready"
+    # Prioritise the most specific available runner type first.
+    if read_only_runner_available:
+        return "read_only_runner"
+    if executable_path_runner_available:
+        return "executable_path"
+    if python_import_repair_available:
+        return "python_import_repair"
+    if cli_install_config_available:
+        return "cli_install_config"
+    if npm_package_preflight_available:
+        return "npm_package_preflight"
+    # Map gap / repair statuses that have no available runner yet.
+    if runner_status in {
+        "readonly_api_ready",
+        "read_only_api_runner_ready",
+        "read_only_metadata_runner_ready",
+    }:
+        return "read_only_runner"
+    if runner_status in {"launcher_metadata_only", "desktop_app_runner_gap"}:
+        return "desktop_app_runner_gap"
+    if runner_status == "gpu_worker_runner_gap":
+        return "gpu_worker_runner_gap"
+    if runner_status == "runtime_repair_required":
+        return "runtime_repair_required"
+    if runner_status in {"source_reference_only", "source_reference_ready"}:
+        return "source_reference_only"
+    if runner_status == "metadata_ready_needs_runner":
+        return "metadata_ready_needs_runner"
+    if runner_status == "npm_package_runner_gap":
+        return "npm_package_preflight"
+    if runner_status in {"cli_runner_gap", "cli_install_config_runner_gap"}:
+        return "cli_install_config"
+    if runner_status == "blocked":
+        return "blocked"
+    # Catch-all for any other gap statuses (e.g. desktop_or_cli_runner_gap).
+    if runner_status.endswith("_gap"):
+        return "desktop_app_runner_gap"
+    return "blocked"
 
 
 def _local_tooling_record(tool_key: str) -> dict[str, Any]:
