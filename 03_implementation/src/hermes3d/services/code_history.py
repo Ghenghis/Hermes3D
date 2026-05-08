@@ -248,7 +248,16 @@ PROVIDER_TEAM_GROUPS = {
     **{team_id: (team_id,) for team_id in PROVIDER_TEAMS},
 }
 PROVIDER_DEFAULT_BASE_URLS = {
+    # DeepSeek: base URL https://api.deepseek.com, endpoint POST /chat/completions,
+    #   auth Authorization: Bearer <DEEPSEEK_API_KEY>, valid models: deepseek-v4-pro, deepseek-v4-flash.
+    #   If smoke returns HTTP 401: replace DEEPSEEK_API_KEY in G:\private\.env with a valid
+    #   key from https://platform.deepseek.com/api_keys — code and endpoint are correct.
     "deepseek": "https://api.deepseek.com",
+    # MiniMax: OpenAI-compatible base URL https://api.minimax.io/v1, endpoint POST /v1/chat/completions,
+    #   auth Authorization: Bearer <MINIMAX_API_KEY> (no GroupId needed for /v1 OpenAI-compat path),
+    #   valid models: MiniMax-M2.7, MiniMax-M2.7-highspeed, MiniMax-M2.5, MiniMax-M2.5-highspeed.
+    #   If smoke returns HTTP 401: replace MINIMAX_API_KEY in G:\private\.env with a valid
+    #   key from https://platform.minimax.io — code and endpoint are correct.
     "minimax": "https://api.minimax.io/v1",
 }
 
