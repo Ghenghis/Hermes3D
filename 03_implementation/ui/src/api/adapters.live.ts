@@ -21,7 +21,7 @@ import type { DimensionalAccuracyReport } from "../types/dimensional";
 import type { LogEntry } from "../types/log";
 import type { Notification } from "../types/notification";
 import type { ProofBundle } from "../types/proof";
-import type { RuntimeReadiness, SystemSnapshot } from "../types/system";
+import type { RuntimeIdentity, RuntimeReadiness, SystemSnapshot } from "../types/system";
 import type { Workflow } from "../types/workflow";
 import type { TaskDAG, TaskEdge, TaskNode } from "../types/dag";
 import type { Printer, PrinterAdapter, PrinterDataSource, PrinterOnboardRequest, PrinterOnboardResult, PrinterStatus } from "../types/printer";
@@ -372,6 +372,10 @@ export function getSystemSnapshotLive(): Promise<SystemSnapshot | null> {
 
 export function getRuntimeReadinessLive(): Promise<RuntimeReadiness | null> {
   return fetchNullable("/api/system/runtime-readiness");
+}
+
+export function getRuntimeIdentityLive(): Promise<RuntimeIdentity | null> {
+  return fetchNullable("/api/system/runtime-identity");
 }
 
 export function getDimensionalReportsLive(): Promise<DimensionalAccuracyReport[]> {

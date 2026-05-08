@@ -14,6 +14,7 @@ import type { Agent } from "../types/agent";
 import type { AgentActionCatalog, AgentActionContract, AgentE2EJobResult, AgentE2EReadiness, ProviderSmokeResult } from "../types/agent-actions";
 import type { IdleWorkbenchState } from "../types/learning";
 import type { Notification } from "../types/notification";
+import type { RuntimeIdentity } from "../types/system";
 
 const AGENT_TONE: Record<Agent["status"], StatusTone> = {
   active: "green",
@@ -122,6 +123,7 @@ export function AgentsTab() {
   const [providerSmokeBusy, setProviderSmokeBusy] = useState<"minimax" | "deepseek" | null>(null);
   const [providerSmokeResult, setProviderSmokeResult] = useState<ProviderSmokeResult | null>(null);
   const [providerSmokeMessage, setProviderSmokeMessage] = useState("Provider smoke calls use private env on the backend and store MCP evidence.");
+  const [runtimeIdentity, setRuntimeIdentity] = useState<RuntimeIdentity | null>(null);
   const [shipTaskId, setShipTaskId] = useState("H3D-AGENT-SHIP");
   const [shipProposalId, setShipProposalId] = useState("");
   const [shipReviewProofs, setShipReviewProofs] = useState("");
@@ -187,6 +189,7 @@ export function AgentsTab() {
 
   useEffect(() => {
     let mounted = true;
+    void refreshRuntimeIdentity(setRuntimeIdentity, setE2eMessage, () => mounted);
     void refreshAgentE2EReadiness(setE2eReadiness, setE2eMessage, () => mounted);
     return () => {
       mounted = false;
@@ -240,6 +243,29 @@ export function AgentsTab() {
                   </div>
                 ))}
                 {!e2eReadiness && <div className="text-muted">CLI runner API has not responded yet.</div>}
+              </div>
+              <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase text-muted">Runtime freshness</div>
+                  <span className={runtimeIdentity?.fresh ? "text-[11px] text-accent-green" : "text-[11px] text-accent-amber"}>
+                    {runtimeIdentity ? runtimeIdentity.status : "checking"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 text-[11px]">
+                  <span className="text-muted">branch</span>
+                  <span className="min-w-0 truncate font-mono text-fg">{runtimeIdentity?.branch ?? "unknown"}</span>
+                  <span className="text-muted">commit</span>
+                  <span className="font-mono text-fg">{runtimeIdentity?.commit ?? "unknown"}</span>
+                  <span className="text-muted">routes</span>
+                  <span className={runtimeIdentity?.missing_agent_workbench_routes.length ? "text-accent-amber" : "text-accent-green"}>
+                    {runtimeIdentity ? `${runtimeIdentity.agent_workbench_required_routes.length - runtimeIdentity.missing_agent_workbench_routes.length}/${runtimeIdentity.agent_workbench_required_routes.length}` : "unknown"}
+                  </span>
+                </div>
+                {runtimeIdentity?.missing_agent_workbench_routes.length ? (
+                  <div className="max-h-14 overflow-auto rounded border border-accent-amber/30 bg-accent-amber/10 p-1.5 font-mono text-[10px] text-accent-amber">
+                    stale backend missing: {runtimeIdentity.missing_agent_workbench_routes.join(", ")}
+                  </div>
+                ) : null}
               </div>
               <div className="grid gap-2 rounded border border-border bg-bg/40 p-2">
                 <div className="flex items-center justify-between gap-2">
@@ -804,6 +830,25 @@ async function refreshAgentE2EReadiness(
     if (!isMounted()) return;
     setReadiness(null);
     setMessage(`Workbench unavailable: ${error instanceof Error ? error.message : "backend error"}`);
+  }
+}
+
+async function refreshRuntimeIdentity(
+  setIdentity: (identity: RuntimeIdentity | null) => void,
+  setMessage: (message: string) => void,
+  isMounted: () => boolean = () => true,
+) {
+  try {
+    const identity = await adapters.getRuntimeIdentity();
+    if (!isMounted()) return;
+    setIdentity(identity);
+    if (identity && !identity.fresh) {
+      setMessage(`Backend is stale: missing ${identity.missing_agent_workbench_routes.length} Agent Workbench route${identity.missing_agent_workbench_routes.length === 1 ? "" : "s"}.`);
+    }
+  } catch (error) {
+    if (!isMounted()) return;
+    setIdentity(null);
+    setMessage(`Runtime freshness unavailable: ${error instanceof Error ? error.message : "backend error"}`);
   }
 }
 

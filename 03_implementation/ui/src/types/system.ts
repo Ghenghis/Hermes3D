@@ -67,3 +67,19 @@ export interface RuntimeReadiness {
   };
   runtimes: RuntimeReadinessRow[];
 }
+
+export interface RuntimeIdentity {
+  status: "fresh" | "stale" | string;
+  fresh: boolean;
+  ts_utc: string;
+  pid: number;
+  cwd: string;
+  backend_source: string;
+  repo_root: string;
+  branch: string;
+  commit: string;
+  dirty: boolean;
+  agent_workbench_required_routes: string[];
+  missing_agent_workbench_routes: string[];
+  route_count: number;
+}
