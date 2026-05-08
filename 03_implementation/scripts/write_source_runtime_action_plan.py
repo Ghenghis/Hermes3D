@@ -76,6 +76,11 @@ def main() -> int:
         for row in readiness_rows
         if isinstance(row, dict) and row.get("cli_install_config_available")
     ]
+    npm_package_preflight_rows = [
+        row
+        for row in readiness_rows
+        if isinstance(row, dict) and row.get("npm_package_preflight_available")
+    ]
     candidate_rows = [
         row
         for row in surface_rows
@@ -116,6 +121,7 @@ def main() -> int:
         f"- Executable path runner smoke rows: {readiness.get('summary', {}).get('executable_path_runner_available', len(executable_path_runner_rows))}",
         f"- Python import repair preflight rows: {readiness.get('summary', {}).get('python_import_repair_available', len(python_import_repair_rows))}",
         f"- CLI install/config preflight rows: {readiness.get('summary', {}).get('cli_install_config_available', len(cli_install_config_rows))}",
+        f"- NPM package metadata preflight rows: {readiness.get('summary', {}).get('npm_package_preflight_available', len(npm_package_preflight_rows))}",
         f"- CLI/service signals needing verifiers: {cli_surface.get('summary', {}).get('candidate_needs_verifier', len(candidate_rows))}",
         f"- Blocked rows: {blocked_rows}",
         "",
@@ -128,6 +134,7 @@ def main() -> int:
         "- Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.",
         "- Python import repair preflight is allowed only for failed Python import verifier rows with a local source checkout. It can read source/dependency metadata only; it cannot install packages, create environments, start workers, write output, or touch printers.",
         "- CLI install/config preflight is allowed only for Slic3r/SuperSlicer rows with source/schema/profile proof. It can read metadata only; it cannot install apps, launch slicers, slice files, write output, update source, or touch printers.",
+        "- NPM package metadata preflight is allowed only for registered npm package rows with local package.json proof. It can read package/script/lockfile metadata only; it cannot run npm, install packages, start processes, write output, update source, or touch printers.",
         "- Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.",
         "- S1 remains camera/read-only and action-locked until the user changes printer policy.",
         "",
@@ -246,6 +253,35 @@ def main() -> int:
                     cell(row.get("verifier")),
                     cell(row.get("proof_gate_version")),
                     cell(row.get("cli_install_config_route")),
+                ]
+            )
+            + " |"
+        )
+
+    lines.extend(
+        [
+            "",
+            "## NPM Package Metadata Preflight Rows",
+            "",
+            "These rows now have `/api/modules/{module_id}/runtime/npm-package-runner`. The route reads only package.json metadata, script names, lockfile/manifests, and local node/npm executable presence. It is not npm install permission, npm run permission, process start permission, or runtime readiness.",
+            "",
+            "| App | Section | Verifier | Proof gate | Route |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+    )
+    for row in sorted(
+        npm_package_preflight_rows,
+        key=lambda item: (str(item.get("section")), str(item.get("display"))),
+    ):
+        lines.append(
+            "| "
+            + " | ".join(
+                [
+                    cell(row.get("display")),
+                    cell(row.get("section")),
+                    cell(row.get("verifier")),
+                    cell(row.get("proof_gate_version")),
+                    cell(row.get("npm_package_preflight_route")),
                 ]
             )
             + " |"

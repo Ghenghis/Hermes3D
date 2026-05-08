@@ -1,6 +1,6 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-08T08:03:47.525418+00:00
+Generated: 2026-05-08T09:27:46.742085+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
@@ -18,6 +18,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Executable path runner smoke rows: 3
 - Python import repair preflight rows: 5
 - CLI install/config preflight rows: 2
+- NPM package metadata preflight rows: 1
 - CLI/service signals needing verifiers: 24
 - Blocked rows: 2
 
@@ -30,6 +31,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.
 - Python import repair preflight is allowed only for failed Python import verifier rows with a local source checkout. It can read source/dependency metadata only; it cannot install packages, create environments, start workers, write output, or touch printers.
 - CLI install/config preflight is allowed only for Slic3r/SuperSlicer rows with source/schema/profile proof. It can read metadata only; it cannot install apps, launch slicers, slice files, write output, update source, or touch printers.
+- NPM package metadata preflight is allowed only for registered npm package rows with local package.json proof. It can read package/script/lockfile metadata only; it cannot run npm, install packages, start processes, write output, update source, or touch printers.
 - Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.
 - S1 remains camera/read-only and action-locked until the user changes printer policy.
 
@@ -95,6 +97,14 @@ These rows now have `/api/modules/{module_id}/runtime/cli-install-config-runner`
 | --- | --- | --- | --- | --- |
 | Slic3r | slicers | Slic3r CLI | runtime-verifier-v1 | /api/modules/slic3r/runtime/cli-install-config-runner |
 | SuperSlicer | slicers | SuperSlicer CLI | runtime-verifier-v1 | /api/modules/superslicer/runtime/cli-install-config-runner |
+
+## NPM Package Metadata Preflight Rows
+
+These rows now have `/api/modules/{module_id}/runtime/npm-package-runner`. The route reads only package.json metadata, script names, lockfile/manifests, and local node/npm executable presence. It is not npm install permission, npm run permission, process start permission, or runtime readiness.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Azure Speech SDK JS | agents | source checkout |  | /api/modules/azure_speech_sdk_js/runtime/npm-package-runner |
 
 ## Verified Agent CLI Rows
 
