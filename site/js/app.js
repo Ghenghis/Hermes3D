@@ -268,7 +268,42 @@
     }
   }
 
-  // ---------- 6. Wonder Emporium — hero particle canvas ----------
+  // ---------- 6. Copy buttons on all <pre> code blocks ----------
+  function setupCodeCopy() {
+    document.querySelectorAll("pre").forEach((pre) => {
+      if (pre.querySelector(".copy-btn")) return; // already wired
+      const btn = document.createElement("button");
+      btn.className = "copy-btn";
+      btn.setAttribute("aria-label", "Copy code");
+      btn.innerHTML =
+        `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      pre.style.position = "relative";
+      btn.style.cssText = [
+        "position:absolute", "top:10px", "right:10px",
+        "background:rgba(148,163,184,0.1)", "border:1px solid rgba(148,163,184,0.2)",
+        "border-radius:6px", "padding:5px 8px", "cursor:pointer",
+        "color:var(--text-muted)", "display:flex", "align-items:center",
+        "gap:4px", "font-size:0.75rem", "font-family:var(--font-mono)",
+        "transition:background 0.15s,color 0.15s",
+      ].join(";");
+      btn.addEventListener("click", () => {
+        const code = pre.querySelector("code");
+        const text = code ? code.textContent : pre.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+          btn.textContent = "Copied!";
+          btn.style.color = "var(--green)";
+          setTimeout(() => {
+            btn.innerHTML =
+              `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+            btn.style.color = "";
+          }, 2000);
+        }).catch(() => {});
+      });
+      pre.appendChild(btn);
+    });
+  }
+
+  // ---------- 7. Wonder Emporium — hero particle canvas ----------
   function setupParticles() {
     if (typeof window.WonderParticles === "undefined") return;
     window.WonderParticles.init("hero-particles");
@@ -376,6 +411,7 @@
     setupTerminal();
     setupShotSwap();
     setupReleases();
+    setupCodeCopy();
     setupHeroTitle();
     setupStatGlow();
     setupCopySparkle();
