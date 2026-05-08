@@ -21,6 +21,7 @@ from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
 from hermes3d.services.module_runtime import (
+    module_cli_install_config_runner_contract,
     module_executable_path_runner_contract,
     module_python_import_repair_runner_contract,
     module_read_only_runner_contract,
@@ -108,6 +109,10 @@ class ModuleRuntimeExecutablePathRunnerRequest(BaseModel):
 
 
 class ModuleRuntimePythonImportRepairRunnerRequest(BaseModel):
+    actor: str = "operator"
+
+
+class ModuleRuntimeCliInstallConfigRunnerRequest(BaseModel):
     actor: str = "operator"
 
 
@@ -735,7 +740,7 @@ def module_runtime_runner_contracts(section: str | None = None) -> dict[str, Any
         **contracts,
         "section": section,
         "execution_mode": "contract_only_until_registered_runner_passes",
-        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; executable_path_runner_available rows may read executable metadata only; python_import_repair_available rows may read source/dependency metadata only; every other row remains Verify/Setup Plan only.",
+        "agent_gate": "Hermes Agents may execute app actions only when agent_executable=true. read_only_runner_available rows may re-run metadata/API proof only; executable_path_runner_available rows may read executable metadata only; python_import_repair_available rows may read source/dependency metadata only; cli_install_config_available rows may read Slic3r/SuperSlicer source/schema/profile metadata only; every other row remains Verify/Setup Plan only.",
     }
 
 
@@ -821,6 +826,11 @@ def module_agent_cli_readiness() -> dict[str, Any]:
         for record in records
         if record["python_import_repair_available"]
     ]
+    cli_install_config_runners = [
+        record["module_id"]
+        for record in records
+        if record["cli_install_config_available"]
+    ]
     return {
         "status": "ready",
         "count": len(records),
@@ -830,12 +840,14 @@ def module_agent_cli_readiness() -> dict[str, Any]:
         "read_only_runner_available": len(read_only_runners),
         "executable_path_runner_available": len(executable_path_runners),
         "python_import_repair_available": len(python_import_repair_runners),
+        "cli_install_config_available": len(cli_install_config_runners),
         "launcher_metadata_only": len(launcher_only),
         "runner_gaps": len(runner_gaps),
         "verified_agent_cli_modules": verified_cli,
         "read_only_runner_modules": read_only_runners,
         "executable_path_runner_modules": executable_path_runners,
         "python_import_repair_modules": python_import_repair_runners,
+        "cli_install_config_modules": cli_install_config_runners,
         "launcher_metadata_only_modules": launcher_only,
         "records": records,
     }
@@ -900,6 +912,12 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
         ),
         "python_import_repair_route": f"/api/modules/{mod['id']}/runtime/python-import-repair-runner"
         if contract.get("python_import_repair_available")
+        else None,
+        "cli_install_config_available": bool(
+            contract.get("cli_install_config_available")
+        ),
+        "cli_install_config_route": f"/api/modules/{mod['id']}/runtime/cli-install-config-runner"
+        if contract.get("cli_install_config_available")
         else None,
         "next_action": _agent_cli_next_action(
             execution_tier, launch_kind, str(runtime.get("verifier") or "")
@@ -1080,6 +1098,55 @@ def create_module_runtime_python_import_repair_runner(
             "proof_gate_version": contract.get("proof_gate_version"),
             "import_module": contract.get("repair", {}).get("import_module"),
             "manifest_hashes": manifest_hashes,
+            "contract": contract,
+        },
+    )
+    return {
+        "module_id": module_id,
+        "accepted": bool(contract["accepted"]),
+        "status": str(contract["status"]),
+        "runtime_ready": bool(contract["runtime_ready"]),
+        "execution_mode": str(contract["execution_mode"]),
+        "contract": contract,
+        "proof_event_id": proof_event_id,
+    }
+
+
+@router.post("/api/modules/{module_id}/runtime/cli-install-config-runner")
+def create_module_runtime_cli_install_config_runner(
+    module_id: str,
+    body: ModuleRuntimeCliInstallConfigRunnerRequest | None = None,
+) -> dict[str, Any]:
+    mod = _sync_module_status(_module_or_404(module_id))
+    actor = _safe_actor(body.actor if body else "operator")
+    contract = module_cli_install_config_runner_contract(mod)
+    candidate_hashes = [
+        item.get("sha256")
+        for item in contract.get("install_config", {}).get("detected_candidate_executables", [])
+        if item.get("sha256")
+    ]
+    schema_hash = (
+        contract.get("install_config", {}).get("adapter_schema", {}).get("sha256")
+    )
+    config_hashes = [
+        item.get("sha256")
+        for item in contract.get("install_config", {}).get("config_files", [])
+        if item.get("sha256")
+    ]
+    proof_event_id = _append_module_proof(
+        "source_module.runtime_cli_install_config.preflighted"
+        if contract["accepted"]
+        else "source_module.runtime_cli_install_config.blocked",
+        actor,
+        {
+            "module_id": module_id,
+            "accepted": contract["accepted"],
+            "status": contract["status"],
+            "verifier_kind": contract["verifier_kind"],
+            "proof_gate_version": contract.get("proof_gate_version"),
+            "schema_hash": schema_hash,
+            "config_hashes": config_hashes,
+            "candidate_executable_hashes": candidate_hashes,
             "contract": contract,
         },
     )

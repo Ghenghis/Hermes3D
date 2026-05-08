@@ -998,6 +998,12 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         module_id = _required_payload_text(payload, "module_id")
         body = modules_route.ModuleRuntimePythonImportRepairRunnerRequest(actor=actor)
         return modules_route.create_module_runtime_python_import_repair_runner(module_id, body)
+    if handler == "source.cli_install_config.preflight":
+        from hermes3d.api.routes import modules as modules_route
+
+        module_id = _required_payload_text(payload, "module_id")
+        body = modules_route.ModuleRuntimeCliInstallConfigRunnerRequest(actor=actor)
+        return modules_route.create_module_runtime_cli_install_config_runner(module_id, body)
     if handler == "source.service_runner.start":
         from hermes3d.api.routes import modules as modules_route
 
@@ -1287,6 +1293,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
     read_only_runners = int(source_counts.get("read_only_runner_available") or 0)
     executable_path_runners = int(source_counts.get("executable_path_runner_available") or 0)
     python_import_repairs = int(source_counts.get("python_import_repair_available") or 0)
+    cli_install_configs = int(source_counts.get("cli_install_config_available") or 0)
     try:
         from hermes3d.services import code_history
 
@@ -1343,6 +1350,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         _contract("source.read_only_runner.smoke", "Run Source OS read-only runner smoke", "source_os", "ready" if read_only_runners else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/read-only-runner", "source.read_only_runner.smoke", f"Reruns only registered package/import/local API verifier proof for {read_only_runners} eligible rows; no setup, install, update, launch, file output, or printer action."),
         _contract("source.executable_path_runner.smoke", "Run Source OS executable path smoke", "source_os", "ready" if executable_path_runners else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/executable-path-runner", "source.executable_path_runner.smoke", f"Reads only installed executable metadata/hash proof for {executable_path_runners} eligible desktop launcher rows; no app launch, setup, install, update, file output, or printer action."),
         _contract("source.python_import_repair.preflight", "Preflight Source OS Python import repair", "source_os", "ready" if python_import_repairs else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/python-import-repair-runner", "source.python_import_repair.preflight", f"Reads failed Python import proof plus source/dependency metadata for {python_import_repairs} eligible CAD/modeling rows; no package install, environment creation, worker start, output write, or printer action."),
+        _contract("source.cli_install_config.preflight", "Preflight Source OS slicer CLI install/config", "source_os", "ready" if cli_install_configs else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/cli-install-config-runner", "source.cli_install_config.preflight", f"Reads Slic3r/SuperSlicer source, adapter schema, profile/config, and candidate executable metadata for {cli_install_configs} eligible rows; no install, launch, slicing, output write, or printer action."),
         _contract("source.service_runner.start", "Start supervised Source OS service runner", "source_os", "partial", "mutate", "high", "POST /api/modules/{module_id}/runtime/start-runner", "source.service_runner.start", "Runs only a registered local/private service command through the Source OS supervisor, then requires live health proof before runtime-ready.", "Per-module start still blocks unless its runner contract preflight passes; use execute=false for proof-only preflight."),
         _contract("source.service_runner.stop", "Stop supervised Source OS service runner", "source_os", "ready", "mutate", "medium", "POST /api/modules/{module_id}/runtime/stop-runner", "source.service_runner.stop", "Stops only a PID that the Source OS supervisor previously recorded for the same module."),
         _contract("source.verifiers.refresh", "Refresh Source OS verifier registry", "source_os", "ready", "read", "low", "GET /api/modules/runtime/verifiers", "source.verifiers", "Shows registered safe runtime verifier rows."),
@@ -1434,6 +1442,7 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         "source.read_only_runner.smoke": {"required": ["module_id"], "optional": {}, "safety": "Reruns only registered package/import/local API verifier proof and appends evidence; no setup, install, update, launch, output writes, or printer actions."},
         "source.executable_path_runner.smoke": {"required": ["module_id"], "optional": {}, "safety": "Reads only configured executable file metadata/hash and appends evidence; no app launch, setup, install, update, output writes, or printer actions."},
         "source.python_import_repair.preflight": {"required": ["module_id"], "optional": {}, "safety": "Reads only failed Python import proof plus local source/dependency metadata and appends evidence; no package install, environment creation, worker start, output writes, or printer actions."},
+        "source.cli_install_config.preflight": {"required": ["module_id"], "optional": {}, "safety": "Reads only Slic3r/SuperSlicer source, adapter schema, profile/config, and candidate executable metadata; no install, launch, slicing, output writes, updates, or printer actions."},
         "source.service_runner.start": {"required": ["module_id"], "optional": {"execute": "boolean; false writes a preflight proof only, true attempts supervised local start"}, "safety": "No arbitrary command input is accepted. Only registered service/web rows with local/private URL, source checkout, available command, and post-start health proof may start."},
         "source.service_runner.stop": {"required": ["module_id"], "optional": {}, "safety": "Stops only PIDs previously started and tracked by the Source OS supervisor."},
         "printers.upload_start": {
@@ -1512,6 +1521,7 @@ def _source_action_counts() -> dict[str, int]:
             "read_only_runner_available": int(readiness_summary.get("read_only_runner_available") or 0),
             "executable_path_runner_available": int(readiness_summary.get("executable_path_runner_available") or 0),
             "python_import_repair_available": int(readiness_summary.get("python_import_repair_available") or 0),
+            "cli_install_config_available": int(readiness_summary.get("cli_install_config_available") or 0),
         }
     try:
         from hermes3d.api.routes import modules as modules_route
@@ -1528,9 +1538,10 @@ def _source_action_counts() -> dict[str, int]:
             "read_only_runner_available": int(cli.get("read_only_runner_available") or 0),
             "executable_path_runner_available": int(cli.get("executable_path_runner_available") or 0),
             "python_import_repair_available": int(cli.get("python_import_repair_available") or 0),
+            "cli_install_config_available": int(cli.get("cli_install_config_available") or 0),
         }
     except Exception:
-        return {"runtime_ready": 0, "runner_gaps": 0, "verified_agent_cli": 0, "cli_candidates": 0, "read_only_runner_available": 0, "executable_path_runner_available": 0, "python_import_repair_available": 0}
+        return {"runtime_ready": 0, "runner_gaps": 0, "verified_agent_cli": 0, "cli_candidates": 0, "read_only_runner_available": 0, "executable_path_runner_available": 0, "python_import_repair_available": 0, "cli_install_config_available": 0}
 
 
 def _read_json(path: Path) -> dict[str, Any]:

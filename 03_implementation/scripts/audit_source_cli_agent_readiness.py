@@ -53,6 +53,7 @@ def main() -> int:
     read_only_rows = [row for row in rows if row["read_only_runner_available"]]
     executable_path_rows = [row for row in rows if row["executable_path_runner_available"]]
     python_import_repair_rows = [row for row in rows if row["python_import_repair_available"]]
+    cli_install_config_rows = [row for row in rows if row["cli_install_config_available"]]
     audit = {
         "generated_at_utc": datetime.now(UTC).isoformat(),
         "target": {
@@ -68,6 +69,7 @@ def main() -> int:
             "read_only_runner_available": len(read_only_rows),
             "executable_path_runner_available": len(executable_path_rows),
             "python_import_repair_available": len(python_import_repair_rows),
+            "cli_install_config_available": len(cli_install_config_rows),
             "launcher_metadata_only": len(launcher_rows),
             "runner_gaps": len(gap_rows),
             "verified_agent_cli_modules": [row["module_id"] for row in cli_rows],
@@ -76,6 +78,9 @@ def main() -> int:
             "executable_path_runner_modules": [row["module_id"] for row in executable_path_rows],
             "python_import_repair_modules": [
                 row["module_id"] for row in python_import_repair_rows
+            ],
+            "cli_install_config_modules": [
+                row["module_id"] for row in cli_install_config_rows
             ],
             "launcher_metadata_only_modules": [row["module_id"] for row in launcher_rows],
         },
@@ -86,6 +91,7 @@ def main() -> int:
             "Use /api/modules/{module_id}/runtime/read-only-runner only for read_only_runner_available rows; it appends proof and cannot install, launch, update, write outputs, or touch printers.",
             "Use /api/modules/{module_id}/runtime/executable-path-runner only for executable_path_runner_available rows; it reads executable metadata/hash only and cannot launch apps or touch printers.",
             "Use /api/modules/{module_id}/runtime/python-import-repair-runner only for python_import_repair_available rows; it reads source/dependency metadata only and cannot install packages or start workers.",
+            "Use /api/modules/{module_id}/runtime/cli-install-config-runner only for cli_install_config_available rows; it reads Slic3r/SuperSlicer source/schema/profile metadata only and cannot install, launch, slice, write outputs, or touch printers.",
             "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
             "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
             "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -151,6 +157,12 @@ def classify_module(runtime: dict[str, Any], module: dict[str, Any], contract: d
         ),
         "python_import_repair_route": f"/api/modules/{module.get('id')}/runtime/python-import-repair-runner"
         if contract.get("python_import_repair_available")
+        else None,
+        "cli_install_config_available": bool(
+            contract.get("cli_install_config_available")
+        ),
+        "cli_install_config_route": f"/api/modules/{module.get('id')}/runtime/cli-install-config-runner"
+        if contract.get("cli_install_config_available")
         else None,
         "runner_contract_status": str(contract.get("runner_status") or "blocked"),
         "required_verifier_family": str(contract.get("required_verifier_family") or ""),

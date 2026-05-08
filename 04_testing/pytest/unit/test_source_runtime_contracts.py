@@ -488,6 +488,79 @@ def test_python_import_repair_preflight_reads_source_metadata_only(monkeypatch, 
     assert repair["execution_mode"] == "registered_python_import_repair_preflight"
 
 
+@pytest.mark.parametrize(
+    ("module_id", "display_name", "cli_path"),
+    [
+        ("slic3r", "Slic3r", "C:/Program Files/Slic3r/slic3r-console.exe"),
+        (
+            "superslicer",
+            "SuperSlicer",
+            "C:/Program Files/SuperSlicer/superslicer-console.exe",
+        ),
+    ],
+)
+def test_slicer_cli_install_config_preflight_keeps_runtime_blocked(
+    monkeypatch,
+    tmp_path,
+    module_id: str,
+    display_name: str,
+    cli_path: str,
+) -> None:
+    (tmp_path / "README.md").write_text(f"# {display_name}\n", encoding="utf-8")
+    (tmp_path / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8")
+
+    def _missing_cli(_mod: dict, *, live: bool = False) -> dict:
+        return {
+            "status": "blocked",
+            "kind": "cli",
+            "verifier": f"{display_name} CLI",
+            "path": cli_path,
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": ["slice_to_gcode", "info"],
+            "reason": f"{display_name} CLI was not verified at {cli_path}.",
+            "proof_gate_version": "runtime-verifier-v1",
+        }
+
+    monkeypatch.setattr(module_runtime, "module_runtime_probe", _missing_cli)
+    monkeypatch.setattr(
+        module_runtime,
+        "runtime_probe_config",
+        lambda _module_id: {
+            "path": cli_path,
+            "kind": "cli",
+            "proof_gate_version": "runtime-verifier-v1",
+        },
+    )
+    mod = {
+        "id": module_id,
+        "display_name": display_name,
+        "section": "slicers",
+        "launch_kind": "desktop_or_cli",
+        "install_state": "installed",
+        "local_path": str(tmp_path),
+    }
+
+    contract = module_runtime.module_runner_contract(mod)
+    preflight = module_runtime.module_cli_install_config_runner_contract(mod)
+
+    assert contract["agent_executable"] is False
+    assert contract["runtime_ready"] is False
+    assert contract["cli_install_config_available"] is True
+    assert "cli_install_config_plan" in contract["safe_actions"]
+    assert preflight["accepted"] is True
+    assert preflight["runtime_ready"] is False
+    assert preflight["install_allowed"] is False
+    assert preflight["process_start_allowed"] is False
+    assert preflight["printer_action_allowed"] is False
+    assert preflight["install_config"]["source_checkout"]["exists"] is True
+    assert preflight["install_config"]["adapter_schema"]["sha256"]
+    assert preflight["install_config"]["config_files"]
+    assert preflight["install_config"]["candidate_executables"][0]["value"] == cli_path
+    assert preflight["execution_mode"] == "registered_cli_install_config_preflight"
+
+
 def test_print_farm_health_probe_requires_configured_local_url(monkeypatch) -> None:
     monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
     monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
@@ -745,6 +818,7 @@ def test_runner_contract_routes_are_registered() -> None:
     assert "/api/modules/{module_id}/runtime/read-only-runner" in paths
     assert "/api/modules/{module_id}/runtime/executable-path-runner" in paths
     assert "/api/modules/{module_id}/runtime/python-import-repair-runner" in paths
+    assert "/api/modules/{module_id}/runtime/cli-install-config-runner" in paths
     assert "/api/modules/{module_id}/runtime/start-runner" in paths
     assert "/api/modules/{module_id}/runtime/stop-runner" in paths
 

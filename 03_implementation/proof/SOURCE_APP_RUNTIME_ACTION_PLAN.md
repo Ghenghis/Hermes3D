@@ -1,6 +1,6 @@
 # Source OS Runtime Action Plan
 
-Generated: 2026-05-08T05:09:21.069104+00:00
+Generated: 2026-05-08T08:03:47.525418+00:00
 
 This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
 
@@ -17,6 +17,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Read-only runner smoke rows: 8
 - Executable path runner smoke rows: 3
 - Python import repair preflight rows: 5
+- CLI install/config preflight rows: 2
 - CLI/service signals needing verifiers: 24
 - Blocked rows: 2
 
@@ -28,6 +29,7 @@ This plan is generated from the Source OS proof JSONs. It is the durable queue f
 - Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.
 - Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.
 - Python import repair preflight is allowed only for failed Python import verifier rows with a local source checkout. It can read source/dependency metadata only; it cannot install packages, create environments, start workers, write output, or touch printers.
+- CLI install/config preflight is allowed only for Slic3r/SuperSlicer rows with source/schema/profile proof. It can read metadata only; it cannot install apps, launch slicers, slice files, write output, update source, or touch printers.
 - Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.
 - S1 remains camera/read-only and action-locked until the user changes printer policy.
 
@@ -84,6 +86,15 @@ These rows now have `/api/modules/{module_id}/runtime/python-import-repair-runne
 | build123d | modelers | build123d Python import | python-import-verifier-v1 | /api/modules/build123d/runtime/python-import-repair-runner |
 | numpy-stl | modelers | numpy-stl Python import | python-import-verifier-v1 | /api/modules/numpy_stl/runtime/python-import-repair-runner |
 | pymesh | modelers | PyMesh/pymeshfix Python import | python-import-verifier-v1 | /api/modules/pymesh/runtime/python-import-repair-runner |
+
+## CLI Install/Config Preflight Rows
+
+These rows now have `/api/modules/{module_id}/runtime/cli-install-config-runner`. The route reads only Slic3r/SuperSlicer source checkout, adapter schema, profile/config, and candidate executable metadata. It is not install permission, launch permission, slicing permission, or runtime readiness.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Slic3r | slicers | Slic3r CLI | runtime-verifier-v1 | /api/modules/slic3r/runtime/cli-install-config-runner |
+| SuperSlicer | slicers | SuperSlicer CLI | runtime-verifier-v1 | /api/modules/superslicer/runtime/cli-install-config-runner |
 
 ## Verified Agent CLI Rows
 

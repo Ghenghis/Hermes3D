@@ -1,11 +1,12 @@
 {
-  "generated_at_utc": "2026-05-08T05:09:20.806966+00:00",
+  "generated_at_utc": "2026-05-08T08:03:06.712154+00:00",
   "next_actions": [
     "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
     "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
     "Use /api/modules/{module_id}/runtime/read-only-runner only for read_only_runner_available rows; it appends proof and cannot install, launch, update, write outputs, or touch printers.",
     "Use /api/modules/{module_id}/runtime/executable-path-runner only for executable_path_runner_available rows; it reads executable metadata/hash only and cannot launch apps or touch printers.",
     "Use /api/modules/{module_id}/runtime/python-import-repair-runner only for python_import_repair_available rows; it reads source/dependency metadata only and cannot install packages or start workers.",
+    "Use /api/modules/{module_id}/runtime/cli-install-config-runner only for cli_install_config_available rows; it reads Slic3r/SuperSlicer source/schema/profile metadata only and cannot install, launch, slice, write outputs, or touch printers.",
     "Promote launcher-only rows only after proving a safe CLI, service API, or explicit desktop-bridge smoke.",
     "For CLI-preferred gaps, locate/install the real executable or document no-CLI-with-proof before exposing agent actions.",
     "For Python/Node/GPU/service/web gaps, register import, package, health, or tiny smoke gates before enabling Hermes Agent runners.",
@@ -17,6 +18,8 @@
       "agent_executable": false,
       "agent_execution_tier": "npm_package_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Azure Speech SDK JS",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -52,6 +55,8 @@
         "blender_python_bridge",
         "provider_candidate"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Blender MCP Candidates",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -90,6 +95,8 @@
         "session_management",
         "self_update_cli"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Hermes Agent (NousResearch)",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -126,6 +133,8 @@
         "web_app_reference",
         "agent_eval_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Kiln",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -161,6 +170,8 @@
         "agent_orchestration_reference",
         "source_inventory"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "LangChain",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -196,6 +207,8 @@
         "agent_orchestration_reference",
         "workflow_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "LangGraph",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -231,6 +244,8 @@
         "mcp_sdk",
         "tool_protocol_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Model Context Protocol",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -267,6 +282,8 @@
         "klipper_firmware_readonly_state",
         "fleet_status_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Klipper",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -303,6 +320,8 @@
         "firmware_source_reference",
         "configuration_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Marlin",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -338,6 +357,8 @@
         "firmware_source_reference",
         "cmake_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Prusa Firmware",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -373,6 +394,8 @@
         "firmware_source_reference",
         "duet_firmware_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "RepRapFirmware",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -408,6 +431,8 @@
         "firmware_source_reference",
         "configuration_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Repetier Firmware",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -443,6 +468,8 @@
         "firmware_source_reference",
         "configuration_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Smoothieware",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -478,6 +505,8 @@
         "catalog_index",
         "hardware_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Awesome Extruders",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -513,6 +542,8 @@
         "hardware_reference",
         "configuration_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "BoxTurtle",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -548,6 +579,8 @@
         "hardware_reference",
         "configuration_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "EnragedRabbitProject",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -583,6 +616,8 @@
         "model_library_service_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Manyfold",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -617,6 +652,8 @@
         "material_database_service_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Open Filament Database",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -652,6 +689,8 @@
         "python_scene_worker",
         "mesh_convert"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Blender",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -688,6 +727,8 @@
         "parametric_cad_worker",
         "step_stl_export"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "CadQuery",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -721,6 +762,8 @@
       "agent_executable": false,
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "FreeCAD",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -755,6 +798,8 @@
         "manifold_mesh_library",
         "boolean_geometry"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Manifold",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -792,6 +837,8 @@
         "mesh_filter_pipeline",
         "mesh_repair_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "MeshLab",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -829,6 +876,8 @@
         "mesh_io",
         "geometry_analysis"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Open3D",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -866,6 +915,8 @@
         "scad_to_3mf",
         "render_png"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "OpenSCAD",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -899,6 +950,8 @@
       "agent_executable": false,
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "SolveSpace",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -933,6 +986,8 @@
         "parametric_cad_worker",
         "solid_modeling"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "build123d",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -970,6 +1025,8 @@
         "stl_transform",
         "mesh_measurement"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "numpy-stl",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1007,6 +1064,8 @@
         "mesh_cleanup",
         "watertightness_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "pymesh",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1044,6 +1103,8 @@
         "mesh_repair",
         "mesh_analysis"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "trimesh",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1080,6 +1141,8 @@
         "rust_cad_reference",
         "source_inventory"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "truck",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1115,6 +1178,8 @@
         "service_reference",
         "queue_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "BotQueue",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1150,6 +1215,8 @@
         "print_farm_service_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "FDM Monster",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1184,6 +1251,8 @@
         "moonraker_web_ui_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Fluidd",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1218,6 +1287,8 @@
         "klipper_readonly_state",
         "fleet_status_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Klipper",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1254,6 +1325,8 @@
         "touch_ui_reference",
         "klipper_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "KlipperScreen",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1289,6 +1362,8 @@
         "moonraker_web_ui_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Mainsail",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1323,6 +1398,8 @@
         "moonraker_readonly_api",
         "fleet_status_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Moonraker",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1359,6 +1436,8 @@
         "print_farm_service_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "OctoFarm",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1393,6 +1472,8 @@
         "octoprint_version_api",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "OctoPrint",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1426,6 +1507,8 @@
       "capabilities": [
         "serial_gui_app"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Printrun",
       "executable_path_runner_available": true,
       "executable_path_runner_route": "/api/modules/printrun/runtime/executable-path-runner",
@@ -1462,6 +1545,8 @@
         "catalog_index",
         "research_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Awesome 3D Printing",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1497,6 +1582,8 @@
         "desktop_slicer_launcher",
         "project_workspace"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "BambuStudio",
       "executable_path_runner_available": true,
       "executable_path_runner_route": "/api/modules/bambustudio/runtime/executable-path-runner",
@@ -1534,6 +1621,8 @@
         "profile_engine",
         "mesh_to_gcode_cli"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "CuraEngine",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1573,6 +1662,8 @@
         "load_settings",
         "load_filaments"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "FLSUN Slicer",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1609,6 +1700,8 @@
         "browser_slicer_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Kiri:Moto / GridSpace",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1640,6 +1733,8 @@
       "agent_executable": false,
       "agent_execution_tier": "desktop_app_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "MatterControl",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1675,6 +1770,8 @@
         "export_3mf",
         "export_stl"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "OrcaSlicer",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1713,6 +1810,8 @@
         "export_stl",
         "info"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "PrusaSlicer",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1750,6 +1849,8 @@
         "export_stl",
         "info"
       ],
+      "cli_install_config_available": true,
+      "cli_install_config_route": "/api/modules/slic3r/runtime/cli-install-config-runner",
       "display": "Slic3r",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1770,7 +1871,9 @@
       "runtime_status": "blocked",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata",
+        "cli_install_config_plan"
       ],
       "section": "slicers",
       "verifier": "Slic3r CLI",
@@ -1785,6 +1888,8 @@
         "desktop_preprocessor_source",
         "cmake_build_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Strec3D",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1822,6 +1927,8 @@
         "export_stl",
         "info"
       ],
+      "cli_install_config_available": true,
+      "cli_install_config_route": "/api/modules/superslicer/runtime/cli-install-config-runner",
       "display": "SuperSlicer",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1842,7 +1949,9 @@
       "runtime_status": "blocked",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata",
+        "cli_install_config_plan"
       ],
       "section": "slicers",
       "verifier": "SuperSlicer CLI",
@@ -1856,6 +1965,8 @@
         "desktop_slicer_launcher",
         "profile_workspace"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Ultimaker Cura",
       "executable_path_runner_available": true,
       "executable_path_runner_route": "/api/modules/cura/runtime/executable-path-runner",
@@ -1893,6 +2004,8 @@
         "read_only_http_probe",
         "system_stats"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "ComfyUI",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1927,6 +2040,8 @@
         "web_app_reference",
         "generation_ui_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "ComfyUI Frontend",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1962,6 +2077,8 @@
         "trellis_wrapper_service_health",
         "read_only_http_probe"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "ComfyUI TRELLIS.2 Wrapper",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -1993,6 +2110,8 @@
       "agent_executable": false,
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Microsoft TRELLIS.2",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -2024,6 +2143,8 @@
       "agent_executable": false,
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "Tencent Hunyuan3D 2.1",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -2055,6 +2176,8 @@
       "agent_executable": false,
       "agent_execution_tier": "gpu_worker_gap",
       "capabilities": [],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "TripoSR",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -2089,6 +2212,8 @@
         "web_app_reference",
         "parametric_generator_reference"
       ],
+      "cli_install_config_available": false,
+      "cli_install_config_route": null,
       "display": "3D Box Generator",
       "executable_path_runner_available": false,
       "executable_path_runner_route": null,
@@ -2155,6 +2280,11 @@
       "runtime_repair_required": 15,
       "source_reference_only": 18
     },
+    "cli_install_config_available": 2,
+    "cli_install_config_modules": [
+      "slic3r",
+      "superslicer"
+    ],
     "executable_path_runner_available": 3,
     "executable_path_runner_modules": [
       "printrun",

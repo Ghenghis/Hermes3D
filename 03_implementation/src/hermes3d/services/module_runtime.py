@@ -30,6 +30,15 @@ SOURCE_REGISTRY_AUDIT_PATH = Path("03_implementation/proof/SOURCE_REGISTRY_TRUTH
 SECRET_RE = re.compile(
     r"(?i)(https?://)([^/@\s]+@)|([?&](?:token|key|api_key|access_token)=)[^&\s]+"
 )
+CLI_INSTALL_CONFIG_RUNNER_MODULE_IDS = {"slic3r", "superslicer"}
+CLI_INSTALL_CONFIG_COMMANDS = {
+    "slic3r": ["slic3r-console", "slic3r", "Slic3r"],
+    "superslicer": ["superslicer-console", "superslicer", "SuperSlicer"],
+}
+CLI_INSTALL_CONFIG_EXTRA_PATHS = {
+    "slic3r": ["C:/Program Files/Slic3r/slic3r.exe"],
+    "superslicer": ["C:/Program Files/SuperSlicer/superslicer.exe"],
+}
 
 BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     "prusaslicer": {
@@ -872,11 +881,18 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         launch_kind=launch_kind,
         local_path=str(mod.get("local_path") or ""),
     )
+    cli_install_config_available = _cli_install_config_runner_available(
+        mod=mod,
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+    )
     runner_status = _runner_status(runtime=runtime, mod=mod, agent_executable=agent_executable)
     required_family = _required_verifier_family(launch_kind, verifier_kind, runner_status)
     blocked_reason = (
         None
-        if read_only_runner_available or executable_path_runner_available
+        if read_only_runner_available
+        or executable_path_runner_available
+        or cli_install_config_available
         else _runner_blocked_reason(
             runtime=runtime, runner_status=runner_status, required_family=required_family
         )
@@ -893,6 +909,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         "read_only_runner_available": read_only_runner_available,
         "executable_path_runner_available": executable_path_runner_available,
         "python_import_repair_available": python_import_repair_available,
+        "cli_install_config_available": cli_install_config_available,
         "runner_status": runner_status,
         "verifier": runtime.get("verifier"),
         "verifier_kind": verifier_kind,
@@ -907,6 +924,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
             read_only_runner_available=read_only_runner_available,
             executable_path_runner_available=executable_path_runner_available,
             python_import_repair_available=python_import_repair_available,
+            cli_install_config_available=cli_install_config_available,
         ),
         "required_verifier_family": required_family,
         "acceptance_gate": _runner_acceptance_gate(
@@ -918,7 +936,7 @@ def module_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
         else (runtime.get("setup_steps") or module_setup_steps(mod))[:6],
         "proof_required": True,
         "mutation_allowed": False,
-        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, executable path smoke may read installed launcher metadata only, and Python import repair preflight may read source/dependency metadata only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
+        "policy": "Hermes Agents may run only registered non-destructive verifiers here. Read-only runner smoke may re-run package/import/local API proof, executable path smoke may read installed launcher metadata only, Python import repair preflight may read source/dependency metadata only, and CLI install/config preflight may read Slic3r/SuperSlicer source/schema/profile metadata only. setup/install/update/launch remains plan-only until a runner is registered with backup, smoke, proof, and rollback gates.",
     }
 
 
@@ -945,6 +963,9 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "python_import_repair_available": sum(
             1 for contract in contracts if contract.get("python_import_repair_available")
         ),
+        "cli_install_config_available": sum(
+            1 for contract in contracts if contract.get("cli_install_config_available")
+        ),
         "runner_gaps": sum(
             1
             for contract in contracts
@@ -960,7 +981,7 @@ def module_runner_contracts(modules: list[dict[str, Any]]) -> dict[str, Any]:
         "by_runner_status": dict(sorted(by_status.items())),
         "by_gap_section": dict(sorted(by_section.items())),
         "contracts": contracts,
-        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata; python_import_repair_available rows may only read source/dependency metadata. None can launch, install, update, or write.",
+        "rule": "No Source OS row is Hermes Agent executable unless this contract has agent_executable=true and a non-destructive verifier proof gate. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read launcher file metadata; python_import_repair_available rows may only read source/dependency metadata; cli_install_config_available rows may only read Slic3r/SuperSlicer source/schema/profile metadata. None can launch, install, update, or write.",
     }
 
 
@@ -1168,6 +1189,84 @@ def module_python_import_repair_runner_contract(mod: dict[str, Any]) -> dict[str
         if ready
         else "blocked_until_source_and_failed_import_proof_exist",
         "policy": "This endpoint reads only Python import failure proof plus local source/dependency metadata and appends evidence. It cannot install packages, create environments, start workers, write output files, or send printer commands.",
+    }
+
+
+def module_cli_install_config_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
+    """Return the Slic3r/SuperSlicer CLI install/config preflight contract.
+
+    These legacy slicers are useful to keep visible in Source OS, but they must
+    not be marked runnable unless a real CLI executable verifies. This preflight
+    only reads local source, adapter schema, profile/config, and candidate CLI
+    path metadata so Hermes Agents can produce a setup plan without installing,
+    launching, slicing, writing output, or touching printers.
+    """
+
+    runtime = module_runtime_probe(mod, live=False)
+    module_id = str(mod.get("id") or "")
+    launch_kind = str(mod.get("launch_kind") or "unknown")
+    verifier_kind = str(runtime.get("kind") or launch_kind)
+    metadata = _cli_install_config_metadata(mod=mod, runtime=runtime)
+    ready = _cli_install_config_runner_available(
+        mod=mod,
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+    )
+    if ready and not (
+        metadata["source_checkout"]["exists"]
+        and (
+            metadata["adapter_schema"]["exists"]
+            or bool(metadata["config_files"])
+            or bool(metadata["detected_candidate_executables"])
+        )
+    ):
+        ready = False
+    blocked_reason = None if ready else _cli_install_config_blocked_reason(
+        mod=mod,
+        runtime=runtime,
+        verifier_kind=verifier_kind,
+        metadata=metadata,
+    )
+    runtime_public = {
+        key: value
+        for key, value in runtime.items()
+        if key not in {"output_head"}
+    }
+    if runtime.get("output_head"):
+        runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
+    return {
+        "module_id": module_id,
+        "display": str(mod.get("display_name") or module_id),
+        "section": str(mod.get("section") or ""),
+        "launch_kind": launch_kind,
+        "status": "config_preflight_ready" if ready else "blocked",
+        "accepted": ready,
+        "runtime_ready": False,
+        "cli_install_config_available": ready,
+        "agent_executable": False,
+        "runner_status": "cli_install_config_preflight_ready" if ready else "blocked",
+        "verifier": runtime.get("verifier"),
+        "verifier_kind": verifier_kind,
+        "proof_gate_version": runtime.get("proof_gate_version"),
+        "path": runtime.get("path") or mod.get("local_path") or "",
+        "executed": bool(runtime.get("executed")),
+        "return_code": runtime.get("return_code"),
+        "capabilities": list(runtime.get("capabilities") or []),
+        "runtime": runtime_public,
+        "install_config": metadata,
+        "safe_actions": ["verify", "setup_plan", "read_metadata", "cli_install_config_plan"]
+        if ready
+        else ["verify", "setup_plan"],
+        "blocked_reason": blocked_reason,
+        "proof_required": True,
+        "mutation_allowed": False,
+        "install_allowed": False,
+        "process_start_allowed": False,
+        "printer_action_allowed": False,
+        "execution_mode": "registered_cli_install_config_preflight"
+        if ready
+        else "blocked_until_source_schema_or_executable_config_proof_exists",
+        "policy": "This endpoint reads only Slic3r/SuperSlicer source checkout, adapter schema, profile/config, and candidate executable metadata. It cannot install packages, start apps, slice files, write outputs, update source, or send printer commands.",
     }
 
 
@@ -2264,6 +2363,21 @@ def _python_import_repair_runner_available(
     )
 
 
+def _cli_install_config_runner_available(
+    *, mod: dict[str, Any], runtime: dict[str, Any], verifier_kind: str
+) -> bool:
+    module_id = str(mod.get("id") or "")
+    local_path = str(mod.get("local_path") or "")
+    return (
+        module_id in CLI_INSTALL_CONFIG_RUNNER_MODULE_IDS
+        and str(runtime.get("status") or "") != "ready"
+        and verifier_kind == "cli"
+        and str(runtime.get("proof_gate_version") or "") == "runtime-verifier-v1"
+        and bool(local_path)
+        and Path(local_path).is_dir()
+    )
+
+
 def _read_only_runner_family(verifier_kind: str) -> str:
     if verifier_kind in READ_ONLY_METADATA_RUNNER_VERIFIER_KINDS:
         return "metadata"
@@ -2337,6 +2451,39 @@ def _python_import_repair_blocked_reason(
     return runtime_reason or "Python import repair preflight is blocked until source metadata exists."
 
 
+def _cli_install_config_blocked_reason(
+    *,
+    mod: dict[str, Any],
+    runtime: dict[str, Any],
+    verifier_kind: str,
+    metadata: dict[str, Any],
+) -> str:
+    module_id = str(mod.get("id") or "")
+    if module_id not in CLI_INSTALL_CONFIG_RUNNER_MODULE_IDS:
+        return (
+            "CLI install/config preflight is currently scoped only to Slic3r and "
+            "SuperSlicer legacy slicer rows."
+        )
+    if str(runtime.get("status") or "") == "ready":
+        return "The CLI already verifies; use the verified CLI runner path instead."
+    if verifier_kind != "cli":
+        return f"CLI install/config preflight requires a registered CLI verifier; this row uses {verifier_kind}."
+    if str(runtime.get("proof_gate_version") or "") != "runtime-verifier-v1":
+        return "CLI install/config preflight requires the runtime-verifier-v1 CLI proof contract."
+    if not metadata.get("source_checkout", {}).get("exists"):
+        return "CLI install/config preflight requires the local source checkout to exist."
+    if not (
+        metadata.get("adapter_schema", {}).get("exists")
+        or metadata.get("config_files")
+        or metadata.get("detected_candidate_executables")
+    ):
+        return (
+            "CLI install/config preflight requires adapter schema, profile/config, "
+            "or an existing candidate executable path."
+        )
+    return str(runtime.get("reason") or "CLI install/config preflight is blocked.")
+
+
 def _safe_runner_actions(
     runtime: dict[str, Any],
     *,
@@ -2344,6 +2491,7 @@ def _safe_runner_actions(
     read_only_runner_available: bool = False,
     executable_path_runner_available: bool = False,
     python_import_repair_available: bool = False,
+    cli_install_config_available: bool = False,
 ) -> list[str]:
     actions = ["verify", "setup_plan"]
     if agent_executable:
@@ -2354,6 +2502,8 @@ def _safe_runner_actions(
         actions.extend(["read_metadata", "executable_path_smoke"])
     elif python_import_repair_available:
         actions.extend(["read_metadata", "python_import_repair_plan"])
+    elif cli_install_config_available:
+        actions.extend(["read_metadata", "cli_install_config_plan"])
     elif runtime.get("status") == "ready":
         actions.append("read_metadata")
     return actions
@@ -2447,6 +2597,90 @@ def _python_import_repair_metadata(
             "Install dependencies from the recorded manifest(s) or package README.",
             f"Run `/api/modules/{mod.get('id')}/runtime/verify` until the Python import verifier returns ready.",
             "Only then promote to read-only runner smoke or a bounded worker dry-run.",
+        ],
+    }
+
+
+def _cli_install_config_metadata(
+    *, mod: dict[str, Any], runtime: dict[str, Any]
+) -> dict[str, Any]:
+    module_id = str(mod.get("id") or "")
+    root_value = str(mod.get("local_path") or "")
+    root = Path(root_value) if root_value else None
+    probe = runtime_probe_config(module_id) or {}
+    registered_path = str(runtime.get("path") or probe.get("path") or "")
+    candidate_values: list[str] = []
+    if registered_path:
+        candidate_values.append(registered_path)
+    candidate_values.extend(CLI_INSTALL_CONFIG_EXTRA_PATHS.get(module_id, []))
+    candidate_values.extend(CLI_INSTALL_CONFIG_COMMANDS.get(module_id, []))
+    candidate_executables: list[dict[str, Any]] = []
+    detected_candidate_executables: list[dict[str, Any]] = []
+    for value in dict.fromkeys(item for item in candidate_values if item):
+        is_path = any(sep in value for sep in ("/", "\\")) or ":" in value
+        resolved = Path(value) if is_path else None
+        metadata = (
+            _executable_file_metadata(resolved)
+            if resolved is not None
+            else _executable_file_metadata(Path(shutil.which(value))) if shutil.which(value) else {
+                "exists": False,
+                "reason": "not_on_path",
+            }
+        )
+        row = {
+            "value": value,
+            "kind": "path" if is_path else "command",
+            **metadata,
+        }
+        candidate_executables.append(row)
+        if row.get("exists"):
+            detected_candidate_executables.append(row)
+
+    manifests: list[dict[str, Any]] = []
+    if root and root.is_dir():
+        for name in (
+            "README.md",
+            "LICENSE",
+            "CMakeLists.txt",
+            "Makefile",
+            "Build.PL",
+            "cpanfile",
+            "xs/Build.PL",
+        ):
+            item = root / name
+            if item.is_file():
+                manifests.append(_source_metadata_file(item))
+
+    schema = IMPLEMENTATION_ROOT / "adapter_registry" / "schemas" / f"{module_id}.schema.json"
+    config_dir = IMPLEMENTATION_ROOT / "config" / "slicer"
+    config_files: list[dict[str, Any]] = []
+    if config_dir.is_dir():
+        for item in sorted(config_dir.glob("*")):
+            if item.is_file() and item.suffix.lower() in {".ini", ".json", ".yaml", ".yml"}:
+                config_files.append(_source_metadata_file(item))
+
+    return {
+        "source_checkout": {
+            "exists": bool(root and root.is_dir()),
+            "path": str(root) if root else "",
+            "manifest_count": len(manifests),
+        },
+        "source_manifests": manifests,
+        "adapter_schema": _source_metadata_file(schema) if schema.exists() else {
+            "exists": False,
+            "path": str(schema),
+            "reason": "missing",
+        },
+        "config_files": config_files,
+        "candidate_executables": candidate_executables,
+        "detected_candidate_executables": detected_candidate_executables,
+        "registered_cli_path": registered_path,
+        "current_runtime_reason": runtime.get("reason"),
+        "setup_plan": [
+            f"Install {mod.get('display_name') or module_id} CLI so one candidate executable path exists.",
+            "Keep adapter schema/profile metadata under versioned Hermes3D source control.",
+            f"Run `/api/modules/{module_id}/runtime/verify` until the CLI help/version verifier returns ready.",
+            "Only then promote to a bounded slicer CLI runner; never infer readiness from source presence alone.",
         ],
     }
 
