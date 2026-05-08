@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-05-07T15:57:12.977247+00:00",
+  "generated_at_utc": "2026-05-07T20:10:19.609811+00:00",
   "next_actions": [
     "Keep verified CLI modules agent-usable through bounded help/version/dry-run commands first.",
     "Use /api/modules/runtime/runner-contracts as the canonical Hermes Agent execution matrix.",
@@ -242,129 +242,149 @@
       "verifier_kind": "moonraker_fleet"
     },
     {
-      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/marlin/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/marlin/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "runner_gap",
-      "capabilities": [],
+      "agent_execution_tier": "source_reference_ready",
+      "capabilities": [
+        "firmware_source_reference",
+        "configuration_reference"
+      ],
       "display": "Marlin",
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "marlin",
-      "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
+      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Marlin",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "read_only_firmware_source_inventory",
-      "return_code": null,
-      "runner_contract_status": "runner_not_registered",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "firmware-source-inventory-v1",
+      "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
+      "return_code": 0,
+      "runner_contract_status": "source_reference_only",
+      "runtime_status": "ready",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata"
       ],
       "section": "firmware",
-      "verifier": "source checkout",
-      "verifier_kind": "firmware_source"
+      "verifier": "Marlin firmware source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
-      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/prusa_firmware/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/prusa_firmware/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "runner_gap",
-      "capabilities": [],
+      "agent_execution_tier": "source_reference_ready",
+      "capabilities": [
+        "firmware_source_reference",
+        "cmake_reference"
+      ],
       "display": "Prusa Firmware",
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "prusa_firmware",
-      "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
+      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Prusa-Firmware",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "read_only_firmware_source_inventory",
-      "return_code": null,
-      "runner_contract_status": "runner_not_registered",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "firmware-source-inventory-v1",
+      "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
+      "return_code": 0,
+      "runner_contract_status": "source_reference_only",
+      "runtime_status": "ready",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata"
       ],
       "section": "firmware",
-      "verifier": "source checkout",
-      "verifier_kind": "firmware_source"
+      "verifier": "Prusa Firmware source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
-      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/reprapfirmware/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/reprapfirmware/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "runner_gap",
-      "capabilities": [],
+      "agent_execution_tier": "source_reference_ready",
+      "capabilities": [
+        "firmware_source_reference",
+        "duet_firmware_reference"
+      ],
       "display": "RepRapFirmware",
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "reprapfirmware",
-      "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
+      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\RepRapFirmware",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "read_only_firmware_source_inventory",
-      "return_code": null,
-      "runner_contract_status": "runner_not_registered",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "firmware-source-inventory-v1",
+      "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
+      "return_code": 0,
+      "runner_contract_status": "source_reference_only",
+      "runtime_status": "ready",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata"
       ],
       "section": "firmware",
-      "verifier": "source checkout",
-      "verifier_kind": "firmware_source"
+      "verifier": "RepRapFirmware source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
-      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/repetier_firmware/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/repetier_firmware/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "runner_gap",
-      "capabilities": [],
+      "agent_execution_tier": "source_reference_ready",
+      "capabilities": [
+        "firmware_source_reference",
+        "configuration_reference"
+      ],
       "display": "Repetier Firmware",
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "repetier_firmware",
-      "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
+      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Repetier-Firmware",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "read_only_firmware_source_inventory",
-      "return_code": null,
-      "runner_contract_status": "runner_not_registered",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "firmware-source-inventory-v1",
+      "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
+      "return_code": 0,
+      "runner_contract_status": "source_reference_only",
+      "runtime_status": "ready",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata"
       ],
       "section": "firmware",
-      "verifier": "source checkout",
-      "verifier_kind": "firmware_source"
+      "verifier": "Repetier Firmware source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
-      "acceptance_gate": "Register read_only_firmware_source_inventory; then `/api/modules/smoothieware/runtime/verify` must return ready with proof before any agent execution.",
+      "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/smoothieware/runtime/verify` must return ready with proof before any agent execution.",
       "agent_executable": false,
-      "agent_execution_tier": "runner_gap",
-      "capabilities": [],
+      "agent_execution_tier": "source_reference_ready",
+      "capabilities": [
+        "firmware_source_reference",
+        "configuration_reference"
+      ],
       "display": "Smoothieware",
       "executed": false,
       "launch_kind": "firmware_source",
       "module_id": "smoothieware",
-      "next_action": "Register a safe module-specific verifier and runner before Hermes Agents can execute this app.",
+      "next_action": "Use as read-only reference data; do not expose runnable actions unless a real adapter exists.",
       "path": "G:\\Github\\Hermes3D-OS\\source-lab\\sources\\firmware\\Smoothieware",
-      "proof_gate_version": "",
-      "reason": "Source checkout is present; no safe module-specific runtime verifier is registered yet.",
-      "required_verifier_family": "read_only_firmware_source_inventory",
-      "return_code": null,
-      "runner_contract_status": "runner_not_registered",
-      "runtime_status": "source_ready",
+      "proof_gate_version": "firmware-source-inventory-v1",
+      "reason": null,
+      "required_verifier_family": "reference_parser_or_adapter_contract",
+      "return_code": 0,
+      "runner_contract_status": "source_reference_only",
+      "runtime_status": "ready",
       "safe_actions": [
         "verify",
-        "setup_plan"
+        "setup_plan",
+        "read_metadata"
       ],
       "section": "firmware",
-      "verifier": "source checkout",
-      "verifier_kind": "firmware_source"
+      "verifier": "Smoothieware source inventory",
+      "verifier_kind": "source_inventory"
     },
     {
       "acceptance_gate": "Register reference_parser_or_adapter_contract; then `/api/modules/awesome_extruders/runtime/verify` must return ready with proof before any agent execution.",
@@ -1732,10 +1752,10 @@
       "npm_package_gap": 1,
       "package_or_import_ready": 5,
       "python_worker_gap": 5,
-      "runner_gap": 6,
+      "runner_gap": 1,
       "service_api_ready": 3,
       "service_gap": 6,
-      "source_reference_ready": 13,
+      "source_reference_ready": 18,
       "verified_agent_cli": 7,
       "web_app_gap": 3
     },
@@ -1748,9 +1768,8 @@
       "metadata_ready_needs_runner": 5,
       "npm_package_runner_gap": 1,
       "readonly_api_ready": 3,
-      "runner_not_registered": 5,
       "runtime_repair_required": 15,
-      "source_reference_only": 13
+      "source_reference_only": 18
     },
     "launcher_metadata_only": 3,
     "launcher_metadata_only_modules": [
@@ -1758,7 +1777,7 @@
       "bambustudio",
       "cura"
     ],
-    "runner_gaps": 29,
+    "runner_gaps": 24,
     "verified_agent_cli": 7,
     "verified_agent_cli_modules": [
       "hermes_agent",
@@ -1771,7 +1790,7 @@
     ]
   },
   "target": {
-    "registered_verifiers": 48,
+    "registered_verifiers": 53,
     "rule": "If an app offers a CLI, Hermes3D must prefer a bounded CLI verifier and Hermes Agent runner; desktop launcher metadata is not agent CLI readiness.",
     "source_backed_apps": 60
   }
