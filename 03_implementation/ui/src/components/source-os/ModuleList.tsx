@@ -1,4 +1,13 @@
 import type { InstallState, SourceModuleCliSurfaceRecord, SourceOSModule } from "../../types/source-os";
+
+type RunnerContract = {
+  module_id: string;
+  runner_status: string;
+  required_verifier_family: string;
+  safe_actions: string[];
+  acceptance_gate: string;
+  blocked_reason: string | null;
+};
 import { ResizablePane } from "../layout/ResizablePane";
 
 const INSTALL_BADGE_CLASS: Record<InstallState, string> = {
@@ -29,6 +38,35 @@ const RUNTIME_BADGE_CLASS: Record<string, string> = {
   blocked: "bg-red-900/50 text-red-300",
 };
 
+// Runner family badge styles — keyed on runner_status from /api/modules/runtime/runner-contracts
+const RUNNER_STATUS_BADGE_CLASS: Record<string, string> = {
+  agent_cli_ready: "bg-green-900/80 text-green-200",
+  readonly_api_ready: "bg-cyan-900/70 text-cyan-200",
+  metadata_ready_needs_runner: "bg-blue-900/60 text-blue-300",
+  launcher_metadata_only: "bg-blue-900/50 text-blue-300",
+  runtime_repair_required: "bg-amber-900/70 text-amber-200",
+  npm_package_runner_gap: "bg-amber-900/60 text-amber-300",
+  desktop_app_runner_gap: "bg-surface2 text-muted",
+  gpu_worker_runner_gap: "bg-purple-950/70 text-purple-300",
+  source_reference_only: "bg-surface2 text-muted",
+  blocked: "bg-red-950/60 text-red-400",
+  metadata_only: "bg-surface2 text-muted",
+};
+
+const RUNNER_STATUS_LABEL: Record<string, string> = {
+  agent_cli_ready: "Agent CLI",
+  readonly_api_ready: "Read-only API",
+  metadata_ready_needs_runner: "Needs Runner",
+  launcher_metadata_only: "Launcher Only",
+  runtime_repair_required: "Repair Needed",
+  npm_package_runner_gap: "npm Gap",
+  desktop_app_runner_gap: "Desktop Gap",
+  gpu_worker_runner_gap: "GPU Gap",
+  source_reference_only: "Source Ref",
+  blocked: "Blocked",
+  metadata_only: "Metadata Only",
+};
+
 const CLI_BADGE_CLASS: Record<string, string> = {
   enabled_agent_cli: "bg-green-950/80 text-green-200",
   cli_candidate_needs_verifier: "bg-cyan-950/80 text-cyan-200",
@@ -43,11 +81,13 @@ export function ModuleList({
   selectedId,
   onSelect,
   cliSurfaceByModule,
+  runnerContractsByModule,
 }: {
   modules: SourceOSModule[];
   selectedId: string | null;
   onSelect: (id: string) => void;
   cliSurfaceByModule?: Record<string, SourceModuleCliSurfaceRecord>;
+  runnerContractsByModule?: Record<string, RunnerContract>;
 }) {
   const sections = modules.reduce<Record<string, SourceOSModule[]>>((acc, module) => {
     acc[module.section] = [...(acc[module.section] ?? []), module];
@@ -76,6 +116,7 @@ export function ModuleList({
               {sectionModules.map((module) => {
                 const selected = module.id === selectedId;
                 const cliSurface = cliSurfaceByModule?.[module.id] ?? null;
+                const runnerContract = runnerContractsByModule?.[module.id] ?? null;
                 return (
                   <li key={module.id}>
                     <button
@@ -93,6 +134,12 @@ export function ModuleList({
                         {cliSurface && <Badge label={cliBadgeLabel(cliSurface)} className={cliBadgeClass(cliSurface)} />}
                         <Badge label={module.installState} className={INSTALL_BADGE_CLASS[module.installState]} />
                         <Badge label={runtimeBadgeLabel(module.runtime.status)} className={RUNTIME_BADGE_CLASS[module.runtime.status] ?? HEALTH_BADGE_CLASS[module.health]} />
+                        {runnerContract && (
+                          <Badge
+                            label={RUNNER_STATUS_LABEL[runnerContract.runner_status] ?? runnerContract.runner_status}
+                            className={RUNNER_STATUS_BADGE_CLASS[runnerContract.runner_status] ?? "bg-surface2 text-muted"}
+                          />
+                        )}
                       </span>
                     </button>
                   </li>

@@ -5,6 +5,15 @@ import { CompilerProofSection } from "./CompilerProofSection";
 import { DispatchGateSection } from "./DispatchGateSection";
 import type { InstallState, SourceModuleCliSurfaceRecord, SourceModuleUpdateRecord, SourceOSModule } from "../../types/source-os";
 
+type RunnerContract = {
+  module_id: string;
+  runner_status: string;
+  required_verifier_family: string;
+  safe_actions: string[];
+  acceptance_gate: string;
+  blocked_reason: string | null;
+};
+
 type HermesImportMeta = ImportMeta & {
   env: {
     VITE_HERMES3D_BRIDGE_PORT?: string;
@@ -39,11 +48,13 @@ export function AppDetailPanel({
   module,
   updateRecord,
   cliSurfaceRecord,
+  runnerContract,
   onRefresh,
 }: {
   module: SourceOSModule | null;
   updateRecord?: SourceModuleUpdateRecord | null;
   cliSurfaceRecord?: SourceModuleCliSurfaceRecord | null;
+  runnerContract?: RunnerContract | null;
   onRefresh?: () => void;
 }) {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -72,6 +83,12 @@ export function AppDetailPanel({
               <Pill label={module.installState} tone={module.installState === "unavailable" ? "muted" : "green"} />
               <Pill label={module.detectedVersion ?? "-"} tone="cyan" />
               <Pill label={runtimeLabel(module.runtime.status)} tone={runtimeTone(module.runtime.status)} />
+              {runnerContract && (
+                <Pill
+                  label={`runner: ${runnerContract.runner_status.replaceAll("_", " ")}`}
+                  tone={runnerContractTone(runnerContract.runner_status)}
+                />
+              )}
             </div>
           </div>
           <div className="flex flex-wrap justify-end gap-1.5">
@@ -168,6 +185,20 @@ export function AppDetailPanel({
             </div>
           )}
         </InfoBox>
+
+        {runnerContract && (
+          <InfoBox title="Runner Contract">
+            <Field label="Runner Status" value={runnerContract.runner_status.replaceAll("_", " ")} />
+            <Field label="Verifier Family" value={runnerContract.required_verifier_family.replaceAll("_", " ")} />
+            <Field label="Safe Actions" value={runnerContract.safe_actions.join(", ") || "none"} />
+            {runnerContract.blocked_reason && (
+              <div className="text-[11px] leading-relaxed text-amber-300">{runnerContract.blocked_reason}</div>
+            )}
+            <div className="rounded border border-border/70 bg-bg/40 p-2 text-[11px] leading-relaxed text-muted">
+              {runnerContract.acceptance_gate}
+            </div>
+          </InfoBox>
+        )}
 
         {module.providers.length > 0 && (
           <InfoBox title="Provider">
@@ -575,6 +606,14 @@ function runtimeLabel(status: string): string {
   if (status === "setup_required") return "setup needed";
   if (status === "not_installed") return "install ready";
   return status;
+}
+
+function runnerContractTone(runnerStatus: string): "blue" | "cyan" | "green" | "red" | "muted" {
+  if (runnerStatus === "agent_cli_ready") return "green";
+  if (runnerStatus === "readonly_api_ready") return "cyan";
+  if (runnerStatus === "metadata_ready_needs_runner" || runnerStatus === "launcher_metadata_only") return "blue";
+  if (runnerStatus === "blocked") return "red";
+  return "muted";
 }
 
 function runtimeTone(status: string): "blue" | "cyan" | "green" | "red" | "muted" {
