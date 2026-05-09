@@ -158,11 +158,18 @@ def staged_update(body: StagedUpdateRequest) -> dict[str, Any]:
         "latest_release": latest,
         "remaining_tags": _pending_tags(tags, final_state.get("exact_tag") or final_state.get("nearest_tag"), target),
     }
+    # Bonus 12 finding #6 fix (Audit PR #135): persist the redacted/truncated
+    # proof summary to agent_config (matching what proof_events already gets).
+    # Pre-fix the raw payload — including 800-char check.output strings that
+    # only got the narrow _redact() pass — was written verbatim to disk, while
+    # proof_events correctly used _proof_summary(). Symmetrize so both sinks
+    # receive the same sanitized blob (Sentry-style single-redaction-hook).
+    persisted = _proof_summary(payload)
     execute(
         "INSERT OR REPLACE INTO agent_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-        ("hermes_agent.update.last_run", json.dumps({"actor": body.actor, **payload})),
+        ("hermes_agent.update.last_run", json.dumps({"actor": body.actor, **persisted})),
     )
-    _append_proof_event("hermes_agent_update_run", body.actor, _proof_summary(payload))
+    _append_proof_event("hermes_agent_update_run", body.actor, persisted)
     return payload
 
 
@@ -187,11 +194,14 @@ def rollback_update(body: RollbackRequest) -> dict[str, Any]:
     final_state = _repo_state(repo)
     ok = all(item.get("status") == "pass" for item in checks)
     payload = {"rolled_back": ok, "status": "rolled_back" if ok else "rollback_failed_checks", "target": target, "checks": checks, "current": final_state}
+    # Bonus 12 finding #6 fix (PR #135): same redaction symmetry for the
+    # rollback path — see staged_update for full rationale.
+    persisted = _proof_summary(payload)
     execute(
         "INSERT OR REPLACE INTO agent_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
-        ("hermes_agent.update.last_rollback", json.dumps({"actor": body.actor, **payload})),
+        ("hermes_agent.update.last_rollback", json.dumps({"actor": body.actor, **persisted})),
     )
-    _append_proof_event("hermes_agent_update_rollback", body.actor, _proof_summary(payload))
+    _append_proof_event("hermes_agent_update_rollback", body.actor, persisted)
     return payload
 
 
