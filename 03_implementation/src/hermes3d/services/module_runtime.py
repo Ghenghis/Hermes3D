@@ -631,75 +631,76 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "proof_gate_version": "moonraker-fleet-verifier-v1",
     },
     "firmware_klipper": {
-        "tool_key": "moonraker_fleet",
-        "label": "Klipper firmware fleet read-only API",
-        "path": "",
-        "args": ["/printer/info", "3"],
-        "capabilities": ["klipper_firmware_readonly_state", "fleet_status_probe"],
-        "kind": "moonraker_fleet",
-        "execute": True,
-        "timeout_s": 2,
-        "proof_gate_version": "moonraker-fleet-verifier-v1",
+        "tool_key": "firmware_source_inventory",
+        "label": "Klipper firmware source inventory",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
+        "args": ["README.md", "klippy"],
+        "capabilities": ["firmware_source_reference", "klipper_firmware_source"],
+        "kind": "firmware_source_inventory",
+        "execute": False,
+        "timeout_s": 5,
+        "proof_gate_version": "firmware-source-inventory-v1",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
     },
     "marlin": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Marlin firmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
         "args": ["README.md", "docs"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
     },
     "prusa_firmware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Prusa Firmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
         "args": ["README.md", "CMakeLists.txt", "Firmware"],
         "capabilities": ["firmware_source_reference", "cmake_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
     },
     "reprapfirmware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "RepRapFirmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
         "args": ["README.md", "src"],
         "capabilities": ["firmware_source_reference", "duet_firmware_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
     },
     "repetier_firmware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Repetier Firmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
         "args": ["README.md", "src"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
     },
     "smoothieware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Smoothieware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
         "args": ["COPYING", "src"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
     },
 }
 
@@ -3061,3 +3062,105 @@ def _head_lines(value: str | list[str], *, max_lines: int = 25, max_chars: int =
         else:
             trimmed.append(line)
     return trimmed
+
+
+# ---------------------------------------------------------------------------
+# Firmware source inventory probe (I7 — read-only, no flash/compile/serial)
+# ---------------------------------------------------------------------------
+
+#: Canonical source paths for each firmware module. These are reference-only
+#: checkouts; no build, compile, flash, or serial action may be performed here.
+#: Absolute safety constraints:
+#:   - NEVER call avrdude, dfu-util, openocd, esptool, or any flash utility.
+#:   - NEVER open serial ports or connect to MCU.
+#:   - NEVER invoke make, cmake, platformio, or any build toolchain.
+#:   - S1 (192.168.0.12): camera-only — no probe performed here.
+#:   - T1 / V400: source repos only — do NOT probe printer firmware.
+FIRMWARE_SOURCE_PATHS: dict[str, str] = {
+    "firmware_klipper": "G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
+    "marlin": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
+    "prusa_firmware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
+    "reprapfirmware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
+    "repetier_firmware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
+    "smoothieware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
+}
+
+#: Runner contract row for every firmware module: source-reference-only status.
+#: These rows will never become agent_cli_ready — they exist for reference only.
+FIRMWARE_RUNNER_CONTRACT_TEMPLATE: dict[str, Any] = {
+    "runner_status": "source_reference_only",
+    "runner_family": "source_reference_only",
+    "agent_executable": False,
+    "mutation_allowed": False,
+    "proof_gate_version": "firmware-source-inventory-v1",
+}
+
+
+def _git_describe(source_path: str, *, timeout: int = 5) -> str | None:
+    """Run ``git describe --tags --always`` in *source_path* and return the tag.
+
+    Returns ``None`` when the path is not a git repo or the command fails.
+    This is a read-only probe — it NEVER modifies the repository.
+    """
+    if not os.path.isdir(source_path):
+        return None
+    try:
+        proc = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            cwd=source_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    tag = (proc.stdout or "").strip()
+    return tag if tag else None
+
+
+def probe_firmware_source_inventory(module_id: str) -> dict[str, Any]:
+    """Return a read-only source-inventory result for a firmware module.
+
+    Probes only the source checkout on disk:
+    - Checks ``os.path.isdir(path)``
+    - Reads ``git describe --tags --always`` (read-only)
+    - Returns ``runner_status=source_reference_only``
+
+    ABSOLUTE CONSTRAINTS (enforced by this function):
+    - No flash commands (avrdude, dfu-util, openocd, esptool, etc.)
+    - No serial port connections
+    - No build / compile (make, cmake, platformio)
+    - S1 (192.168.0.12): not probed here
+    - T1 / V400: source repos only — printers not probed
+
+    Args:
+        module_id: One of the firmware module IDs registered in
+                   :data:`FIRMWARE_SOURCE_PATHS`.
+
+    Returns:
+        A dict with keys: ``module_id``, ``source_path``, ``source_found``,
+        ``version_tag``, ``runner_status``, ``runner_family``,
+        ``agent_executable``, ``mutation_allowed``, ``proof_gate_version``.
+    """
+    source_path = FIRMWARE_SOURCE_PATHS.get(module_id, "")
+    source_found = bool(source_path and os.path.isdir(source_path))
+    version_tag = _git_describe(source_path) if source_found else None
+    return {
+        "module_id": module_id,
+        "source_path": source_path,
+        "source_found": source_found,
+        "version_tag": version_tag,
+        **FIRMWARE_RUNNER_CONTRACT_TEMPLATE,
+    }
+
+
+def probe_all_firmware_sources() -> dict[str, dict[str, Any]]:
+    """Probe all registered firmware source paths and return a results dict.
+
+    Keys are module IDs; values are the output of
+    :func:`probe_firmware_source_inventory`.
+
+    This function is safe to call at any time — it is purely read-only.
+    """
+    return {mod_id: probe_firmware_source_inventory(mod_id) for mod_id in FIRMWARE_SOURCE_PATHS}
