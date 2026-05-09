@@ -112,8 +112,24 @@ def staged_update(body: StagedUpdateRequest) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     repair: dict[str, Any] | None = None
     for tag in steps:
-        _run_git(repo, ["checkout", "--detach", tag], timeout=120)
-        checks = _run_update_checks(repo) if body.run_checks else [{"name": "checks", "status": "skipped", "output": "run_checks=false prevents verified update."}]
+        # Bonus 12 finding #3 fix (PR #135): _run_git raises HTTPException(502)
+        # on non-zero exit, and _run_update_checks raises HTTPException(400) for
+        # bad pytest worker config. Without this guard either escapes the loop
+        # without reaching _auto_repair_to_backup, leaving the repo on the
+        # previous (still-unverified) tag. Surface as a structured step failure
+        # and pivot to auto-repair like any other failed gate.
+        try:
+            _run_git(repo, ["checkout", "--detach", tag], timeout=120)
+            checks = _run_update_checks(repo) if body.run_checks else [{"name": "checks", "status": "skipped", "output": "run_checks=false prevents verified update."}]
+        except HTTPException as exc:
+            synthetic_check = {
+                "name": "git checkout to staged tag",
+                "status": "fail",
+                "output": _redact(str(exc.detail))[:800],
+            }
+            results.append({"tag": tag, "checks": [synthetic_check], "ok": False})
+            repair = _auto_repair_to_backup(repo, backup, body.actor, failed_tag=tag)
+            break
         ok = all(item.get("status") == "pass" for item in checks)
         results.append({"tag": tag, "checks": checks, "ok": ok})
         if not ok:
