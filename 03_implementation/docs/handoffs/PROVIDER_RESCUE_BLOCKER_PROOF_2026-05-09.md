@@ -1,11 +1,21 @@
 # Provider Rescue — Non-Secret Blocker Proof
+
+## SUPERSEDED — Providers Now PASS (2026-05-09)
+
+MiniMax smoke now returns `accepted:true` HTTP 200 — evidence `ev_4a52d9b1336ca9f2`.
+
+DeepSeek smoke now returns `accepted:true` HTTP 200 — evidence `ev_e708071cb269f170`.
+
+The BLOCKED state (HTTP 429/401) below was resolved by an out-of-repo key reset in `G:/private/.env`; it was never a Hermes code-side bug.
+
+Original content preserved below for historical reference.
+
 Date: 2026-05-09  
 Contract: PR #124 + `CLAUDE_PROVIDER_COMPLETION_PROMPT_2026-05-08.md`  
 Task: H3D-CLAUDE-PROVIDER-COMPLETION  
 Owner: claude-provider-rescue  
 Workspace: G:\Github\h3d-gui-wiring-codex (verified MCP_LOCK_WORKSPACE match)  
 Branch: codex/claude-hermes-runtime-finish-contract-2026-05-08
-
 ---
 
 ## What Works Now
