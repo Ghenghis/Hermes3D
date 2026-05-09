@@ -318,11 +318,45 @@ def _dirty_entries(repo: Path) -> list[Path]:
 
 
 def _zip_dirty_entries(repo: Path, paths: list[Path], target: Path) -> None:
+    """Defense-in-depth backup of git-dirty files (Bonus 12 finding #4 fix).
+
+    Hardenings beyond the original ``archive.write(path, path.relative_to(repo))``:
+
+    1. ``allowZip64=True`` — without it, dirty backups >4 GiB silently
+       truncate on Python builds that default to no-zip64.
+    2. Symlink guard — even though ``_dirty_entries`` already resolves
+       paths, a raw symlink can still arrive via tests or future callers;
+       we refuse to write any symlink because the target may live outside
+       the repo.
+    3. Resolved-repo arcname — compute the archive name against
+       ``repo.resolve()`` so a symlinked checkout (e.g. ``/tmp/repo`` ->
+       ``/var/checkout``) does not raise ``ValueError`` from
+       ``relative_to`` and abort the whole backup.
+    4. Arcname sanity assert — refuse absolute or parent-traversing
+       arcnames so a maliciously crafted dirty path cannot escape the
+       archive root on extract.
+
+    References:
+    - https://docs.python.org/3/library/zipfile.html#zipfile.ZipFile
+    - https://cwe.mitre.org/data/definitions/22.html (Path Traversal)
+    """
     if not paths:
         return
-    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    repo_resolved = repo.resolve()
+    with zipfile.ZipFile(
+        target, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True
+    ) as archive:
         for path in paths:
-            archive.write(path, path.relative_to(repo))
+            if path.is_symlink():
+                continue
+            try:
+                arcname = path.resolve().relative_to(repo_resolved)
+            except ValueError:
+                # Resolved target lives outside the repo: refuse to include.
+                continue
+            if arcname.is_absolute() or any(part in ("..", "") for part in arcname.parts):
+                continue
+            archive.write(path, arcname)
 
 
 def _latest_backup() -> dict[str, Any] | None:
