@@ -657,3 +657,90 @@ def restore_snapshot(body: RestoreRequest) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+# ---------------------------------------------------------------------------
+# Recovery Controller v1 — failure ledger routes (no UI, no autonomous apply,
+# no file mutation by the controller). Each route dispatches to code_history
+# helpers that append MCP evidence and write the JSONL ledger.
+# ---------------------------------------------------------------------------
+
+
+class RecoveryRecordFailureRequest(StrictBody):
+    task_id: str
+    failed_step: str = Field(min_length=1, max_length=120)
+    failure_class: str
+    failure_summary: str = Field(min_length=1, max_length=400)
+    failed_step_type: str = "unknown"
+    agent_stack: list[str] = Field(default_factory=list)
+    resume_from_step: str = ""
+    recommended_next_action: str = "none"
+    redaction_status: str = "pass"
+    worker_output_status: str = "complete"
+    context_pack: list[str] = Field(default_factory=list)
+    provenance_ids: list[str] = Field(default_factory=list)
+    evidence_id: str = ""
+    affected_files: list[str] = Field(default_factory=list)
+    attempt_n: int = Field(default=1, ge=1)
+    max_attempts: int = Field(default=3, ge=1, le=32)
+
+
+class RecoveryMarkOutcomeRequest(StrictBody):
+    attempt_id: str = Field(min_length=32, max_length=32)
+    status: str
+    recovery_summary: str = Field(min_length=1, max_length=400)
+    proposal_id: str | None = None
+    review_evidence_id: str | None = None
+    apply_evidence_id: str | None = None
+    retry_gate_id: str | None = None
+
+
+@router.post("/recovery/record-failure")
+def recovery_record_failure(body: RecoveryRecordFailureRequest) -> dict[str, Any]:
+    try:
+        return code_history.record_step_failure(
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            failed_step=body.failed_step,
+            failure_class=body.failure_class,
+            failure_summary=body.failure_summary,
+            failed_step_type=body.failed_step_type,
+            agent_stack=body.agent_stack,
+            resume_from_step=body.resume_from_step,
+            recommended_next_action=body.recommended_next_action,
+            redaction_status=body.redaction_status,
+            worker_output_status=body.worker_output_status,
+            context_pack=body.context_pack,
+            provenance_ids=body.provenance_ids,
+            evidence_id=body.evidence_id,
+            affected_files=body.affected_files,
+            attempt_n=body.attempt_n,
+            max_attempts=body.max_attempts,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/recovery/mark-outcome")
+def recovery_mark_outcome(body: RecoveryMarkOutcomeRequest) -> dict[str, Any]:
+    try:
+        return code_history.mark_recovery_outcome(
+            owner=CODE_OPERATOR_ACTOR,
+            attempt_id=body.attempt_id,
+            status=body.status,
+            recovery_summary=body.recovery_summary,
+            proposal_id=body.proposal_id,
+            review_evidence_id=body.review_evidence_id,
+            apply_evidence_id=body.apply_evidence_id,
+            retry_gate_id=body.retry_gate_id,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.get("/recovery/state")
+def recovery_state(task_id: str | None = None) -> dict[str, Any]:
+    try:
+        return code_history.list_recovery_attempts(task_id=task_id)
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
