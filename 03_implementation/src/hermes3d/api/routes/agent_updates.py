@@ -4,7 +4,9 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
+import urllib.error
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -220,20 +222,51 @@ def _repo_state(repo: Path) -> dict[str, Any]:
 
 
 def _remote_release_tags(repo: Path) -> list[str]:
+    """Fetch published Hermes Agent release tags from the GitHub Releases API.
+
+    Bonus 12 finding #5 fix (Audit PR #135): the original ``except Exception``
+    swallowed every failure mode and returned ``[]`` — DNS poisoning, MITM TLS
+    errors, GitHub 5xx, rate-limit bans all collapsed silently into
+    ``status="already_current"`` downstream, masking a stale Hermes Agent
+    checkout (CWE-918 / OWASP CICD-SEC-1 fail-open shape). Tighten the except
+    to known network/parse modes only and surface real failures as HTTP 502
+    so operators see the outage rather than a false "current" verdict.
+
+    Distinguishes:
+    - ``200 + []``                                  -> repo has no published releases
+    - ``200 + non-list payload``                    -> upstream contract violation (502)
+    - URLError / HTTPError / timeout / JSONDecode  -> network outage (502)
+    """
     del repo
     try:
         request = urllib.request.Request(RELEASES_API, headers={"Accept": "application/vnd.github+json", "User-Agent": "Hermes3D-Agent-Updater"})
         with urllib.request.urlopen(request, timeout=10) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except Exception:
-        return []
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError, json.JSONDecodeError) as exc:
+        # urllib.error.HTTPError subclasses URLError, so 4xx/5xx land here too.
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                f"GitHub Releases API unreachable for {RELEASES_API}: "
+                f"{_redact(type(exc).__name__ + ': ' + str(exc))[:200]}"
+            ),
+        ) from exc
     if not isinstance(payload, list):
-        return []
+        raise HTTPException(
+            status_code=502,
+            detail="GitHub Releases API returned a non-list payload; refusing to treat as no-releases.",
+        )
     tags = [item.get("tag_name") for item in payload if isinstance(item, dict)]
     return sorted({tag for tag in tags if isinstance(tag, str) and TAG_RE.match(tag)}, key=_tag_key)
 
 
 def _latest_release(tags: list[str]) -> dict[str, Any]:
+    """Fetch the latest GitHub Release.
+
+    Distinguishes 404 ("repo has no /releases/latest yet" -> soft warning) from
+    real network outages (URLError / 5xx -> HTTPException 502). See
+    ``_remote_release_tags`` for the broader rationale (Bonus 12 #5 / PR #135).
+    """
     latest: dict[str, Any] = {"tag": None, "name": None, "source": "github_releases_api"}
     try:
         request = urllib.request.Request(LATEST_RELEASE_API, headers={"Accept": "application/vnd.github+json", "User-Agent": "Hermes3D-Agent-Updater"})
@@ -248,7 +281,20 @@ def _latest_release(tags: list[str]) -> dict[str, Any]:
                 "html_url": payload.get("html_url"),
                 "source": "github_releases_api",
             })
-    except Exception as exc:
+    except urllib.error.HTTPError as exc:
+        # 404 = repo has no /releases/latest yet; soft warning so a brand-new
+        # fork is not blocked. Any other HTTP code is a real outage.
+        if exc.code == 404:
+            latest["api_warning"] = "GitHub /releases/latest returned 404 (no published releases yet)."
+        else:
+            raise HTTPException(
+                status_code=502,
+                detail=f"GitHub Releases latest endpoint HTTP {exc.code}: {_redact(str(exc.reason))[:120]}",
+            ) from exc
+    except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError, json.JSONDecodeError) as exc:
+        # Soft-warning preserved here ONLY because _remote_release_tags is the
+        # authoritative gate; if we got this far, tags came back successfully,
+        # so a transient hiccup on the latest endpoint is acceptable.
         latest["api_warning"] = _redact(str(exc))
     if latest.get("tag") is None and tags:
         latest["api_warning"] = "GitHub Releases latest endpoint unavailable; refusing to treat tags as releases."
