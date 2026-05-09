@@ -254,3 +254,113 @@ def test_successful_path_unaffected_by_repair_guard(
     assert payload["status"] == "updated"
     assert payload["repair"] is None
     assert all(step["ok"] is True for step in payload["steps"])
+
+
+# ---------------------------------------------------------------------------
+# BLK-022 + BLK-023 (Master Continuation Agent A6 findings)
+# ---------------------------------------------------------------------------
+
+
+def test_blk022_subprocess_timeout_expired_pivots_to_auto_repair(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BLK-022 (Wave Master Continuation Agent A6): pre-fix the for-tag loop
+    only caught HTTPException. ``subprocess.TimeoutExpired`` raised by
+    ``_run_git`` (when ``subprocess.run(timeout=120)`` fires) escaped the
+    guard and bypassed ``_auto_repair_to_backup``. Post-fix we catch both.
+    """
+    import subprocess as _subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".git").mkdir()
+
+    monkeypatch.setattr(agent_updates, "_repo_path", lambda: repo)
+    monkeypatch.setattr(agent_updates, "_repo_state", _stub_repo_state)
+    monkeypatch.setattr(agent_updates, "_ensure_remote", lambda _r: None)
+    monkeypatch.setattr(agent_updates, "_remote_release_tags", _stub_remote_release_tags)
+    monkeypatch.setattr(agent_updates, "_latest_release", _stub_latest_release)
+    monkeypatch.setattr(agent_updates, "_pending_tags", _stub_pending_tags)
+    monkeypatch.setattr(agent_updates, "_create_backup", _stub_create_backup)
+    monkeypatch.setattr(agent_updates, "_run_update_checks", _stub_run_checks_pass)
+    monkeypatch.setattr(agent_updates, "_append_proof_event", lambda *a, **kw: None)
+    monkeypatch.setattr(agent_updates, "execute", lambda *a, **kw: None)
+
+    # _run_git for "fetch" + others succeeds; for "checkout --detach" raises
+    # subprocess.TimeoutExpired (NOT HTTPException).
+    def timeout_run_git(_repo: Path, args: list[str], timeout: int = 30) -> str:
+        if args[:2] == ["checkout", "--detach"]:
+            raise _subprocess.TimeoutExpired(cmd=["git"] + list(args), timeout=timeout)
+        return ""
+
+    monkeypatch.setattr(agent_updates, "_run_git", timeout_run_git)
+
+    repair_calls: list[str] = []
+
+    def fake_auto_repair(_repo, backup, actor, *, failed_tag):
+        repair_calls.append(failed_tag)
+        return {"attempted": True, "rolled_back": True, "failed_tag": failed_tag}
+
+    monkeypatch.setattr(agent_updates, "_auto_repair_to_backup", fake_auto_repair)
+
+    body = _make_request_body()
+    payload = agent_updates.staged_update(body)
+
+    assert payload["updated"] is False, (
+        "BLK-022 regression: TimeoutExpired escaped and updated stayed True"
+    )
+    assert payload["repair"] is not None, (
+        "BLK-022 regression: TimeoutExpired bypassed _auto_repair_to_backup"
+    )
+    assert len(repair_calls) == 1, (
+        "BLK-022 regression: auto_repair must be invoked exactly once on TimeoutExpired"
+    )
+    failed_check = payload["steps"][0]["checks"][0]
+    assert failed_check["status"] == "fail"
+    assert "timeout" in failed_check["name"].lower() or "timeout" in failed_check["output"].lower()
+
+
+def test_blk023_auto_backup_emits_proof_event(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BLK-023 (Wave Master Continuation Agent A6): the staged_update path
+    creates an automatic backup at line 113 but pre-fix wrote ONLY to
+    agent_config (no proof_events row). Post-fix emits
+    ``hermes_agent_backup_auto_created`` proof_event for symmetry with the
+    manual /backup endpoint.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".git").mkdir()
+
+    proof_events: list[tuple[str, str, dict[str, Any]]] = []
+
+    monkeypatch.setattr(agent_updates, "_repo_path", lambda: repo)
+    monkeypatch.setattr(agent_updates, "_repo_state", _stub_repo_state)
+    monkeypatch.setattr(agent_updates, "_ensure_remote", lambda _r: None)
+    monkeypatch.setattr(agent_updates, "_run_git", lambda *a, **kw: "")
+    monkeypatch.setattr(agent_updates, "_remote_release_tags", _stub_remote_release_tags)
+    monkeypatch.setattr(agent_updates, "_latest_release", _stub_latest_release)
+    monkeypatch.setattr(agent_updates, "_pending_tags", _stub_pending_tags)
+    monkeypatch.setattr(agent_updates, "_create_backup", _stub_create_backup)
+    monkeypatch.setattr(agent_updates, "_run_update_checks", _stub_run_checks_pass)
+    monkeypatch.setattr(
+        agent_updates,
+        "_append_proof_event",
+        lambda event_type, source_agent, payload: proof_events.append((event_type, source_agent, payload)),
+    )
+    monkeypatch.setattr(agent_updates, "execute", lambda *a, **kw: None)
+    monkeypatch.setattr(agent_updates, "_auto_repair_to_backup", lambda *a, **kw: None)
+
+    body = _make_request_body()
+    agent_updates.staged_update(body)
+
+    backup_proof_events = [pe for pe in proof_events if pe[0] == "hermes_agent_backup_auto_created"]
+    assert len(backup_proof_events) == 1, (
+        f"BLK-023 regression: expected exactly 1 hermes_agent_backup_auto_created "
+        f"proof_event, got {len(backup_proof_events)}. All events: {[pe[0] for pe in proof_events]}"
+    )
+    event_type, source_agent, payload = backup_proof_events[0]
+    assert source_agent == "claude-test"
+    assert "backup" in payload
+    assert payload["backup"]["backup_id"] == "20260509T000000Z_v2026.5.7_abcdef012345"
