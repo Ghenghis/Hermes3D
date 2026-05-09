@@ -345,7 +345,7 @@ export function AgentsTab() {
                     <button
                       type="button"
                       disabled={sandboxBusy}
-                      onClick={() => void refreshSandboxReadiness(setSandboxReadiness, setSandboxMessage)}
+                      onClick={() => { setSandboxBusy(true); void refreshSandboxReadiness(setSandboxReadiness, setSandboxMessage).finally(() => setSandboxBusy(false)); }}
                       className="rounded border border-border px-1.5 py-0.5 text-[10px] text-fg disabled:opacity-50"
                     >
                       {sandboxBusy ? "checking" : "Refresh"}
