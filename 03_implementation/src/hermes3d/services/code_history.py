@@ -22,7 +22,14 @@ from typing import Any
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows, utc_now
 from hermes3d.db.init import DB_PATH
 from hermes3d.services.agent_runtime import env_value, private_env
+from hermes3d.services.agent_checkout import hermes_agent_checkout
 from hermes3d.gateways.redaction import redact_text
+
+# Hermes Agent v0.13 canary switch (Wave A4 finding): captured at import
+# so SOURCE_REPOS can be a module-level tuple (consumers iterate it
+# repeatedly). The HTTP route's _repo_path() reads the env per-call for
+# mid-process flips; this site is documentation-of-intent only.
+_HERMES_AGENT_CHECKOUT_AT_IMPORT = hermes_agent_checkout()
 
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 PROJECT_ROOT = IMPLEMENTATION_ROOT.parent
@@ -191,7 +198,11 @@ SOURCE_REPOS = (
     SourceRepo(
         id="nous_hermes_agent",
         label="Nous Hermes Agent runtime",
-        local_path=Path(r"G:\Github\hermes-agent-fresh"),
+        # Hermes Agent v0.13 canary switch: respects HERMES_AGENT_CHECKOUT
+        # via the shared resolver. Captured at import time; canary requires
+        # the env be set BEFORE process start for this site (the HTTP route
+        # _repo_path reads env per-call and supports mid-process flip).
+        local_path=_HERMES_AGENT_CHECKOUT_AT_IMPORT,
         remote_url="https://github.com/NousResearch/hermes-agent.git",
         role="primary agent runtime, tools, skills, MCP, delegation, terminal/code loop",
         required_files=("run_agent.py", "model_tools.py", "toolsets.py", "tools/registry.py", "tools/file_tools.py", "tools/terminal_tool.py"),

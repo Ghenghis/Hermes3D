@@ -24,6 +24,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from hermes3d.services.agent_checkout import hermes_agent_checkout as _hermes_agent_checkout_at_import
+
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 LOCAL_TOOLING_AUDIT_PATH = IMPLEMENTATION_ROOT / "proof" / "LOCAL_TOOLING_AUDIT.json"
 SOURCE_REGISTRY_AUDIT_PATH = Path("03_implementation/proof/SOURCE_REGISTRY_TRUTH_AUDIT.json")
@@ -196,7 +198,9 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     "hermes_agent": {
         "tool_key": "hermes_agent_source_cli",
         "label": "Hermes Agent source CLI",
-        "path": "G:/Github/hermes-agent-fresh",
+        # Hermes Agent v0.13 canary switch (Wave A4 finding): respects
+        # HERMES_AGENT_CHECKOUT via shared resolver. Captured at import.
+        "path": str(_hermes_agent_checkout_at_import()),
         "args": ["hermes_cli.main", "--help"],
         "capabilities": ["agent_cli", "mcp_management", "session_management", "self_update_cli"],
         "kind": "python_module_cli",

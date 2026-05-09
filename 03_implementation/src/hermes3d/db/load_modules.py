@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from hermes3d.db.init import DB_PATH, connect, init_db
+from hermes3d.services.agent_checkout import hermes_agent_checkout as _hermes_agent_checkout_at_import
 
 REFERENCE_LAUNCH_KINDS = {
     "catalog_reference",
@@ -72,10 +73,15 @@ SOURCE_OVERRIDES = {
         "local_path": "G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Printrun",
     },
     # Link the user's existing checked-out agent source instead of claiming a
-    # missing source-lab copy.
+    # missing source-lab copy. Hermes Agent v0.13 canary switch
+    # (Wave A4 finding): use ``hermes_agent_checkout()`` so an operator
+    # can flip canary↔production via ``HERMES_AGENT_CHECKOUT`` env var.
+    # Note: this dict is built at module import; canary requires the env
+    # var be set BEFORE process start for this site (the HTTP route
+    # ``_repo_path()`` reads env per-call and supports mid-process flip).
     "hermes_agent": {
         "repo": "https://github.com/NousResearch/Hermes-Agent.git",
-        "local_path": "G:/Github/hermes-agent-fresh",
+        "local_path": str(_hermes_agent_checkout_at_import()),
     },
 }
 LAUNCH_KIND_OVERRIDES = {

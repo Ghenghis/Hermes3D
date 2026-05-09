@@ -17,11 +17,20 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id
+from hermes3d.services.agent_checkout import hermes_agent_checkout
 
 router = APIRouter()
 
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[4]
 BACKUP_ROOT = IMPLEMENTATION_ROOT / "var" / "hermes_agent_backups"
+# Hermes Agent v0.13 canary switch (Wave A5 finding): the prior
+# ``DEFAULT_CHECKOUT = Path(os.environ.get("HERMES_AGENT_CHECKOUT", ...))``
+# captured the env at module-import time and the value never refreshed.
+# Canary↔production rollback required a process restart. Switching to a
+# per-call resolver (``hermes_agent_checkout()``) reads the env every time
+# ``_repo_path()`` is called, so flipping ``HERMES_AGENT_CHECKOUT`` between
+# requests works as expected. ``DEFAULT_CHECKOUT`` retained for any
+# downstream import (e.g. tests that monkeypatch the constant).
 DEFAULT_CHECKOUT = Path(os.environ.get("HERMES_AGENT_CHECKOUT", "G:/Github/hermes-agent-fresh"))
 UPSTREAM_URL = os.environ.get("HERMES_AGENT_UPSTREAM_URL", "https://github.com/NousResearch/Hermes-Agent.git")
 LATEST_RELEASE_API = "https://api.github.com/repos/NousResearch/hermes-agent/releases/latest"
@@ -221,7 +230,14 @@ def rollback_update(body: RollbackRequest) -> dict[str, Any]:
 
 
 def _repo_path() -> Path:
-    return DEFAULT_CHECKOUT
+    """Resolve the active Hermes Agent checkout per-call.
+
+    Wave A5 fix: read ``HERMES_AGENT_CHECKOUT`` from the live env every
+    call (via ``hermes_agent_checkout()``) instead of returning the
+    module-level ``DEFAULT_CHECKOUT`` constant captured at import time.
+    Lets canary↔production rollback work without process restart.
+    """
+    return hermes_agent_checkout()
 
 
 def _repo_state(repo: Path) -> dict[str, Any]:
