@@ -99,6 +99,14 @@ def completion_caller(config: ProviderConfig) -> LLMCaller:
 
 
 def _minimax_api_key(config: ProviderConfig) -> str:
+    """Resolve a MiniMax API key from the configured env-var chain.
+
+    Squad G follow-up (Wave synthesis 2026-05-09; mirrors PR #145 DeepSeek
+    fix): the original ``raise KeyError(config.api_key_env)`` named the
+    env variable in the traceback (low-risk info disclosure). Switch to an
+    explicit ``RuntimeError`` with an actionable operator-facing message
+    that does NOT echo the variable name.
+    """
     for name in (
         "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY",
         "MINIMAX_TOKEN_PLAN_API_KEY",
@@ -111,7 +119,10 @@ def _minimax_api_key(config: ProviderConfig) -> str:
         value = os.environ.get(name)
         if value:
             return value
-    raise KeyError(config.api_key_env)
+    raise RuntimeError(
+        "MiniMax provider is not configured: API key env variable is unset. "
+        "Set the configured key in the private env file before invoking the provider."
+    )
 
 
 def _now_iso() -> str:
