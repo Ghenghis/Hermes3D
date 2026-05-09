@@ -1470,18 +1470,85 @@ def apply_patch_proposal(
         action_id="code.patch.apply.pre",
         reason=apply_reason,
     )
+    # Bonus 12 finding #7 fix (Audit PR #135): close TOCTOU + crash window in
+    # apply_patch_proposal. Pre-fix order was:
+    #   write tmp -> replace -> read -> hash -> rollback (post-replace verify)
+    # Failure modes:
+    #   * No fsync of tmp fd; Windows write-back caching could lose bytes on
+    #     power loss (etcd #13839 documents the same pattern producing
+    #     zero-byte files on POSIX).
+    #   * Hash verified AFTER os.replace, so a corrupt write went live first.
+    #   * proof_events insert ran AFTER replace; SIGKILL between left the
+    #     mutated file with no audit row to reconcile against.
+    #   * No fsync of the parent directory on POSIX, so the rename itself
+    #     was not durable.
+    # Post-fix order:
+    #   hash-of-bytes-to-write -> compare -> open+write+fsync(fd) ->
+    #   record inflight intent -> os.replace -> fsync(parent_dir on POSIX) ->
+    #   defensive post-read (FS drift, not proposal mismatch).
     proposed_bytes = proposed_text.encode("utf-8")
-    tmp_path = target.with_name(f"{target.name}.tmp.{os.getpid()}.{new_id()[:8]}")
-    tmp_path.write_bytes(proposed_bytes)
-    os.replace(tmp_path, target)
-    post_bytes = target.read_bytes()
-    post_sha = hashlib.sha256(post_bytes).hexdigest()
     proposed_sha = str(proposal.get("proposed_sha256") or "")
-    if post_sha != proposed_sha:
+    pre_replace_sha = hashlib.sha256(proposed_bytes).hexdigest()
+    if pre_replace_sha != proposed_sha:
+        # Verify the bytes we are about to write BEFORE any FS mutation.
+        raise RuntimeError(
+            "Proposed bytes sha256 does not match proposal manifest; refusing to apply."
+        )
+    tmp_path = target.with_name(f"{target.name}.tmp.{os.getpid()}.{new_id()[:8]}")
+    # Use ``open(..., "wb")`` (binary) for cross-platform safety: ``os.open``
+    # without ``O_BINARY`` on Windows can translate ``\n`` -> ``\r\n`` and
+    # break the post-replace hash check.
+    with open(tmp_path, "wb") as fh:
+        fh.write(proposed_bytes)
+        fh.flush()
+        os.fsync(fh.fileno())
+    # Record the in-flight intent BEFORE os.replace so a crash mid-replace is
+    # reconcilable: a recovery worker can match the proposal_id +
+    # pre_apply_snapshot_id and decide to roll forward or roll back.
+    inflight_event_id = new_id()
+    execute(
+        "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
+        (
+            inflight_event_id,
+            "code_patch.replace_inflight",
+            agent_id,
+            as_json({
+                "proposal_id": proposal_id,
+                "relative_path": rel,
+                "task_id": task_id,
+                "owner": agent_id,
+                "pre_apply_snapshot_id": pre_snapshot["id"],
+                "base_sha256": base_sha,
+                "proposed_sha256": proposed_sha,
+                "tmp_path": str(tmp_path),
+                "lock_id": lock.get("lock_id"),
+            }),
+        ),
+    )
+    os.replace(tmp_path, target)
+    if os.name == "posix":
+        # POSIX: fsync the parent directory so the rename itself is durable.
+        # Windows NTFS journals the rename, so this is unnecessary there
+        # (and os.fsync on a Windows directory handle raises).
+        try:
+            dir_fd = os.open(str(target.parent), os.O_DIRECTORY)
+        except (AttributeError, OSError):
+            dir_fd = None
+        if dir_fd is not None:
+            try:
+                os.fsync(dir_fd)
+            finally:
+                os.close(dir_fd)
+    # Defensive post-read: any drift here is FS corruption, not a proposal
+    # mismatch (we already verified the bytes' hash above).
+    post_bytes = target.read_bytes()
+    if hashlib.sha256(post_bytes).hexdigest() != proposed_sha:
         rollback_path = target.with_name(f"{target.name}.rollback.{os.getpid()}.{new_id()[:8]}")
         rollback_path.write_bytes(current_bytes)
         os.replace(rollback_path, target)
-        raise RuntimeError("Applied patch sha256 did not match the proposal.")
+        raise RuntimeError(
+            "Filesystem drift after os.replace; rolled back to pre-snapshot bytes."
+        )
     post_snapshot = snapshot_file(
         rel,
         agent_id=agent_id,
