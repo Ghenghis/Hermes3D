@@ -110,13 +110,14 @@ type DashboardPipelineStage = {
   detail?: string;
 };
 
-const PIPELINE_STAGES: DashboardPipelineStage[] = [
-  { id: "prompt",    label: "Prompt / Input", Icon: Sparkles,      status: "complete" },
-  { id: "gen3d",     label: "3D Generation",  Icon: Box,           status: "complete" },
-  { id: "blender",   label: "Blender MCP",    Icon: Layers,        status: "complete" },
-  { id: "validate",  label: "Validation",     Icon: ShieldCheck,   status: "complete" },
-  { id: "slice",     label: "Slicing",        Icon: Sliders,       status: "complete" },
-  { id: "print",     label: "Print",          Icon: PrinterIcon,   status: "active" },
+/** Icon-only lookup for pipeline stage nodes — status comes from live API, never from this table. */
+const PIPELINE_STAGE_ICONS: Array<{ id: string; label: string; Icon: typeof Sparkles }> = [
+  { id: "prompt",    label: "Prompt / Input", Icon: Sparkles    },
+  { id: "gen3d",     label: "3D Generation",  Icon: Box         },
+  { id: "blender",   label: "Blender MCP",    Icon: Layers      },
+  { id: "validate",  label: "Validation",     Icon: ShieldCheck },
+  { id: "slice",     label: "Slicing",        Icon: Sliders     },
+  { id: "print",     label: "Print",          Icon: PrinterIcon },
 ];
 
 type EvidenceEvent = {
@@ -512,7 +513,7 @@ function PipelinePanel({ workflow }: { workflow: Workflow | null }) {
     ? workflow.stages.map((stage, index): DashboardPipelineStage => ({
       id: stage.id,
       label: stage.label,
-      Icon: PIPELINE_STAGES[index]?.Icon ?? CircleDot,
+      Icon: PIPELINE_STAGE_ICONS[index]?.Icon ?? CircleDot,
       status: stage.status === "done" ? "complete" : stage.status === "active" ? "active" : stage.status === "failed" ? "failed" : "pending",
       detail: stage.detail,
     }))

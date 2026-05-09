@@ -71,7 +71,9 @@ export function JobsTab() {
     void adapters.emitProofEvent("jobs.job.selected", { job_id: selectedJobId });
   }, [selectedJobId]);
 
-  const counts = useMemo(() => Object.fromEntries(FILTERS.map((filter) => [filter.id, filter.id === activeFilter ? jobs.length : 0])), [activeFilter, jobs.length]);
+  // Only show the count for the active filter — inactive filters show no count because the API
+  // is not queried for them, so displaying "0" would be a fake/misleading value.
+  const activeFilterCount = jobs.length;
   const cancel = async () => {
     if (!detail || !window.confirm(`Cancel job ${detail.title}? This cannot be undone.`)) {
       return;
@@ -123,7 +125,10 @@ export function JobsTab() {
         <div className="flex gap-2 border-b border-border">
           {FILTERS.map((filter) => (
             <button key={filter.id} type="button" onClick={() => setActiveFilter(filter.id)} className={`px-3 py-2 text-sm ${activeFilter === filter.id ? "border-b-2 border-accent-blue text-fg" : "text-muted"}`}>
-              {filter.label} <span className="text-xs">{counts[filter.id] ?? 0}</span>
+              {filter.label}
+              {filter.id === activeFilter && (
+                <span className="ml-1 text-xs">{activeFilterCount}</span>
+              )}
             </button>
           ))}
         </div>

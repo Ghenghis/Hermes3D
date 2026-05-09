@@ -13,7 +13,6 @@ type HermesImportMeta = ImportMeta & {
 const DEFAULT_BRIDGE_PORT = "8765";
 const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
-const EXPECTED_READINESS_CHECKS = 16;
 
 export function AutopilotTab() {
   const setActiveTabId = useStore((state) => state.setActiveTabId);
@@ -21,8 +20,11 @@ export function AutopilotTab() {
   const [guardrails, setGuardrails] = useState<GuardrailPolicy[]>([]);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const readyCount = useMemo(() => checks.filter((check) => check.status === "ready").length, [checks]);
-  const readinessTotal = checks.length || EXPECTED_READINESS_CHECKS;
-  const allReady = checks.length === EXPECTED_READINESS_CHECKS && readyCount === checks.length;
+  // readinessTotal reflects what the API actually returned — no hardcoded expectation.
+  const readinessTotal = checks.length;
+  // allReady is true only when the backend confirms every returned check passes.
+  // A hardcoded count was removed: the API is the source of truth for how many checks exist.
+  const allReady = checks.length > 0 && readyCount === checks.length;
 
   useEffect(() => {
     let mounted = true;
@@ -78,9 +80,16 @@ export function AutopilotTab() {
       <section id="autopilot.readiness" className="flex min-h-0 flex-col rounded border border-border bg-surface p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-fg">READINESS CHECKS</h2>
-          <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">{readyCount}/{readinessTotal} READY</span>
+          <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">
+            {readinessTotal === 0 ? "loading…" : `${readyCount}/${readinessTotal} READY`}
+          </span>
         </div>
         <div className="mt-3 grid min-h-0 flex-1 gap-2 overflow-auto md:grid-cols-2">
+          {checks.length === 0 && (
+            <div className="col-span-2 flex items-center justify-center rounded border border-border bg-bg/40 px-3 py-4 text-sm text-muted">
+              Waiting for readiness checks from the backend API…
+            </div>
+          )}
           {checks.map((check) => (
             <div key={check.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-2 rounded border border-border bg-bg/40 px-3 py-2 text-sm">
               <div className="min-w-0">
