@@ -30,10 +30,22 @@ def test_build_probe_request_uses_env_key_and_probe_url(monkeypatch) -> None:
 
 
 def test_build_probe_request_missing_env_raises(monkeypatch) -> None:
+    """Squad G follow-up (2026-05-09 Discovery audit): explicit RuntimeError
+    on missing env (was bare KeyError that leaked the env variable name
+    in tracebacks)."""
     monkeypatch.delenv("HERMES3D_DEEPSEEK_API_KEY", raising=False)
 
-    with pytest.raises(KeyError):
+    with pytest.raises(RuntimeError, match="DeepSeek provider is not configured"):
         deepseek.build_probe_request(_config())
+
+
+def test_completion_caller_missing_env_raises(monkeypatch) -> None:
+    """Same Squad G follow-up applied to completion_caller."""
+    monkeypatch.delenv("HERMES3D_DEEPSEEK_API_KEY", raising=False)
+    caller = deepseek.completion_caller(_config())
+    request = LLMRequest(prompt="hello", max_completion_tokens=10, token_id="test-token-id")
+    with pytest.raises(RuntimeError, match="DeepSeek provider is not configured"):
+        caller(request)
 
 
 def test_parse_probe_response_accepts_list_object_with_non_empty_data() -> None:

@@ -23,9 +23,23 @@ from hermes3d.orchestration.types import (
 
 
 def build_probe_request(config: ProviderConfig) -> tuple[str, str, dict[str, str]]:
+    """Construct the DeepSeek probe request.
+
+    Squad G follow-up (Discovery audit Agent #3, 2026-05-09): the original
+    ``os.environ[config.api_key_env]`` raised bare ``KeyError`` when the env
+    var was missing, which surfaced as an opaque HTTP 500 with the env
+    variable NAME in the traceback. Convert to an explicit ``RuntimeError``
+    so callers see "DeepSeek API key not configured" instead of leaking
+    the variable name (low-risk info disclosure).
+    """
     method = "GET"
     url = f"{config.base_url.rstrip('/')}/{config.probe_path.lstrip('/')}"
-    key = os.environ[config.api_key_env]
+    key = os.environ.get(config.api_key_env)
+    if not key:
+        raise RuntimeError(
+            "DeepSeek provider is not configured: API key env variable is unset. "
+            "Set the configured key in the private env file before invoking the probe."
+        )
     headers = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
     return method, url, headers
 
@@ -75,7 +89,14 @@ def probe_caller(config: ProviderConfig) -> ProbeCaller:
 def completion_caller(config: ProviderConfig) -> LLMCaller:
     def _caller(request: LLMRequest) -> LLMResponse:
         url = f"{config.base_url.rstrip('/')}/{config.completion_path.lstrip('/')}"
-        key = os.environ[config.api_key_env]
+        # Squad G follow-up: explicit RuntimeError instead of bare KeyError
+        # (Discovery audit Agent #3 2026-05-09).
+        key = os.environ.get(config.api_key_env)
+        if not key:
+            raise RuntimeError(
+                "DeepSeek provider is not configured: API key env variable is unset. "
+                "Set the configured key in the private env file before invoking completion."
+            )
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
