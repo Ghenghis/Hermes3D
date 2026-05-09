@@ -9,10 +9,18 @@
 > "If you finish all six, claim HP-0.5.1-PERF... Stop after that." You
 > wrote the morning report per spec — that was correct per the OLD spec.
 >
-> **New spec (this file overrides):** never stop while user is asleep. The
-> queue is now in `handoffs/STREAM/GATE_GAP_QUEUE.md` +
+> **Control update 2026-05-08:** this file is historical context for why the
+> queue should not go idle. It no longer authorizes unbounded mutation. The
+> newer Hermes Agent truth/proof plan, STREAM protocol hard rules, and
+> `PERPETUAL_MASTER_INDEX.md` hard-stop conditions override any "never stop" or
+> "no exit" wording here.
+>
+> **New spec (restricted):** keep polling while user is asleep, but continue
+> read-only when hard-stop conditions are present. The queue is now in
+> `handoffs/STREAM/GATE_GAP_QUEUE.md` +
 > `handoffs/STREAM/ENHANCEMENT_QUEUE.md` and is **continuously fed**.
-> Polling cadence: every 3-5 min. When queue empty, idle-poll continues.
+> Polling cadence: every 3-5 min. When queue empty, idle-poll continues
+> read-only unless a task has exact MCP locks, current context, and gates.
 
 ---
 
@@ -34,8 +42,12 @@
         - go work it
 3. Heartbeat every 30 min on tasks > 90 min estimated effort
 4. On stuck/blocker: post BLOCKED, free locks, try next item
-5. Never write a "complete" report. There is no exit condition.
-   The loop ends only when the user wakes up and explicitly says stop.
+5. Never write a fake "complete" report. There is no silent idle condition,
+   but there are hard stops: MCP disconnect/workspace mismatch, missing locks,
+   stale base/index, provider auth failure, failed gate, unresolved critic
+   finding, secret/private-env need, hardware ambiguity, or no proof progress
+   after three cycles. During a hard stop, write BLOCKED/read-only status and
+   do not mutate until corrected.
 ```
 
 The HermesProof MCP server is still authoritative for locks. The STREAM/
@@ -102,11 +114,13 @@ When a queue item touches BOTH repos (e.g., workflow-pinning-gate):
 ## 6. Hermes Agent integration (preview, not yet active)
 
 User has approved a plan to integrate **NousResearch/hermes-agent** as an
-ANONYMOUS-USER role inside HermesProof. Once integrated:
+ANONYMOUS-USER role inside HermesProof. Once integrated and provider/auth smoke
+passes:
 
 - Hermes Agent reads the project plan + LEDGER.md
-- Acts as the user during sleep — grants implicit YOLO authorization for
-  approved scope
+- Acts as the user during sleep only inside an explicit granted scope and with
+  evidence. It does not grant implicit permission for merges, provider actions,
+  installs, releases, private env reads, or printer actions.
 - Posts AS_USER messages that close BLOCKED escalations
 - Final source of truth on "is this in scope"
 
