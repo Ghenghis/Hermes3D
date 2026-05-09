@@ -387,6 +387,37 @@ def test_deepseek_v4_pro_payload_uses_official_reasoning_fields() -> None:
     assert payload["reasoning_effort"] == "high"
 
 
+def test_cli_provider_env_contract_redacts_task_scoped_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in [
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_MODEL",
+        "MINIMAX_TOKEN_PLAN_API_KEY",
+        "DEEPSEEK_API_KEY",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+
+    contract = code_history._cli_provider_env_contract(
+        {
+            "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY": "secret-minimax-token-plan",
+            "OPENAI_BASE_URL": "https://api.minimax.io/v1",
+            "MINIMAX_MODEL": "MiniMax-M2.7-highspeed",
+            "DEEPSEEK_API_KEY": "secret-deepseek-key",
+            "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+            "DEEPSEEK_MODEL": "deepseek-v4-pro",
+        }
+    )
+
+    assert contract["ready"] is True
+    assert "OPENAI_API_KEY" in contract["exported_env_names"]
+    assert "DEEPSEEK_API_KEY" in contract["exported_env_names"]
+    assert "secret-minimax-token-plan" not in str(contract)
+    assert "secret-deepseek-key" not in str(contract)
+    assert all(item["value"] == "<redacted>" for profile in contract["profiles"] for item in profile["exports"])
+    minimax = next(profile for profile in contract["profiles"] if profile["provider_id"] == "minimax")
+    assert minimax["api_key_source"] == "private_env:HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY"
+
+
 def test_provider_status_blocks_after_failed_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
     auth_contract = {

@@ -405,12 +405,14 @@ def code_cli_runners() -> dict[str, Any]:
     runners = [_cli_runner_status("opencode"), _cli_runner_status("openhands")]
     detected = [item for item in runners if item["detected"]]
     sandbox = code_sandbox_readiness()
+    provider_env = _cli_provider_env_contract()
     return {
         "status": "ready" if detected else "setup_required",
         "count": len(runners),
         "detected": len(detected),
         "runners": runners,
         "sandbox": sandbox,
+        "provider_env": provider_env,
         "policy": {
             "write_runs_allowed": False,
             "reason": "OpenHands/OpenCode CLI write runs require sandbox readiness, MCP locks, snapshots, task-scoped env/cwd/files, redacted output proof, review, and gates.",
@@ -499,6 +501,7 @@ def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> di
     _validate_task_id(task_id)
     runner = _validate_cli_runner_required(runner_id)
     status = _cli_runner_status(runner)
+    provider_env = _cli_provider_env_contract()
     evidence = append_mcp_evidence(
         owner=owner,
         task_id=task_id,
@@ -511,12 +514,16 @@ def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> di
             "blocked_reason": status["blocked_reason"],
             "path_source": status.get("path_source"),
             "sandbox_ready": code_sandbox_readiness().get("ready"),
+            "provider_env_ready": provider_env["ready"],
+            "provider_env_exports": provider_env["exported_env_names"],
+            "provider_env_blocked_reasons": provider_env["blocked_reasons"],
         },
     )
     return {
         "status": "ready" if status["detected"] else "blocked",
         "accepted": bool(status["detected"]),
         "runner": status,
+        "provider_env": provider_env,
         "mcp_evidence": evidence,
         "next_required_steps": _cli_runner_next_steps(status),
     }
@@ -543,12 +550,16 @@ def run_code_cli_runner(
     branch = _validate_git_ref(target_branch) if target_branch else None
     runner_status = _cli_runner_status(runner)
     sandbox = code_sandbox_readiness()
+    provider_env = _cli_provider_env_contract()
     blocked: list[str] = []
     if not runner_status["detected"]:
         blocked.append(runner_status["blocked_reason"] or f"{runner} CLI runner is not detected.")
     if not sandbox["ready"]:
         blocked.extend(str(item) for item in sandbox["blocked_reasons"])
-    blocked.append("CLI execution is fail-closed until task-scoped container execution, output artifact capture, DeepSeek review, and gate handoff are wired.")
+    blocked.append(
+        "CLI execution is fail-closed until provider smoke passes and the reviewed output handoff is enabled; "
+        "the task-scoped provider env contract is reported here with values redacted."
+    )
     evidence = append_mcp_evidence(
         owner=owner,
         task_id=task_id,
@@ -562,6 +573,9 @@ def run_code_cli_runner(
             "objective_sha256": hashlib.sha256(clean_objective.encode("utf-8")).hexdigest(),
             "runner_detected": runner_status["detected"],
             "sandbox_ready": sandbox["ready"],
+            "provider_env_ready": provider_env["ready"],
+            "provider_env_exports": provider_env["exported_env_names"],
+            "provider_env_blocked_reasons": provider_env["blocked_reasons"],
             "blocked_reasons": blocked,
         },
     )
@@ -570,6 +584,7 @@ def run_code_cli_runner(
         "accepted": False,
         "runner": runner_status,
         "sandbox": sandbox,
+        "provider_env": provider_env,
         "files": safe_files,
         "target_branch": branch,
         "blocked_reasons": blocked,
@@ -635,7 +650,10 @@ def run_agent_e2e_job(
         runner = next((item for item in readiness["cli_runners"]["runners"] if item["id"] == cli), None)
         if not runner or not runner.get("detected"):
             blocked.append(f"CLI worker {cli} is not detected.")
-        blocked.append(f"CLI worker {cli} is detection/preflight-only until sandbox runner is wired.")
+        blocked.append(
+            f"CLI worker {cli} is fail-closed until provider smoke passes and reviewed CLI output handoff is enabled; "
+            "redacted provider env readiness is exposed in cli_runners.provider_env."
+        )
     if blocked:
         evidence = append_mcp_evidence(
             owner=owner,
@@ -2350,6 +2368,72 @@ def _cli_runner_source_path(config: dict[str, Any]) -> str | None:
         if configured:
             return configured
     return None
+
+
+def _cli_provider_env_contract(private_values: dict[str, str] | None = None) -> dict[str, Any]:
+    values = private_values if private_values is not None else private_env()
+    profiles: list[dict[str, Any]] = []
+    blocked: list[str] = []
+    exported: list[str] = []
+    for provider_id in ("minimax", "deepseek"):
+        config = _provider_chat_config(provider_id, values, require_ready=False)
+        exports = _cli_provider_env_exports(provider_id, config)
+        exported.extend(item["name"] for item in exports)
+        provider_blocked: list[str] = []
+        if not config["api_key_configured"]:
+            provider_blocked.append(f"{provider_id} private API key is not configured.")
+        if not config["model"]:
+            provider_blocked.append(f"{provider_id} model is not configured.")
+        blocked.extend(provider_blocked)
+        profiles.append(
+            {
+                "provider_id": provider_id,
+                "ready": not provider_blocked,
+                "model": config["model"],
+                "model_source": config["model_source"] or "default",
+                "base_url_label": config["base_url_label"],
+                "base_url_source": config["base_url_source"],
+                "api_key_configured": config["api_key_configured"],
+                "api_key_source": config["api_key_source"],
+                "exports": exports,
+                "blocked_reasons": provider_blocked,
+            }
+        )
+    return {
+        "status": "ready" if not blocked else "blocked",
+        "ready": not blocked,
+        "profiles": profiles,
+        "exported_env_names": sorted(set(exported)),
+        "blocked_reasons": blocked,
+        "secret_policy": "values are injected only as task-scoped process env; API responses and evidence expose names/sources only",
+    }
+
+
+def _cli_provider_env_exports(provider_id: str, config: dict[str, Any]) -> list[dict[str, Any]]:
+    if provider_id == "minimax":
+        return [
+            _redacted_env_export("OPENAI_API_KEY", config["api_key_source"], required=True),
+            _redacted_env_export("OPENAI_BASE_URL", config["base_url_source"], required=True),
+            _redacted_env_export("OPENAI_MODEL", config["model_source"] or "default", required=True),
+            _redacted_env_export("MINIMAX_API_KEY", config["api_key_source"], required=True),
+            _redacted_env_export("MINIMAX_BASE_URL", config["base_url_source"], required=True),
+            _redacted_env_export("MINIMAX_MODEL", config["model_source"] or "default", required=True),
+        ]
+    return [
+        _redacted_env_export("DEEPSEEK_API_KEY", config["api_key_source"], required=True),
+        _redacted_env_export("DEEPSEEK_BASE_URL", config["base_url_source"], required=True),
+        _redacted_env_export("DEEPSEEK_MODEL", config["model_source"] or "default", required=True),
+    ]
+
+
+def _redacted_env_export(name: str, source: str | None, *, required: bool) -> dict[str, Any]:
+    return {
+        "name": name,
+        "source": source or "default",
+        "configured": bool(source),
+        "required": required,
+        "value": "<redacted>",
+    }
 
 
 def _cli_runner_next_steps(status: dict[str, Any]) -> list[str]:
