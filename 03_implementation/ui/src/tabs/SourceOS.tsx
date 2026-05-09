@@ -22,6 +22,21 @@ type RuntimeCounts = {
   not_installed: number;
   blocked: number;
 };
+
+// Runner contract record from /api/modules/runtime/runner-contracts
+type RunnerContract = {
+  module_id: string;
+  runner_status: string;
+  required_verifier_family: string;
+  safe_actions: string[];
+  acceptance_gate: string;
+  blocked_reason: string | null;
+};
+
+type RunnerContractsPayload = {
+  count: number;
+  contracts: RunnerContract[];
+};
 type RuntimeVerifierSummary = {
   count: number;
   enabled_count: number;
@@ -118,6 +133,7 @@ export function SourceOSTab() {
   const [verifierSummary, setVerifierSummary] = useState<RuntimeVerifierSummary | null>(null);
   const [cliSurfaceSummary, setCliSurfaceSummary] = useState<CliSurfaceSummary | null>(null);
   const [cliSurfaceRecords, setCliSurfaceRecords] = useState<SourceModuleCliSurfaceRecord[]>([]);
+  const [runnerContracts, setRunnerContracts] = useState<Record<string, RunnerContract>>({});
   // CLI readiness panel state
   const [sourcesReadiness, setSourcesReadiness] = useState<SourcesReadinessPayload | null>(null);
   const [sourcesReadinessLoading, setSourcesReadinessLoading] = useState(false);
@@ -156,6 +172,7 @@ export function SourceOSTab() {
     void loadVerifierSummary();
     void loadCliSurfaceSummary();
     void loadSourcesReadiness();
+    void loadRunnerContracts();
   }, []);
 
   const loadVerifierSummary = async () => {
@@ -193,6 +210,32 @@ export function SourceOSTab() {
     } catch {
       setCliSurfaceSummary(null);
       setCliSurfaceRecords([]);
+    }
+  };
+
+  const loadRunnerContracts = async () => {
+    try {
+      const response = await fetch(`${LIVE_BASE_URL}/api/modules/runtime/runner-contracts`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        setRunnerContracts({});
+        return;
+      }
+      const payload = await response.json() as RunnerContractsPayload;
+      const byModuleId: Record<string, RunnerContract> = {};
+      if (Array.isArray(payload.contracts)) {
+        for (const contract of payload.contracts) {
+          if (typeof contract.module_id === "string" && contract.module_id.length > 0) {
+            byModuleId[contract.module_id] = contract;
+          }
+        }
+      }
+      setRunnerContracts(byModuleId);
+    } catch {
+      setRunnerContracts({});
     }
   };
 
@@ -241,6 +284,7 @@ export function SourceOSTab() {
       await loadModules({ showLoading: false });
       await loadVerifierSummary();
       await loadCliSurfaceSummary();
+      await loadRunnerContracts();
     } catch {
       setRuntimeVerifyMessage(`Verify All failed: backend API is unreachable at ${LIVE_BASE_URL}.`);
     } finally {
@@ -263,6 +307,7 @@ export function SourceOSTab() {
       await loadModules({ showLoading: false });
       await loadVerifierSummary();
       await loadCliSurfaceSummary();
+      await loadRunnerContracts();
     } catch {
       setSetupQueueMessage(`Setup Queue failed: backend API is unreachable at ${LIVE_BASE_URL}.`);
     } finally {
@@ -383,15 +428,18 @@ export function SourceOSTab() {
               selectedId={selectedModule?.id ?? null}
               onSelect={setSelectedId}
               cliSurfaceByModule={cliSurfaceByModule}
+              runnerContractsByModule={runnerContracts}
             />
             <AppDetailPanel
               module={selectedModule}
               updateRecord={selectedUpdateRecord}
               cliSurfaceRecord={selectedCliSurfaceRecord}
+              runnerContract={selectedModule ? (runnerContracts[selectedModule.id] ?? null) : null}
               onRefresh={() => {
                 void loadModules({ showLoading: false });
                 void loadUpdateReadiness(updateReadiness?.deep ?? false);
                 void loadCliSurfaceSummary();
+                void loadRunnerContracts();
               }}
             />
           </>
