@@ -27,17 +27,26 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
 
   useEffect(() => {
     let mounted = true;
-    void adapters.getSystemSnapshot().then((snapshot) => {
-      if (mounted) setSys(snapshot);
-    });
-    void adapters.getNotifications().then((items) => {
-      if (mounted) setNotifications(items);
-    });
-    void adapters.getLatestProofBundle().then((bundle) => {
-      if (mounted) setLatestProof(bundle);
-    });
+
+    const fetchAll = () => {
+      void adapters.getSystemSnapshot().then((snapshot) => {
+        if (mounted) setSys(snapshot);
+      });
+      void adapters.getNotifications().then((items) => {
+        if (mounted) setNotifications(items);
+      });
+      void adapters.getLatestProofBundle().then((bundle) => {
+        if (mounted) setLatestProof(bundle);
+      });
+    };
+
+    fetchAll();
+    // Refresh system status every 10 s — non-critical display data; 10 s avoids render churn.
+    const timer = window.setInterval(fetchAll, 10_000);
+
     return () => {
       mounted = false;
+      window.clearInterval(timer);
     };
   }, []);
 

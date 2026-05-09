@@ -21,7 +21,7 @@ export function AppShell({ children }: { children?: ReactNode }) {
       <Sidebar />
       <div className="flex min-h-0 flex-1 flex-col">
         <TopBar activeLabel={activeTab.label} />
-        <main className={dashboard ? "min-h-0 flex-1 overflow-auto p-2.5 lg:overflow-hidden" : "min-h-0 flex-1 overflow-auto p-2.5"}>
+        <main className={dashboard ? "min-h-0 flex-1 overflow-auto p-2.5" : "min-h-0 flex-1 overflow-auto p-2.5"}>
           {children}
         </main>
       </div>

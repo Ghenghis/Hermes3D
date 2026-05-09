@@ -32,7 +32,9 @@ export function Sidebar() {
           />
         ))}
       </nav>
-      <AgentChatMirror />
+      <div className="min-h-0 shrink overflow-hidden">
+        <AgentChatMirror />
+      </div>
     </ResizablePane>
   );
 }
