@@ -335,8 +335,9 @@ def test_readonly_http_contract_is_not_agent_executable(monkeypatch) -> None:
     assert contract["runtime_status"] == "ready"
     assert contract["agent_executable"] is False
     assert contract["read_only_runner_available"] is True
-    assert contract["runner_status"] == "readonly_api_ready"
-    assert contract["required_verifier_family"] == "read_only_api_runner_contract"
+    # local_http_health probes now get the more precise service_web_health_runner status
+    assert contract["runner_status"] == "service_web_health_runner"
+    assert contract["required_verifier_family"] == "service_web_health_runner_contract"
     assert contract["safe_actions"] == [
         "verify",
         "setup_plan",
