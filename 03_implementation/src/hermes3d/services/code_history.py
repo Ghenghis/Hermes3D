@@ -3431,6 +3431,30 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
         "MCP_LOCK_WORKSPACE": str(PROJECT_ROOT),
         "MCP_LOCK_SERVER": str(server),
     })
+    # Bonus 12 finding #8 (Audit PR #135) — escalated to follow-up.
+    #
+    # The audit recommended replacing the manual Popen+thread+sleep+terminate
+    # ladder below with ``subprocess.run(input=stdin, timeout=...)`` to avoid
+    # the pipe-buffer deadlock shape Python's subprocess docs warn against.
+    # However ``subprocess.run`` internally calls ``Popen.communicate(input=)``
+    # which writes the input bytes and IMMEDIATELY closes the child's stdin.
+    # The hermes3d MCP / hermesproof Node servers treat stdin EOF as a client
+    # disconnect and shut down before flushing all queued JSON-RPC responses
+    # — this was caught by 6 ``test_code_operator.py::test_recovery_*`` tests
+    # that exercise the real Node server through TestClient (rc=0,
+    # ``[hermesproof] shutdown: stdin EOF (client disconnect)``).
+    #
+    # The deadlock concern is real but server-side: it requires the child to
+    # generate stdout that fills the OS pipe buffer (~64 KiB on most kernels)
+    # BEFORE the parent reads. In practice every MCP tool response from
+    # hermes3d-locks fits in a single line < 8 KiB, so the deadlock window
+    # is closed by the existing 50ms poll + 3s terminate ladder.
+    #
+    # Decision: keep the Popen+thread pattern below for now; documented as
+    # BLK-009 (status "upstream-blocked / server-contract") in the E2E
+    # Blocker Registry. The proper fix is a server-side change to drain
+    # queued messages on stdin EOF before shutdown, OR a client switch to
+    # the MCP HTTP transport when it lands. Either is a separate PR.
     stdout_lines: list[str] = []
     stderr_lines: list[str] = []
 
@@ -3494,6 +3518,11 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 process.kill()
+        # Bonus 12 finding #8 partial mitigation: explicitly join the reader
+        # threads so they don't outlive the function call (was a leak on
+        # every invocation pre-fix).
+        stdout_thread.join(timeout=1)
+        stderr_thread.join(timeout=1)
     if response.get("error"):
         raise RuntimeError(f"Hermes MCP tool {tool_name} failed: {response['error']}")
     content = ((response.get("result") or {}).get("content") or [])
