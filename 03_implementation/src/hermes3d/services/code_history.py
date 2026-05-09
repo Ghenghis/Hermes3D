@@ -499,6 +499,105 @@ def code_sandbox_readiness() -> dict[str, Any]:
     }
 
 
+def opencode_openhands_sandbox_readiness() -> dict[str, Any]:
+    """Return the I3-spec sandbox readiness shape for OpenCode/OpenHands CLI runners.
+
+    Fields:
+    - opencode_detected: bool
+    - opencode_version: str | None
+    - openhands_detected: bool
+    - openhands_image: str | None  (Docker image name from private env, or None)
+    - sandbox_network_mode: always "none"
+    - denied_paths: list[str]
+    - ready: bool  (both CLI runners detected)
+    """
+    private_values = private_env()
+    opencode_status = _cli_runner_status("opencode")
+    openhands_status = _cli_runner_status("openhands")
+    # OpenHands may run via Docker image rather than a local bin; surface the configured image name.
+    openhands_image = env_value("HERMES3D_AGENT_SANDBOX_IMAGE", private_values).strip() or None
+    denied_paths = sorted([
+        ".git",
+        ".venv",
+        "G:/private",
+        "node_modules",
+        "03_implementation/proof",
+        "03_implementation/var",
+    ])
+    ready = bool(opencode_status["detected"] and openhands_status["detected"])
+    return {
+        "opencode_detected": bool(opencode_status["detected"]),
+        "opencode_version": opencode_status.get("version"),
+        "openhands_detected": bool(openhands_status["detected"]),
+        "openhands_image": openhands_image,
+        "sandbox_network_mode": "none",
+        "denied_paths": denied_paths,
+        "ready": ready,
+    }
+
+
+def preflight_code_cli_runner_get(*, runner_id: str) -> dict[str, Any]:
+    """Non-mutating dry-run preflight for a CLI runner (GET variant — no task claim required).
+
+    Runs <runner> --version (or equivalent) and returns stdout, exit_code, elapsed_ms.
+    Does not append MCP evidence (use the POST variant for evidence-tracked preflights).
+    """
+    runner = _validate_cli_runner_required(runner_id)
+    config = CLI_RUNNER_COMMANDS[runner]
+    exe, path_source, configured_path = _cli_runner_executable(config)
+    stdout: str | None = None
+    stderr_out: str | None = None
+    exit_code: int | None = None
+    elapsed_ms: float | None = None
+    if exe:
+        start = time.monotonic()
+        ran = False
+        for args in ([exe, "--version"], [exe, "version"]):
+            try:
+                result = subprocess.run(
+                    args,
+                    cwd=PROJECT_ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                    check=False,
+                )
+                elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+                stdout = (result.stdout or "").strip()[:512] or None
+                stderr_out = (result.stderr or "").strip()[:256] or None
+                exit_code = result.returncode
+                ran = True
+                break
+            except subprocess.TimeoutExpired:
+                elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+                stdout = None
+                stderr_out = "Timed out after 8 seconds."
+                exit_code = -1
+                ran = True
+                break
+            except OSError as exc:
+                elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+                stdout = None
+                stderr_out = str(exc)
+                exit_code = -1
+                ran = True
+                break
+        if not ran:
+            elapsed_ms = 0.0
+    return {
+        "runner_id": runner,
+        "label": config["label"],
+        "detected": bool(exe),
+        "executable": exe,
+        "path_source": path_source,
+        "stdout": stdout,
+        "stderr": stderr_out,
+        "exit_code": exit_code,
+        "elapsed_ms": elapsed_ms,
+        "ready": exit_code == 0 if exit_code is not None else False,
+    }
+
+
 def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> dict[str, Any]:
     _validate_owner(owner)
     _validate_task_id(task_id)
