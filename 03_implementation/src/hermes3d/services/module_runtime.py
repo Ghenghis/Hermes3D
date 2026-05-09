@@ -2239,7 +2239,21 @@ def _private_runtime_env() -> dict[str, str]:
         from hermes3d.services.agent_runtime import private_env
 
         return private_env()
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 -- silent fallback was Wave Agent 7 finding
+        # Squad G follow-up (Remaining/Skipped Wave 2026-05-09): expose the
+        # silent-fallback so observability is preserved. Use ``redact_text``
+        # because env-import exceptions can carry path / token fragments.
+        try:
+            import logging
+
+            from hermes3d.gateways.redaction import redact_text
+
+            logging.getLogger(__name__).warning(
+                "_private_runtime_env: private_env import/load failed: %s",
+                redact_text(f"{type(exc).__name__}: {exc}")[:200],
+            )
+        except Exception:  # noqa: BLE001 -- best-effort during teardown
+            pass
         return {}
 
 

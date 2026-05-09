@@ -901,8 +901,15 @@ def _probe_python_provider(
     try:
         import importlib.metadata as meta_mod
         version_str = meta_mod.version(module_name)
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: surface the silent fallback
+        try:
+            import logging
+            logging.getLogger(__name__).debug(
+                "design.module_version_lookup: metadata.version(%r) failed: %s: %s",
+                module_name, type(exc).__name__, exc,
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     if spec.origin:
         module_path = str(spec.origin)

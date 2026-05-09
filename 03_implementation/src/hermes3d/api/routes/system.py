@@ -551,8 +551,15 @@ def _host_telemetry() -> dict[str, Any]:
 
         cpu_pct = int(round(psutil.cpu_percent(interval=0.05)))
         ram_pct = int(round(psutil.virtual_memory().percent))
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: psutil import/probe is optional; log for observability
+        try:
+            import logging
+            logging.getLogger(__name__).debug(
+                "system.metrics: psutil unavailable; cpu/ram default to 0: %s: %s",
+                type(exc).__name__, exc,
+            )
+        except Exception:  # noqa: BLE001
+            pass
     try:
         disk_pct = int(round(shutil.disk_usage(implementation_path()).used / shutil.disk_usage(implementation_path()).total * 100))
     except OSError:
