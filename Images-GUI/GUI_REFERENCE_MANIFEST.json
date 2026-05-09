@@ -1,0 +1,116 @@
+{
+  "created": "2026-05-08",
+  "purpose": "Hermes3D OS GUI visual direction and page coverage reference pack",
+  "total_png_references": 31,
+  "remaining_images_needed_for_current_scope": 0,
+  "coverage": {
+    "primary_tabs": {
+      "covered": 16,
+      "total": 16,
+      "items": [
+        "source_os",
+        "dashboard",
+        "autopilot",
+        "design",
+        "gen3d",
+        "jobs",
+        "printers",
+        "observe",
+        "voice",
+        "agents",
+        "learning",
+        "artifacts",
+        "approvals",
+        "plugins",
+        "settings",
+        "roadmap"
+      ]
+    },
+    "settings_subtabs": {
+      "covered": 6,
+      "total": 6,
+      "items": ["providers", "agents", "printers", "environment", "updates", "about"]
+    },
+    "voice_subtabs": {
+      "covered": 3,
+      "total": 3,
+      "items": ["voice_browser", "transcript_history", "proof_review"]
+    },
+    "source_os_categories": {
+      "covered": 11,
+      "total": 11,
+      "items": {
+        "modelers": 13,
+        "slicers": 11,
+        "print_farm": 10,
+        "agents": 7,
+        "firmware": 6,
+        "three_d_generation": 6,
+        "hardware": 3,
+        "library": 1,
+        "materials": 1,
+        "research": 1,
+        "utilities": 1
+      }
+    },
+    "themes": [
+      "default_hermes_dark",
+      "cyberpunk",
+      "matrix",
+      "tron",
+      "industrial_forge",
+      "aurora_operator"
+    ]
+  },
+  "reference_groups": [
+    {
+      "folder": "00-user-current-downloads",
+      "description": "User-provided/current approved references kept for comparison."
+    },
+    {
+      "folder": "01-dashboard-modes",
+      "description": "Simple, Advanced, and Custom dashboard mode references."
+    },
+    {
+      "folder": "02-primary-pages",
+      "description": "Primary tab references."
+    },
+    {
+      "folder": "03-settings-voice",
+      "description": "Settings and voice/communication subtabs."
+    },
+    {
+      "folder": "04-source-os",
+      "description": "Source OS categories and 60-app coverage matrix."
+    },
+    {
+      "folder": "05-action-windows",
+      "description": "Resizable Action Window templates."
+    },
+    {
+      "folder": "06-states-responsive",
+      "description": "Responsive layouts and state screens."
+    },
+    {
+      "folder": "07-plugins-skills-mcp",
+      "description": "Plugins, skills, MCP servers, app connectors."
+    },
+    {
+      "folder": "08-app-utility-pages",
+      "description": "Workflows, print queue, files, logs, proof, health, notifications, safety."
+    },
+    {
+      "folder": "09-themes",
+      "description": "Theme variants."
+    }
+  ],
+  "implementation_rules": [
+    "Use these images as visual targets, not runtime proof.",
+    "Use Playwright screenshots as runtime proof after implementation.",
+    "No fake data, no unsupported readiness claims, no secret values.",
+    "All primary tabs and current features must remain accessible.",
+    "All 60 Source OS apps must open through shared app/action-window patterns.",
+    "Dashboards must support Simple, Advanced, and Custom modes.",
+    "Themes must be user-changeable."
+  ]
+}
