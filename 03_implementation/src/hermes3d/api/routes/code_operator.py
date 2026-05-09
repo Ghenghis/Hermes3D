@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from hermes3d.services import code_history
+from hermes3d.services import code_history, recovery_controller
 
 router = APIRouter(prefix="/api/code-operator", tags=["code-operator"])
 CODE_OPERATOR_ACTOR = "hermes-agent"
@@ -768,4 +768,27 @@ def recovery_state(task_id: str | None = None) -> dict[str, Any]:
     try:
         return code_history.list_recovery_attempts(task_id=task_id)
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.get("/recovery/runs")
+def recovery_runs_active(task_id: str | None = None) -> dict[str, Any]:
+    """Return live RC v2 active runs from the in-memory registry.
+
+    BLK-026 fix (Master Continuation Wave Agent D20): Recovery Controller
+    v2 commits 1+2 landed in PR #149 but no HTTP route exposed the v2
+    enrichment payload (``state``, ``branch``, ``locked_files``,
+    ``pre_snapshot_ids``, ``freeze_event_utc``, ``next_action``). The v1
+    ``/recovery/state`` only returns the JSONL ledger shape.
+
+    This endpoint is **read-only** — it lists active runs from the
+    transient ``_RUNS`` registry. Confirm-by-default policy preserved:
+    no mutation routes added in this PR. Mutation routes (start, freeze,
+    cancel) land with RC v2 commits 3-5.
+
+    See ``recovery_controller.list_active_runs`` for the payload shape.
+    """
+    try:
+        return recovery_controller.list_active_runs(task_id=task_id)
+    except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
