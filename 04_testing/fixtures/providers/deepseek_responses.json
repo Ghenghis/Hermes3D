@@ -5,7 +5,7 @@
       "object": "list",
       "data": [
         {
-          "id": "deepseek-chat",
+          "id": "deepseek-v4-pro",
           "object": "model"
         }
       ]

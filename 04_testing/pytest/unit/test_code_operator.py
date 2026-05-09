@@ -299,13 +299,15 @@ def test_provider_status_requires_live_smoke_proof(monkeypatch: pytest.MonkeyPat
 
 def test_provider_status_accepts_private_env_aliases(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
     status = code_history._provider_status(
         "minimax",
         {
             "MINIMAX_API_KEY": "configured-through-user-env",
             "MINIMAX_BASE_URL": "https://api.minimax.io/v1",
-            "MINIMAX_MODEL": "MiniMax-M2.7",
+            "MINIMAX_MODEL": "MiniMax-M2.7-highspeed",
         },
     )
 
@@ -313,13 +315,21 @@ def test_provider_status_accepts_private_env_aliases(monkeypatch: pytest.MonkeyP
     assert status["api_key_source"] == "private_env:MINIMAX_API_KEY"
     assert status["base_url_source"] == "private_env:MINIMAX_BASE_URL"
     assert status["model_source"] == "private_env:MINIMAX_MODEL"
-    assert status["accepted_api_key_env"] == ["HERMES3D_MINIMAX_API_KEY", "MINIMAX_API_KEY"]
+    assert status["accepted_api_key_env"] == [
+        "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY",
+        "MINIMAX_TOKEN_PLAN_API_KEY",
+        "HERMES3D_MINIMAX_HIGHSPEED_API_KEY",
+        "MINIMAX_HIGHSPEED_API_KEY",
+        "HERMES3D_MINIMAX_API_KEY",
+        "OPENAI_API_KEY",
+        "MINIMAX_API_KEY",
+    ]
 
 
 def test_minimax_chat_payload_uses_current_openai_compatible_fields() -> None:
     payload = code_history._provider_chat_payload(
         "minimax",
-        config={"model": "MiniMax-M2.7"},
+        config={"model": "MiniMax-M2.7-highspeed"},
         messages=[{"role": "user", "content": "hi"}],
         temperature=0.0,
         max_tokens=128,
@@ -328,6 +338,90 @@ def test_minimax_chat_payload_uses_current_openai_compatible_fields() -> None:
     assert payload["temperature"] == 0.01
     assert payload["max_completion_tokens"] == 256
     assert "max_tokens" not in payload
+
+
+def test_minimax_provider_accepts_openai_token_plan_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "token-plan-key")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.minimax.io/v1")
+
+    config = code_history._provider_chat_config("minimax", {}, require_ready=False)
+
+    assert config["api_key_source"] == "environment:OPENAI_API_KEY"
+    assert config["base_url_source"] == "environment:OPENAI_BASE_URL"
+    assert config["accepted_api_key_env"] == [
+        "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY",
+        "MINIMAX_TOKEN_PLAN_API_KEY",
+        "HERMES3D_MINIMAX_HIGHSPEED_API_KEY",
+        "MINIMAX_HIGHSPEED_API_KEY",
+        "HERMES3D_MINIMAX_API_KEY",
+        "OPENAI_API_KEY",
+        "MINIMAX_API_KEY",
+    ]
+    assert config["model"] == "MiniMax-M2.7-highspeed"
+
+
+def test_minimax_provider_prefers_explicit_token_plan_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MINIMAX_TOKEN_PLAN_API_KEY", "token-plan-key")
+    monkeypatch.setenv("OPENAI_API_KEY", "generic-openai-key")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.minimax.io/v1")
+
+    config = code_history._provider_chat_config("minimax", {}, require_ready=False)
+
+    assert config["api_key_source"] == "environment:MINIMAX_TOKEN_PLAN_API_KEY"
+    assert config["base_url_source"] == "environment:OPENAI_BASE_URL"
+    assert config["model"] == "MiniMax-M2.7-highspeed"
+
+
+def test_deepseek_v4_pro_is_current_default_model() -> None:
+    config = code_history._provider_chat_config("deepseek", {"DEEPSEEK_API_KEY": "configured"}, require_ready=False)
+
+    assert config["model"] == "deepseek-v4-pro"
+
+
+def test_deepseek_v4_pro_payload_uses_official_reasoning_fields() -> None:
+    payload = code_history._provider_chat_payload(
+        "deepseek",
+        config={"model": "deepseek-v4-pro"},
+        messages=[{"role": "user", "content": "hi"}],
+        temperature=0.0,
+        max_tokens=128,
+    )
+
+    assert payload["model"] == "deepseek-v4-pro"
+    assert payload["max_tokens"] == 256
+    assert payload["thinking"] == {"type": "enabled"}
+    assert payload["reasoning_effort"] == "high"
+
+
+def test_cli_provider_env_contract_redacts_task_scoped_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in [
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "OPENAI_MODEL",
+        "MINIMAX_TOKEN_PLAN_API_KEY",
+        "DEEPSEEK_API_KEY",
+    ]:
+        monkeypatch.delenv(name, raising=False)
+
+    contract = code_history._cli_provider_env_contract(
+        {
+            "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY": "secret-minimax-token-plan",
+            "OPENAI_BASE_URL": "https://api.minimax.io/v1",
+            "MINIMAX_MODEL": "MiniMax-M2.7-highspeed",
+            "DEEPSEEK_API_KEY": "secret-deepseek-key",
+            "DEEPSEEK_BASE_URL": "https://api.deepseek.com",
+            "DEEPSEEK_MODEL": "deepseek-v4-pro",
+        }
+    )
+
+    assert contract["ready"] is True
+    assert "OPENAI_API_KEY" in contract["exported_env_names"]
+    assert "DEEPSEEK_API_KEY" in contract["exported_env_names"]
+    assert "secret-minimax-token-plan" not in str(contract)
+    assert "secret-deepseek-key" not in str(contract)
+    assert all(item["value"] == "<redacted>" for profile in contract["profiles"] for item in profile["exports"])
+    minimax = next(profile for profile in contract["profiles"] if profile["provider_id"] == "minimax")
+    assert minimax["api_key_source"] == "private_env:HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY"
 
 
 def test_provider_status_blocks_after_failed_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
