@@ -22,6 +22,24 @@ Hermes Agents are not complete when the chat rail renders, a provider key exists
 
 Until that chain passes on a real Hermes3D task, the agent system is `IN_PROGRESS`, not done.
 
+## Supersession And Focus Rule
+
+This plan supersedes older perpetual-loop or handoff instructions wherever they
+conflict with Hermes Agent coding, OpenCode/OpenHands execution, provider
+routing, MCP locks, visual proof, rollback, merge, install, update, release, or
+printer safety. Older docs may provide history, but they cannot authorize:
+
+- writing without exact-worktree same-owner MCP locks,
+- treating env-var presence as provider readiness,
+- replacing MiniMax builder + DeepSeek reviewer proof with local fallback,
+- using raw OpenCode/OpenHands shell commands from chat,
+- merging solely because CI is green,
+- continuing mutation during MCP disconnect/workspace mismatch,
+- marking UI or agent features done without visual proof and rollback proof.
+
+If this plan and another doc disagree, follow this plan and record the conflict
+as a blocker or doc correction.
+
 ## Required Agent Context
 
 Every coding task starts with the folder index created for agents:
@@ -47,6 +65,19 @@ Acceptance:
 | Local fallback | LM Studio/Ollama | Backup reviewer or offline assistant | May assist only when explicitly marked fallback; cannot replace MiniMax/DeepSeek proof when those keys are configured. |
 
 Provider keys stay in `G:/private/.env` only. The UI and proof files may name env keys and provider ids, never secret values.
+
+Private env safe-use rule:
+
+- Hermes Agent, OpenCode, OpenHands, Claude agents, and Codex agents may use
+  private provider keys only through Hermes3D backend adapters or sandbox env
+  injection that redacts values before output capture.
+- Agents may say which env key was used and whether it passed, failed, or was
+  missing; they may not reveal the value, prefix/suffix, token length, raw HTTP
+  auth header, full request body, or any screenshot/log containing the value.
+- Any accidental secret exposure is a P0 incident: stop the lane, revoke/rotate
+  the affected key outside the repo, remove the leak from artifacts/history where
+  possible, and record a redacted incident proof. Do not continue coding on that
+  lane until the secret incident is closed.
 
 Current live-smoke result for this branch:
 

@@ -71,6 +71,23 @@ P0 correction from 2026-05-08:
 - Current live smoke proof for this workbench slice: folder-index and MCP lock readiness pass, `G:/private/.env` aliases are loaded and shown only as redacted sources, but MiniMax and DeepSeek chat execution are both blocked by redacted HTTP 401 from their configured private provider values. The route now returns redacted blocked reasons and evidence instead of crashing or claiming a usable provider.
 - The complete truth/proof contract lives in `03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md`.
 
+Canonical Agent Completion Gate:
+
+Hermes Agent work is not DONE until it has all of the following in the current
+worktree: task id, exact worktree path, same-owner MCP task and file locks,
+verified `MCP_LOCK_WORKSPACE`, folder-index files used, pre-change snapshots,
+provider build/review artifacts where required, reviewed patch, post-change
+snapshots, required gates, visual proof for visible UI changes, security scan
+for auth/provider/process/filesystem/printer changes, rollback/restore proof id,
+branch/commit/PR evidence, evidence ids, and released locks. Any missing item is
+BLOCKED, not partial success.
+
+OpenCode/OpenHands are helpers behind this gate, not bypasses around it. They
+may run only through registered code-operator CLI runners with sandbox readiness,
+task-scoped env/cwd/files, redacted output capture, MiniMax/DeepSeek provider
+proof when provider-backed, DeepSeek review, fixed gates, and rollback evidence.
+Raw unmanaged OpenCode/OpenHands shell commands from chat are blocked.
+
 Next working order:
 
 1. DONE in the current workbench slice: build the Hermes Agent Code Workbench in Agents UI so the user can submit a real coding task with title, objective, files, target branch, provider team, and required roles.

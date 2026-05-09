@@ -149,16 +149,19 @@ are rare. Three-way is theoretical — the same tiebreak rule cascades.
 
 If `hermes3d-locks` MCP drops mid-cycle:
 
-- File-based STREAM/ keeps working (it's all markdown + filesystem).
+- File-based STREAM/ keeps working for read-only status only.
 - `STATE.md` flag set: `mcp_status: disconnected` with timestamp.
-- Watchdog falls back to `gh` + `git` + `node` direct calls (no MCP needed).
-- When MCP reconnects, `STATE.md` is updated; any locks taken via direct
-  filesystem manipulation are reconciled with `hermes_get_state`.
+- Watchdog may run read-only `gh`, `git`, and route probes to report state.
+- No source writes, lock-file writes, staging, commits, pushes, merges,
+  installs, updates, release actions, provider write tasks, or printer actions
+  are allowed while MCP is disconnected or scoped to the wrong workspace.
+- When MCP reconnects, `STATE.md` is updated from `hermes_get_state`; any
+  task that would have required a write must reacquire same-owner MCP task and
+  file locks before continuing.
 
-This was already a confirmed pattern (see
-`memory/feedback_mcp_disconnects.md`): MCP disconnect ≠ session abort. STREAM
-formalizes it: messages in inbox queue are the proof-of-life, not the MCP
-heartbeat.
+MCP disconnect does not need to abort the whole conversation, but it does abort
+write authority. STREAM inbox messages are proof-of-life only; they are never a
+replacement for Hermes locks or evidence.
 
 ---
 

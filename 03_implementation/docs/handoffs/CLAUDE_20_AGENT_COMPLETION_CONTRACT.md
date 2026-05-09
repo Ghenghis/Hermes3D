@@ -18,11 +18,20 @@ Use these answers if Claude asks how to start:
 ## Non-Negotiable Contract
 
 - Use Hermes locks before editing: claim task, lock files, heartbeat, append proof, release files, release task.
+- `MCP_LOCK_WORKSPACE` must match the exact worktree being edited. A lock from
+  the wrong repo/worktree is false proof and blocks the lane.
 - Every visible UI control must be live-backed, proof-backed, or honestly blocked. No fake, mocked, simulated, placeholder, or "looks wired" surfaces.
+- Every visible UI change needs visual proof: screenshot artifact path, route,
+  viewport, console/404 check result, and proof event id.
 - All failures must be corrected to pass state before a lane is called done.
 - S1 `192.168.0.12` is camera/read-only only. No move, upload, print, or test.
 - T1 #1 `192.168.0.10`, T1 #2 `192.168.0.11`, and V400 `192.168.0.34` can be tested only through policy-gated backend routes.
 - Secrets are runtime-only from `G:/private/.env`; never commit, echo, screenshot, or send them to frontend.
+- Private env values are usable only through approved backend adapters,
+  redacted sandbox env injection, or provider clients that never print values.
+  Agents may reference env key names and redacted source/provenance, but must
+  never display, diff, copy, serialize, screenshot, log, put into CLI args, PR
+  bodies, markdown, proof artifacts, test snapshots, or browser-visible UI.
 - Do not touch Codex-owned code-operator files during this contract:
   - `03_implementation/src/hermes3d/services/code_history.py`
   - `03_implementation/src/hermes3d/api/routes/code_operator.py`
@@ -43,6 +52,10 @@ python scripts/scan_active_ui_no_fake.py
 ```
 
 If a gate fails, fix it in the same lane before handoff. If a failure is outside the lane's files, stop and report the exact file and owner instead of editing across lanes.
+
+Security scans are required for any lane touching auth, provider routing,
+process/shell execution, filesystem mutation, MCP/tooling, secrets, printer
+policy, network access, or sandbox behavior. A failed scan is a lane blocker.
 
 ## 20 No-Conflict Lanes
 
@@ -74,10 +87,23 @@ If a gate fails, fix it in the same lane before handoff. If a failure is outside
 A lane is complete only when it reports:
 
 - lock task id and file locks used
+- exact worktree path and verified `MCP_LOCK_WORKSPACE`
+- folder-index files or roadmap sections used for scope
+- pre-change snapshots and post-change proof for every touched file
+- provider build/review artifacts when the lane uses Hermes Agents, MiniMax,
+  DeepSeek, OpenCode, or OpenHands
 - changed files
 - exact tests/gates run
+- visual proof artifact path, viewport, changed tab/route, and console/404
+  status for any visible UI change
+- security scan result when auth/provider/process/filesystem/MCP/printer/network
+  behavior changed
+- rollback or restore proof id
+- branch, commit, push, and PR evidence
 - proof artifact paths and proof event ids
 - remaining blockers, if any
 - `git status --short`
 
-No lane may call itself done with failing tests, hidden mocks, undocumented blocked states, or unverified UI behavior.
+No lane may call itself done with failing tests, hidden mocks, undocumented
+blocked states, stale base/index context, unresolved critic findings, missing
+visual proof, missing rollback proof, or unreleased locks.
