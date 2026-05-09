@@ -3851,6 +3851,108 @@ def _snapshot_payload(snapshot_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 _RECOVERY_LEDGER_PATH = HISTORY_ROOT / "recovery" / "recovery-ledger.jsonl"
+_RECOVERY_LEDGER_LOCK_PATH = HISTORY_ROOT / "recovery" / "recovery-ledger.lock"
+_RECOVERY_LEDGER_THREAD_LOCK = threading.Lock()
+_RECOVERY_LEDGER_LOCK_TIMEOUT_S = 10.0
+
+# Bonus 12 finding #1 fix (PR #135): cross-process + in-process exclusive lock
+# around recovery ledger I/O. Without it, two concurrent record_step_failure
+# calls (or one append + one full-file read in mark_recovery_outcome) can
+# interleave partial JSONL lines on Windows. mark_recovery_outcome then
+# silently json.JSONDecodeError-skips them and may report "attempt_id not
+# found" for a real attempt. The lock also serializes the read+append in
+# mark_recovery_outcome so the idempotency check (Bonus 12 finding #2) is
+# not a TOCTOU.
+try:  # pragma: no cover - platform branch
+    import fcntl as _fcntl  # POSIX
+except ImportError:  # pragma: no cover - platform branch
+    _fcntl = None  # type: ignore[assignment]
+try:  # pragma: no cover - platform branch
+    import msvcrt as _msvcrt  # Windows
+except ImportError:  # pragma: no cover - platform branch
+    _msvcrt = None  # type: ignore[assignment]
+
+
+class _RecoveryLedgerLock:
+    """Cross-platform exclusive lock around recovery ledger writes/reads.
+
+    Combines a process-local ``threading.Lock`` (for FastAPI threadpool
+    workers) with an OS-level advisory lock on a sidecar lockfile (for
+    multi-process uvicorn workers). Uses ``fcntl.flock`` on POSIX and
+    ``msvcrt.locking`` on Windows; both are stdlib so no new dependency.
+
+    On platforms where neither backend is available, falls back to the
+    threading lock alone — still safe inside a single process, and surfaces
+    the limitation through ``backend == "thread-only"``.
+    """
+
+    def __init__(self) -> None:
+        self._fh: Any = None
+        self.backend: str = "thread-only"
+
+    def __enter__(self) -> "_RecoveryLedgerLock":
+        _RECOVERY_LEDGER_THREAD_LOCK.acquire()
+        try:
+            _RECOVERY_LEDGER_LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+            self._fh = _RECOVERY_LEDGER_LOCK_PATH.open("a+b")
+            try:
+                if _fcntl is not None:
+                    _fcntl.flock(self._fh.fileno(), _fcntl.LOCK_EX)
+                    self.backend = "fcntl"
+                elif _msvcrt is not None:
+                    self._fh.seek(0)
+                    deadline = time.monotonic() + _RECOVERY_LEDGER_LOCK_TIMEOUT_S
+                    while True:
+                        try:
+                            _msvcrt.locking(self._fh.fileno(), _msvcrt.LK_NBLCK, 1)
+                            self.backend = "msvcrt"
+                            break
+                        except OSError:
+                            if time.monotonic() > deadline:
+                                raise TimeoutError(
+                                    "Recovery ledger lock acquisition timed out (msvcrt)."
+                                )
+                            time.sleep(0.05)
+                else:
+                    self.backend = "thread-only"
+            except BaseException:
+                self._fh.close()
+                self._fh = None
+                raise
+        except BaseException:
+            _RECOVERY_LEDGER_THREAD_LOCK.release()
+            raise
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        try:
+            try:
+                if self._fh is not None:
+                    if _fcntl is not None:
+                        try:
+                            _fcntl.flock(self._fh.fileno(), _fcntl.LOCK_UN)
+                        except OSError:
+                            pass
+                    elif _msvcrt is not None:
+                        try:
+                            self._fh.seek(0)
+                            _msvcrt.locking(self._fh.fileno(), _msvcrt.LK_UNLCK, 1)
+                        except OSError:
+                            pass
+            finally:
+                if self._fh is not None:
+                    try:
+                        self._fh.close()
+                    except OSError:
+                        pass
+                    self._fh = None
+        finally:
+            _RECOVERY_LEDGER_THREAD_LOCK.release()
+
+
+def _recovery_ledger_lock() -> _RecoveryLedgerLock:
+    """Return a context manager holding the recovery ledger exclusive lock."""
+    return _RecoveryLedgerLock()
 
 RECOVERY_FAILURE_CLASSES = frozenset({
     "missing_proof",
@@ -4073,8 +4175,19 @@ def record_step_failure(
         "ts_utc": utc_now(),
     }
     _RECOVERY_LEDGER_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with _RECOVERY_LEDGER_PATH.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    # Bonus 12 finding #1 fix (PR #135): wrap append in cross-platform
+    # exclusive lock + flush + fsync. Without this, concurrent appends on
+    # Windows can interleave partial JSONL lines (silent corruption that
+    # mark_recovery_outcome would later json.JSONDecodeError-skip).
+    with _recovery_ledger_lock():
+        with _RECOVERY_LEDGER_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+            fh.flush()
+            try:
+                os.fsync(fh.fileno())
+            except OSError:
+                # fsync is best-effort: tmpfs / mocked file objects may refuse.
+                pass
     summary = f"Recovery failure {failure_class}/{failed_step_type} on {clean_step}"[:400]
     mcp_evidence = append_mcp_evidence(
         owner=owner,
@@ -4118,21 +4231,6 @@ def mark_recovery_outcome(
     clean_summary = redact_text(_validate_bounded_text(recovery_summary, "recovery_summary", max_chars=400))
     if not _RECOVERY_LEDGER_PATH.exists():
         raise FileNotFoundError(f"Recovery ledger does not exist; cannot find attempt {attempt_id}.")
-    found = False
-    with _RECOVERY_LEDGER_PATH.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if entry.get("kind") == "failure" and entry.get("attempt_id") == attempt_id:
-                found = True
-                break
-    if not found:
-        raise ValueError(f"attempt_id {attempt_id!r} not found in recovery ledger.")
 
     optional_ids = {
         "proposal_id": proposal_id,
@@ -4155,8 +4253,45 @@ def mark_recovery_outcome(
         "retry_gate_id": retry_gate_id,
         "ts_utc": utc_now(),
     }
-    with _RECOVERY_LEDGER_PATH.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps(outcome, ensure_ascii=False) + "\n")
+    # Bonus 12 finding #1 + #2 fix (PR #135): hold the recovery ledger lock
+    # across the read scan AND the append. This makes the idempotency check
+    # ("has this attempt_id already received an outcome row?") atomic with the
+    # append — without the lock, a concurrent caller could pass the read
+    # check and both append a duplicate outcome row, which list_recovery_
+    # attempts would then report as ambiguous state.
+    with _recovery_ledger_lock():
+        found = False
+        already_finalized = False
+        with _RECOVERY_LEDGER_PATH.open("r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if entry.get("attempt_id") != attempt_id:
+                    continue
+                kind = entry.get("kind")
+                if kind == "failure":
+                    found = True
+                elif kind == "outcome":
+                    already_finalized = True
+        if not found:
+            raise ValueError(f"attempt_id {attempt_id!r} not found in recovery ledger.")
+        if already_finalized:
+            raise ValueError(
+                f"attempt_id {attempt_id!r} already has a recorded outcome; "
+                "recovery outcomes are idempotent and cannot be re-finalized."
+            )
+        with _RECOVERY_LEDGER_PATH.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(outcome, ensure_ascii=False) + "\n")
+            fh.flush()
+            try:
+                os.fsync(fh.fileno())
+            except OSError:
+                pass
     mcp_evidence = append_mcp_evidence(
         owner=owner,
         task_id=attempt_id,
