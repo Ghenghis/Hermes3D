@@ -36,9 +36,49 @@
   --gutter: clamp(1.25rem, 3vw, 3rem);
   --section-y: clamp(4rem, 10vw, 8rem);
   --container: 1240px;
+
+  /* ── Wonder Emporium animation tokens ───────────────────── */
+  --dur-fast:      200ms;
+  --dur-medium:    400ms;
+  --dur-slow:      700ms;
+  --dur-reveal:    900ms;
+  --dur-dramatic: 1200ms;
+  --ease-wonder:  cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-snap:    cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  --ease-glide:   cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-dramatic:cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* Glow recipes */
+  --glow-violet: 0 0 40px rgba(168,85,247,0.5), 0 0 80px rgba(168,85,247,0.15);
+  --glow-cyan:   0 0 40px rgba(6,182,212,0.5),  0 0 80px rgba(6,182,212,0.15);
+  --glow-amber:  0 0 40px rgba(245,158,11,0.5),  0 0 80px rgba(245,158,11,0.15);
+
+  /* 11-section catalog color identity */
+  --section-slicers:    #f97316;
+  --section-modelers:   #06b6d4;
+  --section-gen3d:      #a855f7;
+  --section-farmware:   #22c55e;
+  --section-agents:     #ec4899;
+  --section-firmware:   #94a3b8;
+  --section-library:    #f59e0b;
+  --section-materials:  #84cc16;
+  --section-hardware:   #ef4444;
+  --section-research:   #6366f1;
+  --section-utilities:  #8b5cf6;
+
+  /* Stagger base for child cards */
+  --stagger-sm: 60ms;
+  --stagger-md: 90ms;
+  --stagger-lg: 130ms;
+
+  /* Particle canvas opacity */
+  --particle-opacity: 0.7;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :root {
+    --particle-opacity: 0;
+  }
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
@@ -546,7 +586,8 @@ pre code { background: transparent; padding: 0; color: inherit; }
 .reveal {
   opacity: 0;
   transform: translateY(28px);
-  transition: opacity 0.7s ease-out, transform 0.7s ease-out;
+  transition: opacity var(--dur-slow) var(--ease-glide),
+              transform var(--dur-slow) var(--ease-glide);
 }
 .reveal.is-visible {
   opacity: 1;
@@ -554,6 +595,260 @@ pre code { background: transparent; padding: 0; color: inherit; }
 }
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1; transform: none; }
+}
+
+/* Staggered card reveals inside a .reveal grid */
+.reveal.is-visible .card:nth-child(1)  { transition-delay: calc(var(--stagger-md) * 0); }
+.reveal.is-visible .card:nth-child(2)  { transition-delay: calc(var(--stagger-md) * 1); }
+.reveal.is-visible .card:nth-child(3)  { transition-delay: calc(var(--stagger-md) * 2); }
+.reveal.is-visible .card:nth-child(4)  { transition-delay: calc(var(--stagger-md) * 3); }
+.reveal.is-visible .card:nth-child(5)  { transition-delay: calc(var(--stagger-md) * 4); }
+.reveal.is-visible .card:nth-child(6)  { transition-delay: calc(var(--stagger-md) * 5); }
+.reveal.is-visible .card:nth-child(7)  { transition-delay: calc(var(--stagger-md) * 6); }
+.reveal.is-visible .card:nth-child(8)  { transition-delay: calc(var(--stagger-md) * 7); }
+.reveal.is-visible .card:nth-child(9)  { transition-delay: calc(var(--stagger-md) * 8); }
+.reveal.is-visible .card:nth-child(10) { transition-delay: calc(var(--stagger-md) * 9); }
+.reveal.is-visible .card:nth-child(11) { transition-delay: calc(var(--stagger-md) * 10); }
+.reveal.is-visible .card:nth-child(12) { transition-delay: calc(var(--stagger-md) * 11); }
+
+/* Cards start hidden; reveal on parent .is-visible */
+.reveal .card {
+  opacity: 0;
+  transform: translateY(20px) scale(0.97);
+  transition: opacity var(--dur-medium) var(--ease-wonder),
+              transform var(--dur-medium) var(--ease-wonder),
+              box-shadow var(--dur-fast) ease;
+}
+.reveal.is-visible .card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal .card { opacity: 1; transform: none; }
+}
+
+/* ----- Section kicker identity accent ----- */
+.kicker[data-section="slicers"]   { color: var(--section-slicers);   border-color: var(--section-slicers);   background: rgba(249,115,22,0.08); }
+.kicker[data-section="modelers"]  { color: var(--section-modelers);  border-color: var(--section-modelers);  background: rgba(6,182,212,0.08); }
+.kicker[data-section="gen3d"]     { color: var(--section-gen3d);     border-color: var(--section-gen3d);     background: rgba(168,85,247,0.08); }
+.kicker[data-section="farmware"]  { color: var(--section-farmware);  border-color: var(--section-farmware);  background: rgba(34,197,94,0.08); }
+.kicker[data-section="agents"]    { color: var(--section-agents);    border-color: var(--section-agents);    background: rgba(236,72,153,0.08); }
+.kicker[data-section="pipeline"]  { color: var(--cyan);              border-color: var(--cyan);              background: rgba(6,182,212,0.08); }
+.kicker[data-section="stacks"]    { color: var(--violet);            border-color: var(--violet);            background: rgba(168,85,247,0.08); }
+
+/* ----- Particle canvas layer ----- */
+#hero-particles {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: var(--particle-opacity);
+  will-change: transform;
+  z-index: 0;
+}
+.hero__canvas-wrap {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* ----- Hero h1 word entrance ----- */
+.hero__h1 .word {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+/* ----- Stat number glow on complete ----- */
+@keyframes statGlow {
+  0%   { text-shadow: 0 0 20px var(--violet), 0 0 40px var(--violet); }
+  100% { text-shadow: none; }
+}
+.stat__num--done .stat__num span {
+  animation: statGlow 1.2s var(--ease-glide) forwards;
+}
+
+/* ----- Copy button sparkle ----- */
+.sparkle {
+  position: absolute;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: sparkleFly 0.6s var(--ease-dramatic) forwards;
+}
+@keyframes sparkleFly {
+  0%   { transform: translate(0,0) scale(1); opacity: 0.9; }
+  100% { transform: translate(var(--sx), var(--sy)) scale(0); opacity: 0; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Wonder Emporium M2 — Pipeline stage tracker, agent orbits, gate checks
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ----- Pipeline stage tracker ----- */
+.stage-tracker {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 2rem 0 2.5rem;
+  padding: 1.5rem;
+  background: var(--bg-card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow-x: auto;
+}
+.stage-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 80px;
+  opacity: 0.3;
+  transition: opacity var(--dur-medium) var(--ease-glide),
+              transform var(--dur-medium) var(--ease-wonder);
+  transform: translateY(4px);
+}
+.stage-node--lit {
+  opacity: 1;
+  transform: translateY(0);
+}
+.stage-node__dot {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--stage-color, var(--cyan));
+  background: transparent;
+  transition: background var(--dur-medium) ease,
+              box-shadow var(--dur-medium) ease;
+  position: relative;
+}
+.stage-node--lit .stage-node__dot {
+  background: color-mix(in srgb, var(--stage-color, var(--cyan)) 15%, transparent);
+  box-shadow: 0 0 16px var(--stage-color, var(--cyan)),
+              0 0 32px color-mix(in srgb, var(--stage-color, var(--cyan)) 30%, transparent);
+}
+.stage-node__dot::after {
+  content: "";
+  position: absolute; inset: 6px;
+  border-radius: 50%;
+  background: var(--stage-color, var(--cyan));
+  transform: scale(0);
+  transition: transform var(--dur-medium) var(--ease-wonder);
+}
+.stage-node--lit .stage-node__dot::after { transform: scale(1); }
+
+.stage-node__label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  text-align: center;
+  transition: color var(--dur-medium) ease;
+}
+.stage-node--lit .stage-node__label { color: var(--text); }
+
+.stage-node__desc {
+  font-size: 0.6rem;
+  color: var(--text-faint);
+  text-align: center;
+  max-width: 80px;
+  line-height: 1.3;
+}
+
+.stage-line {
+  flex: 1;
+  min-width: 16px;
+  height: 2px;
+  background: var(--line);
+  border-radius: 1px;
+  transition: background var(--dur-fast) ease;
+  align-self: center;
+  margin-bottom: 2.4rem;
+}
+.stage-line--lit {
+  background: linear-gradient(90deg, var(--cyan), var(--violet));
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+}
+
+/* ----- Agent team cards ----- */
+.agent-team-card {
+  border-color: color-mix(in srgb, var(--team-color, var(--cyan)) 30%, transparent) !important;
+  transition: border-color var(--dur-medium) ease,
+              box-shadow var(--dur-medium) ease,
+              transform var(--dur-medium) var(--ease-wonder);
+}
+.agent-team-card:hover {
+  box-shadow: 0 0 30px var(--team-glow, var(--cyan-glow));
+  transform: translateY(-4px) scale(1.01);
+}
+
+.agent-avatar {
+  position: relative;
+  width: 72px; height: 72px;
+  margin: 0 auto 1rem;
+}
+.agent-avatar__core {
+  position: absolute;
+  inset: 14px;
+  border-radius: 50%;
+  border: 2px solid;
+  display: flex; align-items: center; justify-content: center;
+}
+.agent-avatar__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1.5px solid;
+  animation: orbitSpin0 8s linear infinite;
+}
+.agent-avatar__ring--2 {
+  inset: 6px;
+  animation: orbitSpin1 12s linear infinite reverse;
+}
+@keyframes orbitSpin0 {
+  from { transform: rotate(0deg) scaleY(0.3); }
+  to   { transform: rotate(360deg) scaleY(0.3); }
+}
+@keyframes orbitSpin1 {
+  from { transform: rotate(0deg) scaleY(0.4); }
+  to   { transform: rotate(360deg) scaleY(0.4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar__ring, .agent-avatar__ring--2 { animation: none; }
+}
+
+/* ----- Gate checkmark draw ----- */
+.gate-check {
+  float: right;
+  margin: 0 0 0.5rem 0.5rem;
+}
+.gate-check__path {
+  stroke-dasharray: 30;
+  stroke-dashoffset: 30;
+  transition: stroke-dashoffset 0.5s ease;
+}
+
+/* ----- Nav active indicator ----- */
+.nav__links { position: relative; }
+.nav-link--active {
+  color: var(--cyan) !important;
+  position: relative;
+}
+.nav-link--active::after {
+  content: "";
+  position: absolute;
+  bottom: -20px; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--cyan), var(--violet));
+  border-radius: 2px;
+  animation: navSlideIn 0.3s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes navSlideIn {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 /* ----- Layer-stack hero (CSS-only "self-printing" effect, no R3F yet) ----- */
