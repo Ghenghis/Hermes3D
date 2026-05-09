@@ -251,6 +251,10 @@ PROVIDER_DEFAULT_BASE_URLS = {
     "deepseek": "https://api.deepseek.com",
     "minimax": "https://api.minimax.io/v1",
 }
+PROVIDER_DEFAULT_MODELS = {
+    "deepseek": "deepseek-v4-pro",
+    "minimax": "MiniMax-M2.7-highspeed",
+}
 
 
 def programming_readiness() -> dict[str, Any]:
@@ -2626,16 +2630,42 @@ def _provider_chat_config(provider_id: str, private_values: dict[str, str] | Non
         raise ValueError("Unsupported provider id.")
     values = private_values if private_values is not None else private_env()
     prefix = "MINIMAX" if provider == "minimax" else "DEEPSEEK"
-    api_key_binding = _first_env_binding(values, f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY")
-    base_url_binding = _first_env_binding(
-        values,
+    api_key_names = [f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY"]
+    base_url_names = [
         f"HERMES3D_{prefix}_BASE_URL",
         f"HERMES3D_{prefix}_API_BASE",
         f"HERMES3D_{prefix}_API_URL",
         f"{prefix}_BASE_URL",
         f"{prefix}_API_BASE",
         f"{prefix}_API_URL",
-    )
+    ]
+    if provider == "minimax":
+        # MiniMax's token-plan/Codex setup is OpenAI-compatible and commonly
+        # exports OPENAI_API_KEY / OPENAI_BASE_URL. Treat those as MiniMax
+        # aliases only for the MiniMax lane so other providers cannot steal
+        # a generic OpenAI binding.
+        api_key_names = [
+            f"HERMES3D_{prefix}_TOKEN_PLAN_API_KEY",
+            f"{prefix}_TOKEN_PLAN_API_KEY",
+            f"HERMES3D_{prefix}_HIGHSPEED_API_KEY",
+            f"{prefix}_HIGHSPEED_API_KEY",
+            f"HERMES3D_{prefix}_API_KEY",
+            "OPENAI_API_KEY",
+            f"{prefix}_API_KEY",
+        ]
+        base_url_names = [
+            f"HERMES3D_{prefix}_BASE_URL",
+            f"HERMES3D_{prefix}_API_BASE",
+            f"HERMES3D_{prefix}_API_URL",
+            "OPENAI_BASE_URL",
+            "OPENAI_API_BASE",
+            "OPENAI_API_URL",
+            f"{prefix}_BASE_URL",
+            f"{prefix}_API_BASE",
+            f"{prefix}_API_URL",
+        ]
+    api_key_binding = _first_env_binding(values, *api_key_names)
+    base_url_binding = _first_env_binding(values, *base_url_names)
     model_binding = _first_env_binding(values, f"HERMES3D_{prefix}_MODEL", f"{prefix}_MODEL")
     api_key = str(api_key_binding["value"])
     base_url = str(base_url_binding["value"])
@@ -2646,12 +2676,12 @@ def _provider_chat_config(provider_id: str, private_values: dict[str, str] | Non
         "api_key": api_key,
         "api_key_configured": bool(api_key),
         "api_key_source": api_key_binding["source"],
-        "accepted_api_key_env": [f"HERMES3D_{prefix}_API_KEY", f"{prefix}_API_KEY"],
+        "accepted_api_key_env": api_key_names,
         "base_url": effective_base,
         "base_url_configured": bool(base_url),
         "base_url_source": base_url_binding["source"] or "default",
         "base_url_label": _host_label(effective_base),
-        "model": model or None,
+        "model": model or PROVIDER_DEFAULT_MODELS[provider],
         "model_configured": bool(model),
         "model_source": model_binding["source"],
     }
@@ -2766,6 +2796,9 @@ def _provider_chat_payload(
         payload["max_completion_tokens"] = token_limit
     else:
         payload["max_tokens"] = token_limit
+        if str(config.get("model") or "") == "deepseek-v4-pro":
+            payload["thinking"] = {"type": "enabled"}
+            payload["reasoning_effort"] = "high"
     return payload
 
 
@@ -2959,7 +2992,10 @@ def _provider_error_summary(provider_id: str, text: str) -> str:
     http = re.search(r"HTTP\s+(\d{3})", text, re.IGNORECASE)
     status = f"HTTP {http.group(1)}" if http else "request failure"
     if _provider_smoke_auth_failed(text):
-        return f"Provider {provider_id} returned {status}: authentication failed; verify private API key, base URL, and model."
+        return (
+            f"Provider {provider_id} returned {status}: authentication failed; "
+            "verify the configured private API key, account access, and provider endpoint."
+        )
     return f"Provider {provider_id} returned {status}: {_redact_provider_text(text)[:300]}"
 
 

@@ -16,9 +16,9 @@ Hermes Agents are **BLOCKED**. The closed coding loop cannot complete until Mini
 | Agent | Role | Result |
 |---|---|---|
 | A1 | PR Stack Stabilizer | PASS — PR #121 TS6133 fixed, commit 6c348f9 pushed |
-| A2 | Provider Auth Specialist | BLOCKED — MiniMax HTTP 401, DeepSeek HTTP 401 |
-| A3 | MiniMax Builder Smoke | NOT RUN — blocked by A2 |
-| A4 | DeepSeek Reviewer Smoke | NOT RUN — blocked by A2 |
+| A2 | Provider Auth Specialist | BLOCKED — MiniMax now reaches highspeed token-plan endpoint and returns HTTP 429 insufficient balance; DeepSeek still returns HTTP 401 from configured private env binding |
+| A3 | MiniMax Builder Smoke | BLOCKED — HTTP 429 insufficient balance/quota after adapter correction |
+| A4 | DeepSeek Reviewer Smoke | BLOCKED — HTTP 401 with provider-listed `deepseek-v4-pro` payload |
 | A5 | E2E Loop Integrator | NOT RUN — blocked by A2 |
 | A6 | OpenCode Runner Auditor | PASS — v1.4.3-hermes3d detected, sandbox-ready, write blocked by policy |
 | A7 | OpenHands Runner Auditor | PASS — v1.16.0 detected, Docker 29.4.1, network=none, write blocked by policy |
@@ -97,13 +97,17 @@ After all above merge to `feat/hermes3d-7-complete-gui-repo-wiring`:
 
 | Provider | Key Env | Base URL | Model | HTTP Status | Evidence ID |
 |---|---|---|---|---|---|
-| minimax | MINIMAX_API_KEY | api.minimax.io | MiniMax-M2.7 | **401** | ev_76100eecec1a74d3 |
-| deepseek | DEEPSEEK_API_KEY | api.deepseek.com | deepseek-v4-pro | **401** | ev_4a09a50436696cb7 |
+| minimax | OPENAI_API_KEY / OPENAI_BASE_URL token-plan binding; MiniMax aliases accepted as fallback | api.minimax.io | MiniMax-M2.7-highspeed | **429 insufficient balance/quota** | ev_e8ed04d923a294c9 |
+| deepseek | DEEPSEEK_API_KEY | api.deepseek.com | deepseek-v4-pro | **401 configured private env value rejected by DeepSeek** | ev_5702585f7b8a83a7 |
 
-**Recommended user action:**  
-Update `G:/private/.env` with valid API keys. Also verify model names:  
-- MiniMax: `MiniMax-M2.7` — if still 401 after key update, try `MiniMax-Text-01`  
-- DeepSeek: `deepseek-v4-pro` is **not a valid DeepSeek model ID**. Valid names: `deepseek-chat` (V3), `deepseek-reasoner` (R1), `deepseek-coder`
+**Corrected follow-up:**
+Do not assume the user's new keys are bad. The adapter must use the provider's
+real configured model ids and current token-plan bindings:
+- MiniMax highspeed plan: `MiniMax-M2.7-highspeed` through the provider-listed
+  OpenAI-compatible endpoint.
+- DeepSeek V4 Pro: `deepseek-v4-pro` is a current provider-listed model id.
+- MiniMax token-plan setups may expose `OPENAI_API_KEY` / `OPENAI_BASE_URL`;
+  Hermes must accept those as MiniMax aliases without exposing values.
 
 ---
 
@@ -133,7 +137,7 @@ Write runs unlock only after: provider smoke PASS + MCP locks + snapshot + revie
 
 ## First Proof Task Result
 
-**NOT RUN** — blocked by provider auth (MiniMax + DeepSeek both HTTP 401).  
+**NOT RUN** — blocked by provider readiness (MiniMax HTTP 429 insufficient balance/quota; DeepSeek HTTP 401).
 The full closed loop (`intent → MiniMax build → DeepSeek review → patch → gates → PR`) cannot execute until both providers authenticate.
 
 ---
@@ -176,8 +180,8 @@ All zombie locks are from completed 24-agent PRs. They will expire naturally ~00
 | Docker sandbox | READY |
 | OpenCode CLI | READY (detect/preflight only) |
 | OpenHands CLI | READY (detect/preflight only) |
-| MiniMax provider | **BLOCKED** (HTTP 401) |
-| DeepSeek provider | **BLOCKED** (HTTP 401) |
+| MiniMax provider | **BLOCKED** (HTTP 429 insufficient balance/quota) |
+| DeepSeek provider | **BLOCKED** (HTTP 401 from configured private env binding) |
 | First proof PR | NOT RUN |
 | **Overall** | **BLOCKED** |
 
@@ -185,7 +189,13 @@ All zombie locks are from completed 24-agent PRs. They will expire naturally ~00
 
 ## Next Three Actions for Codex
 
-1. **User must update `G:/private/.env`** — add valid MiniMax API key and valid DeepSeek API key. Verify `DEEPSEEK_MODEL=deepseek-chat` (not `deepseek-v4-pro`). Verify `MINIMAX_MODEL` matches MiniMax's current model catalog. Then run `/api/code-operator/providers/smoke` for each provider.
+1. **Provider adapter/config correction** — Hermes now reads the active MiniMax
+   token-plan binding (`OPENAI_API_KEY` / `OPENAI_BASE_URL`) and uses
+   `MINIMAX_MODEL=MiniMax-M2.7-highspeed`. MiniMax is now blocked by provider
+   balance/quota, not stale auth wiring. Keep `DEEPSEEK_MODEL=deepseek-v4-pro`;
+   the remaining DeepSeek issue is the configured private env value returning
+   HTTP 401 from the official API. Re-run `/api/code-operator/providers/smoke`
+   after provider account/env state changes.
 
 2. **Merge PRs in sequence** — follow the 16-step merge order above into `feat/hermes3d-7-complete-gui-repo-wiring`. Wait for PR #121 CI to turn green first. Do NOT bulk-merge all at once.
 

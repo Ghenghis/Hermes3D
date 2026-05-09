@@ -4,11 +4,11 @@
     "probe_body": {
       "data": [
         {
-          "id": "abab6.5s-chat",
+          "id": "MiniMax-M2.7-highspeed",
           "object": "model"
         },
         {
-          "id": "abab6.5t-chat",
+          "id": "MiniMax-M2.7",
           "object": "model"
         }
       ]

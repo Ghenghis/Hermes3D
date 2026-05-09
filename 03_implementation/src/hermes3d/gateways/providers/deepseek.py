@@ -80,11 +80,15 @@ def completion_caller(config: ProviderConfig) -> LLMCaller:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
+        model = os.environ.get("HERMES3D_DEEPSEEK_MODEL") or os.environ.get("DEEPSEEK_MODEL") or "deepseek-v4-pro"
         body = {
-            "model": "deepseek-chat",
+            "model": model,
             "messages": [{"role": "user", "content": request.prompt}],
             "max_tokens": request.max_completion_tokens,
         }
+        if model == "deepseek-v4-pro":
+            body["thinking"] = {"type": "enabled"}
+            body["reasoning_effort"] = "high"
         with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
             response = client.post(url, headers=headers, json=body)
         parsed = response.json()

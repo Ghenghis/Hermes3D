@@ -16,7 +16,7 @@ MCP workspace match: VERIFIED
 | A1 | PR merge/conflict matrix | PASS | See matrix below |
 | A2 | MCP lock/zombie audit | PASS | 2 stale locks recovered, 0 remaining |
 | A3 | Secret leak audit | PASS | No values found; test fixtures use placeholders only |
-| A4 | MiniMax/DeepSeek smoke | BLOCKED | HTTP 401 both providers — see provider table |
+| A4 | MiniMax/DeepSeek smoke | BLOCKED | MiniMax now reaches the token-plan endpoint and returns HTTP 429 insufficient balance; DeepSeek still returns HTTP 401 from the configured private env binding |
 | A5 | OpenCode/OpenHands/sandbox | PASS | Both detected, sandbox READY, write policy-blocked |
 | A6 | E2E code loop | BLOCKED | Blocked by provider auth failures |
 | A7 | Source OS 60-app runners | PASS | 60 apps, 0 unknown families, 53 verifiers |
@@ -80,17 +80,18 @@ Separately: `#109 docs(readme,pages)` → `develop`
 
 | Provider | Key Env | Base URL Host | Model | Status | Evidence ID |
 |---|---|---|---|---|---|
-| minimax | MINIMAX_API_KEY | api.minimax.io | MiniMax-M2.7 | **BLOCKED HTTP 401** | ev_dbf23c31c04af4ca |
-| deepseek | DEEPSEEK_API_KEY | api.deepseek.com | deepseek-v4-pro | **BLOCKED HTTP 401** | ev_a736131a4b0d8c6e |
+| minimax | OPENAI_API_KEY / OPENAI_BASE_URL token-plan binding from `G:/private/.env`; MiniMax aliases accepted as fallback | api.minimax.io | MiniMax-M2.7-highspeed | **BLOCKED HTTP 429: insufficient balance/quota** | ev_0f7b0fe27dd0b49a |
+| deepseek | DEEPSEEK_API_KEY | api.deepseek.com | deepseek-v4-pro | **BLOCKED HTTP 401: configured private env value rejected by DeepSeek** | ev_0a7d65d00436a1b8 |
 
 **Per PR #125 non-negotiable rule 7:** MiniMax and DeepSeek are NOT working until real chat-completions smoke passes. Hermes Agent coding loop is BLOCKED.
 
 **Required user actions (env values must never appear here — key names only):**
-1. Update `MINIMAX_API_KEY` in `G:/private/.env` with a valid MiniMax API key
-2. Verify `MINIMAX_MODEL` — `MiniMax-M2.7` may not be a valid model ID; check `https://platform.minimax.io/docs/api-reference/text-chat` for current model names
-3. Update `DEEPSEEK_API_KEY` in `G:/private/.env` with a valid DeepSeek API key
-4. Update `DEEPSEEK_MODEL` — `deepseek-v4-pro` is **not a valid DeepSeek model ID**; use `deepseek-chat` (DeepSeek-V3) or `deepseek-reasoner` (DeepSeek-R1)
-5. After updating `.env`, restart the backend and re-run `/api/code-operator/providers/smoke` for each provider
+1. Keep `MINIMAX_MODEL=MiniMax-M2.7-highspeed` for the user's MiniMax Highspeed 2.7 token plan.
+2. Keep the working MiniMax token-plan binding in `G:/private/.env`: `OPENAI_API_KEY` and `OPENAI_BASE_URL` are now accepted for the MiniMax lane; MiniMax-specific aliases remain accepted as fallback. `G:/private/.env2.txt` was consumed and deleted after selecting the authenticated MiniMax candidate.
+3. Resolve the MiniMax provider-side `insufficient_balance (1008)` / HTTP 429 condition outside the repo before the builder lane can spend tokens.
+4. Keep `DEEPSEEK_MODEL=deepseek-v4-pro` when using the current DeepSeek V4 Pro API model. Do not downgrade to older aliases unless the user explicitly chooses them.
+5. Verify that `DEEPSEEK_API_KEY` in `G:/private/.env` is the exact API key that works against the DeepSeek API site; both official path variants returned HTTP 401 with the configured private env value.
+6. After updating provider account/env state, restart the backend and re-run `/api/code-operator/providers/smoke` for each provider.
 
 ---
 
@@ -151,8 +152,8 @@ All other 24-agent wave locks expired and were recovered. Lock state is clean.
 | Docker sandbox | READY | v29.4.1, network=none |
 | OpenCode CLI | READY (preflight) | Write blocked by policy |
 | OpenHands CLI | READY (preflight) | Write blocked by policy |
-| MiniMax provider | **BLOCKED** | HTTP 401 — key/model requires user fix |
-| DeepSeek provider | **BLOCKED** | HTTP 401 — key/model requires user fix; `deepseek-v4-pro` invalid |
+| MiniMax provider | **BLOCKED** | HTTP 429 insufficient balance/quota — auth path now reaches the highspeed token-plan endpoint |
+| DeepSeek provider | **BLOCKED** | HTTP 401 — configured private env value rejected by DeepSeek; `deepseek-v4-pro` is a current provider-listed model |
 | E2E code loop | **BLOCKED** | Cannot run until both providers pass smoke |
 | First proof PR | NOT RUN | Blocked by provider auth |
 | **Overall verdict** | **BLOCKED** | |
@@ -166,11 +167,12 @@ All other 24-agent wave locks expired and were recovered. Lock state is clean.
 **Priority order:**
 
 1. **[USER ACTION REQUIRED] Fix `G:/private/.env`:**
-   - Env key: `DEEPSEEK_MODEL` → change value to `deepseek-chat` (or `deepseek-reasoner`)
-   - Env key: `DEEPSEEK_API_KEY` → update to a valid key
-   - Env key: `MINIMAX_API_KEY` → update to a valid key
-   - Env key: `MINIMAX_MODEL` → verify against current MiniMax catalog
-   - Restart backend after changes
+   - Env key: `DEEPSEEK_MODEL` → keep the provider-listed `deepseek-v4-pro`
+   - Env key: `DEEPSEEK_API_KEY` → verify it is the exact API key that passes the official DeepSeek API smoke
+   - Env keys: `OPENAI_API_KEY` / `OPENAI_BASE_URL` → keep the MiniMax token-plan binding Hermes now reads
+   - Env key: `MINIMAX_MODEL` → keep `MiniMax-M2.7-highspeed`
+   - Provider account state: resolve MiniMax HTTP 429 `insufficient_balance (1008)` before builder execution
+   - Restart backend after provider/env changes
    - Re-run `POST /api/code-operator/providers/smoke` for each provider
    - Do not proceed to step 2 until both return `accepted: true`
 
@@ -188,5 +190,9 @@ All other 24-agent wave locks expired and were recovered. Lock state is clean.
 |---|---|---|
 | ev_ffa9a8c3e3bd4a40 | gate | tsc PASS after TS6133 fix in Agents.tsx |
 | ev_3ef0c842f7148e83 | commit | 6c348f9 pushed to PR #121 branch |
-| ev_dbf23c31c04af4ca | code_provider_smoke | MiniMax smoke BLOCKED HTTP 401 |
-| ev_a736131a4b0d8c6e | code_provider_smoke | DeepSeek smoke BLOCKED HTTP 401 |
+| ev_dbf23c31c04af4ca | code_provider_smoke | Historical MiniMax smoke BLOCKED HTTP 401 before adapter correction |
+| ev_a736131a4b0d8c6e | code_provider_smoke | Historical DeepSeek smoke BLOCKED HTTP 401 |
+| ev_e8ed04d923a294c9 | code_provider_smoke | Interim MiniMax smoke reached highspeed token-plan binding before `.env2` consolidation, BLOCKED HTTP 429 insufficient balance |
+| ev_5702585f7b8a83a7 | code_provider_smoke | Interim DeepSeek smoke BLOCKED HTTP 401 with configured private env binding |
+| ev_0f7b0fe27dd0b49a | code_provider_smoke | Current MiniMax smoke reads `G:/private/.env` `OPENAI_API_KEY`/`OPENAI_BASE_URL`, BLOCKED HTTP 429 insufficient balance |
+| ev_0a7d65d00436a1b8 | code_provider_smoke | Current DeepSeek smoke reads `G:/private/.env` and remains BLOCKED HTTP 401 |

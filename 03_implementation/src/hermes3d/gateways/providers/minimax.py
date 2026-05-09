@@ -25,7 +25,7 @@ from hermes3d.orchestration.types import (
 def build_probe_request(config: ProviderConfig) -> tuple[str, str, dict[str, str]]:
     method = "GET"
     url = f"{config.base_url.rstrip('/')}/{config.probe_path.lstrip('/')}"
-    key = os.environ[config.api_key_env]
+    key = _minimax_api_key(config)
     headers = {"Authorization": f"Bearer {key}", "Accept": "application/json"}
     return method, url, headers
 
@@ -74,15 +74,16 @@ def probe_caller(config: ProviderConfig) -> ProbeCaller:
 def completion_caller(config: ProviderConfig) -> LLMCaller:
     def _caller(request: LLMRequest) -> LLMResponse:
         url = f"{config.base_url.rstrip('/')}/{config.completion_path.lstrip('/')}"
-        key = os.environ[config.api_key_env]
+        key = _minimax_api_key(config)
         headers = {
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
+        model = os.environ.get("HERMES3D_MINIMAX_MODEL") or os.environ.get("MINIMAX_MODEL") or "MiniMax-M2.7-highspeed"
         body = {
-            "model": "abab6.5s-chat",
+            "model": model,
             "messages": [{"role": "user", "content": request.prompt}],
-            "max_tokens": request.max_completion_tokens,
+            "max_completion_tokens": request.max_completion_tokens,
         }
         with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
             response = client.post(url, headers=headers, json=body)
@@ -95,6 +96,22 @@ def completion_caller(config: ProviderConfig) -> LLMCaller:
         )
 
     return _caller
+
+
+def _minimax_api_key(config: ProviderConfig) -> str:
+    for name in (
+        "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY",
+        "MINIMAX_TOKEN_PLAN_API_KEY",
+        "HERMES3D_MINIMAX_HIGHSPEED_API_KEY",
+        "MINIMAX_HIGHSPEED_API_KEY",
+        config.api_key_env,
+        "OPENAI_API_KEY",
+        "MINIMAX_API_KEY",
+    ):
+        value = os.environ.get(name)
+        if value:
+            return value
+    raise KeyError(config.api_key_env)
 
 
 def _now_iso() -> str:
