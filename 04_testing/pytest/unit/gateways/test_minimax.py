@@ -32,6 +32,9 @@ def test_build_probe_request_uses_env_key_and_probe_url(monkeypatch) -> None:
 
 
 def test_build_probe_request_missing_env_raises(monkeypatch) -> None:
+    """Squad G follow-up (Wave synthesis 2026-05-09): explicit RuntimeError
+    on missing env (was bare KeyError that named the env variable in
+    tracebacks, mirrors PR #145 DeepSeek fix)."""
     monkeypatch.delenv("HERMES3D_MINIMAX_API_KEY", raising=False)
     monkeypatch.delenv("HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY", raising=False)
     monkeypatch.delenv("MINIMAX_TOKEN_PLAN_API_KEY", raising=False)
@@ -40,7 +43,7 @@ def test_build_probe_request_missing_env_raises(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("MINIMAX_API_KEY", raising=False)
 
-    with pytest.raises(KeyError):
+    with pytest.raises(RuntimeError, match="MiniMax provider is not configured"):
         minimax.build_probe_request(_config())
 
 
