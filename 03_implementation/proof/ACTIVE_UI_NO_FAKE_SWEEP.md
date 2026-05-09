@@ -22,6 +22,14 @@ Observed result on 2026-05-06:
 - No active production import from `data/mock` remains.
 - No active production string/template literal contains the blocked fake-mode terms.
 
+Observed result on 2026-05-08:
+- Command: `python 03_implementation/scripts/scan_active_ui_no_fake.py --repo-root <worktree-root>`
+- The scan walked 81 active production UI files reachable from the App.tsx entry point.
+- The scan passed with 0 findings.
+- No active production import from `data/mock` remains.
+- No active production string/template literal contains the blocked fake-mode terms.
+- Coverage note: 96 total .ts/.tsx/.js/.jsx files exist under ui/src/; 15 are not in the active import graph (orphaned/unused components including AutopilotConsole, ObserveConsole, ServiceHealthPage, PluginRollbackPanel, DataTable, adapters.live, and several type-only modules). All 15 unwalked files were separately verified clean — the only occurrence of a forbidden term in unwalked files is the word "fake" inside a JSDoc comment in AutopilotConsole.tsx (a developer instruction NOT to add fake values), which the scanner's comment-stripping logic would correctly ignore if the file were active.
+
 Playwright proof:
 - Command: `npx playwright test --config=playwright.e2e.config.ts`
 - Latest full result: 41/41 passed after the fleet-onboarding, job-id upload/start gate, Jobs proof-pipeline UI, Jobs repair/rollback transition wiring, Learning/Agents idle workbench Run boundary, Azure STT/backend reply-voice proof, Settings runtime-readiness ledger, Simple sidebar routing, Source OS runtime-readiness split, Design toolchain proof, Design executor MVP, 3D Generation executor MVP, Observe refresh/reconnect, route-sync, bounded printer telemetry, and Hermes Agent Playwright proof-runner slices.

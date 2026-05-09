@@ -631,75 +631,76 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
         "proof_gate_version": "moonraker-fleet-verifier-v1",
     },
     "firmware_klipper": {
-        "tool_key": "moonraker_fleet",
-        "label": "Klipper firmware fleet read-only API",
-        "path": "",
-        "args": ["/printer/info", "3"],
-        "capabilities": ["klipper_firmware_readonly_state", "fleet_status_probe"],
-        "kind": "moonraker_fleet",
-        "execute": True,
-        "timeout_s": 2,
-        "proof_gate_version": "moonraker-fleet-verifier-v1",
+        "tool_key": "firmware_source_inventory",
+        "label": "Klipper firmware source inventory",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
+        "args": ["README.md", "klippy"],
+        "capabilities": ["firmware_source_reference", "klipper_firmware_source"],
+        "kind": "firmware_source_inventory",
+        "execute": False,
+        "timeout_s": 5,
+        "proof_gate_version": "firmware-source-inventory-v1",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
     },
     "marlin": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Marlin firmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
         "args": ["README.md", "docs"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
     },
     "prusa_firmware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Prusa Firmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
         "args": ["README.md", "CMakeLists.txt", "Firmware"],
         "capabilities": ["firmware_source_reference", "cmake_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
     },
     "reprapfirmware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "RepRapFirmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
         "args": ["README.md", "src"],
         "capabilities": ["firmware_source_reference", "duet_firmware_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
     },
     "repetier_firmware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Repetier Firmware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
         "args": ["README.md", "src"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
     },
     "smoothieware": {
-        "tool_key": "source_inventory",
+        "tool_key": "firmware_source_inventory",
         "label": "Smoothieware source inventory",
-        "path": "",
+        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
         "args": ["COPYING", "src"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "source_inventory",
+        "kind": "firmware_source_inventory",
         "execute": False,
-        "timeout_s": 1,
+        "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed.",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
     },
 }
 
@@ -2061,6 +2062,178 @@ def _local_http_health_response(
     }
 
 
+# ---------------------------------------------------------------------------
+# Service/web-app named probe functions (I6 — read-only HTTP health only)
+# Each function is a thin, individually-testable wrapper around
+# _local_http_health_probe.  They never POST, mutate, start, or authenticate.
+# ---------------------------------------------------------------------------
+
+SERVICE_WEB_HEALTH_MODULE_IDS: frozenset[str] = frozenset(
+    {
+        "fluidd",
+        "mainsail",
+        "octoprint",
+        "fdm_monster",
+        "octofarm",
+        "manyfold",
+        "comfyui",
+    }
+)
+
+
+def probe_fluidd() -> dict[str, Any]:
+    """Read-only GET probe for the Fluidd web UI health endpoint.
+
+    Uses HERMES3D_SOURCE_FLUIDD_URL (default http://127.0.0.1:8083).
+    Never mutates, posts, or requires authentication.
+    """
+    probe = runtime_probe_config("fluidd")
+    if not probe:
+        return _service_no_probe_response("fluidd", "Fluidd local health")
+    return _local_http_health_probe(probe)
+
+
+def probe_mainsail() -> dict[str, Any]:
+    """Read-only GET probe for the Mainsail web UI health endpoint.
+
+    Uses HERMES3D_SOURCE_MAINSAIL_URL (default http://127.0.0.1:4173).
+    Never mutates, posts, or requires authentication.
+    """
+    probe = runtime_probe_config("mainsail")
+    if not probe:
+        return _service_no_probe_response("mainsail", "Mainsail local health")
+    return _local_http_health_probe(probe)
+
+
+def probe_octoprint() -> dict[str, Any]:
+    """Read-only GET probe for OctoPrint /api/version endpoint.
+
+    Uses HERMES3D_SOURCE_OCTOPRINT_URL (default http://127.0.0.1:5000).
+    Never mutates, posts, uploads, or sends printer commands.
+    """
+    probe = runtime_probe_config("octoprint")
+    if not probe:
+        return _service_no_probe_response("octoprint", "OctoPrint local version API")
+    return _local_http_health_probe(probe)
+
+
+def probe_fdm_monster() -> dict[str, Any]:
+    """Read-only GET probe for FDM Monster health endpoint.
+
+    Uses HERMES3D_SOURCE_FDM_MONSTER_URL (default http://127.0.0.1:4000).
+    Never mutates, posts, or issues print-farm commands.
+    """
+    probe = runtime_probe_config("fdm_monster")
+    if not probe:
+        return _service_no_probe_response("fdm_monster", "FDM Monster local health")
+    return _local_http_health_probe(probe)
+
+
+def probe_octofarm() -> dict[str, Any]:
+    """Read-only GET probe for OctoFarm health endpoint.
+
+    Uses HERMES3D_SOURCE_OCTOFARM_URL (default http://127.0.0.1:4001).
+    Never mutates, posts, or issues print-farm commands.
+    """
+    probe = runtime_probe_config("octofarm")
+    if not probe:
+        return _service_no_probe_response("octofarm", "OctoFarm local health")
+    return _local_http_health_probe(probe)
+
+
+def probe_manyfold() -> dict[str, Any]:
+    """Read-only GET probe for Manyfold model library health endpoint.
+
+    Uses HERMES3D_SOURCE_MANYFOLD_URL (default http://127.0.0.1:3214).
+    Never mutates, posts, imports, or writes library records.
+    """
+    probe = runtime_probe_config("manyfold")
+    if not probe:
+        return _service_no_probe_response("manyfold", "Manyfold local health")
+    return _local_http_health_probe(probe)
+
+
+def probe_comfyui() -> dict[str, Any]:
+    """Read-only GET probe for ComfyUI /system_stats endpoint.
+
+    Uses HERMES3D_SOURCE_COMFYUI_URL (default http://127.0.0.1:8188).
+    Never mutates, posts, or enqueues generation work.
+    """
+    probe = runtime_probe_config("comfyui")
+    if not probe:
+        return _service_no_probe_response("comfyui", "ComfyUI local system stats")
+    return _local_http_health_probe(probe)
+
+
+def probe_service_web_health(module_id: str) -> dict[str, Any]:
+    """Dispatch a read-only HTTP health probe to the named service module.
+
+    Only service/web-app module IDs in SERVICE_WEB_HEALTH_MODULE_IDS are
+    accepted.  Returns a blocked response for unknown or unsupported IDs.
+    Never starts, mutates, or authenticates against any service.
+
+    Args:
+        module_id: One of the registered service IDs (e.g. "fluidd").
+
+    Returns:
+        Probe result dict with status, kind, executed, return_code, etc.
+    """
+    _DISPATCHERS: dict[str, Any] = {
+        "fluidd": probe_fluidd,
+        "mainsail": probe_mainsail,
+        "octoprint": probe_octoprint,
+        "fdm_monster": probe_fdm_monster,
+        "octofarm": probe_octofarm,
+        "manyfold": probe_manyfold,
+        "comfyui": probe_comfyui,
+    }
+    fn = _DISPATCHERS.get(str(module_id))
+    if fn is None:
+        return {
+            "status": "blocked",
+            "kind": "local_http_health",
+            "verifier": f"{module_id} service probe",
+            "path": module_id,
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": [],
+            "reason": f"No service/web-app health probe is registered for module_id={module_id!r}.",
+            "setup_steps": [
+                f"Register a local_http_health probe for {module_id} in BUILTIN_RUNTIME_PROBES.",
+                "Run Verify again from Source OS.",
+            ],
+            "proof_source": None,
+            "output_head": [],
+            "registry_source": "builtin",
+            "proof_gate_version": "local-http-health-verifier-v1",
+        }
+    return fn()
+
+
+def _service_no_probe_response(module_id: str, label: str) -> dict[str, Any]:
+    """Return a blocked response when the probe config is missing."""
+    return {
+        "status": "blocked",
+        "kind": "local_http_health",
+        "verifier": label,
+        "path": module_id,
+        "detected": False,
+        "executed": False,
+        "return_code": None,
+        "capabilities": [],
+        "reason": f"no_configured_url: no runtime probe config is registered for {module_id}.",
+        "setup_steps": [
+            f"Register a local_http_health probe entry for {module_id} in BUILTIN_RUNTIME_PROBES.",
+            "Run Verify again from Source OS.",
+        ],
+        "proof_source": None,
+        "output_head": ["probe=missing"],
+        "registry_source": "builtin",
+        "proof_gate_version": "local-http-health-verifier-v1",
+    }
+
+
 def _private_runtime_env() -> dict[str, str]:
     try:
         from hermes3d.services.agent_runtime import private_env
@@ -2357,7 +2530,9 @@ def _runner_status(*, runtime: dict[str, Any], mod: dict[str, Any], agent_execut
         "node_package",
     }:
         return "metadata_ready_needs_runner"
-    if runtime_status == "ready" and verifier_kind in {"local_http_health", "moonraker_fleet"}:
+    if runtime_status == "ready" and verifier_kind == "local_http_health":
+        return "service_web_health_runner"
+    if runtime_status == "ready" and verifier_kind == "moonraker_fleet":
         return "readonly_api_ready"
     if runtime_status == "ready" and verifier_kind == "source_inventory":
         return "source_reference_only"
@@ -2381,6 +2556,8 @@ def _required_verifier_family(launch_kind: str, verifier_kind: str, runner_statu
         return "cli_api_or_desktop_bridge_smoke"
     if runner_status == "metadata_ready_needs_runner":
         return "dry_run_worker_smoke"
+    if runner_status == "service_web_health_runner":
+        return "service_web_health_runner_contract"
     if runner_status == "readonly_api_ready":
         return "read_only_api_runner_contract"
     if runner_status == "source_reference_only":
@@ -3463,3 +3640,102 @@ def probe_modeler_import(module_id: str) -> dict[str, Any]:
         "proof_gate_version": probe_cfg.get("proof_gate_version") or "modeler-import-verifier-v1",
         "output_head": base_result.get("output_head") or [],
     }
+# Firmware source inventory probe (I7 — read-only, no flash/compile/serial)
+# ---------------------------------------------------------------------------
+
+#: Canonical source paths for each firmware module. These are reference-only
+#: checkouts; no build, compile, flash, or serial action may be performed here.
+#: Absolute safety constraints:
+#:   - NEVER call avrdude, dfu-util, openocd, esptool, or any flash utility.
+#:   - NEVER open serial ports or connect to MCU.
+#:   - NEVER invoke make, cmake, platformio, or any build toolchain.
+#:   - S1 (192.168.0.12): camera-only — no probe performed here.
+#:   - T1 / V400: source repos only — do NOT probe printer firmware.
+FIRMWARE_SOURCE_PATHS: dict[str, str] = {
+    "firmware_klipper": "G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
+    "marlin": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
+    "prusa_firmware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
+    "reprapfirmware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
+    "repetier_firmware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
+    "smoothieware": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
+}
+
+#: Runner contract row for every firmware module: source-reference-only status.
+#: These rows will never become agent_cli_ready — they exist for reference only.
+FIRMWARE_RUNNER_CONTRACT_TEMPLATE: dict[str, Any] = {
+    "runner_status": "source_reference_only",
+    "runner_family": "source_reference_only",
+    "agent_executable": False,
+    "mutation_allowed": False,
+    "proof_gate_version": "firmware-source-inventory-v1",
+}
+
+
+def _git_describe(source_path: str, *, timeout: int = 5) -> str | None:
+    """Run ``git describe --tags --always`` in *source_path* and return the tag.
+
+    Returns ``None`` when the path is not a git repo or the command fails.
+    This is a read-only probe — it NEVER modifies the repository.
+    """
+    if not os.path.isdir(source_path):
+        return None
+    try:
+        proc = subprocess.run(
+            ["git", "describe", "--tags", "--always"],
+            cwd=source_path,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    tag = (proc.stdout or "").strip()
+    return tag if tag else None
+
+
+def probe_firmware_source_inventory(module_id: str) -> dict[str, Any]:
+    """Return a read-only source-inventory result for a firmware module.
+
+    Probes only the source checkout on disk:
+    - Checks ``os.path.isdir(path)``
+    - Reads ``git describe --tags --always`` (read-only)
+    - Returns ``runner_status=source_reference_only``
+
+    ABSOLUTE CONSTRAINTS (enforced by this function):
+    - No flash commands (avrdude, dfu-util, openocd, esptool, etc.)
+    - No serial port connections
+    - No build / compile (make, cmake, platformio)
+    - S1 (192.168.0.12): not probed here
+    - T1 / V400: source repos only — printers not probed
+
+    Args:
+        module_id: One of the firmware module IDs registered in
+                   :data:`FIRMWARE_SOURCE_PATHS`.
+
+    Returns:
+        A dict with keys: ``module_id``, ``source_path``, ``source_found``,
+        ``version_tag``, ``runner_status``, ``runner_family``,
+        ``agent_executable``, ``mutation_allowed``, ``proof_gate_version``.
+    """
+    source_path = FIRMWARE_SOURCE_PATHS.get(module_id, "")
+    source_found = bool(source_path and os.path.isdir(source_path))
+    version_tag = _git_describe(source_path) if source_found else None
+    return {
+        "module_id": module_id,
+        "source_path": source_path,
+        "source_found": source_found,
+        "version_tag": version_tag,
+        **FIRMWARE_RUNNER_CONTRACT_TEMPLATE,
+    }
+
+
+def probe_all_firmware_sources() -> dict[str, dict[str, Any]]:
+    """Probe all registered firmware source paths and return a results dict.
+
+    Keys are module IDs; values are the output of
+    :func:`probe_firmware_source_inventory`.
+
+    This function is safe to call at any time — it is purely read-only.
+    """
+    return {mod_id: probe_firmware_source_inventory(mod_id) for mod_id in FIRMWARE_SOURCE_PATHS}

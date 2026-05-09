@@ -248,7 +248,16 @@ PROVIDER_TEAM_GROUPS = {
     **{team_id: (team_id,) for team_id in PROVIDER_TEAMS},
 }
 PROVIDER_DEFAULT_BASE_URLS = {
+    # DeepSeek: base URL https://api.deepseek.com, endpoint POST /chat/completions,
+    #   auth Authorization: Bearer <DEEPSEEK_API_KEY>, valid models: deepseek-v4-pro, deepseek-v4-flash.
+    #   If smoke returns HTTP 401: replace DEEPSEEK_API_KEY in G:\private\.env with a valid
+    #   key from https://platform.deepseek.com/api_keys — code and endpoint are correct.
     "deepseek": "https://api.deepseek.com",
+    # MiniMax: OpenAI-compatible base URL https://api.minimax.io/v1, endpoint POST /v1/chat/completions,
+    #   auth Authorization: Bearer <MINIMAX_API_KEY> (no GroupId needed for /v1 OpenAI-compat path),
+    #   valid models: MiniMax-M2.7, MiniMax-M2.7-highspeed, MiniMax-M2.5, MiniMax-M2.5-highspeed.
+    #   If smoke returns HTTP 401: replace MINIMAX_API_KEY in G:\private\.env with a valid
+    #   key from https://platform.minimax.io — code and endpoint are correct.
     "minimax": "https://api.minimax.io/v1",
 }
 
@@ -490,6 +499,105 @@ def code_sandbox_readiness() -> dict[str, Any]:
     }
 
 
+def opencode_openhands_sandbox_readiness() -> dict[str, Any]:
+    """Return the I3-spec sandbox readiness shape for OpenCode/OpenHands CLI runners.
+
+    Fields:
+    - opencode_detected: bool
+    - opencode_version: str | None
+    - openhands_detected: bool
+    - openhands_image: str | None  (Docker image name from private env, or None)
+    - sandbox_network_mode: always "none"
+    - denied_paths: list[str]
+    - ready: bool  (both CLI runners detected)
+    """
+    private_values = private_env()
+    opencode_status = _cli_runner_status("opencode")
+    openhands_status = _cli_runner_status("openhands")
+    # OpenHands may run via Docker image rather than a local bin; surface the configured image name.
+    openhands_image = env_value("HERMES3D_AGENT_SANDBOX_IMAGE", private_values).strip() or None
+    denied_paths = sorted([
+        ".git",
+        ".venv",
+        "G:/private",
+        "node_modules",
+        "03_implementation/proof",
+        "03_implementation/var",
+    ])
+    ready = bool(opencode_status["detected"] and openhands_status["detected"])
+    return {
+        "opencode_detected": bool(opencode_status["detected"]),
+        "opencode_version": opencode_status.get("version"),
+        "openhands_detected": bool(openhands_status["detected"]),
+        "openhands_image": openhands_image,
+        "sandbox_network_mode": "none",
+        "denied_paths": denied_paths,
+        "ready": ready,
+    }
+
+
+def preflight_code_cli_runner_get(*, runner_id: str) -> dict[str, Any]:
+    """Non-mutating dry-run preflight for a CLI runner (GET variant — no task claim required).
+
+    Runs <runner> --version (or equivalent) and returns stdout, exit_code, elapsed_ms.
+    Does not append MCP evidence (use the POST variant for evidence-tracked preflights).
+    """
+    runner = _validate_cli_runner_required(runner_id)
+    config = CLI_RUNNER_COMMANDS[runner]
+    exe, path_source, configured_path = _cli_runner_executable(config)
+    stdout: str | None = None
+    stderr_out: str | None = None
+    exit_code: int | None = None
+    elapsed_ms: float | None = None
+    if exe:
+        start = time.monotonic()
+        ran = False
+        for args in ([exe, "--version"], [exe, "version"]):
+            try:
+                result = subprocess.run(
+                    args,
+                    cwd=PROJECT_ROOT,
+                    capture_output=True,
+                    text=True,
+                    timeout=8,
+                    check=False,
+                )
+                elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+                stdout = (result.stdout or "").strip()[:512] or None
+                stderr_out = (result.stderr or "").strip()[:256] or None
+                exit_code = result.returncode
+                ran = True
+                break
+            except subprocess.TimeoutExpired:
+                elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+                stdout = None
+                stderr_out = "Timed out after 8 seconds."
+                exit_code = -1
+                ran = True
+                break
+            except OSError as exc:
+                elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+                stdout = None
+                stderr_out = str(exc)
+                exit_code = -1
+                ran = True
+                break
+        if not ran:
+            elapsed_ms = 0.0
+    return {
+        "runner_id": runner,
+        "label": config["label"],
+        "detected": bool(exe),
+        "executable": exe,
+        "path_source": path_source,
+        "stdout": stdout,
+        "stderr": stderr_out,
+        "exit_code": exit_code,
+        "elapsed_ms": elapsed_ms,
+        "ready": exit_code == 0 if exit_code is not None else False,
+    }
+
+
 def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> dict[str, Any]:
     _validate_owner(owner)
     _validate_task_id(task_id)
@@ -599,6 +707,68 @@ def folder_index_context(files: list[str]) -> dict[str, Any]:
         "target_roots": target_roots,
         "provider_context_files": provider_files,
         "required": base_docs,
+    }
+
+
+def list_e2e_jobs(limit: int = 100) -> dict[str, Any]:
+    """Return recent E2E code-loop job events recorded in proof_events.
+
+    Each entry reflects the final proof_event written per task_id by
+    run_agent_e2e_job (kind='code_e2e').  Status values:
+      - needs_reviewed_patch_proposal  — planning/review completed, patch apply next
+      - blocked                        — job was blocked at coding or review pass
+    """
+    safe_limit = max(1, min(int(limit), 500))
+    records = rows(
+        """
+        SELECT id, event_type, source_agent, payload, created_at
+        FROM proof_events
+        WHERE event_type LIKE 'code_e2e%' OR event_type LIKE 'code_patch%'
+           OR event_type LIKE 'code_git%'
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (safe_limit,),
+    )
+    jobs: list[dict[str, Any]] = []
+    seen_task_ids: set[str] = set()
+    for record in records:
+        raw_payload = record.get("payload") or "{}"
+        try:
+            payload = json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
+        except json.JSONDecodeError:
+            payload = {}
+        task_id = str(payload.get("task_id") or "")
+        status = str(payload.get("next_status") or payload.get("status") or "")
+        entry: dict[str, Any] = {
+            "proof_event_id": record["id"],
+            "event_type": record["event_type"],
+            "source_agent": record["source_agent"],
+            "task_id": task_id,
+            "title": str(payload.get("title") or ""),
+            "files": payload.get("files") or [],
+            "status": status,
+            "blocked_reasons": payload.get("blocked_reasons") or [],
+            "created_at": record["created_at"],
+        }
+        jobs.append(entry)
+        if task_id:
+            seen_task_ids.add(task_id)
+    return {
+        "status": "ready",
+        "workspace": str(PROJECT_ROOT),
+        "count": len(jobs),
+        "unique_task_ids": len(seen_task_ids),
+        "limit": safe_limit,
+        "jobs": jobs,
+        "state_legend": {
+            "needs_reviewed_patch_proposal": "Planning/review done — patch apply + git ship next",
+            "blocked": "Blocked at coding or review pass — check provider keys",
+            "code_patch.applied": "Patch applied to file under MCP lock",
+            "code_git.committed": "Files committed with proof evidence",
+            "code_git.pushed": "Branch pushed to origin",
+            "code_git.pr_opened": "Pull request opened",
+        },
     }
 
 

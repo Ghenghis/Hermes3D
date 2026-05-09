@@ -24,6 +24,16 @@ import type { IdleWorkbenchState } from "../types/learning";
 import type { Notification } from "../types/notification";
 import type { RuntimeIdentity } from "../types/system";
 
+type SandboxReadiness = {
+  opencode_detected: boolean;
+  opencode_version: string | null;
+  openhands_detected: boolean;
+  openhands_image: string | null;
+  sandbox_network_mode: string;
+  denied_paths: string[];
+  ready: boolean;
+};
+
 const AGENT_TONE: Record<Agent["status"], StatusTone> = {
   active: "green",
   idle: "muted",
@@ -132,6 +142,9 @@ export function AgentsTab() {
   const [cliRunnerMessage, setCliRunnerMessage] = useState("OpenHands/OpenCode can be detected now; write runs stay proof-gated.");
   const [cliRunnerPreflight, setCliRunnerPreflight] = useState<CodeCliRunnerPreflightResult | null>(null);
   const [cliRunnerRun, setCliRunnerRun] = useState<CodeCliRunnerRunResult | null>(null);
+  const [sandboxReadiness, setSandboxReadiness] = useState<SandboxReadiness | null>(null);
+  const [sandboxMessage, setSandboxMessage] = useState("Loading sandbox readiness.");
+  const [sandboxBusy, setSandboxBusy] = useState(false);
   const [providerSmokeBusy, setProviderSmokeBusy] = useState<"minimax" | "deepseek" | null>(null);
   const [providerSmokeResult, setProviderSmokeResult] = useState<ProviderSmokeResult | null>(null);
   const [providerSmokeMessage, setProviderSmokeMessage] = useState("Provider smoke calls use private env on the backend and store MCP evidence.");
@@ -203,6 +216,7 @@ export function AgentsTab() {
     let mounted = true;
     void refreshRuntimeIdentity(setRuntimeIdentity, setE2eMessage, () => mounted);
     void refreshAgentE2EReadiness(setE2eReadiness, setE2eMessage, () => mounted);
+    void refreshSandboxReadiness(setSandboxReadiness, setSandboxMessage, () => mounted);
     return () => {
       mounted = false;
     };
@@ -320,6 +334,42 @@ export function AgentsTab() {
                     {e2eReadiness?.cli_runners.sandbox?.blocked_reasons.slice(0, 3).map((reason) => <div key={reason}>- {reason}</div>)}
                   </div>
                 ) : null}
+              </div>
+              <div className="grid gap-1 rounded border border-border bg-bg/40 p-2" data-testid="sandbox-readiness-panel">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[10px] uppercase text-muted">Sandbox readiness</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={sandboxReadiness?.ready ? "text-[10px] uppercase text-accent-green" : "text-[10px] uppercase text-accent-amber"}>
+                      {sandboxReadiness === null ? "loading" : sandboxReadiness.ready ? "ready" : "blocked"}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={sandboxBusy}
+                      onClick={() => { setSandboxBusy(true); void refreshSandboxReadiness(setSandboxReadiness, setSandboxMessage).finally(() => setSandboxBusy(false)); }}
+                      className="rounded border border-border px-1.5 py-0.5 text-[10px] text-fg disabled:opacity-50"
+                    >
+                      {sandboxBusy ? "checking" : "Refresh"}
+                    </button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[10px]">
+                  <span className="text-muted">OpenCode</span>
+                  <span className={sandboxReadiness?.opencode_detected ? "text-accent-green" : "text-accent-amber"}>
+                    {sandboxReadiness === null ? "—" : sandboxReadiness.opencode_detected ? (sandboxReadiness.opencode_version ?? "detected") : "not detected"}
+                  </span>
+                  <span className="text-muted">OpenHands</span>
+                  <span className={sandboxReadiness?.openhands_detected ? "text-accent-green" : "text-accent-amber"}>
+                    {sandboxReadiness === null ? "—" : sandboxReadiness.openhands_detected ? (sandboxReadiness.openhands_image ?? "detected") : "not detected"}
+                  </span>
+                  <span className="text-muted">network</span>
+                  <span className="font-mono text-fg">{sandboxReadiness?.sandbox_network_mode ?? "—"}</span>
+                </div>
+                {sandboxReadiness && (sandboxReadiness.denied_paths.length > 0) && (
+                  <div className="mt-0.5 text-[10px] text-muted">
+                    denied: {sandboxReadiness.denied_paths.slice(0, 3).join(", ")}{sandboxReadiness.denied_paths.length > 3 ? ` +${sandboxReadiness.denied_paths.length - 3}` : ""}
+                  </div>
+                )}
+                <div className="text-[10px] text-muted">{sandboxMessage}</div>
               </div>
               <div className="grid gap-1 rounded border border-border bg-bg/40 p-2">
                 <div className="flex items-center justify-between gap-2">
@@ -888,6 +938,32 @@ async function runPlaywrightProof(
     setMessage(`Blocked: agents backend API is unreachable at ${LIVE_BASE_URL}.`);
   } finally {
     setBusy(false);
+  }
+}
+
+async function refreshSandboxReadiness(
+  setReadiness: (readiness: SandboxReadiness | null) => void,
+  setMessage: (message: string) => void,
+  isMounted: () => boolean = () => true,
+) {
+  try {
+    const response = await fetch(`${LIVE_BASE_URL}/api/code-operator/sandbox/readiness`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json() as SandboxReadiness;
+    if (!isMounted()) return;
+    setReadiness(data);
+    const oc = data.opencode_detected ? "OpenCode detected" : "OpenCode missing";
+    const oh = data.openhands_detected ? "OpenHands detected" : "OpenHands missing";
+    setMessage(`${oc} · ${oh}.`);
+  } catch (error) {
+    if (!isMounted()) return;
+    setReadiness(null);
+    setMessage(`Sandbox readiness unavailable: ${error instanceof Error ? error.message : "backend error"}`);
   }
 }
 
