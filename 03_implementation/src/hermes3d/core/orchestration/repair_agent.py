@@ -179,8 +179,11 @@ class RepairAgent:
             from hermes3d.core.llm.providers import extract_json
 
             suggestion = extract_json(getattr(result, "text", "")) or suggestion
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log suggestion extraction failure
+            log.debug(
+                "repair_agent.extract_json fallback: %s: %s",
+                type(exc).__name__, exc,
+            )
         return RepairResult(
             outcome="fixed",
             strategy_used="llm_suggestion",

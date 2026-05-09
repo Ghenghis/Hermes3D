@@ -267,8 +267,15 @@ def update_center() -> dict[str, Any]:
                 as_json({"updater_status": velopack["status"], "providers": provider_summary}),
             ),
         )
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log the proof-event insert fallback
+        try:
+            import logging
+            logging.getLogger(__name__).warning(
+                "update_center.read: proof_events insert failed: %s: %s",
+                type(exc).__name__, exc,
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     return payload
 
