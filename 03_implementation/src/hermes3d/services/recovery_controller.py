@@ -207,6 +207,10 @@ class RecoveryRun:
     terminal_status: str | None = None  # one of code_history.RECOVERY_OUTCOME_STATUSES
     cancelled_reason: str | None = None
     history: list[dict[str, Any]] = field(default_factory=list)
+    # Commit 2 additions (saga step 2: freeze + snapshot).
+    locked_files: tuple[str, ...] = ()
+    pre_snapshot_ids: tuple[str, ...] = ()
+    freeze_event_utc: str = ""
 
     def to_state_payload(self) -> dict[str, Any]:
         """Render the public state payload (used by /state route in commit 2)."""
@@ -233,6 +237,9 @@ class RecoveryRun:
             "cancelled_reason": self.cancelled_reason,
             "is_terminal": self.state.is_terminal,
             "is_cancellable": self.state.is_cancellable,
+            "locked_files": list(self.locked_files),
+            "pre_snapshot_ids": list(self.pre_snapshot_ids),
+            "freeze_event_utc": self.freeze_event_utc,
             "next_action": _describe_next_action(self.state, self.branch),
         }
 
@@ -630,6 +637,177 @@ def _reset_registry_for_tests() -> None:
         _OPEN_BY_FINGERPRINT.clear()
 
 
+# ---------------------------------------------------------------------------
+# Commit 2: saga step 2 — freeze + snapshot before any provider work.
+# ---------------------------------------------------------------------------
+
+
+def freeze_run(
+    *,
+    attempt_id: str,
+    owner: str,
+    files: tuple[str, ...],
+) -> dict[str, Any]:
+    """Acquire MCP file locks + take pre-recovery snapshots for a CREATED run.
+
+    Saga step 2. Composes ``code_history.lock_mcp_files`` and
+    ``code_history.snapshot_file`` over the v1 ledger primitives so the
+    proposing/applying steps run against a frozen file set with audit
+    snapshots.
+
+    Ordering (Temporal-style with compensation):
+      1. Validate run exists and is in CREATED.
+      2. Refuse if branch == ESCALATE_IMMEDIATELY (already terminal).
+      3. lock_mcp_files (TTL 30 min). On non-locked status: leave run in
+         CREATED, return ``status="lock_blocked"``.
+      4. For each file: snapshot_file. If ANY raises -> COMPENSATE:
+         release_mcp_files for the same set, mark_recovery_outcome
+         ("retry_failed"), _transition CREATED -> RETRY_FAILED.
+      5. Persist (locked_files, pre_snapshot_ids) on the run.
+      6. _transition CREATED -> PROPOSING.
+
+    Returns dict with key ``status`` in {"frozen", "lock_blocked",
+    "snapshot_failed", "not_in_created", "unknown_attempt",
+    "hard_escalate_terminal"}.
+    """
+    with _REGISTRY_LOCK:
+        run = _RUNS.get(attempt_id)
+        if run is None:
+            return {"status": "unknown_attempt", "attempt_id": attempt_id}
+        if run.branch == RecoveryBranch.ESCALATE_IMMEDIATELY:
+            raise ValueError(
+                "freeze_run: hard-escalate branch is already terminal; cannot freeze."
+            )
+        if run.state != RecoveryState.CREATED:
+            return {
+                "status": "not_in_created",
+                "attempt_id": attempt_id,
+                "current_state": run.state.value,
+            }
+    # File-validation: keep the call list minimal (1..32 files).
+    if not files or len(files) > 32:
+        raise ValueError("freeze_run: 'files' must be 1..32 entries.")
+    file_list = list(files)
+    lock_result = code_history.lock_mcp_files(
+        owner=owner,
+        files=file_list,
+        task_id=run.spec.task_id,
+        reason=f"recovery-freeze:{attempt_id[:8]}",
+        role="agent",
+        ttl_minutes=30,
+    )
+    if lock_result.get("status") != "locked":
+        # Compensation NOT needed: nothing was acquired. Run stays CREATED;
+        # caller can retry with backoff.
+        return {
+            "status": "lock_blocked",
+            "attempt_id": attempt_id,
+            "lock_result": lock_result,
+        }
+    # Snapshots phase. If any raises, release locks + record retry_failed.
+    snapshots: list[dict[str, Any]] = []
+    try:
+        for rel in file_list:
+            snap = code_history.snapshot_file(
+                rel,
+                agent_id=owner,
+                action_id="recovery.freeze.pre",
+                reason=f"RC v2 freeze {attempt_id[:8]}",
+            )
+            snapshots.append(snap)
+    except Exception as exc:  # noqa: BLE001 -- saga compensation
+        # COMPENSATE: release whatever locks we acquired, write a v1
+        # outcome row, transition the run to RETRY_FAILED.
+        try:
+            code_history.release_mcp_files(
+                owner=owner,
+                files=file_list,
+                note=f"recovery-freeze rollback: snapshot failed for {attempt_id[:8]}",
+            )
+        except Exception:  # noqa: BLE001 -- best-effort during teardown
+            pass
+        _compensate_freeze_failure(run, owner, exc)
+        return {
+            "status": "snapshot_failed",
+            "attempt_id": attempt_id,
+            "lock_result": lock_result,
+            "error": type(exc).__name__,
+        }
+    # Persist + transition.
+    snap_ids = tuple(str(s.get("id", "")) for s in snapshots)
+    with _REGISTRY_LOCK:
+        run.locked_files = tuple(file_list)
+        run.pre_snapshot_ids = snap_ids
+        run.freeze_event_utc = code_history.utc_now()
+        _transition(
+            run,
+            new_state=RecoveryState.PROPOSING,
+            note=f"frozen: {len(file_list)} files locked, {len(snap_ids)} snapshots taken",
+        )
+    return {
+        "status": "frozen",
+        "attempt_id": attempt_id,
+        "run": run.to_state_payload(),
+        "lock_result": lock_result,
+        "snapshots": [{"id": s.get("id"), "ts_utc": s.get("ts_utc")} for s in snapshots],
+    }
+
+
+def thaw_run(*, attempt_id: str, owner: str, note: str = "") -> dict[str, Any]:
+    """Compensation: release locks if a run terminates pre-apply.
+
+    Idempotent: repeated calls return ``status="already_thawed"``.
+    Snapshots are NOT touched (kept as audit trail).
+    """
+    with _REGISTRY_LOCK:
+        run = _RUNS.get(attempt_id)
+        if run is None:
+            return {"status": "unknown_attempt", "attempt_id": attempt_id}
+        if not run.locked_files:
+            return {"status": "already_thawed", "attempt_id": attempt_id}
+        files_to_release = list(run.locked_files)
+    try:
+        result = code_history.release_mcp_files(
+            owner=owner,
+            files=files_to_release,
+            note=note or f"recovery-thaw {attempt_id[:8]}",
+        )
+    except Exception as exc:  # noqa: BLE001 -- best-effort
+        return {
+            "status": "release_failed",
+            "attempt_id": attempt_id,
+            "error": type(exc).__name__,
+        }
+    with _REGISTRY_LOCK:
+        run.locked_files = ()
+    return {"status": "thawed", "attempt_id": attempt_id, "release_result": result}
+
+
+def _compensate_freeze_failure(run: RecoveryRun, owner: str, exc: Exception) -> None:
+    """Write the v1 outcome row + transition the run to RETRY_FAILED.
+
+    Used by ``freeze_run`` when ``snapshot_file`` raises after
+    ``lock_mcp_files`` already succeeded. Caller has already released the
+    file locks.
+    """
+    try:
+        code_history.mark_recovery_outcome(
+            owner=owner,
+            attempt_id=run.attempt_id,
+            status="retry_failed",
+            recovery_summary=f"snapshot_failed: {type(exc).__name__}: {str(exc)[:200]}",
+        )
+    except Exception:  # noqa: BLE001 -- best-effort during teardown
+        pass
+    with _REGISTRY_LOCK:
+        _transition(
+            run,
+            new_state=RecoveryState.RETRY_FAILED,
+            note=f"freeze compensated: {type(exc).__name__}",
+            terminal_status="retry_failed",
+        )
+
+
 __all__ = [
     "RecoveryState",
     "RecoveryBranch",
@@ -640,4 +818,6 @@ __all__ = [
     "get_run_state",
     "cancel_run",
     "list_active_runs",
+    "freeze_run",
+    "thaw_run",
 ]
