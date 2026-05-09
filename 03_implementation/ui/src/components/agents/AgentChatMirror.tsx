@@ -187,7 +187,10 @@ export function AgentChatMirror() {
         signal: controller.signal,
       });
       if (!response.ok || !response.body) {
-        setStatus(`Agent chat blocked: HTTP ${response.status}.`);
+        // Extract the actual blocked reason from the response body (e.g. HTTP 401 from MiniMax/DeepSeek shows real reason)
+        const errPayload: unknown = await response.json().catch(() => null);
+        const errReason = agentBlockedReason(errPayload, response.status, response.statusText);
+        setStatus(`Agent chat blocked: ${errReason}`);
         return;
       }
       const localUserMessage: AgentMessage = {
@@ -509,6 +512,17 @@ export function AgentChatMirror() {
         </select>
 
         <div className="min-h-[5rem] overflow-auto rounded border border-border bg-surface/70 p-1.5 text-[10px]">
+          {/* Provider blocked banner: shown when chat is blocked due to 401/unavailable agent */}
+          {agents.length === 0 && (
+            <div className="mb-1.5 rounded border border-accent-amber/40 bg-accent-amber/10 px-2 py-1.5 text-accent-amber">
+              <div className="font-semibold uppercase">Providers blocked</div>
+              <div className="mt-0.5 text-muted">
+                {status.toLowerCase().includes("blocked") || status.toLowerCase().includes("unreachable")
+                  ? status
+                  : "Agent roster is empty. Configure provider API keys in G:\\private\\.env to enable chat."}
+              </div>
+            </div>
+          )}
           {history.slice(-8).map((message) => (
             <div key={message.id} className={`mb-1 rounded px-1.5 py-1 ${message.role === "user" ? "bg-blue-950/40 text-blue-100" : "bg-surface2 text-fg"}`}>
               <div className="mb-0.5 uppercase text-muted">{message.role}</div>
@@ -537,7 +551,7 @@ export function AgentChatMirror() {
               )}
             </div>
           ))}
-          {history.length === 0 && <div className="flex h-full items-center justify-center text-center text-muted">No conversation history from the selected agent.</div>}
+          {history.length === 0 && agents.length > 0 && <div className="flex h-full items-center justify-center text-center text-muted">No conversation history from the selected agent.</div>}
         </div>
 
         <div className="grid gap-1">
@@ -852,4 +866,33 @@ function nextHeight(height: "compact" | "normal" | "tall"): "compact" | "normal"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Extracts a human-readable blocked reason from a failed chat response payload.
+ * Shows the real provider error (e.g. HTTP 401 from MiniMax or DeepSeek) rather
+ * than just the HTTP status code.
+ */
+function agentBlockedReason(payload: unknown, status: number, statusText: string): string {
+  if (isRecord(payload)) {
+    // FastAPI detail field — may be string or object
+    if (typeof payload.detail === "string" && payload.detail.length > 0) {
+      return `${payload.detail} (HTTP ${status})`;
+    }
+    if (isRecord(payload.detail)) {
+      const reason = payload.detail.reason ?? payload.detail.status ?? payload.detail.message;
+      if (typeof reason === "string" && reason.length > 0) {
+        return `${reason} (HTTP ${status})`;
+      }
+    }
+    const reason = payload.reason ?? payload.error ?? payload.message ?? payload.status;
+    if (typeof reason === "string" && reason.length > 0) {
+      return `${reason} (HTTP ${status})`;
+    }
+    // Provider-specific: 401 typically means API key blocked
+    if (status === 401) {
+      return `Provider API key is not configured or was rejected (HTTP 401). Check G:\\private\\.env for the agent's provider credentials.`;
+    }
+  }
+  return `HTTP ${status}${statusText ? ` ${statusText}` : ""}.`;
 }

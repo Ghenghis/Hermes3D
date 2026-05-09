@@ -1,4 +1,4 @@
-import { ChevronRight, Clock, Mic, MicOff, Pause, Play, RefreshCw, Save, Settings, Shield, Square, Volume2 } from "lucide-react";
+import { ChevronRight, Clock, Mic, MicOff, Pause, Play, RefreshCw, Save, Settings, Shield, Square, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { adapters } from "../api/adapters";
 import { ResizablePane } from "../components/layout/ResizablePane";
@@ -45,6 +45,7 @@ export function VoiceTab() {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
   const [activeTab, setActiveTab] = useState<TabName>("browser");
 
   // Transcript history state
@@ -127,9 +128,15 @@ export function VoiceTab() {
     try {
       const result = await adapters.previewVoice(selectedAgent.id, voice, previewText, rate, pitch);
       if (result.accepted && result.audioBase64 && result.mimeType) {
-        const audio = new Audio(`data:${result.mimeType};base64,${result.audioBase64}`);
-        await audio.play().catch(() => undefined);
-        setMessage(`Playing Azure preview for ${voice} (${result.bytes ?? 0} bytes).`);
+        // Text transcript always set (mute cannot suppress the text display)
+        const textSummary = `Azure TTS preview: "${previewText.slice(0, 80)}${previewText.length > 80 ? "…" : ""}" — voice ${voice} (${result.bytes ?? 0} bytes)`;
+        if (muted) {
+          setMessage(`Muted — audio suppressed. ${textSummary}`);
+        } else {
+          const audio = new Audio(`data:${result.mimeType};base64,${result.audioBase64}`);
+          await audio.play().catch(() => undefined);
+          setMessage(`Playing Azure preview for ${voice} (${result.bytes ?? 0} bytes).`);
+        }
       } else {
         setMessage(`Blocked: ${result.reason ?? result.status}.`);
       }
@@ -387,7 +394,7 @@ export function VoiceTab() {
                 </label>
                 <RangeControl label={`Rate: ${rate.toFixed(1)}x`} min={0.5} max={2} step={0.1} value={rate} onChange={setRate} />
                 <RangeControl label={`Pitch: ${pitch}%`} min={-50} max={50} step={1} value={pitch} onChange={setPitch} />
-                <div className="mt-auto grid grid-cols-2 gap-2">
+                <div className="mt-auto grid grid-cols-[1fr_1fr_auto] gap-2">
                   <button
                     type="button"
                     disabled={!selectedAgent || selectedVoiceId === "" || saving}
@@ -406,6 +413,17 @@ export function VoiceTab() {
                   >
                     <Play size={13} />
                     {previewing ? "Loading" : "Preview"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMuted((current) => !current)}
+                    title={muted ? "Audio muted — click to unmute. Text is always shown." : "Click to mute audio. Text transcript is always visible."}
+                    className={[
+                      "inline-flex items-center justify-center rounded border px-2 py-1.5",
+                      muted ? "border-accent-amber/60 bg-accent-amber/10 text-accent-amber" : "border-border text-muted hover:text-fg",
+                    ].join(" ")}
+                  >
+                    {muted ? <VolumeX size={13} /> : <Volume2 size={13} />}
                   </button>
                 </div>
                 {message && <div className="rounded border border-border bg-surface p-2 text-[11px] text-muted">{message}</div>}
@@ -542,20 +560,38 @@ export function VoiceTab() {
                     )}
                     {/* Agent voice playback — backend-proxied, no direct device access */}
                     <div className="mt-auto rounded border border-border bg-surface p-2">
-                      <div className="mb-2 text-[10px] font-semibold text-muted uppercase tracking-wide">Agent Voice Playback</div>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <div className="text-[10px] font-semibold text-muted uppercase tracking-wide">Agent Voice Playback</div>
+                        <button
+                          type="button"
+                          onClick={() => setMuted((current) => !current)}
+                          title={muted ? "Audio muted — text always visible. Click to unmute." : "Mute audio. Text transcript stays visible."}
+                          className={[
+                            "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px]",
+                            muted ? "border-accent-amber/60 bg-accent-amber/10 text-accent-amber" : "border-border text-muted hover:text-fg",
+                          ].join(" ")}
+                        >
+                          {muted ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                          {muted ? "Muted" : "Sound on"}
+                        </button>
+                      </div>
                       <p className="mb-2 text-[10px] text-muted">
                         Audio is fetched from the local backend. No API keys are exposed to the browser.
+                        {muted ? " Muted — audio is suppressed but text transcript is always shown." : ""}
                       </p>
                       <div className="flex gap-2">
                         <button
                           type="button"
-                          disabled={playbackState === "loading"}
-                          onClick={() => playRecording(selectedTranscript.proofEventId)}
+                          disabled={playbackState === "loading" || muted}
+                          onClick={() => !muted && playRecording(selectedTranscript.proofEventId)}
+                          title={muted ? "Unmute to play audio. Text is always visible above." : undefined}
                           className={[
                             "inline-flex flex-1 items-center justify-center gap-1.5 rounded px-2 py-1.5 text-xs font-medium",
-                            playbackState === "playing" && playbackRecordingId === selectedTranscript.proofEventId
-                              ? "bg-accent-amber/20 text-accent-amber border border-accent-amber/40"
-                              : "bg-accent-cyan/90 text-bg disabled:opacity-50 disabled:cursor-not-allowed",
+                            muted
+                              ? "border border-border text-muted cursor-not-allowed opacity-50"
+                              : playbackState === "playing" && playbackRecordingId === selectedTranscript.proofEventId
+                                ? "bg-accent-amber/20 text-accent-amber border border-accent-amber/40"
+                                : "bg-accent-cyan/90 text-bg disabled:opacity-50 disabled:cursor-not-allowed",
                           ].join(" ")}
                         >
                           {playbackState === "loading" && playbackRecordingId === selectedTranscript.proofEventId ? (
@@ -564,6 +600,8 @@ export function VoiceTab() {
                             <><Pause size={12} /> Pause</>
                           ) : playbackState === "paused" && playbackRecordingId === selectedTranscript.proofEventId ? (
                             <><Play size={12} /> Resume</>
+                          ) : muted ? (
+                            <><VolumeX size={12} /> Audio muted</>
                           ) : (
                             <><Play size={12} /> Play Recording</>
                           )}
