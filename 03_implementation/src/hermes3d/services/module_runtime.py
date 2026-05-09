@@ -3241,6 +3241,405 @@ def _head_lines(value: str | list[str], *, max_lines: int = 25, max_chars: int =
 
 
 # ---------------------------------------------------------------------------
+# I5: Slicer / modeler probe functions
+#
+# These functions provide non-mutating CLI detection (--version / --help only)
+# and Python import probes for all slicer and modeler rows in Source OS.
+# No STL files are sent. No firmware is flashed. No printer is connected.
+# ---------------------------------------------------------------------------
+
+#: Slicer module IDs that have a CLI executable on disk (not desktop-only launchers).
+#: Used by probe_slicer_cli() and the test suite to enumerate expected entries.
+SLICER_MODULE_IDS: frozenset[str] = frozenset(
+    {
+        "prusaslicer",
+        "orcaslicer",
+        "flsun_slicer",
+        "curaengine",
+        "superslicer",
+        "slic3r",
+        "bambustudio",
+    }
+)
+
+#: Modeler module IDs whose runtime proof is a Python import or a CLI on PATH.
+#: Includes CLI modelers (blender, openscad, freecad) and Python-import modelers.
+#: truck is a Rust library with source_inventory probe only — not in this set.
+MODELER_PYTHON_IMPORT_IDS: frozenset[str] = frozenset(
+    {
+        "blender",
+        "openscad",
+        "freecad",
+        "trimesh",
+        "cadquery",
+        "build123d",
+        "numpy_stl",
+        "open3d",
+        "meshlab",
+    }
+)
+
+#: Modeler module IDs whose proof is a source inventory scan only (no CLI or import).
+MODELER_SOURCE_INVENTORY_IDS: frozenset[str] = frozenset({"truck"})
+
+# Alternative install paths searched after the canonical BUILTIN_RUNTIME_PROBES path.
+# Keys are module_id; values are lists of additional absolute paths to check.
+_SLICER_ALT_PATHS: dict[str, list[str]] = {
+    "prusaslicer": [
+        "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
+        "C:/Program Files (x86)/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
+    ],
+    "orcaslicer": [
+        "C:/Program Files/OrcaSlicer/OrcaSlicer.exe",
+        "C:/Program Files (x86)/OrcaSlicer/orca-slicer.exe",
+    ],
+    "flsun_slicer": [
+        "C:/FlsunSlicer2.0/FlsunSlicer.exe",
+        "C:/Program Files/FlsunSlicer/FlsunSlicer.exe",
+    ],
+    "curaengine": [
+        "C:/Program Files/Ultimaker Cura 4.13.1/CuraEngine.exe",
+        "C:/Program Files/UltiMaker Cura/CuraEngine.exe",
+    ],
+    "superslicer": [
+        "C:/Program Files/SuperSlicer/SuperSlicer.exe",
+        "C:/Program Files (x86)/SuperSlicer/superslicer-console.exe",
+    ],
+    "slic3r": [
+        "C:/Program Files/Slic3r/slic3r.exe",
+        "C:/Program Files (x86)/Slic3r/slic3r-console.exe",
+    ],
+    "bambustudio": [
+        "C:/Program Files/Bambu Lab/Bambu Studio/bambu-studio.exe",
+        "C:/Program Files (x86)/Bambu Studio/bambu-studio.exe",
+    ],
+    "blender": [
+        "C:/Program Files/Blender Foundation/Blender 4.4/blender.exe",
+        "C:/Program Files/Blender Foundation/Blender 4.3/blender.exe",
+        "C:/Program Files/Blender Foundation/Blender 4.2/blender.exe",
+        "C:/Program Files/Blender Foundation/Blender 4.1/blender.exe",
+        "C:/Program Files/Blender Foundation/Blender 4.0/blender.exe",
+        "C:/Program Files/Blender Foundation/Blender/blender.exe",
+    ],
+    "openscad": [
+        "C:/Program Files (x86)/OpenSCAD/openscad.exe",
+        "C:/Program Files/OpenSCAD (Nightly)/openscad.exe",
+    ],
+    "freecad": [
+        "C:/Program Files/FreeCAD 1.0/bin/FreeCADCmd.exe",
+        "C:/Program Files/FreeCAD 0.21/bin/FreeCADCmd.exe",
+        "C:/Program Files (x86)/FreeCAD 0.21/bin/FreeCADCmd.exe",
+        "C:/Program Files/FreeCAD/bin/FreeCADCmd.exe",
+        "C:/Program Files/FreeCAD 0.20/bin/FreeCADCmd.exe",
+    ],
+}
+
+# PATH command names to try via shutil.which() for each slicer module.
+_SLICER_PATH_COMMANDS: dict[str, list[str]] = {
+    "prusaslicer": ["prusa-slicer", "prusa-slicer-console", "PrusaSlicer"],
+    "orcaslicer": ["orca-slicer", "OrcaSlicer", "orcaslicer"],
+    "flsun_slicer": ["FlsunSlicer", "flsun-slicer", "flusn-slicer"],
+    "curaengine": ["CuraEngine", "curaengine"],
+    "superslicer": ["superslicer", "superslicer-console", "SuperSlicer"],
+    "slic3r": ["slic3r", "slic3r-console", "Slic3r"],
+    "bambustudio": ["bambu-studio", "BambuStudio"],
+    "blender": ["blender"],
+    "openscad": ["openscad", "OpenSCAD"],
+    "freecad": ["freecadcmd", "FreeCADCmd", "freecad"],
+}
+
+# Slicers whose --version exit code may be non-zero even when successful;
+# for these, file presence + any output is sufficient to mark detected=True.
+_SLICER_NONZERO_VERSION_OK: frozenset[str] = frozenset(
+    {"prusaslicer", "orcaslicer", "bambustudio", "flsun_slicer", "superslicer"}
+)
+
+
+def _find_slicer_executable(module_id: str) -> tuple[str | None, str]:
+    """Search for a slicer/modeler executable.
+
+    Returns (found_path_str, blocked_reason).  If found, blocked_reason is "".
+    Searches in order: canonical BUILTIN_RUNTIME_PROBES path → alt paths → PATH.
+    """
+    probe_cfg = BUILTIN_RUNTIME_PROBES.get(module_id)
+    canonical = str(probe_cfg.get("path") or "") if probe_cfg else ""
+    alt_paths = _SLICER_ALT_PATHS.get(module_id, [])
+    path_cmds = _SLICER_PATH_COMMANDS.get(module_id, [])
+
+    tried: list[str] = []
+    for candidate in [canonical, *alt_paths]:
+        if not candidate:
+            continue
+        tried.append(candidate)
+        if Path(candidate).is_file():
+            return candidate, ""
+
+    for cmd in path_cmds:
+        which_result = shutil.which(cmd)
+        if which_result:
+            return which_result, ""
+        tried.append(f"PATH:{cmd}")
+
+    if path_cmds:
+        cmd_list = ", ".join(path_cmds)
+        not_on_path = f"not on PATH ({cmd_list})"
+    else:
+        not_on_path = "no PATH commands registered"
+    tried_str = "; ".join(tried) if tried else "no paths configured"
+    return None, (
+        f"{probe_cfg.get('label', module_id) if probe_cfg else module_id} executable not found. "
+        f"Tried: {tried_str}; {not_on_path}"
+    )
+
+
+def probe_slicer_cli(module_id: str) -> dict[str, Any]:
+    """Non-mutating probe for a slicer CLI row.
+
+    Detects the executable via canonical path, alt paths, and PATH search.
+    Runs ``--version`` (or ``help`` for CuraEngine) with a 10-second timeout.
+    Never sends an STL file, connects to a printer, or flashes firmware.
+
+    Returns a probe dict with at minimum:
+    - status: "ready" | "blocked" | "setup_required"
+    - kind: "slicer_cli"
+    - verifier: human-readable label
+    - path: path that was found (or canonical path if not found)
+    - detected: bool
+    - executed: bool
+    - return_code: int | None
+    - capabilities: list[str]
+    - blocked_reason: str | None
+    - proof_gate_version: str
+    """
+    probe_cfg = BUILTIN_RUNTIME_PROBES.get(module_id)
+    has_alt_config = module_id in _SLICER_ALT_PATHS or module_id in _SLICER_PATH_COMMANDS
+    if probe_cfg is None and not has_alt_config:
+        return {
+            "status": "blocked",
+            "kind": "slicer_cli",
+            "verifier": module_id,
+            "path": "",
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": [],
+            "blocked_reason": (
+                f"No slicer probe configuration found for '{module_id}'. "
+                "Register a BUILTIN_RUNTIME_PROBES entry to enable this verifier."
+            ),
+            "proof_gate_version": "slicer-cli-verifier-v1",
+            "output_head": [],
+        }
+
+    found_path, blocked_reason = _find_slicer_executable(module_id)
+    label = probe_cfg.get("label", module_id) if probe_cfg else module_id
+    canonical_path = str(probe_cfg.get("path") or "") if probe_cfg else ""
+    capabilities: list[str] = list(probe_cfg.get("capabilities") or []) if probe_cfg else []
+
+    if not found_path:
+        return {
+            "status": "blocked",
+            "kind": "slicer_cli",
+            "verifier": label,
+            "path": canonical_path,
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": capabilities,
+            "blocked_reason": blocked_reason,
+            "proof_gate_version": "slicer-cli-verifier-v1",
+            "output_head": [],
+        }
+
+    # Determine version/help args — CuraEngine uses 'help', others use '--version'
+    version_args: list[str]
+    if module_id == "curaengine":
+        version_args = ["help"]
+    elif probe_cfg and probe_cfg.get("execute") is False:
+        # desktop_app kind — do not execute, just confirm path exists
+        return {
+            "status": "ready",
+            "kind": "slicer_cli",
+            "verifier": label,
+            "path": found_path,
+            "detected": True,
+            "executed": False,
+            "return_code": 0,
+            "capabilities": capabilities,
+            "blocked_reason": None,
+            "proof_gate_version": probe_cfg.get("proof_gate_version") or "slicer-cli-verifier-v1",
+            "output_head": [f"executable detected at {found_path}"],
+        }
+    else:
+        version_args = ["--version"]
+
+    try:
+        proc = subprocess.run(
+            [found_path, *version_args],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (subprocess.TimeoutExpired, OSError, FileNotFoundError) as exc:
+        return {
+            "status": "blocked",
+            "kind": "slicer_cli",
+            "verifier": label,
+            "path": found_path,
+            "detected": True,
+            "executed": True,
+            "return_code": None,
+            "capabilities": capabilities,
+            "blocked_reason": (
+                f"{label} was detected at {found_path} but failed to run "
+                f"--version: {exc}"
+            ),
+            "proof_gate_version": "slicer-cli-verifier-v1",
+            "output_head": [],
+        }
+
+    combined_output = _redact_text(
+        (proc.stdout or "")
+        + ("\n" if proc.stdout and proc.stderr else "")
+        + (proc.stderr or "")
+    )
+    output_head = _head_lines(combined_output)
+
+    # Some slicers (PrusaSlicer, OrcaSlicer, BambuStudio, FLSUN) exit non-zero
+    # for --version but still emit version text.  For those, file presence +
+    # any output is sufficient to mark the probe ready.
+    nonzero_ok = module_id in _SLICER_NONZERO_VERSION_OK
+    is_ready = proc.returncode == 0 or (nonzero_ok and bool(combined_output.strip()))
+
+    return {
+        "status": "ready" if is_ready else "setup_required",
+        "kind": "slicer_cli",
+        "verifier": label,
+        "path": found_path,
+        "detected": True,
+        "executed": True,
+        "return_code": proc.returncode,
+        "capabilities": capabilities,
+        "blocked_reason": None
+        if is_ready
+        else (
+            f"{label} ran at {found_path} but --version returned rc={proc.returncode} "
+            f"with no usable output."
+        ),
+        "proof_gate_version": probe_cfg.get("proof_gate_version") if probe_cfg else "slicer-cli-verifier-v1",
+        "output_head": output_head,
+    }
+
+
+def probe_modeler_import(module_id: str) -> dict[str, Any]:
+    """Non-mutating probe for a modeler row.
+
+    For CLI modelers (blender, openscad, freecad): searches PATH and standard
+    install paths, then runs ``--version`` with a 10-second timeout.
+
+    For Python-import modelers (trimesh, cadquery, build123d, numpy_stl,
+    open3d, meshlab, truck): runs ``python -c 'import <module>'`` in a
+    subprocess; the parent process is never mutated.
+
+    Never sends an STL file, connects to a printer, or flashes firmware.
+
+    Returns a probe dict with the same field contract as probe_slicer_cli().
+    """
+    # CLI-based modelers delegate to probe_slicer_cli
+    cli_modelers = {"blender", "openscad", "freecad"}
+    if module_id in cli_modelers:
+        result = probe_slicer_cli(module_id)
+        # Normalise kind for downstream consumers
+        return {**result, "kind": "slicer_cli"}
+
+    # Source-inventory-only modelers (e.g. truck — Rust library, no Python import)
+    if module_id in MODELER_SOURCE_INVENTORY_IDS:
+        probe_cfg = BUILTIN_RUNTIME_PROBES.get(module_id)
+        label = probe_cfg.get("label", module_id) if probe_cfg else module_id
+        capabilities = list(probe_cfg.get("capabilities") or []) if probe_cfg else []
+        return {
+            "status": "blocked",
+            "kind": "modeler_import",
+            "verifier": label,
+            "path": "",
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": capabilities,
+            "blocked_reason": (
+                f"{label} is a source-inventory-only module. "
+                "No Python import or CLI runner is registered. "
+                "Add a bounded adapter or CLI bridge to enable agent execution."
+            ),
+            "proof_gate_version": "modeler-import-verifier-v1",
+            "output_head": [],
+        }
+
+    probe_cfg = BUILTIN_RUNTIME_PROBES.get(module_id)
+    if probe_cfg is None:
+        return {
+            "status": "blocked",
+            "kind": "modeler_import",
+            "verifier": module_id,
+            "path": sys.executable,
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": [],
+            "blocked_reason": (
+                f"No modeler probe configuration found for '{module_id}'. "
+                "Register a BUILTIN_RUNTIME_PROBES entry to enable this verifier."
+            ),
+            "proof_gate_version": "modeler-import-verifier-v1",
+            "output_head": [],
+        }
+
+    # For Python-import modelers, delegate to _python_import_probe which
+    # runs the import in a fresh subprocess — safe and non-mutating.
+    # Only valid for probes with kind == "python_import".
+    if probe_cfg.get("kind") != "python_import":
+        return {
+            "status": "blocked",
+            "kind": "modeler_import",
+            "verifier": probe_cfg.get("label", module_id),
+            "path": sys.executable,
+            "detected": False,
+            "executed": False,
+            "return_code": None,
+            "capabilities": list(probe_cfg.get("capabilities") or []),
+            "blocked_reason": (
+                f"{probe_cfg.get('label', module_id)} has probe kind "
+                f"'{probe_cfg.get('kind')}' — not a Python import modeler. "
+                "Register a python_import probe to enable this verifier."
+            ),
+            "proof_gate_version": "modeler-import-verifier-v1",
+            "output_head": [],
+        }
+
+    base_result = _python_import_probe(probe_cfg)
+
+    # Map _python_import_probe fields to our contract
+    is_ready = base_result.get("status") == "ready"
+    reason = base_result.get("reason") or None
+    module_name = str((probe_cfg.get("args") or [""])[0] or "")
+    return {
+        "status": base_result.get("status", "blocked"),
+        "kind": "modeler_import",
+        "verifier": probe_cfg.get("label", module_id),
+        "path": sys.executable,
+        "detected": bool(base_result.get("detected", True)),
+        "executed": bool(base_result.get("executed", True)),
+        "return_code": base_result.get("return_code"),
+        "capabilities": list(probe_cfg.get("capabilities") or []),
+        "blocked_reason": None
+        if is_ready
+        else (
+            reason
+            or f"Python module {module_name!r} is not importable in the Hermes3D backend runtime."
+        ),
+        "proof_gate_version": probe_cfg.get("proof_gate_version") or "modeler-import-verifier-v1",
+        "output_head": base_result.get("output_head") or [],
+    }
 # Firmware source inventory probe (I7 — read-only, no flash/compile/serial)
 # ---------------------------------------------------------------------------
 
