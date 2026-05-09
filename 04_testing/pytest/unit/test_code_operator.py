@@ -686,3 +686,199 @@ def test_list_e2e_jobs_route_returns_200() -> None:
     assert payload["status"] == "ready"
     assert "jobs" in payload
     assert "state_legend" in payload
+# ---------------------------------------------------------------------------
+# Recovery Controller v1 tests (lean ledger; no UI, no autonomous apply).
+# Each test uses a unique task_id so ledger entries don't collide. Tests
+# verify ledger writes, validation, redaction, outcome marking, and state
+# read-back. Future v1.5 fields covered: failed_step_type, failure_fingerprint,
+# retry_budget, agent_stack, worker_output_status, recommended_next_action.
+# ---------------------------------------------------------------------------
+
+
+from uuid import uuid4 as _recovery_uuid4
+
+
+def _recovery_task_id(suffix: str) -> str:
+    return f"H3D-TEST-RECOVERY-{_recovery_uuid4().hex[:12]}-{suffix}"
+
+
+def test_recovery_records_gate_fail() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("gate")
+
+    response = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "git-diff-check",
+            "failure_class": "gate_fail",
+            "failure_summary": "trailing whitespace flagged on added line",
+            "failed_step_type": "gate_run",
+            "agent_stack": ["MiniMax", "DeepSeek", "Gate Runner"],
+            "recommended_next_action": "rollback_and_retry",
+            "worker_output_status": "complete",
+            "attempt_n": 1,
+            "max_attempts": 3,
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "recorded"
+    attempt_id = payload["attempt_id"]
+    assert len(attempt_id) == 32
+    assert all(c in "0123456789abcdef" for c in attempt_id)
+    record = payload["record"]
+    assert record["failure_class"] == "gate_fail"
+    assert record["failed_step_type"] == "gate_run"
+    assert record["agent_stack"] == ["MiniMax", "DeepSeek", "Gate Runner"]
+    assert record["retry_budget"] == {"attempt_n": 1, "max_attempts": 3, "exhausted": False}
+    assert len(record["failure_fingerprint"]) == 16
+
+
+def test_recovery_records_patch_rejected() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("patch")
+
+    response = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "deepseek_review_v1",
+            "failure_class": "patch_rejected",
+            "failure_summary": "reviewer requested in-band evidence",
+            "failed_step_type": "reviewer_pass",
+            "recommended_next_action": "refresh_context",
+            "worker_output_status": "complete",
+        },
+    )
+
+    assert response.status_code == 200
+    record = response.json()["record"]
+    assert record["failure_class"] == "patch_rejected"
+    assert record["failed_step_type"] == "reviewer_pass"
+    assert record["recommended_next_action"] == "refresh_context"
+
+
+def test_recovery_records_merge_git_fail() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("merge")
+
+    response = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "git_branch",
+            "failure_class": "merge_git_fail",
+            "failure_summary": "untracked files blocked branch creation",
+            "failed_step_type": "git_branch",
+            "recommended_next_action": "rollback_and_retry",
+        },
+    )
+
+    assert response.status_code == 200
+    record = response.json()["record"]
+    assert record["failure_class"] == "merge_git_fail"
+    assert record["failed_step_type"] == "git_branch"
+
+
+def test_recovery_rejects_unknown_failure_class() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("unknown")
+
+    response = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "something",
+            "failure_class": "not_a_real_class",
+            "failure_summary": "this should reject",
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_recovery_redacts_secret_like_values() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("secret")
+    bearer_value = "Bearer abcdefghijklmnop1234567890ABCDEFGH"
+
+    response = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "auth_check",
+            "failure_class": "provider_auth",
+            "failure_summary": f"upstream returned {bearer_value} mismatch",
+            "failed_step_type": "provider_smoke",
+            "redaction_status": "pass",
+        },
+    )
+
+    assert response.status_code == 200
+    summary = response.json()["record"]["failure_summary"]
+    assert bearer_value not in summary
+    assert "abcdefghijklmnop1234567890" not in summary
+
+
+def test_recovery_mark_outcome_recovered() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("outcome")
+
+    record_resp = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "git-diff-check",
+            "failure_class": "gate_fail",
+            "failure_summary": "initial gate failure",
+            "failed_step_type": "gate_run",
+            "recommended_next_action": "rollback_and_retry",
+        },
+    )
+    assert record_resp.status_code == 200
+    attempt_id = record_resp.json()["attempt_id"]
+
+    outcome_resp = client.post(
+        "/api/code-operator/recovery/mark-outcome",
+        json={
+            "attempt_id": attempt_id,
+            "status": "recovered",
+            "recovery_summary": "rollback + re-author + re-gate succeeded",
+            "retry_gate_id": "gate_git-diff-check_demo",
+        },
+    )
+    assert outcome_resp.status_code == 200
+    payload = outcome_resp.json()
+    assert payload["status"] == "recorded"
+    outcome = payload["outcome"]
+    assert outcome["status"] == "recovered"
+    assert outcome["attempt_id"] == attempt_id
+
+
+def test_recovery_state_route_returns_attempts() -> None:
+    client = TestClient(create_gui_app())
+    task_id = _recovery_task_id("state")
+
+    record_resp = client.post(
+        "/api/code-operator/recovery/record-failure",
+        json={
+            "task_id": task_id,
+            "failed_step": "state_route_test",
+            "failure_class": "missing_proof",
+            "failure_summary": "for state route test",
+            "failed_step_type": "reviewer_pass",
+        },
+    )
+    assert record_resp.status_code == 200
+    attempt_id = record_resp.json()["attempt_id"]
+
+    state_resp = client.get(
+        f"/api/code-operator/recovery/state?task_id={task_id}",
+    )
+    assert state_resp.status_code == 200
+    payload = state_resp.json()
+    assert "attempts" in payload
+    assert payload["count"] >= 1
+    assert any(item.get("attempt_id") == attempt_id for item in payload["attempts"])
