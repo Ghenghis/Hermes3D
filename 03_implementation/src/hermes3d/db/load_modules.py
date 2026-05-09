@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -101,13 +102,32 @@ LAUNCH_KIND_OVERRIDES = {
 
 
 def _registry_path() -> Path:
-    candidates = [
+    """Return the loader-real registry YAML path.
+
+    Bonus 12 finding #9 fix (PR #135 / synthesis 2026-05-09):
+    ``Path(__file__).resolve().parents[5]`` is evaluated unguarded. On a
+    frozen build / zipapp / nuitka package, ``__file__`` may be much
+    shallower than 5 directories from any plausible repo root, raising
+    ``IndexError`` BEFORE the ``FileNotFoundError`` fallback to
+    ``_registry_from_committed_proof`` can trigger. Wrap each candidate
+    expression in its own try/except so a malformed candidate is dropped,
+    not propagated.
+    """
+    candidates: list[Path] = [
         Path("G:/Github/Hermes3D/Hermes3D-GUI-Wiring-Contract-Kit/03_REPO_REGISTRY/external_repos_registry.yaml"),
-        Path(__file__).resolve().parents[5]
-        / "Hermes3D-GUI-Wiring-Contract-Kit"
-        / "03_REPO_REGISTRY"
-        / "external_repos_registry.yaml",
     ]
+    try:
+        candidates.append(
+            Path(__file__).resolve().parents[5]
+            / "Hermes3D-GUI-Wiring-Contract-Kit"
+            / "03_REPO_REGISTRY"
+            / "external_repos_registry.yaml"
+        )
+    except IndexError:
+        # Frozen build / zipapp: __file__ is shallower than parents[5];
+        # silently skip this candidate so the FileNotFoundError fallback
+        # to _registry_from_committed_proof can still fire.
+        pass
     for candidate in candidates:
         if candidate.exists():
             return candidate
@@ -327,6 +347,19 @@ def inspect_source_path(local_path: str | None, repo_url: str | None) -> dict[st
 
 
 def load_modules() -> int:
+    """Load the external-repos registry into the SQLite ``modules`` table.
+
+    Bonus 12 finding #10 fix (PR #135 / synthesis 2026-05-09):
+    The pre-fix function used a bare ``conn = connect(); ...; conn.commit();
+    conn.close()`` with no ``try/finally`` and no rollback. A ``KeyError``
+    or ``sqlite3.IntegrityError`` mid-loop (e.g. a non-string value the
+    parameterized INSERT rejects) raised out of the loop with the
+    connection still open, leaking the FD and the WAL files on Windows.
+
+    Post-fix: ``with closing(conn) as conn:`` always closes the connection;
+    a try/except around the loop runs ``conn.rollback()`` on any exception
+    before re-raising, so partial loads do NOT leave half-committed state.
+    """
     if not DB_PATH.exists():
         init_db()
     try:
@@ -334,58 +367,67 @@ def load_modules() -> int:
     except FileNotFoundError:
         registry = _registry_from_committed_proof()
     manifest = _manifest_index()
-    conn = connect()
     count = 0
     seen_ids: set[str] = set()
-    for section_key, entries in registry.items():
-        for module_id, entry in entries.items():
-            unique_id = module_id if module_id not in seen_ids else f"{section_key}_{module_id}"
-            seen_ids.add(unique_id)
-            launch_kind = LAUNCH_KIND_OVERRIDES.get(unique_id) or LAUNCH_KIND_OVERRIDES.get(module_id) or entry.get("launch_kind") or "unknown"
-            source = resolve_module_source(section_key, module_id, entry, manifest)
-            source_status = inspect_source_path(source["local_path"], source["repo_url"])
-            install_state = source_status["install_state"]
-            if not source["repo_url"] and launch_kind in REFERENCE_LAUNCH_KINDS:
-                install_state = "unavailable"
-            tasks = entry.get("required_actions") or entry.get("bridge_tasks") or []
-            if isinstance(tasks, str):
-                tasks = [tasks]
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO modules
-                    (id, display_name, section, priority, license, repo_url, local_path,
-                     install_state, install_progress, detected_version, health, launch_kind,
-                     bridge_tasks, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                """,
-                (
-                    unique_id,
-                    entry.get("display", module_id),
-                    section_key,
-                    entry.get("priority", "reference"),
-                    entry.get("license"),
-                    source["repo_url"],
-                    source["local_path"],
-                    install_state,
-                    source_status["install_progress"],
-                    source_status["detected_version"],
-                    source_status["health"],
-                    launch_kind,
-                    json.dumps(tasks),
-                ),
-            )
-            for task_name in tasks:
-                task_id = f"{unique_id}::{task_name}"
-                conn.execute(
-                    """
-                    INSERT OR IGNORE INTO bridge_tasks (id, module_id, name, status)
-                    VALUES (?, ?, ?, 'pending')
-                    """,
-                    (task_id, unique_id, str(task_name)),
-                )
-            count += 1
-    conn.commit()
-    conn.close()
+    with closing(connect()) as conn:
+        try:
+            for section_key, entries in registry.items():
+                for module_id, entry in entries.items():
+                    unique_id = module_id if module_id not in seen_ids else f"{section_key}_{module_id}"
+                    seen_ids.add(unique_id)
+                    launch_kind = LAUNCH_KIND_OVERRIDES.get(unique_id) or LAUNCH_KIND_OVERRIDES.get(module_id) or entry.get("launch_kind") or "unknown"
+                    source = resolve_module_source(section_key, module_id, entry, manifest)
+                    source_status = inspect_source_path(source["local_path"], source["repo_url"])
+                    install_state = source_status["install_state"]
+                    if not source["repo_url"] and launch_kind in REFERENCE_LAUNCH_KINDS:
+                        install_state = "unavailable"
+                    tasks = entry.get("required_actions") or entry.get("bridge_tasks") or []
+                    if isinstance(tasks, str):
+                        tasks = [tasks]
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO modules
+                            (id, display_name, section, priority, license, repo_url, local_path,
+                             install_state, install_progress, detected_version, health, launch_kind,
+                             bridge_tasks, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                        """,
+                        (
+                            unique_id,
+                            entry.get("display", module_id),
+                            section_key,
+                            entry.get("priority", "reference"),
+                            entry.get("license"),
+                            source["repo_url"],
+                            source["local_path"],
+                            install_state,
+                            source_status["install_progress"],
+                            source_status["detected_version"],
+                            source_status["health"],
+                            launch_kind,
+                            json.dumps(tasks),
+                        ),
+                    )
+                    for task_name in tasks:
+                        task_id = f"{unique_id}::{task_name}"
+                        conn.execute(
+                            """
+                            INSERT OR IGNORE INTO bridge_tasks (id, module_id, name, status)
+                            VALUES (?, ?, ?, 'pending')
+                            """,
+                            (task_id, unique_id, str(task_name)),
+                        )
+                    count += 1
+            conn.commit()
+        except Exception:
+            # Bonus 12 #10: roll back partial inserts so the next caller
+            # does not see a half-loaded modules table. Re-raise so
+            # operators see the real failure.
+            try:
+                conn.rollback()
+            except Exception:  # nosec - best-effort during teardown
+                pass
+            raise
     return count
 
 
