@@ -353,10 +353,77 @@ def _run_update_checks(repo: Path) -> list[dict[str, Any]]:
         if compile_targets:
             checks.append(_check_external(repo, "python compile gate", ["python", "-m", "compileall", "-q", *compile_targets], timeout=180))
         tests_dir = repo / "tests"
+        # Hermes Agent pytest gate — security-hardened (Audit PR #135 / commit 5ecd8ff
+        # Batch 2 Agent 10 + Agent 6 must-fix items).
+        #
+        # Path-based --ignore mirrors upstream tests.yml. Marker-only filtering
+        # cannot prevent tests/e2e/conftest.py from polluting sys.modules at
+        # collection time:
+        #   https://raw.githubusercontent.com/NousResearch/hermes-agent/main/.github/workflows/tests.yml
+        #   https://docs.pytest.org/en/stable/example/pythoncollection.html#ignore-paths-during-test-collection
+        #
+        # Worker-count guard: -n 0/1 disables xdist isolation, re-exposing the
+        # conftest leak under cross-test contamination. Production requires >=2;
+        # default is 4 to mirror upstream GHA's 4-vCPU runner.
+        # HERMES_AGENT_DIAGNOSTIC=1 overrides for triage.
+        #
+        # maxfail guard: production stops at 1 (mirrors upstream tests.yml);
+        # diagnostic mode raises to 5 for triage-friendly multi-failure output.
+        #
+        # Skip-path fail-closed: missing HERMES_AGENT_RUN_PYTEST surfaces as
+        # status="fail" with REQUIRES_CONFIRMATION output, never status="skipped"
+        # or 200/OK. Blocks CICD-SEC-1 fake-pass per
+        #   https://owasp.org/www-project-top-10-ci-cd-security-risks/
+        #   https://about.codecov.io/apr-2021-post-mortem/
         if os.environ.get("HERMES_AGENT_RUN_PYTEST") == "1" and tests_dir.exists():
-            checks.append(_check_external(repo, "python pytest non-integration", ["python", "-m", "pytest", str(tests_dir), "-m", "not integration", "--maxfail=1", "-q"], timeout=300))
+            workers_env = os.environ.get("HERMES_AGENT_PYTEST_WORKERS", "4").strip()
+            diagnostic_mode = os.environ.get("HERMES_AGENT_DIAGNOSTIC", "").strip() == "1"
+            if workers_env != "auto":
+                try:
+                    parsed_workers = int(workers_env)
+                except ValueError as exc:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            f"HERMES_AGENT_PYTEST_WORKERS must be 'auto' or a positive "
+                            f"integer; got {workers_env!r}."
+                        ),
+                    ) from exc
+                if parsed_workers < 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="HERMES_AGENT_PYTEST_WORKERS must be 'auto' or a positive integer.",
+                    )
+                if not diagnostic_mode and parsed_workers < 2:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "HERMES_AGENT_PYTEST_WORKERS<2 disables xdist isolation; "
+                            "set HERMES_AGENT_DIAGNOSTIC=1 to override in triage."
+                        ),
+                    )
+            maxfail = "5" if diagnostic_mode else "1"
+            pytest_args = [
+                "python", "-m", "pytest", str(tests_dir),
+                "-m", "not integration",
+                "--ignore=tests/integration",
+                "--ignore=tests/e2e",
+                f"--maxfail={maxfail}",
+                "-q",
+                "-n", workers_env,
+            ]
+            checks.append(_check_external(repo, "python pytest non-integration", pytest_args, timeout=600))
         elif tests_dir.exists():
-            checks.append({"name": "python pytest non-integration", "status": "skipped", "output": "Set HERMES_AGENT_RUN_PYTEST=1 to run the full Hermes Agent pytest gate in this environment."})
+            checks.append({
+                "name": "python pytest non-integration",
+                "status": "fail",
+                "output": (
+                    "REQUIRES_CONFIRMATION: HERMES_AGENT_RUN_PYTEST not set to '1'. "
+                    "Pytest gate cannot certify update without explicit opt-in. "
+                    "Re-run with HERMES_AGENT_RUN_PYTEST=1 (default workers=4) to certify, "
+                    "or set HERMES_AGENT_DIAGNOSTIC=1 for triage mode."
+                ),
+            })
     return checks
 
 
