@@ -2,6 +2,46 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * W8-3 — Default CSS custom properties so any code reading
+ * `var(--h3d-color-*)` lands on the dark palette before the React theme
+ * provider mounts. The provider overwrites these per active theme via
+ * `themeBootstrap.ts`. Safe to remove if bootstrap is guaranteed to run
+ * before first paint.
+ */
+:root,
+:root.dark {
+  --h3d-color-background: #0a0e1a;
+  --h3d-color-surface: #0f1626;
+  --h3d-color-surface-2: #141d33;
+  --h3d-color-border: #1f2a44;
+  --h3d-color-text-primary: #e6edf7;
+  --h3d-color-text-secondary: #7c8aa8;
+  --h3d-color-primary: #22d3ee;
+  --h3d-color-secondary: #3b82f6;
+  --h3d-color-accent: #a78bfa;
+  --h3d-color-error: #ef4444;
+  --h3d-color-warning: #f59e0b;
+  --h3d-color-success: #22c55e;
+  --h3d-color-info: #3b82f6;
+}
+
+:root.light {
+  --h3d-color-background: #ffffff;
+  --h3d-color-surface: #f6f8fc;
+  --h3d-color-surface-2: #eef2f9;
+  --h3d-color-border: #d4dbe7;
+  --h3d-color-text-primary: #0a0e1a;
+  --h3d-color-text-secondary: #475569;
+  --h3d-color-primary: #0e7490;
+  --h3d-color-secondary: #1d4ed8;
+  --h3d-color-accent: #6d28d9;
+  --h3d-color-error: #b91c1c;
+  --h3d-color-warning: #b45309;
+  --h3d-color-success: #15803d;
+  --h3d-color-info: #1d4ed8;
+}
+
 @layer base {
   html,
   body {
@@ -13,6 +53,16 @@
     color: theme(colors.fg);
     font-family: theme(fontFamily.sans);
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  /*
+   * When the W8-3 ThemeProvider stamps the document with the `light`
+   * class, override the body background to follow the active palette
+   * via the CSS custom properties. Dark stays the default theme(colors)
+   * baseline.
+   */
+  html.light body {
+    background-color: var(--h3d-color-background);
+    color: var(--h3d-color-text-primary);
   }
   * {
     min-width: 0;
