@@ -2,6 +2,7 @@ import { Bell, CircleDot, Clock, Cpu, Settings as SettingsIcon, ShieldCheck } fr
 import { EditionBadge } from "../badges/EditionBadge";
 import { ProofChip } from "../badges/ProofChip";
 import { DashboardModeSwitcher } from "../dashboard/DashboardModeSwitcher";
+import { ThemeSwitcher } from "../ThemeSwitcher";
 import { adapters } from "../../api/adapters";
 import type { Notification } from "../../types/notification";
 import type { ProofBundle } from "../../types/proof";
@@ -88,6 +89,7 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
           Simple
         </button>
         <TimePill time={time} />
+        <ThemeSwitcher variant="compact" />
         <BellButton unread={unread} onClick={() => setActiveTabId("dashboard")} />
         <GearButton onClick={() => setActiveTabId("settings")} />
         <Avatar initials="FN" />
