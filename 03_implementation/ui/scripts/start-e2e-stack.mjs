@@ -34,12 +34,19 @@ const env = runtimeEnv({
 // Without this gate, Vite's port-5173 listener satisfies Playwright's
 // webServer.url probe while uvicorn is still binding, so the page-load
 // fetch fan-out hits ERR_CONNECTION_REFUSED. Deterministic, no timeouts.
+//
+// W9-2f (2026-05-10): serialize the two uvicorn spawns so init_db() on the
+// shared SQLite file (var/hermes3d.db) doesn't race across processes. The
+// db/init._INIT_LOCK is per-process; with parallel spawn both children
+// concurrently call executescript() and the second one fails with
+// "sqlite3.OperationalError: database is locked" before commit. By waiting
+// for the first server's /health (which fires only after init_db() returns)
+// the second process always finds an already-initialized DB and the
+// IF-NOT-EXISTS / INSERT-OR-IGNORE paths become no-ops.
 const children = [spawnServer(apiPort, "Hermes3D GUI API")];
-if (desktopPort) {
-  children.push(spawnServer(desktopPort, "Hermes Desktop compatibility API"));
-}
 await waitForHealth(`http://127.0.0.1:${apiPort}/health`, "Hermes3D GUI API");
 if (desktopPort) {
+  children.push(spawnServer(desktopPort, "Hermes Desktop compatibility API"));
   await waitForHealth(`http://127.0.0.1:${desktopPort}/health`, "Hermes Desktop compatibility API");
 }
 children.push(spawn(
