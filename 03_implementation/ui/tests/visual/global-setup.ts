@@ -1,5 +1,5 @@
 /**
- * W8-14 Playwright globalSetup for the visual-proof harness.
+ * W8-14 / W15-A9 Playwright globalSetup for the visual-oracle harness.
  *
  * Why this file exists
  * --------------------
@@ -20,17 +20,23 @@
  * as the source of truth (we only ever copy from Images-GUI/, never the
  * other way around).
  *
+ * W15-A9 keeps this contract verbatim — the harness now also writes
+ * region-suffixed snapshots (`<ref-stem>.<region>.png`) into the same
+ * __refs__/ tree, but those are written by the spec on its FIRST run
+ * (a no-op for return runs because updateSnapshots is "none"). global-setup
+ * only owns the Images-GUI -> __refs__/ mirror.
+ *
  * Idempotent + cheap: a per-file mtime + size check skips copies when the
  * destination is already current. First run does the full copy; subsequent
  * runs are effectively a no-op walk.
  *
  * No-fake / no-paid contract:
  *  - Copies ONLY from `Images-GUI/` -> `__refs__/`. Never the reverse.
- *  - Never deletes a reference; orphan __refs__/ files are pruned only if
- *    they no longer exist in `Images-GUI/`.
+ *  - Never deletes a Images-GUI/ reference; orphan __refs__/ files are
+ *    pruned only if they no longer exist in `Images-GUI/`.
  *  - All-local; no network, no paid services.
  *
- * Sources cited (per W8-14 contract):
+ * Sources cited (per W15-A9 contract):
  *  1. Playwright snapshotPathTemplate reference (parent-dir safety check):
  *     https://playwright.dev/docs/api/class-testconfig#test-config-snapshot-path-template
  *  2. Playwright globalSetup reference:

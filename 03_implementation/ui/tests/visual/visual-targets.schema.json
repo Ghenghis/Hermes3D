@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/Ghenghis/Hermes3D/03_implementation/ui/tests/visual/visual-targets.schema.json",
+  "title": "Hermes3D Visual Target Manifest",
+  "description": "W15-A9 schema for visual-targets.json. Describes the W15 visual-oracle harness contract: per-target route, reference PNG, optional viewport / theme / clock / region overrides. The manifest is authored by W15-A8 (visual-target-registry); the harness here in W15-A9 consumes it.",
+  "type": "object",
+  "required": ["targets"],
+  "additionalProperties": true,
+  "properties": {
+    "description": { "type": "string" },
+    "owner": { "type": "string" },
+    "created": { "type": "string", "format": "date" },
+    "tolerance_default": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Default maxDiffPixelRatio used when a target omits the `tolerance` field."
+    },
+    "reference_viewport": {
+      "type": "string",
+      "pattern": "^[0-9]+x[0-9]+$",
+      "description": "Human-readable WxH label for the default reference viewport (e.g. 1536x1024)."
+    },
+    "viewport": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer", "minimum": 320 },
+        "height": { "type": "integer", "minimum": 240 }
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/VisualTarget" }
+    }
+  },
+  "$defs": {
+    "VisualTarget": {
+      "type": "object",
+      "required": ["target", "reference", "route", "status", "tolerance"],
+      "additionalProperties": false,
+      "properties": {
+        "target": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "description": "Stable identifier used as the snapshot folder and the reporter row key."
+        },
+        "reference": {
+          "type": "string",
+          "description": "Repo-relative path to the reference PNG under Images-GUI/."
+        },
+        "route": {
+          "type": "string",
+          "description": "Hash route or full URL to navigate to. Started with / for SPA hash routes."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["live", "future"],
+          "description": "live: actively compared; future: registered but skipped (owned by another lane)."
+        },
+        "tolerance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "maxDiffPixelRatio passed to expect(page).toHaveScreenshot."
+        },
+        "wait_test_id": {
+          "type": "string",
+          "description": "data-testid the spec waits for before screenshot. 15s timeout."
+        },
+        "viewport": {
+          "type": "object",
+          "required": ["width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "width": { "type": "integer", "minimum": 320 },
+            "height": { "type": "integer", "minimum": 240 }
+          },
+          "description": "W15-A9 cap 2 — per-target viewport override. Falls back to top-level `viewport`."
+        },
+        "theme": {
+          "type": "string",
+          "description": "W15-A9 cap 7 — theme key stored in localStorage[h3d.theme] before first paint."
+        },
+        "clock_time": {
+          "type": "string",
+          "description": "W15-A9 cap 6 — ISO-8601 timestamp pinned via page.clock.install + pauseAt."
+        },
+        "regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/VisualRegion" },
+          "description": "W15-A9 caps 1 & 9 — region crops for collage references. Each region produces its own screenshot + diff."
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "VisualRegion": {
+      "type": "object",
+      "required": ["name", "clip"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "description": "Region label used as part of the snapshot filename and reporter row."
+        },
+        "clip": {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "number", "minimum": 0 },
+            "y": { "type": "number", "minimum": 0 },
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "description": "Clip rectangle in CSS pixels passed to page.screenshot({ clip })."
+        },
+        "reference": {
+          "type": "string",
+          "description": "Optional per-region reference PNG (under Images-GUI/). Defaults to target.reference."
+        },
+        "tolerance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Optional per-region tolerance. Defaults to target.tolerance."
+        }
+      }
+    }
+  }
+}
