@@ -98,6 +98,31 @@ const SAMPLE_DETAIL = {
 };
 
 async function stubApps(page: import("@playwright/test").Page) {
+  // appsClient (W9-2k) tries `/api/apps` first then falls back to
+  // `/api/source-os/modules`. Stub both so the GUI sees fixture data
+  // regardless of which endpoint the client picks. Mirrors the dual
+  // stub in `gui-breadth-pages.spec.ts`.
+  const runProofPayload = {
+    accepted: true,
+    proof_event_id: "proof-new",
+    status: "pending",
+    reason: "queued",
+  };
+  await page.route("**/api/apps", (route) => {
+    if (route.request().method() === "GET") {
+      return fulfillJson(route, SAMPLE_APPS);
+    }
+    return route.continue();
+  });
+  await page.route("**/api/apps/hermes-agent", (route) =>
+    fulfillJson(route, SAMPLE_DETAIL),
+  );
+  await page.route("**/api/apps/*/run-proof", (route) => {
+    if (route.request().method() === "POST") {
+      return fulfillJson(route, runProofPayload);
+    }
+    return route.continue();
+  });
   await page.route("**/api/source-os/modules", (route) => {
     if (route.request().method() === "GET") {
       return fulfillJson(route, SAMPLE_APPS);
@@ -109,12 +134,7 @@ async function stubApps(page: import("@playwright/test").Page) {
   );
   await page.route("**/api/source-os/modules/*/run-proof", (route) => {
     if (route.request().method() === "POST") {
-      return fulfillJson(route, {
-        accepted: true,
-        proof_event_id: "proof-new",
-        status: "pending",
-        reason: "queued",
-      });
+      return fulfillJson(route, runProofPayload);
     }
     return route.continue();
   });
