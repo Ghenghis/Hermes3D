@@ -8,7 +8,7 @@
 - `60_APP_UPDATE_READINESS_AUDIT_2026-05-09.md` (PR #135)
 - `60-apps-batch2/bonus12-bug-finder.md`, `bonus13-schema-inconsistency.md`, `bonus13-errata-followup.md` (PR #144)
 - `60-apps-batch2/agent7-docker-proof.md`, `agent8-ubuntu2404-proof.md`, `agent9-vps-proof-plan.md`, `agent10-compat-patch.md`, `agent11-upstream-issues.md`, `bonus14-secret-leak-scanner.md`
-- `Images-GUI/` reference pack (PR #128/#134)
+- `Images-GUI/` reference pack (PR #134; supersedes closed PR #128)
 - All merged PRs #136-#150 today
 - 20-agent Blocker Elimination Swarm (Wave 1, 2026-05-09 morning)
 - 10-agent Remaining/Skipped Wave (Wave 2, 2026-05-09 afternoon)

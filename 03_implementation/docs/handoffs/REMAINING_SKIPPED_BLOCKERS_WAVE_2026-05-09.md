@@ -1,5 +1,11 @@
 # Remaining/Skipped Blockers Wave — Synthesis (2026-05-09)
 
+> **STATUS UPDATE 2026-05-10 (W5-8b doc-fix):**
+> - **§6 ("Whether Hermes Agent v0.13 can be retried now: NO — KEEP DEFERRED") is SUPERSEDED.** v0.13 was retried via canary (PR #155, merged 2026-05-09T23:23Z), smoke-tested (PR #157, merged 2026-05-09T23:47Z), conditionally promoted (PR #160, merged 2026-05-10T00:19Z), and is now the production default. v0.12 remains opt-in fallback via `HERMES_AGENT_CHECKOUT=G:/Github/hermes-agent-fresh`. Source of truth: `services/agent_checkout.py:L31` (`DEFAULT_AGENT_CHECKOUT = Path("G:/Github/hermes-agent-v013-canary")`).
+> - **BLK-011 figure corrected.** Re-grouped main `Tests` runs by canonical `workflow_id=242054771`: 39/100 green (not 0/100). The earlier 0/100 was a query artifact. See `HERMES_AGENT_ONLY_SWARM_STATUS_2026-05-09.md:L13`.
+> - **§3 "Next 5 PRs in exact order" is HISTORICAL.** Those PRs (#146–#150) shipped exactly as listed; treat that section as a post-mortem, not a forward plan.
+> - The text below from §1 onward is preserved verbatim for audit-trail fidelity. Read this STATUS UPDATE first; treat any conflicting language below as the pre-Wave-5 verdict.
+
 **Provenance:** 10-agent Remaining/Skipped Blocker Wave (Pipelines 1-3, agents 1-10), all returned with research receipts. This synthesis is the mandated artifact that gates code-PR resumption.
 
 **Companion docs (already merged):**

@@ -1,5 +1,7 @@
 # Hermes Agent v0.13 Production + Multi-Version Pipelines — Action Plan (2026-05-09)
 
+> **STATUS UPDATE 2026-05-10 (W5-8b doc-fix): EXECUTED 2026-05-09 → 2026-05-10.** Pipeline A landed via PR #160 (squash `3158a4e`, merged 2026-05-10T00:19:20Z). Pipeline C (v0.12 fallback) remains operational via `HERMES_AGENT_CHECKOUT=G:/Github/hermes-agent-fresh`. Source-of-truth constant `DEFAULT_AGENT_CHECKOUT = Path("G:/Github/hermes-agent-v013-canary")` is live in `services/agent_checkout.py:L31` (no longer a "future 1-line change"). The "**This plan is NOT executing**" line below is **superseded** — the plan ran end-to-end via PRs #155, #157, #159, #160, #165, #171, #172, #173, #174 between 2026-05-09T23:23Z and 2026-05-10T01:44Z. PR #169 is the only follow-on still in flight.
+
 **Mission:** Promote v0.13 to production AND keep all Hermes Agent versions operational concurrently. 20-agent swarm across 3 pipelines.
 
 **Inputs:**
