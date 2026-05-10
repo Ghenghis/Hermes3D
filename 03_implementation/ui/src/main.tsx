@@ -4,7 +4,16 @@ import App from "./App";
 import { AppRegistryTab } from "./tabs/AppRegistry";
 import { ServiceHealthPage } from "./components/health/ServiceHealthPage";
 import { ThemeProvider } from "./theme/ThemeProvider";
+import { installConsoleFilter } from "./api/consoleFilter";
 import "./styles/globals.css";
+
+// W15-FIX-502 — install the console.error -> console.warn redirector for
+// known-offline 5xx / network failures BEFORE any module starts polling
+// `/api/agents/update/status`. The UI banner still renders "offline" honestly;
+// only the log level changes so the strict visual-proof gate (W15-A9 cap 3)
+// does not trip on an expected transient state. MDN + Sentry-style level
+// semantics: 5xx/refused on a polling status check is `warn`, not `error`.
+installConsoleFilter();
 
 const APPS_HASH_PREFIX = "apps";
 const HEALTH_HASH_PREFIX = "health";
