@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id
+from hermes3d.gateways.redaction import redact_text
 from hermes3d.services.agent_checkout import DEFAULT_AGENT_CHECKOUT
 from hermes3d.services.agent_checkout import hermes_agent_checkout
 from hermes3d.services.proof_helpers import attach_version_fields
@@ -48,7 +49,15 @@ LATEST_RELEASE_API = "https://api.github.com/repos/NousResearch/hermes-agent/rel
 RELEASES_API = "https://api.github.com/repos/NousResearch/hermes-agent/releases?per_page=100"
 TAG_RE = re.compile(r"^v(?P<year>\d{4})\.(?P<month>\d{1,2})\.(?P<day>\d{1,2})$")
 BACKUP_ID_RE = re.compile(r"^[A-Za-z0-9._-]{12,96}$")
-SECRET_RE = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+")
+# F3 fix (P1-8 post-promotion hardening, 2026-05-09): the local
+# ``SECRET_RE`` and ``redact_text()`` helper were materially weaker than
+# ``hermes3d.gateways.redaction.redact_text`` (no JWT, no Anthropic /
+# OpenAI key shape, no header redaction, etc.). They are gone. Every
+# call site now goes through ``redact_text`` so a single hardened
+# regex chain owns secret masking for this module — matches the
+# Sentry single-redaction-hook pattern already used elsewhere
+# (Bonus 12 #6 fix). See gateways.redaction docstring for the full
+# pattern list and OWASP A09:2021 rationale.
 
 
 class BackupRequest(BaseModel):
@@ -162,7 +171,7 @@ def staged_update(body: StagedUpdateRequest) -> dict[str, Any]:
             synthetic_check = {
                 "name": check_name,
                 "status": "fail",
-                "output": _redact(detail)[:800],
+                "output": redact_text(detail)[:800],
             }
             results.append({"tag": tag, "checks": [synthetic_check], "ok": False})
             repair = _auto_repair_to_backup(repo, backup, body.actor, failed_tag=tag)
@@ -196,9 +205,11 @@ def staged_update(body: StagedUpdateRequest) -> dict[str, Any]:
     # Bonus 12 finding #6 fix (Audit PR #135): persist the redacted/truncated
     # proof summary to agent_config (matching what proof_events already gets).
     # Pre-fix the raw payload — including 800-char check.output strings that
-    # only got the narrow _redact() pass — was written verbatim to disk, while
-    # proof_events correctly used _proof_summary(). Symmetrize so both sinks
-    # receive the same sanitized blob (Sentry-style single-redaction-hook).
+    # only got the narrow legacy ``_redact()`` pass — was written verbatim to
+    # disk, while proof_events correctly used _proof_summary(). Symmetrize so
+    # both sinks receive the same sanitized blob (Sentry-style
+    # single-redaction-hook). P1-8 F3 (2026-05-09): the legacy ``_redact()`` /
+    # ``SECRET_RE`` are gone; ``_proof_summary`` now calls ``redact_text``.
     persisted = _proof_summary(payload)
     execute(
         "INSERT OR REPLACE INTO agent_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
@@ -333,7 +344,7 @@ def _remote_release_tags(repo: Path) -> list[str]:
             status_code=502,
             detail=(
                 f"GitHub Releases API unreachable for {RELEASES_API}: "
-                f"{_redact(type(exc).__name__ + ': ' + str(exc))[:200]}"
+                f"{redact_text(type(exc).__name__ + ': ' + str(exc))[:200]}"
             ),
         ) from exc
     if not isinstance(payload, list):
@@ -374,13 +385,13 @@ def _latest_release(tags: list[str]) -> dict[str, Any]:
         else:
             raise HTTPException(
                 status_code=502,
-                detail=f"GitHub Releases latest endpoint HTTP {exc.code}: {_redact(str(exc.reason))[:120]}",
+                detail=f"GitHub Releases latest endpoint HTTP {exc.code}: {redact_text(str(exc.reason))[:120]}",
             ) from exc
     except (urllib.error.URLError, socket.timeout, TimeoutError, ConnectionError, json.JSONDecodeError) as exc:
         # Soft-warning preserved here ONLY because _remote_release_tags is the
         # authoritative gate; if we got this far, tags came back successfully,
         # so a transient hiccup on the latest endpoint is acceptable.
-        latest["api_warning"] = _redact(str(exc))
+        latest["api_warning"] = redact_text(str(exc))
     if latest.get("tag") is None and tags:
         latest["api_warning"] = "GitHub Releases latest endpoint unavailable; refusing to treat tags as releases."
     return latest
@@ -667,27 +678,27 @@ def _run_update_checks(repo: Path) -> list[dict[str, Any]]:
 def _check_command(repo: Path, name: str, args: list[str], expect_returncode: int = 0) -> dict[str, Any]:
     try:
         result = subprocess.run(["git", *args], cwd=repo, text=True, capture_output=True, timeout=30, check=False)
-        output = _redact((result.stdout or result.stderr).strip())[:800]
+        output = redact_text((result.stdout or result.stderr).strip())[:800]
         if name == "git status" and result.returncode == expect_returncode and output:
             return {"name": name, "status": "fail", "output": output}
         return {"name": name, "status": "pass" if result.returncode == expect_returncode else "fail", "output": output}
     except Exception as exc:
-        return {"name": name, "status": "fail", "output": _redact(str(exc))}
+        return {"name": name, "status": "fail", "output": redact_text(str(exc))}
 
 
 def _check_external(repo: Path, name: str, args: list[str], timeout: int = 60) -> dict[str, Any]:
     try:
         executable = shutil.which(args[0]) or args[0]
         result = subprocess.run([executable, *args[1:]], cwd=repo, text=True, capture_output=True, timeout=timeout, check=False)
-        return {"name": name, "status": "pass" if result.returncode == 0 else "fail", "output": _redact((result.stdout or result.stderr).strip())[:800]}
+        return {"name": name, "status": "pass" if result.returncode == 0 else "fail", "output": redact_text((result.stdout or result.stderr).strip())[:800]}
     except Exception as exc:
-        return {"name": name, "status": "fail", "output": _redact(str(exc))}
+        return {"name": name, "status": "fail", "output": redact_text(str(exc))}
 
 
 def _run_git(repo: Path, args: list[str], timeout: int = 30) -> str:
     result = subprocess.run(["git", *args], cwd=repo, text=True, capture_output=True, timeout=timeout, check=False)
     if result.returncode != 0:
-        raise HTTPException(status_code=502, detail=f"git {' '.join(args)} failed: {_redact((result.stderr or result.stdout).strip())}")
+        raise HTTPException(status_code=502, detail=f"git {' '.join(args)} failed: {redact_text((result.stderr or result.stdout).strip())}")
     return result.stdout
 
 
@@ -732,7 +743,7 @@ def _auto_repair_to_backup(repo: Path, backup: dict[str, Any] | None, actor: str
             "rolled_back": False,
             "failed_tag": failed_tag,
             "target": target,
-            "reason": _redact(str(exc.detail)),
+            "reason": redact_text(str(exc.detail)),
         }
     _append_proof_event("hermes_agent_update_auto_repair", actor, _proof_summary(repair))
     return repair
@@ -758,7 +769,7 @@ def _proof_summary(payload: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": check.get("name"),
             "status": check.get("status"),
-            "output_head": _redact(str(check.get("output") or ""))[:180],
+            "output_head": redact_text(str(check.get("output") or ""))[:180],
         }
 
     summary = dict(payload)
@@ -804,7 +815,3 @@ def _proof_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "dirty": current.get("dirty"),
         }
     return summary
-
-
-def _redact(value: str) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value)

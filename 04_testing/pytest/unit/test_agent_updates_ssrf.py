@@ -143,7 +143,12 @@ def test_remote_release_tags_non_list_payload_raises_502(tmp_path: Path) -> None
 
 
 # ---------------------------------------------------------------------------
-# _redact applied to error detail (no secret leakage in 502 body)
+# redact_text applied to error detail (no secret leakage in 502 body)
+# P1-8 F3 (2026-05-09): the legacy local ``_redact()`` (which produced
+# ``Bearer [REDACTED]``) was replaced with the gateway ``redact_text``
+# (which produces ``Bearer ***`` for the same input). Both contracts
+# guarantee the secret is gone; this test pins the new marker shape so
+# a future regression to the legacy helper would fail.
 # ---------------------------------------------------------------------------
 
 
@@ -154,8 +159,10 @@ def test_remote_release_tags_redacts_bearer_in_detail(tmp_path: Path) -> None:
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._remote_release_tags(tmp_path)
     detail = str(exc_info.value.detail)
+    # Cleartext gone — the security contract.
     assert "abc123secret-do-not-leak" not in detail
-    assert "[REDACTED]" in detail
+    # ``redact_text`` collapses ``Bearer xxx`` to ``Bearer ***``.
+    assert "Bearer ***" in detail
 
 
 # ---------------------------------------------------------------------------
