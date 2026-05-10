@@ -167,7 +167,7 @@ def _wire_load_modules_stubs(
     fake_db = tmp_path / "fake-db.sqlite"
     fake_db.write_bytes(b"")  # exists()==True
     monkeypatch.setattr(lm, "DB_PATH", fake_db)
-    monkeypatch.setattr(lm, "init_db", lambda: None)
+    monkeypatch.setattr(lm, "init_db", lambda *, force=False: None)
     monkeypatch.setattr(lm, "_parse_registry", lambda _p: _stub_registry())
     monkeypatch.setattr(lm, "_registry_path", lambda: tmp_path / "fake.yaml")
     monkeypatch.setattr(lm, "_manifest_index", lambda: {})

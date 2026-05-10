@@ -10,6 +10,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from hermes3d.db.init import DB_PATH as DB_PATH
 from hermes3d.db.init import connect, init_db
 from hermes3d.services.agent_checkout import (
     hermes_agent_checkout as _hermes_agent_checkout_at_import,
@@ -384,7 +385,7 @@ def load_modules() -> int:
     # an existing DB, not just on first creation. init_db() is idempotent
     # — _migrate() checks for column existence before ALTER, so running
     # it on an already-migrated DB is a no-op.
-    init_db()
+    init_db(force=True)
     try:
         registry = _parse_registry(_registry_path())
     except FileNotFoundError:

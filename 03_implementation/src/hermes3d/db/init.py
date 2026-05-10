@@ -33,6 +33,7 @@ SCHEMA_PATH = Path(__file__).with_name("schema.sql")
 # core/orchestration/retry_controller.py L11-13).
 _INIT_LOCK = threading.Lock()
 _initialized = False
+_initialized_path: Path | None = None
 MODULE_PROVIDER_TARGETS = {
     "blender_mcp_candidates": (
         "blender_mcp_candidates",
@@ -67,14 +68,14 @@ def init_db(*, force: bool = False) -> Path:
         force: when True, re-runs schema/migrate/seed even if already
             initialized in this process. Used by tests that swap DB_PATH.
     """
-    global _initialized
+    global _initialized, _initialized_path
     # Fast path: already done in this process.
-    if _initialized and not force:
+    if _initialized and _initialized_path == DB_PATH and not force:
         return DB_PATH
     with _INIT_LOCK:
         # Re-check inside the lock — another thread may have initialized
         # while we were waiting.
-        if _initialized and not force:
+        if _initialized and _initialized_path == DB_PATH and not force:
             return DB_PATH
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         conn = connect()
@@ -86,6 +87,7 @@ def init_db(*, force: bool = False) -> Path:
         finally:
             conn.close()
         _initialized = True
+        _initialized_path = DB_PATH
         return DB_PATH
 
 
@@ -97,9 +99,10 @@ def reset_initialization_state() -> None:
     ``_initialized`` flag (set by an earlier test) would short-circuit
     initialization and leave the new DB without any tables.
     """
-    global _initialized
+    global _initialized, _initialized_path
     with _INIT_LOCK:
         _initialized = False
+        _initialized_path = None
 
 
 def _migrate(conn: sqlite3.Connection) -> None:

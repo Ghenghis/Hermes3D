@@ -144,7 +144,10 @@ def test_agent_updates_imports_resolver() -> None:
     from hermes3d.api.routes import agent_updates
 
     src = inspect.getsource(agent_updates)
-    assert "from hermes3d.services.agent_checkout import hermes_agent_checkout" in src, (
+    assert "from hermes3d.services.agent_checkout import" in src, (
+        "Wave A4/A5 regression: agent_updates no longer imports the resolver module."
+    )
+    assert "hermes_agent_checkout" in src, (
         "Wave A4/A5 regression: agent_updates no longer imports the resolver."
     )
 
