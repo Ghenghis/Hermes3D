@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import { AppRegistryTab } from "./tabs/AppRegistry";
 import { ServiceHealthPage } from "./components/health/ServiceHealthPage";
+import { ThemeProvider } from "./theme/ThemeProvider";
 import "./styles/globals.css";
 
 const APPS_HASH_PREFIX = "apps";
@@ -102,6 +103,8 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Root />
+    <ThemeProvider defaultTheme="system">
+      <Root />
+    </ThemeProvider>
   </React.StrictMode>,
 );
