@@ -23,6 +23,7 @@ import { AgentsTab } from "./tabs/Agents";
 import { LearningTab } from "./tabs/Learning";
 import { ArtifactsTab } from "./tabs/Artifacts";
 import { ApprovalsTab } from "./tabs/Approvals";
+import { AppRegistryTab } from "./tabs/AppRegistry";
 import { PluginsTab } from "./tabs/Plugins";
 import { SettingsTab } from "./tabs/Settings";
 import { RoadmapTab } from "./tabs/Roadmap";
@@ -42,6 +43,7 @@ const TAB_COMPONENTS: Record<string, () => JSX.Element> = {
   learning: LearningTab,
   artifacts: ArtifactsTab,
   approvals: ApprovalsTab,
+  apps: AppRegistryTab,
   plugins: PluginsTab,
   settings: SettingsTab,
   roadmap: RoadmapTab,
@@ -91,11 +93,18 @@ export default function App() {
     // Keep the URL hash authoritative for the active tab and the dashboard
     // mode. We use replaceState (not pushState) so navigating tabs does not
     // pollute browser history with every click.
+    //
+    // Tabs with nested routing (e.g. `#apps/<id>`) own their trailing
+    // segment after a "/" separator. Only rewrite the hash when the head
+    // segment doesn't already match the active tab.
     const baseHash = TAB_TO_HASH[activeTabId] ?? activeTabId;
     const nextHash =
       activeTabId === "dashboard" && uiMode === "full"
         ? `#${baseHash}:${dashboardMode}`
         : `#${baseHash}`;
+    const currentHead = window.location.hash.replace(/^#/, "").split("/", 2)[0] ?? "";
+    const expectedHead = baseHash;
+    if (currentHead === expectedHead) return;
     if (window.location.hash !== nextHash) {
       window.history.replaceState(null, "", nextHash);
     }

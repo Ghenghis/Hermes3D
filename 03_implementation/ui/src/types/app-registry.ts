@@ -73,6 +73,8 @@ export interface RegistryAppDetail extends RegistryApp {
   recent_proofs: AppProofResult[];
   /** Pointer to the rollback runbook (relative or absolute URL). */
   rollback_runbook_url?: string | null;
+  /** Optional canonical command to re-run the proof for this app (W8-2). */
+  proof_command?: string | null;
   /** Optional metadata block (free-form, must be string-keyed scalars). */
   metadata?: Record<string, string | number | boolean | null>;
 }

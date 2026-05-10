@@ -18,6 +18,7 @@ const TAB_IDS = [
   "learning",
   "artifacts",
   "approvals",
+  "apps",
   "plugins",
   "settings",
   "roadmap",
@@ -39,6 +40,7 @@ const HASH_TO_TAB: Record<string, string> = {
   learning: "learning",
   artifacts: "artifacts",
   approvals: "approvals",
+  apps: "apps",
   plugins: "plugins",
   settings: "settings",
   roadmap: "roadmap",
@@ -57,6 +59,7 @@ export const TAB_TO_HASH: Record<string, string> = {
   learning: "learning",
   artifacts: "artifacts",
   approvals: "approvals",
+  apps: "apps",
   plugins: "plugins",
   settings: "settings",
   roadmap: "roadmap",
@@ -76,9 +79,9 @@ export function tabIdFromHash(hash: string): string | null {
     return null;
   }
   // Strip an optional `:mode` suffix used by the dashboard mode router
-  // (e.g. `#dashboard:simple`, `#dashboard/custom`, `#dashboard.advanced`).
-  // The mode portion is consumed by `dashboardModeStore.modeFromHash`; this
-  // helper only resolves the tab.
+  // (e.g. `#dashboard:simple`) AND support nested hash routes like
+  // `#apps/<id>` (W8-2). The first segment selects the tab; trailing
+  // mode/path segments are owned by the tab itself.
   const head = raw.split(/[:/.]/, 1)[0] ?? raw;
   const tabId = HASH_TO_TAB[head] ?? head;
   return TAB_IDS.includes(tabId as (typeof TAB_IDS)[number]) ? tabId : null;

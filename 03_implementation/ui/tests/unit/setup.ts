@@ -1,12 +1,12 @@
 /**
- * Vitest setup — W6-3 lane.
+ * Vitest setup — shared by W6-3, W6-8, W8-2 lanes.
  *
  * Provides:
  *   - `@testing-library/jest-dom` matchers
  *   - Auto-cleanup of mounted DOM nodes between tests
- *   - A working `localStorage` polyfill. jsdom 25 under Node 25 leaves
- *     `localStorage` as an empty object without the standard methods, so
- *     we install a minimal Storage shim.
+ *   - A working `localStorage` / `sessionStorage` polyfill. jsdom 25
+ *     under Node 25 leaves `localStorage` as an empty object without the
+ *     standard methods, so we install a minimal Storage shim.
  */
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";

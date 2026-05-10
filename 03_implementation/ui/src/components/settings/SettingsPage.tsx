@@ -15,22 +15,45 @@
  * react-router; the universal shell uses the TABS pattern only.
  */
 import { useState } from "react";
-import { Bot, Cog, Cpu, Info, Map, Package, Printer as PrinterIcon, Terminal } from "lucide-react";
+import {
+  Bot,
+  Cog,
+  Cpu,
+  Info,
+  Lock,
+  Map,
+  MonitorCog,
+  Package,
+  Printer as PrinterIcon,
+  Terminal,
+} from "lucide-react";
 import { Panel } from "../layout/Panel";
 import { ResizablePane } from "../layout/ResizablePane";
 import { useStore } from "../../app/store";
+import { GeneralSubtab } from "./GeneralSubtab";
 import { ProvidersSubtab } from "./ProvidersSubtab";
 import { PrintersSubtab } from "./PrintersSubtab";
 import { EnvironmentSubtab } from "./EnvironmentSubtab";
 import { AboutSubtab } from "./AboutSubtab";
 import { AgentConfigSection } from "./AgentConfigSection";
 import { UpdateCenterSubtab } from "./UpdateCenterSubtab";
+import { McpSubtab } from "./McpSubtab";
 
-type SubtabKey = "providers" | "agents" | "printers" | "environment" | "about" | "updates";
+type SubtabKey =
+  | "general"
+  | "providers"
+  | "agents"
+  | "mcp"
+  | "printers"
+  | "environment"
+  | "about"
+  | "updates";
 
 const SUBTABS: { key: SubtabKey; label: string; Icon: typeof Cpu; description: string }[] = [
+  { key: "general",     label: "General",       Icon: MonitorCog,  description: "Theme, language, defaults" },
   { key: "providers",   label: "Providers",     Icon: Cpu,         description: "LLM endpoints + policy" },
   { key: "agents",      label: "Agents",        Icon: Bot,         description: "Agent policy preview" },
+  { key: "mcp",         label: "MCP",           Icon: Lock,        description: "Active MCP file locks" },
   { key: "printers",    label: "Printers",      Icon: PrinterIcon, description: "Fleet + health" },
   { key: "environment", label: "Environment",   Icon: Terminal,    description: "env-var presence (redacted)" },
   { key: "updates",     label: "Update Center", Icon: Package,     description: "Versions, updater, rollback" },
@@ -39,7 +62,7 @@ const SUBTABS: { key: SubtabKey; label: string; Icon: typeof Cpu; description: s
 
 export function SettingsPage() {
   const setActiveTabId = useStore((state) => state.setActiveTabId);
-  const [active, setActive] = useState<SubtabKey>("providers");
+  const [active, setActive] = useState<SubtabKey>("general");
   const meta = SUBTABS.find((s) => s.key === active) ?? SUBTABS[0];
 
   return (
@@ -129,8 +152,10 @@ export function SettingsPage() {
             data-testid={`settings-panel-${active}`}
             className="h-full"
           >
+            {active === "general" && <GeneralSubtab />}
             {active === "providers" && <ProvidersSubtab />}
             {active === "agents" && <AgentConfigSection />}
+            {active === "mcp" && <McpSubtab />}
             {active === "printers" && <PrintersSubtab />}
             {active === "environment" && <EnvironmentSubtab />}
             {active === "updates" && <UpdateCenterSubtab />}

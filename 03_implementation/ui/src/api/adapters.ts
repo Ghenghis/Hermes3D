@@ -67,6 +67,7 @@ import {
   backupHermesDesktopLive,
   downloadHermesDesktopInstallerLive,
   rejectApprovalLive,
+  deferApprovalLive,
   backupHermesAgentLive,
   saveAgentConfigLive,
   saveSettingsLive,
@@ -250,6 +251,7 @@ export interface AdapterAPI {
   getApprovalHistory(): Promise<Approval[]>;
   approveApproval(id: string, notes: string): Promise<void>;
   rejectApproval(id: string, reason: string): Promise<void>;
+  deferApproval(id: string, reason: string): Promise<void>;
   getRoadmapItems(): Promise<RoadmapItem[]>;
   getRoadmapTabCompletion(): Promise<RoadmapTabCompletion>;
   getSourceOSModules(): Promise<SourceOSModule[]>;
@@ -345,6 +347,7 @@ export const adapters: AdapterAPI = {
   getApprovalHistory: getApprovalHistoryLive,
   approveApproval: approveApprovalLive,
   rejectApproval: rejectApprovalLive,
+  deferApproval: deferApprovalLive,
   getRoadmapItems: getRoadmapItemsLive,
   getRoadmapTabCompletion: getRoadmapTabCompletionLive,
   getSourceOSModules: getSourceOSModulesLive,
