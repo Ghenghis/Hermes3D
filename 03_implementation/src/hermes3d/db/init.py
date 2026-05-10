@@ -4,10 +4,35 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parents[3] / "var" / "hermes3d.db"
 SCHEMA_PATH = Path(__file__).with_name("schema.sql")
+
+# BLK-021 fix (2026-05-09, agent W8-11): cold-start race protection.
+#
+# Symptom (W5-3 GUI E2E drill, see HERMES_AGENT_V013_GUI_E2E_2026-05-09.md
+# L137-138 + E2E_BLOCKER_REGISTRY_2026-05-09.md row BLK-021): the first
+# /api/agents/update/status request after a fresh worker spawn returned 500;
+# the second call returned 200. Tests passed because they hit the API after
+# warmup. Reproduction: subprocess-launched uvicorn + immediate request.
+#
+# Root cause: init_db() is invoked from two places (a) FastAPI startup hook
+# in api/app.py and (b) the lazy ensure_db() in api/routes/_common.py called
+# by every route helper. Two concurrent first requests can each enter
+# executescript()/migrate()/seed() simultaneously. SQLite's CREATE TABLE IF
+# NOT EXISTS is idempotent in isolation, but the surrounding _migrate()
+# (ALTER TABLE) and _seed() (executemany INSERT OR IGNORE referencing
+# tables that another writer is mid-create) can fail with "no such table"
+# or "table is locked" before either commit lands.
+#
+# Fix: serialize init_db() with a module-level threading.Lock and short-
+# circuit re-entrant calls after a successful first run via _initialized.
+# This is local-first, zero-new-deps (project explicitly avoids tenacity per
+# core/orchestration/retry_controller.py L11-13).
+_INIT_LOCK = threading.Lock()
+_initialized = False
 MODULE_PROVIDER_TARGETS = {
     "blender_mcp_candidates": (
         "blender_mcp_candidates",
@@ -35,15 +60,46 @@ def connect() -> sqlite3.Connection:
     return conn
 
 
-def init_db() -> Path:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = connect()
-    conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
-    _migrate(conn)
-    _seed(conn)
-    conn.commit()
-    conn.close()
-    return DB_PATH
+def init_db(*, force: bool = False) -> Path:
+    """Idempotent, thread-safe DB init. See BLK-021 note at top of file.
+
+    Args:
+        force: when True, re-runs schema/migrate/seed even if already
+            initialized in this process. Used by tests that swap DB_PATH.
+    """
+    global _initialized
+    # Fast path: already done in this process.
+    if _initialized and not force:
+        return DB_PATH
+    with _INIT_LOCK:
+        # Re-check inside the lock — another thread may have initialized
+        # while we were waiting.
+        if _initialized and not force:
+            return DB_PATH
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        conn = connect()
+        try:
+            conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+            _migrate(conn)
+            _seed(conn)
+            conn.commit()
+        finally:
+            conn.close()
+        _initialized = True
+        return DB_PATH
+
+
+def reset_initialization_state() -> None:
+    """Reset the in-process initialization marker. Test-only helper.
+
+    Tests that point ``DB_PATH`` at a fresh tempdir need ``init_db()`` to
+    run from scratch on the new path; without this, the module-level
+    ``_initialized`` flag (set by an earlier test) would short-circuit
+    initialization and leave the new DB without any tables.
+    """
+    global _initialized
+    with _INIT_LOCK:
+        _initialized = False
 
 
 def _migrate(conn: sqlite3.Connection) -> None:

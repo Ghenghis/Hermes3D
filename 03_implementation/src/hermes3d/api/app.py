@@ -43,6 +43,17 @@ from hermes3d.db.init import init_db
 
 
 def create_gui_app() -> FastAPI:
+    # BLK-021 fix (2026-05-09, agent W8-11): synchronously initialize the
+    # SQLite schema BEFORE wiring routers so the first cold-start request
+    # cannot race route handlers against partially-created tables. Earlier
+    # behavior relied solely on FastAPI's @app.on_event("startup") hook,
+    # which fires asynchronously and does not block request acceptance under
+    # uvicorn's standard worker spawn — see W5-3 GUI E2E drill receipt at
+    # 03_implementation/docs/handoffs/HERMES_AGENT_V013_GUI_E2E_2026-05-09.md
+    # L137-138 and E2E_BLOCKER_REGISTRY_2026-05-09.md row BLK-021. init_db()
+    # is itself idempotent + thread-safe per db/init.py BLK-021 fix.
+    init_db()
+
     app = FastAPI(title="Hermes3D GUI API", version="0.7.0")
     app.add_middleware(
         CORSMiddleware,
@@ -58,6 +69,9 @@ def create_gui_app() -> FastAPI:
 
     @app.on_event("startup")
     async def _startup() -> None:
+        # Defense in depth: re-run init in case the factory ran in a
+        # parent process and the worker forked without inheriting the
+        # _initialized flag (e.g. multiprocessing spawn on Windows).
         init_db()
 
     @app.middleware("http")
