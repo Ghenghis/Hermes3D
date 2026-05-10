@@ -30,18 +30,23 @@ const env = runtimeEnv({
     : sourcePath,
 }, ports);
 
-const children = [
-  spawnServer(apiPort, "Hermes3D GUI API"),
-  spawn(
-    process.execPath,
-    [viteBin, "--host", "127.0.0.1", "--port", String(uiPort), "--strictPort"],
-    { cwd: uiRoot, env, stdio: "inherit", windowsHide: true },
-  ),
-];
-
+// Start API servers FIRST and gate on /health before launching Vite.
+// Without this gate, Vite's port-5173 listener satisfies Playwright's
+// webServer.url probe while uvicorn is still binding, so the page-load
+// fetch fan-out hits ERR_CONNECTION_REFUSED. Deterministic, no timeouts.
+const children = [spawnServer(apiPort, "Hermes3D GUI API")];
 if (desktopPort) {
   children.push(spawnServer(desktopPort, "Hermes Desktop compatibility API"));
 }
+await waitForHealth(`http://127.0.0.1:${apiPort}/health`, "Hermes3D GUI API");
+if (desktopPort) {
+  await waitForHealth(`http://127.0.0.1:${desktopPort}/health`, "Hermes Desktop compatibility API");
+}
+children.push(spawn(
+  process.execPath,
+  [viteBin, "--host", "127.0.0.1", "--port", String(uiPort), "--strictPort"],
+  { cwd: uiRoot, env, stdio: "inherit", windowsHide: true },
+));
 
 let stopping = false;
 const stop = () => {
@@ -104,4 +109,21 @@ function spawnServer(port, label) {
     ["-m", "uvicorn", "hermes3d.api.app:app", "--host", "127.0.0.1", "--port", String(port)],
     { cwd: implementationRoot, env, stdio: "inherit", windowsHide: true },
   );
+}
+
+async function waitForHealth(url, label, { timeoutMs = 60_000, intervalMs = 250 } = {}) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(url, { method: "GET" });
+      if (res.ok) {
+        console.log(`[hermes3d] ${label} ready at ${url}`);
+        return;
+      }
+    } catch {
+      // listener not bound yet — back off and retry
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+  throw new Error(`[hermes3d] ${label} did not become healthy at ${url} within ${timeoutMs}ms`);
 }
