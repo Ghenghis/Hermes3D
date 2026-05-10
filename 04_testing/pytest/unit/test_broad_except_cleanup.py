@@ -23,8 +23,6 @@ References:
 
 from __future__ import annotations
 
-import inspect
-
 import pytest
 
 
@@ -94,7 +92,5 @@ def test_module_runtime_uses_redact_text_for_env_exception() -> None:
     must run through ``redact_text`` before logging (Wave Agent 7 caveat)."""
     src = _read_source("hermes3d.services.module_runtime")
     # The redact_text call must appear in or near the _private_runtime_env block.
-    assert "redact_text" in src, (
-        "module_runtime must import redact_text for safe exception logging"
-    )
+    assert "redact_text" in src, "module_runtime must import redact_text for safe exception logging"
     assert "_private_runtime_env" in src

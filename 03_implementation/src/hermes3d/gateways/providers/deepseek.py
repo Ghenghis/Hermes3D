@@ -101,7 +101,11 @@ def completion_caller(config: ProviderConfig) -> LLMCaller:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
-        model = os.environ.get("HERMES3D_DEEPSEEK_MODEL") or os.environ.get("DEEPSEEK_MODEL") or "deepseek-v4-pro"
+        model = (
+            os.environ.get("HERMES3D_DEEPSEEK_MODEL")
+            or os.environ.get("DEEPSEEK_MODEL")
+            or "deepseek-v4-pro"
+        )
         body = {
             "model": model,
             "messages": [{"role": "user", "content": request.prompt}],

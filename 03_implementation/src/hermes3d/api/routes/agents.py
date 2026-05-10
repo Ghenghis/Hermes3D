@@ -108,7 +108,9 @@ ALLOWED_ATTACHMENT_EXTENSIONS = {
     ".flac",
 }
 FILENAME_RE = re.compile(r"[^A-Za-z0-9._ -]")
-SECRET_RE = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+")
+SECRET_RE = re.compile(
+    r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+"
+)
 
 
 class ChatRequest(BaseModel):
@@ -165,7 +167,11 @@ async def _chat_stream(persona_id: str, body: ChatRequest) -> AsyncIterator[str]
                 (id, persona_id, role, message_type, content)
             VALUES (?, ?, 'system', 'ATTACHMENT_CONTEXT', ?)
             """,
-            (new_id(), persona_id, f"User attached {len(attachments)} local artifact(s):\n{attachment_lines}"),
+            (
+                new_id(),
+                persona_id,
+                f"User attached {len(attachments)} local artifact(s):\n{attachment_lines}",
+            ),
         )
     runtime_url = _trusted_runtime_url()
     if runtime_url:
@@ -194,15 +200,19 @@ async def _chat_stream(persona_id: str, body: ChatRequest) -> AsyncIterator[str]
         yield ": keepalive\n\n"
 
 
-async def _runtime_chat_stream(runtime_url: str, persona_id: str, body: ChatRequest, attachments: list[dict]) -> AsyncIterator[str]:
+async def _runtime_chat_stream(
+    runtime_url: str, persona_id: str, body: ChatRequest, attachments: list[dict]
+) -> AsyncIterator[str]:
     session_id = new_id()
     runtime_model = configured_runtime_model(fallback=persona_id)
     request_body = json.dumps(
-        runtime_request_body({
-            "model": persona_id,
-            "stream": True,
-            "messages": _runtime_messages(persona_id, body, attachments),
-        }),
+        runtime_request_body(
+            {
+                "model": persona_id,
+                "stream": True,
+                "messages": _runtime_messages(persona_id, body, attachments),
+            }
+        ),
         separators=(",", ":"),
     ).encode("utf-8")
     execute(
@@ -219,7 +229,9 @@ async def _runtime_chat_stream(runtime_url: str, persona_id: str, body: ChatRequ
                     "runtime_configured": True,
                     "requested_model": persona_id,
                     "resolved_model": runtime_model,
-                    "active_surface": body.context.get("active_surface") if isinstance(body.context, dict) else None,
+                    "active_surface": body.context.get("active_surface")
+                    if isinstance(body.context, dict)
+                    else None,
                 }
             ),
         ),
@@ -245,10 +257,15 @@ async def _runtime_chat_stream(runtime_url: str, persona_id: str, body: ChatRequ
             upstream.close()
     except urllib.error.HTTPError as exc:
         detail = _redact(exc.read().decode("utf-8", errors="replace"))[:500]
-        yield _blocked_runtime_reply(persona_id, f"Configured Hermes Agent runtime rejected chat request: HTTP {exc.code}: {detail}")
+        yield _blocked_runtime_reply(
+            persona_id,
+            f"Configured Hermes Agent runtime rejected chat request: HTTP {exc.code}: {detail}",
+        )
         return
     except Exception as exc:
-        yield _blocked_runtime_reply(persona_id, f"Configured Hermes Agent runtime is unreachable: {_redact(str(exc))[:500]}")
+        yield _blocked_runtime_reply(
+            persona_id, f"Configured Hermes Agent runtime is unreachable: {_redact(str(exc))[:500]}"
+        )
         return
     if assistant_content.strip():
         execute(
@@ -274,8 +291,13 @@ def _runtime_messages(persona_id: str, body: ChatRequest, attachments: list[dict
         f"Active GUI surface: {active_surface or 'unknown'}."
     )
     if attachment_lines:
-        system += "\nLocal Hermes3D attachments available to inspect:\n" + "\n".join(attachment_lines)
-    message = body.message.strip() or "User attached Hermes3D artifact(s). Inspect the attached context and recommend the safest real next action."
+        system += "\nLocal Hermes3D attachments available to inspect:\n" + "\n".join(
+            attachment_lines
+        )
+    message = (
+        body.message.strip()
+        or "User attached Hermes3D artifact(s). Inspect the attached context and recommend the safest real next action."
+    )
     return [{"role": "system", "content": system}, {"role": "user", "content": message}]
 
 
@@ -327,7 +349,9 @@ def _openai_sse_content(frame: str) -> str:
 
 
 def _redact(value: str) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value)
+    return SECRET_RE.sub(
+        lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value
+    )
 
 
 @router.post("/api/agents/{persona_id}/chat")
@@ -338,7 +362,9 @@ async def chat(persona_id: str, body: ChatRequest) -> StreamingResponse:
 @router.post("/api/agents/{persona_id}/attachments", status_code=201)
 async def upload_attachment(persona_id: str, request: Request) -> dict:
     _require_persona(persona_id)
-    filename = _safe_filename(request.query_params.get("filename") or request.headers.get("x-hermes-filename") or "")
+    filename = _safe_filename(
+        request.query_params.get("filename") or request.headers.get("x-hermes-filename") or ""
+    )
     if not filename:
         raise HTTPException(status_code=400, detail="filename is required")
     extension = Path(filename).suffix.lower()
@@ -355,7 +381,9 @@ async def upload_attachment(persona_id: str, request: Request) -> dict:
     if not body:
         raise HTTPException(status_code=400, detail="attachment body is empty")
     if len(body) > MAX_ATTACHMENT_BYTES:
-        raise HTTPException(status_code=413, detail=f"attachment exceeds {MAX_ATTACHMENT_BYTES} bytes")
+        raise HTTPException(
+            status_code=413, detail=f"attachment exceeds {MAX_ATTACHMENT_BYTES} bytes"
+        )
     artifact_id = new_id()
     digest = hashlib.sha256(body).hexdigest()
     storage = DB_PATH.parent / "agent_uploads" / persona_id
@@ -374,7 +402,10 @@ async def upload_attachment(persona_id: str, request: Request) -> dict:
             filename,
             str(target),
             len(body),
-            json.dumps({"content_type": content_type, "sha256": digest, "source": "hermes_agent_chat"}, sort_keys=True),
+            json.dumps(
+                {"content_type": content_type, "sha256": digest, "source": "hermes_agent_chat"},
+                sort_keys=True,
+            ),
         ),
     )
     execute(
@@ -383,7 +414,11 @@ async def upload_attachment(persona_id: str, request: Request) -> dict:
             (id, persona_id, role, message_type, content)
         VALUES (?, ?, 'system', 'ATTACHMENT_UPLOADED', ?)
         """,
-        (new_id(), persona_id, f"Attachment uploaded: {filename} ({len(body)} bytes, artifact {artifact_id})"),
+        (
+            new_id(),
+            persona_id,
+            f"Attachment uploaded: {filename} ({len(body)} bytes, artifact {artifact_id})",
+        ),
     )
     artifact = row("SELECT * FROM artifacts WHERE id = ?", (artifact_id,))
     return {"uploaded": True, "artifact": artifact}
@@ -408,15 +443,32 @@ def clear_history(persona_id: str) -> dict:
 @router.post("/api/agents/{persona_id}/confirm-action/{action_id}")
 def confirm_action(persona_id: str, action_id: str) -> dict:
     action = _pending_action(persona_id, action_id)
-    execute("UPDATE agent_autonomous_actions SET outcome = ? WHERE id = ?", ("confirmed", action_id))
-    return {"persona_id": persona_id, "action_id": action_id, "decision": "confirmed", "recorded": True, "session_id": action["session_id"]}
+    execute(
+        "UPDATE agent_autonomous_actions SET outcome = ? WHERE id = ?", ("confirmed", action_id)
+    )
+    return {
+        "persona_id": persona_id,
+        "action_id": action_id,
+        "decision": "confirmed",
+        "recorded": True,
+        "session_id": action["session_id"],
+    }
 
 
 @router.post("/api/agents/{persona_id}/deny-action/{action_id}")
 def deny_action(persona_id: str, action_id: str) -> dict:
     action = _pending_action(persona_id, action_id)
-    execute("UPDATE agent_autonomous_actions SET outcome = ?, veto_reason = COALESCE(veto_reason, ?) WHERE id = ?", ("denied", "Denied by operator", action_id))
-    return {"persona_id": persona_id, "action_id": action_id, "decision": "denied", "recorded": True, "session_id": action["session_id"]}
+    execute(
+        "UPDATE agent_autonomous_actions SET outcome = ?, veto_reason = COALESCE(veto_reason, ?) WHERE id = ?",
+        ("denied", "Denied by operator", action_id),
+    )
+    return {
+        "persona_id": persona_id,
+        "action_id": action_id,
+        "decision": "denied",
+        "recorded": True,
+        "session_id": action["session_id"],
+    }
 
 
 @router.post("/api/agents/{persona_id}/actions/{action_id}")
@@ -566,13 +618,17 @@ def action_catalog() -> dict:
     counts = Counter(contract["status"] for contract in contracts)
     public_contracts = [_public_action_contract(contract) for contract in contracts]
     return {
-        "status": "in_progress" if counts.get("blocked", 0) or counts.get("partial", 0) else "ready",
+        "status": "in_progress"
+        if counts.get("blocked", 0) or counts.get("partial", 0)
+        else "ready",
         "summary": "Hermes Agents can use any Hermes3D OS feature only after that feature has a cataloged backend action, safety policy, proof event, and ready/blocked state.",
         "contract_version": "agent-operator-contract-v1",
         "counts": dict(sorted(counts.items())),
         "total": len(contracts),
         "ready_now": [contract["id"] for contract in contracts if contract["status"] == "ready"],
-        "blocked_or_partial": [contract["id"] for contract in contracts if contract["status"] != "ready"],
+        "blocked_or_partial": [
+            contract["id"] for contract in contracts if contract["status"] != "ready"
+        ],
         "contracts": public_contracts,
     }
 
@@ -586,7 +642,12 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
         proof_event_id = _append_agent_proof(
             "hermes_agent.action.blocked",
             actor,
-            {"action_id": action_id, "status": "blocked", "reason": "action_not_registered", "requested_reason": requested_reason},
+            {
+                "action_id": action_id,
+                "status": "blocked",
+                "reason": "action_not_registered",
+                "requested_reason": requested_reason,
+            },
         )
         return {
             "action_id": action_id,
@@ -623,7 +684,12 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
         proof_event_id = _append_agent_proof(
             "hermes_agent.action.failed",
             actor,
-            {"action_id": action_id, "handler": handler, "status": "failed", "reason": _redact(str(exc))[:500]},
+            {
+                "action_id": action_id,
+                "handler": handler,
+                "status": "failed",
+                "reason": _redact(str(exc))[:500],
+            },
         )
         return {
             "action_id": action_id,
@@ -641,7 +707,9 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
             "handler": handler,
             "status": "completed",
             "result_status": _result_status(result),
-            "result_sha256": hashlib.sha256(json.dumps(_proof_safe_result(result), sort_keys=True, default=str).encode("utf-8")).hexdigest(),
+            "result_sha256": hashlib.sha256(
+                json.dumps(_proof_safe_result(result), sort_keys=True, default=str).encode("utf-8")
+            ).hexdigest(),
             "requested_reason": requested_reason,
         },
     )
@@ -658,11 +726,25 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
 def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) -> dict:
     if handler.startswith("agents.playwright."):
         scope = handler.rsplit(".", 1)[-1]
-        persona_id = str(payload.get("persona_id") or (actor if actor in PERSONAS else "oliver-qa-agent"))
-        return playwright_run(persona_id, AgentPlaywrightRunRequest(scope=scope, reason=str(payload.get("reason") or "Hermes Agent operator catalog proof")))
+        persona_id = str(
+            payload.get("persona_id") or (actor if actor in PERSONAS else "oliver-qa-agent")
+        )
+        return playwright_run(
+            persona_id,
+            AgentPlaywrightRunRequest(
+                scope=scope,
+                reason=str(payload.get("reason") or "Hermes Agent operator catalog proof"),
+            ),
+        )
     if handler == "agents.health":
         probe = runtime_probe()
-        return {"ready": bool(probe["ready"]), "status": probe["status"], "reason": probe["reason"], "model": probe.get("model"), "latency_ms": probe.get("latency_ms")}
+        return {
+            "ready": bool(probe["ready"]),
+            "status": probe["status"],
+            "reason": probe["reason"],
+            "model": probe.get("model"),
+            "latency_ms": probe.get("latency_ms"),
+        }
     if handler == "code.programming_readiness":
         from hermes3d.services import code_history
 
@@ -954,7 +1036,9 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
     if handler == "code.mcp_locks.heartbeat":
         from hermes3d.services import code_history
 
-        return code_history.heartbeat_mcp_task(owner=actor, task_id=_required_payload_text(payload, "task_id"))
+        return code_history.heartbeat_mcp_task(
+            owner=actor, task_id=_required_payload_text(payload, "task_id")
+        )
     if handler == "code.mcp_locks.release_files":
         from hermes3d.services import code_history
 
@@ -1117,7 +1201,11 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         if not candidate_id:
             workbench = learning_route.idle_workbench()
             for candidate in workbench.get("candidates", []):
-                if isinstance(candidate, dict) and candidate.get("kind") == "research" and candidate.get("status") in {"queued", "ready_for_review"}:
+                if (
+                    isinstance(candidate, dict)
+                    and candidate.get("kind") == "research"
+                    and candidate.get("status") in {"queued", "ready_for_review"}
+                ):
                     candidate_id = str(candidate.get("id") or "")
                     break
         if not candidate_id:
@@ -1135,8 +1223,13 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
             )
             candidate_id = str((created.get("candidate") or {}).get("id") or "")
         if not candidate_id:
-            raise HTTPException(status_code=409, detail={"reason": "No runnable research candidate is available."})
-        return learning_route.run_idle_candidate(candidate_id, learning_route.IdleCandidateRun(actor=actor, notes=str(payload.get("notes") or "")))
+            raise HTTPException(
+                status_code=409, detail={"reason": "No runnable research candidate is available."}
+            )
+        return learning_route.run_idle_candidate(
+            candidate_id,
+            learning_route.IdleCandidateRun(actor=actor, notes=str(payload.get("notes") or "")),
+        )
     if handler == "printers.refresh":
         from hermes3d.api.routes import printers as printers_route
 
@@ -1167,17 +1260,27 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
     if handler == "autopilot.guardrails":
         from hermes3d.api.routes import autopilot as autopilot_route
 
-        return {"status": "ready", "readiness": autopilot_route.readiness(), "guardrails": autopilot_route.guardrails()}
+        return {
+            "status": "ready",
+            "readiness": autopilot_route.readiness(),
+            "guardrails": autopilot_route.guardrails(),
+        }
     if handler == "design.intake":
         from hermes3d.api.routes import design as design_route
 
         prompt = str(payload.get("prompt") or "parametric desk organizer")
-        constraints = payload.get("constraints") if isinstance(payload.get("constraints"), dict) else {}
-        return design_route.submit_intake(design_route.DesignIntake(prompt=prompt, constraints=constraints))
+        constraints = (
+            payload.get("constraints") if isinstance(payload.get("constraints"), dict) else {}
+        )
+        return design_route.submit_intake(
+            design_route.DesignIntake(prompt=prompt, constraints=constraints)
+        )
     if handler == "generation.run":
         from hermes3d.api.routes import generation as generation_route
 
-        constraints = payload.get("constraints") if isinstance(payload.get("constraints"), dict) else {}
+        constraints = (
+            payload.get("constraints") if isinstance(payload.get("constraints"), dict) else {}
+        )
         request = generation_route.GenerationRun(
             prompt=str(payload.get("prompt") or "calibration cube"),
             seed=int(payload.get("seed") or 3201),
@@ -1200,23 +1303,43 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         if transition == "cancel":
             return jobs_route.cancel_job(job_id)
         if transition == "repair_propose":
-            return jobs_route.propose_repair(job_id, jobs_route.JobActorRequest(actor=actor, reason=reason))
+            return jobs_route.propose_repair(
+                job_id, jobs_route.JobActorRequest(actor=actor, reason=reason)
+            )
         if transition == "repair_apply":
-            return jobs_route.apply_repair(job_id, jobs_route.JobActorRequest(actor=actor, reason=reason))
+            return jobs_route.apply_repair(
+                job_id, jobs_route.JobActorRequest(actor=actor, reason=reason)
+            )
         if transition == "retry":
-            return jobs_route.retry_job(job_id, jobs_route.JobActorRequest(actor=actor, reason=reason))
+            return jobs_route.retry_job(
+                job_id, jobs_route.JobActorRequest(actor=actor, reason=reason)
+            )
         if transition == "rollback":
             return jobs_route.rollback_job(
                 job_id,
-                jobs_route.JobRollbackRequest(actor=actor, reason=reason, target_artifact_id=str(payload.get("target_artifact_id") or "") or None),
+                jobs_route.JobRollbackRequest(
+                    actor=actor,
+                    reason=reason,
+                    target_artifact_id=str(payload.get("target_artifact_id") or "") or None,
+                ),
             )
-        raise HTTPException(status_code=422, detail={"reason": "Unsupported job transition.", "allowed": ["cancel", "repair_propose", "repair_apply", "retry", "rollback"]})
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "reason": "Unsupported job transition.",
+                "allowed": ["cancel", "repair_propose", "repair_apply", "retry", "rollback"],
+            },
+        )
     if handler == "artifacts.list":
         from hermes3d.api.routes import artifacts as artifacts_route
 
         job_id = str(payload.get("job_id") or "").strip() or None
         artifact_rows = artifacts_route.list_artifacts(job_id=job_id)
-        count = len(artifact_rows) if isinstance(artifact_rows, list) else sum(len(items) for items in artifact_rows.values())
+        count = (
+            len(artifact_rows)
+            if isinstance(artifact_rows, list)
+            else sum(len(items) for items in artifact_rows.values())
+        )
         return {"status": "ready", "count": count, "artifacts": artifact_rows}
     if handler == "approvals.list":
         from hermes3d.api.routes import approvals as approvals_route
@@ -1234,7 +1357,10 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
             return approvals_route.approve(approval_id, approvals_route.ApprovalNotes(notes=notes))
         if decision == "reject":
             return approvals_route.reject(approval_id, approvals_route.ApprovalNotes(reason=notes))
-        raise HTTPException(status_code=422, detail={"reason": "Unsupported approval decision.", "allowed": ["approve", "reject"]})
+        raise HTTPException(
+            status_code=422,
+            detail={"reason": "Unsupported approval decision.", "allowed": ["approve", "reject"]},
+        )
     if handler == "plugins.list":
         from hermes3d.api.routes import plugins as plugins_route
 
@@ -1290,17 +1416,37 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
         artifact_id = _required_payload_text(payload, "artifact_id")
         artifact = row("SELECT * FROM artifacts WHERE id = ?", (artifact_id,))
         if not artifact:
-            raise HTTPException(status_code=404, detail={"reason": "Audio artifact not found.", "artifact_id": artifact_id})
+            raise HTTPException(
+                status_code=404,
+                detail={"reason": "Audio artifact not found.", "artifact_id": artifact_id},
+            )
         audio_path = Path(str(artifact.get("file_path") or ""))
         if not audio_path.exists() or not audio_path.is_file():
-            raise HTTPException(status_code=404, detail={"reason": "Audio artifact file not found.", "artifact_id": artifact_id})
+            raise HTTPException(
+                status_code=404,
+                detail={"reason": "Audio artifact file not found.", "artifact_id": artifact_id},
+            )
         audio = audio_path.read_bytes()
         if len(audio) > voice_route.MAX_STT_AUDIO_BYTES:
-            raise HTTPException(status_code=413, detail={"reason": "Audio artifact is too large for speech transcription.", "bytes": len(audio)})
+            raise HTTPException(
+                status_code=413,
+                detail={
+                    "reason": "Audio artifact is too large for speech transcription.",
+                    "bytes": len(audio),
+                },
+            )
         config = voice_route._azure_config()
         if not config["configured"]:
-            proof_event_id = voice_route._append_voice_proof("voice.stt.blocked", {"status": "not_configured", "artifact_id": artifact_id})
-            return {"accepted": False, "configured": False, "status": "not_configured", "reason": "Azure Speech credentials are not configured in the private runtime env.", "proof_event_id": proof_event_id}
+            proof_event_id = voice_route._append_voice_proof(
+                "voice.stt.blocked", {"status": "not_configured", "artifact_id": artifact_id}
+            )
+            return {
+                "accepted": False,
+                "configured": False,
+                "status": "not_configured",
+                "reason": "Azure Speech credentials are not configured in the private runtime env.",
+                "proof_event_id": proof_event_id,
+            }
         transcript = voice_route._azure_fast_transcribe(
             config,
             audio,
@@ -1316,11 +1462,21 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
                 "bytes": len(audio),
                 "locale": str(payload.get("locale") or "en-US"),
                 "provider": "azure_fast_transcription",
-                "transcript_sha256": hashlib.sha256(transcript["transcript"].encode("utf-8")).hexdigest(),
+                "transcript_sha256": hashlib.sha256(
+                    transcript["transcript"].encode("utf-8")
+                ).hexdigest(),
                 "phrase_count": transcript["phrase_count"],
             },
         )
-        return {"accepted": True, "configured": True, "status": "ready", "provider": "azure", **transcript, "bytes": len(audio), "proof_event_id": proof_event_id}
+        return {
+            "accepted": True,
+            "configured": True,
+            "status": "ready",
+            "provider": "azure",
+            **transcript,
+            "bytes": len(audio),
+            "proof_event_id": proof_event_id,
+        }
     if handler == "roadmap.operator_coverage":
         from hermes3d.api.routes import roadmap as roadmap_route
 
@@ -1336,7 +1492,10 @@ def _execute_catalog_handler(handler: str, actor: str, payload: dict[str, Any]) 
 def _agent_action_contracts() -> list[dict[str, Any]]:
     cached_contracts = _ACTION_CONTRACT_CACHE.get("contracts")
     cached_at = float(_ACTION_CONTRACT_CACHE.get("ts") or 0.0)
-    if isinstance(cached_contracts, list) and (time.monotonic() - cached_at) < ACTION_CONTRACT_CACHE_TTL_S:
+    if (
+        isinstance(cached_contracts, list)
+        and (time.monotonic() - cached_at) < ACTION_CONTRACT_CACHE_TTL_S
+    ):
         return [dict(contract) for contract in cached_contracts]
     source_counts = _source_action_counts()
     runtime = _runtime_action_counts()
@@ -1358,104 +1517,1157 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         e2e_readiness = code_history.agent_e2e_readiness()
         cli_runners = code_history.code_cli_runners()
     except Exception:
-        mcp_locks = {"ready": False, "blocked_reason": "Hermes MCP lock readiness could not be evaluated."}
-        provider_teams = {"ready": False, "status": "blocked", "blocked_reasons": ["Hermes Agent provider-team readiness could not be evaluated."]}
-        e2e_readiness = {"ready": False, "status": "blocked", "blocked_reasons": ["Hermes Agent E2E readiness could not be evaluated."]}
-        cli_runners = {"status": "blocked", "detected": 0, "runners": [], "policy": {"write_runs_allowed": False}}
-    team_blocked_reason = "; ".join(str(item) for item in provider_teams.get("blocked_reasons", [])[:4]) if provider_teams.get("blocked_reasons") else None
-    e2e_blocked_reason = "; ".join(str(item) for item in e2e_readiness.get("blocked_reasons", [])[:4]) if e2e_readiness.get("blocked_reasons") else None
+        mcp_locks = {
+            "ready": False,
+            "blocked_reason": "Hermes MCP lock readiness could not be evaluated.",
+        }
+        provider_teams = {
+            "ready": False,
+            "status": "blocked",
+            "blocked_reasons": ["Hermes Agent provider-team readiness could not be evaluated."],
+        }
+        e2e_readiness = {
+            "ready": False,
+            "status": "blocked",
+            "blocked_reasons": ["Hermes Agent E2E readiness could not be evaluated."],
+        }
+        cli_runners = {
+            "status": "blocked",
+            "detected": 0,
+            "runners": [],
+            "policy": {"write_runs_allowed": False},
+        }
+    team_blocked_reason = (
+        "; ".join(str(item) for item in provider_teams.get("blocked_reasons", [])[:4])
+        if provider_teams.get("blocked_reasons")
+        else None
+    )
+    e2e_blocked_reason = (
+        "; ".join(str(item) for item in e2e_readiness.get("blocked_reasons", [])[:4])
+        if e2e_readiness.get("blocked_reasons")
+        else None
+    )
     cli_runner_count = int(cli_runners.get("detected") or 0) if isinstance(cli_runners, dict) else 0
     contracts = [
-        _contract("agents.health.refresh", "Refresh Hermes Agent runtime health", "agents", "ready" if runtime.get("hermes_agent_runtime") == "ready" else "blocked", "read", "low", "GET /api/agents/health", "agents.health", "Checks the configured local/private agent runtime bridge."),
-        _contract("code.programming_readiness.refresh", "Refresh Hermes Agent programming readiness", "agents", "ready", "read", "low", "GET /api/code-operator/programming-readiness", "code.programming_readiness", "Checks true source inputs from Nous Hermes Agent and Atomic Hermes plus MiniMax/DeepSeek provider readiness."),
-        _contract("code.teams.readiness.refresh", "Refresh Hermes Agent team readiness", "agents", str(provider_teams.get("status") or "blocked"), "read", "low", "GET /api/code-operator/teams/readiness", "code.teams.readiness", "Checks MiniMax builder and DeepSeek reviewer team readiness without exposing provider secrets.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
-        _contract("code.providers.smoke", "Run live provider smoke proof", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/providers/smoke", "code.providers.smoke", "Calls MiniMax or DeepSeek through the same bounded OpenAI-compatible chat path used by coding/review passes and records pass/blocked evidence without exposing secrets.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for provider proof.")),
-        _contract("code.e2e.readiness.refresh", "Refresh Agent Code Workbench readiness", "agents", "ready" if e2e_readiness.get("ready") else "blocked", "read", "low", "GET /api/code-operator/e2e/readiness", "code.e2e.readiness", "Checks folder index, MCP locks, MiniMax builder, DeepSeek reviewer, snapshots, and proof prerequisites for Hermes Agents coding alongside Codex.", None if e2e_readiness.get("ready") else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready.")),
-        _contract("code.cli_runners.readiness.refresh", "Refresh OpenHands/OpenCode CLI readiness", "agents", "ready", "read", "low", "GET /api/code-operator/cli-runners", "code.cli_runners.readiness", f"Detects OpenHands and OpenCode CLI binaries for future sandboxed agent delegation; current contract is detection/version only, no writes. Detected now: {cli_runner_count}."),
-        _contract("code.e2e.run", "Run proof-gated Agent Code Workbench job", "agents", "ready" if e2e_readiness.get("ready") else "blocked", "artifact", "high", "POST /api/code-operator/e2e/jobs", "code.e2e.run", "Runs the real folder-index -> task claim -> file lock -> pre-snapshot -> MiniMax coding pass -> DeepSeek review pass loop and returns a reviewed patch-planning artifact. It does not mutate source directly.", None if e2e_readiness.get("ready") else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready.")),
-        _contract("code.teams.assign_task", "Assign provider-backed code task", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/assign-task", "code.teams.assign_task", "Records a proof-backed provider-team coding task only after selected source, provider, and MCP lock prerequisites are ready.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent provider teams are not ready.")),
-        _contract("code.teams.request_review", "Request second-team code review", "agents", "ready" if provider_teams.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/teams/request-review", "code.teams.request_review", "Requests a proof-backed DeepSeek/Atomic Hermes review for files and proof ids before PR shipping.", None if provider_teams.get("ready") else (team_blocked_reason or "Hermes Agent reviewer team is not ready.")),
-        _contract("code.teams.run_coding_pass", "Run MiniMax coding plan pass", "agents", "ready" if provider_teams.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/teams/run-coding-pass", "code.teams.run_coding_pass", "Calls the configured MiniMax builder through a bounded OpenAI-compatible chat request and records a code-plan artifact; it does not edit source files.", None if provider_teams.get("ready") else (team_blocked_reason or "MiniMax builder team is not ready.")),
-        _contract("code.teams.run_review_pass", "Run DeepSeek review pass", "agents", "ready" if provider_teams.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/teams/run-review-pass", "code.teams.run_review_pass", "Calls the configured DeepSeek reviewer through a bounded OpenAI-compatible chat request and records a review artifact tied to proof ids.", None if provider_teams.get("ready") else (team_blocked_reason or "DeepSeek reviewer team is not ready.")),
-        _contract("code.mcp_locks.readiness.refresh", "Refresh Hermes MCP lock readiness", "agents", "ready" if mcp_locks.get("ready") else "partial", "read", "low", "GET /api/code-operator/mcp-locks/readiness", "code.mcp_locks.readiness", "Checks that the Hermes Agent runtime has hermes3d-locks source/server access and that MCP_LOCK_WORKSPACE matches the actual edit workspace before write tools can enable.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes.")),
-        _contract("code.write_readiness.refresh", "Refresh Hermes Agent write readiness", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/write/readiness", "code.write.readiness", "Explains whether Hermes Agents may enable patch/apply/command/git coding tools yet. Read-only context stays available; write tools stay blocked until locks, source inputs, providers, snapshots, and proof gates are ready.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes.")),
-        _contract("code.history.files.refresh", "Refresh agent-touched file history", "agents", "ready", "read", "low", "GET /api/code-operator/history/files", "code.history.files", "Lists files already snapshotted by Hermes Agent code operations."),
-        _contract("code.history.snapshot", "Snapshot a Hermes3D source file", "agents", "ready", "artifact", "medium", "POST /api/code-operator/history/snapshots", "code.history.snapshot", "Creates a pre-change snapshot and proof event before an agent edits a source file."),
-        _contract("code.repo.status.refresh", "Refresh Hermes3D repo status", "agents", "ready", "read", "low", "GET /api/code-operator/repo/status", "code.repo.status", "Reads branch, commit, dirty files, and diff stat so agents know the current project state before planning."),
-        _contract("code.repo.tree.refresh", "Read bounded Hermes3D repo tree", "agents", "ready", "read", "low", "GET /api/code-operator/repo/tree", "code.repo.tree", "Returns a bounded project-relative file tree while excluding secrets, generated output, caches, node_modules, and VCS internals."),
-        _contract("code.repo.search", "Search Hermes3D source text", "agents", "ready", "read", "low", "POST /api/code-operator/repo/search", "code.repo.search", "Runs bounded ripgrep against allowed project paths and returns path, line, column, and excerpt for agent planning."),
-        _contract("code.file.read", "Read bounded Hermes3D source slice", "agents", "ready", "read", "low", "POST /api/code-operator/files/read", "code.file.read", "Reads a bounded line slice from an allowed project text file with a content hash for proof."),
-        _contract("code.patch.propose", "Propose a Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "artifact", "medium", "POST /api/code-operator/patch/proposals", "code.patch.propose", "Creates a pre-snapshot, hash-checks the target, writes a reviewable patch proposal artifact, and appends proof without mutating source files.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch proposals.")),
-        _contract("code.patch.apply", "Apply MCP-locked Hermes3D source patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply", "code.patch.apply", "Applies an existing patch proposal only with a same-owner Hermes MCP file lock for the target, records pre/post snapshots, and appends chained MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code patch apply.")),
-        _contract("code.patch.apply_reviewed", "Apply reviewed MCP-locked patch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/patch/apply-reviewed", "code.patch.apply_reviewed", "Applies a patch proposal only after same-owner MCP lock checks and at least one review/proof id, then records reviewed-apply evidence for gate/PR shipping.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for reviewed patch apply.")),
-        _contract("code.gates.list.refresh", "List Hermes MCP code gates", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/gates", "code.gates.list", "Lists gates exposed by the exact-worktree hermes3d-locks MCP server; no arbitrary shell is exposed.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
-        _contract("code.gate.run", "Run Hermes MCP allowlisted gate", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/gates/run", "code.gate.run", "Runs one allowlisted hermes3d-locks MCP gate in the exact edit worktree and stores the gate result in the MCP evidence ledger.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates.")),
-        _contract("code.git.readiness.refresh", "Refresh Hermes Agent git shipping readiness", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/git/readiness", "code.git.readiness", "Shows whether the current branch, dirty files, snapshots, and MCP lock prerequisites allow agent branch/commit/push/PR work.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
-        _contract("code.git.branch", "Create Hermes Agent git branch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/branch", "code.git.branch", "Creates only codex/ or hermes-agent/ branches from a clean worktree and records MCP evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
-        _contract("code.git.stage_owned", "Stage snapshotted locked files", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/stage-owned", "code.git.stage_owned", "Stages only files that are changed, source-allowed, snapshotted by the same agent, and covered by an active same-owner MCP file lock.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
-        _contract("code.git.commit_owned", "Commit snapshotted Hermes Agent changes", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/commit-owned", "code.git.commit_owned", "Commits only the same snapshotted locked file set and embeds supplied proof ids in the commit message.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
-        _contract("code.git.push", "Push Hermes Agent branch", "agents", "ready" if mcp_locks.get("ready") else "blocked", "mutate", "high", "POST /api/code-operator/git/push", "code.git.push", "Pushes the current codex/ or hermes-agent/ branch to origin without force after the worktree is clean.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
-        _contract("code.git.pr", "Open Hermes Agent pull request", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "high", "POST /api/code-operator/git/pr", "code.git.pr", "Opens a GitHub PR for the current safe agent branch through the authenticated gh CLI and records evidence.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work.")),
-        _contract("code.mcp_locks.state.refresh", "Refresh Hermes MCP lock state", "agents", "ready" if mcp_locks.get("ready") else "blocked", "read", "low", "GET /api/code-operator/mcp-locks/state", "code.mcp_locks.state", "Reads exact-worktree Hermes lock/task/evidence state before coding work.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("code.mcp_locks.claim_task", "Claim Hermes MCP code task", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/claim-task", "code.mcp_locks.claim_task", "Claims a task through hermes3d-locks before any file lock or write.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("code.mcp_locks.lock_files", "Lock Hermes3D code files", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/lock-files", "code.mcp_locks.lock_files", "Atomically locks project-relative files through hermes3d-locks; denied paths and unsafe file types fail closed.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("code.mcp_locks.heartbeat", "Heartbeat Hermes MCP code task", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "low", "POST /api/code-operator/mcp-locks/heartbeat", "code.mcp_locks.heartbeat", "Refreshes task/file-lock TTL while an agent is working.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("code.mcp_locks.evidence", "Append Hermes MCP evidence", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/evidence", "code.mcp_locks.evidence", "Appends hash-chained proof to the exact-worktree Hermes ledger.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("code.mcp_locks.release_files", "Release Hermes MCP file locks", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/release-files", "code.mcp_locks.release_files", "Releases files after evidence and gates are recorded.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("code.mcp_locks.release_task", "Release Hermes MCP code task", "agents", "ready" if mcp_locks.get("ready") else "blocked", "proof", "medium", "POST /api/code-operator/mcp-locks/release-task", "code.mcp_locks.release_task", "Completes a claimed code task after its file locks have been released.", None if mcp_locks.get("ready") else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready.")),
-        _contract("dashboard.snapshot.refresh", "Refresh dashboard truth snapshot", "dashboard", "ready", "read", "low", "GET dashboard aggregate", "dashboard.snapshot", "Reads system, printer, job, and notification state for the main dashboard."),
-        _contract("agents.playwright.observe", "Run Observe Playwright proof", "agents", "ready", "proof", "low", "POST /api/agents/{persona_id}/playwright-run", "agents.playwright.observe", "Use the existing persona-scoped Playwright runner with scope=observe."),
-        _contract("agents.playwright.smoke", "Run smoke Playwright proof", "agents", "ready", "proof", "medium", "POST /api/agents/{persona_id}/playwright-run", "agents.playwright.smoke", "Use the existing persona-scoped Playwright runner with scope=smoke."),
-        _contract("agents.playwright.full", "Run full Playwright proof", "agents", "ready", "proof", "medium", "POST /api/agents/{persona_id}/playwright-run", "agents.playwright.full", "Use the existing persona-scoped Playwright runner with scope=full."),
-        _contract("source.modules.refresh", "Refresh Source OS module rows", "source_os", "ready", "read", "low", "GET /api/modules", "source.modules", "Returns the 60 source-backed module registry rows."),
-        _contract("source.verify_all", "Verify all Source OS runtimes", "source_os", "ready", "proof", "low", "POST /api/modules/runtime/verify-all", "source.verify_all", f"Runs registered safe verifiers only. Current proof target: {source_ready} ready rows, {source_gaps} runner gaps."),
-        _contract("source.plan_setup_queue", "Plan Source OS setup queue", "source_os", "ready", "plan", "low", "POST /api/modules/runtime/setup-queue", "source.plan_setup_queue", "Creates a proof-backed plan; it does not run unregistered installers."),
-        _contract("source.update_readiness.refresh", "Refresh Source OS update readiness", "source_os", "ready", "read", "low", "GET /api/modules/update/readiness", "source.update_readiness", "Reads update readiness without fetch, pull, build, install, or update side effects."),
-        _contract("source.runtime_gaps.refresh", "Refresh Source OS runner gaps", "source_os", "ready", "read", "low", "GET /api/modules/runtime/gaps", "source.runtime_gaps", f"Shows {source_gaps} source-app runner gaps that still block full agent app operation."),
-        _contract("source.runner_contracts.refresh", "Refresh Source OS runner contracts", "source_os", "ready", "read", "low", "GET /api/modules/runtime/runner-contracts", "source.runner_contracts", "Returns the 60-row Hermes Agent execution contract matrix; only rows with agent_executable=true may run app actions. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read executable metadata; python_import_repair_available rows may only read source/dependency metadata; npm_package_preflight_available rows may only read package metadata/script names."),
-        _contract("source.runner_contract.refresh", "Refresh one Source OS runner contract", "source_os", "ready", "read", "low", "GET /api/modules/{module_id}/runtime/runner-contract", "source.runner_contract", "Returns the proof gate, safe actions, and exact blocked reason for one source-backed app."),
-        _contract("source.read_only_runner.smoke", "Run Source OS read-only runner smoke", "source_os", "ready" if read_only_runners else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/read-only-runner", "source.read_only_runner.smoke", f"Reruns only registered package/import/local API verifier proof for {read_only_runners} eligible rows; no setup, install, update, launch, file output, or printer action."),
-        _contract("source.executable_path_runner.smoke", "Run Source OS executable path smoke", "source_os", "ready" if executable_path_runners else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/executable-path-runner", "source.executable_path_runner.smoke", f"Reads only installed executable metadata/hash proof for {executable_path_runners} eligible desktop launcher rows; no app launch, setup, install, update, file output, or printer action."),
-        _contract("source.python_import_repair.preflight", "Preflight Source OS Python import repair", "source_os", "ready" if python_import_repairs else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/python-import-repair-runner", "source.python_import_repair.preflight", f"Reads failed Python import proof plus source/dependency metadata for {python_import_repairs} eligible CAD/modeling rows; no package install, environment creation, worker start, output write, or printer action."),
-        _contract("source.cli_install_config.preflight", "Preflight Source OS slicer CLI install/config", "source_os", "ready" if cli_install_configs else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/cli-install-config-runner", "source.cli_install_config.preflight", f"Reads Slic3r/SuperSlicer source, adapter schema, profile/config, and candidate executable metadata for {cli_install_configs} eligible rows; no install, launch, slicing, output write, or printer action."),
-        _contract("source.npm_package.preflight", "Preflight Source OS npm package metadata", "source_os", "ready" if npm_package_preflights else "partial", "proof", "low", "POST /api/modules/{module_id}/runtime/npm-package-runner", "source.npm_package.preflight", f"Reads package.json metadata, script names, lockfile/manifests, and local node/npm executable presence for {npm_package_preflights} eligible npm rows; no npm install, npm run, process start, output write, update, or printer action."),
-        _contract("source.service_runner.start", "Start supervised Source OS service runner", "source_os", "partial", "mutate", "high", "POST /api/modules/{module_id}/runtime/start-runner", "source.service_runner.start", "Runs only a registered local/private service command through the Source OS supervisor, then requires live health proof before runtime-ready.", "Per-module start still blocks unless its runner contract preflight passes; use execute=false for proof-only preflight."),
-        _contract("source.service_runner.stop", "Stop supervised Source OS service runner", "source_os", "ready", "mutate", "medium", "POST /api/modules/{module_id}/runtime/stop-runner", "source.service_runner.stop", "Stops only a PID that the Source OS supervisor previously recorded for the same module."),
-        _contract("source.verifiers.refresh", "Refresh Source OS verifier registry", "source_os", "ready", "read", "low", "GET /api/modules/runtime/verifiers", "source.verifiers", "Shows registered safe runtime verifier rows."),
-        _contract("source.agent_cli_readiness.refresh", "Refresh agent CLI readiness", "source_os", "ready", "read", "low", "GET /api/modules/runtime/agent-cli-readiness", "source.agent_cli_readiness", f"Shows {agent_cli} verified agent CLI runners and {cli_candidates} CLI/service signals needing verifiers."),
-        _contract("source.cli_surface.refresh", "Refresh Source OS CLI surface audit", "source_os", "ready", "read", "low", "GET /api/modules/runtime/cli-surface", "source.cli_surface", "Returns the proof-backed CLI/service surface audit."),
-        _contract("source.update_all", "Update all Source OS apps", "source_os", "partial", "mutate", "high", "PENDING", None, "Blocked until one-click backup, approval, smoke gate, and rollback policy is complete for every app family.", "App update center is partial; agents may plan/check but cannot bulk-update yet."),
-        _contract("source.register_missing_runners", "Execute missing Source OS setup runners", "source_os", "partial", "mutate", "high", "PENDING", None, "Blocked until every runner gap has a registered safe verifier/runner.", f"{source_gaps} Source OS rows still need runner contracts."),
-        _contract("settings.runtime_readiness.refresh", "Refresh runtime readiness ledger", "settings", "ready", "read", "low", "GET /api/system/runtime-readiness", "settings.runtime_readiness", "Shows runtime keys/status without exposing secret values."),
-        _contract("providers.health.refresh", "Refresh provider health", "settings", "ready", "read", "low", "GET /api/providers/health", "providers.health", "Reads local/cloud provider health without exposing secret values."),
-        _contract("learning.idle_workbench.refresh", "Refresh idle workbench", "learning", "ready", "read", "low", "GET /api/learning/idle-workbench", "learning.idle_workbench", "Shows candidate queue, blockers, and per-kind readiness."),
-        _contract("learning.research_report.run", "Run idle research report", "learning", "ready" if idle.get("research") == "ready" else "blocked", "report", "low", "POST /api/learning/idle-workbench/candidates/{id}/run", "learning.research_report", "Runs a report-only idle candidate; no install, merge, upload, move, or print.", None if idle.get("research") == "ready" else "Idle research is blocked until runtime and proof prerequisites are ready."),
-        _contract("learning.documentation.run", "Run idle documentation work", "learning", "ready" if idle.get("documentation") == "ready" else "blocked", "report", "medium", "POST /api/learning/idle-workbench/candidates/{id}/run", None, "Documentation work must wait for quiet-system and proof gates.", None if idle.get("documentation") == "ready" else "Current idle blockers prevent documentation execution."),
-        _contract("learning.app_update.run", "Run idle app update work", "learning", "ready" if idle.get("app_update") == "ready" else "blocked", "mutate", "high", "POST /api/learning/idle-workbench/candidates/{id}/run", None, "App update work stays gated by quiet-system, backup, approval, smoke gate, and rollback.", None if idle.get("app_update") == "ready" else "Current idle blockers or app update gates prevent execution."),
-        _contract("printers.refresh", "Refresh printer fleet", "printers", "ready" if runtime.get("printer_fleet") == "ready" else "partial", "read", "low", "GET /api/printers", "printers.refresh", "Agents can read live/degraded printer telemetry; physical actions use separate gates."),
-        _contract("printers.upload_start", "Upload/start printer job", "printers", "ready", "mutate", "critical", "POST /api/printers/{printer_id}/upload-gcode", "printers.upload_start", "Ready only with job_id, approved PRINT_APPROVAL, passing truth gates, idle printer, and non-S1 target."),
-        _contract("printers.s1_actions", "Move/upload/test/print on S1", "printers", "blocked", "mutate", "critical", "HTTP 423 policy", None, "S1 read-only camera/status remains allowed.", "User policy locks S1 movement, upload, test, and print."),
-        _contract("observe.cameras.refresh", "Refresh Observe camera registry", "observe", "ready", "read", "low", "GET /api/observe/cameras", "observe.cameras", "Returns configured live camera endpoints and view settings."),
-        _contract("observe.capture_evidence", "Capture camera evidence", "observe", "ready", "artifact", "medium", "POST /api/observe/cameras/{printer_id}/capture-evidence", "observe.capture_evidence", "Captures a real camera snapshot artifact when the camera endpoint responds."),
-        _contract("autopilot.guardrails.refresh", "Refresh Autopilot guardrails", "autopilot", "ready", "read", "low", "GET /api/autopilot/readiness + /api/autopilot/guardrails", "autopilot.guardrails", "Shows proof-gated print/action policies."),
-        _contract("design.intake.submit", "Submit bounded design job", "design", "ready" if runtime.get("design_executor") == "ready" else "blocked", "artifact", "medium", "POST /api/design/intake", "design.intake", "Current bounded design executor can generate the supported parametric template with proof."),
-        _contract("design.toolchain.refresh", "Refresh design toolchain", "design", "ready", "read", "low", "GET /api/design/toolchain/status", "design.toolchain", "Reads modeler/CAD/source toolchain status and supported templates."),
-        _contract("generation.services.refresh", "Refresh 3D generation services", "gen3d", "ready", "read", "low", "GET /api/generation/services", "generation.services", "Reads provider/service setup state for 3D generation."),
-        _contract("generation.run.submit", "Submit bounded 3D generation job", "gen3d", "partial" if runtime.get("generation_provider") == "partial" else "ready", "artifact", "medium", "POST /api/generation/run", "generation.run", "Local calibration-cube generation is live; arbitrary external provider generation remains setup-gated."),
-        _contract("jobs.list.refresh", "Refresh jobs", "jobs", "ready", "read", "low", "GET /api/jobs", "jobs.list", "Reads current print/modeling job rows."),
-        _contract("jobs.transition", "Run job repair/retry/rollback transitions", "jobs", "ready", "mutate", "high", "POST /api/jobs/{job_id}/...", "jobs.transition", "Existing transition routes append proof and enforce backend transition state."),
-        _contract("artifacts.list.refresh", "Refresh artifacts", "artifacts", "ready", "read", "low", "GET /api/artifacts", "artifacts.list", "Reads proof/artifact rows for agent context."),
-        _contract("approvals.list.refresh", "Refresh approvals", "approvals", "ready", "read", "low", "GET /api/approvals", "approvals.list", "Reads pending approval rows before any decision action."),
-        _contract("approvals.decide", "Approve or reject pending approvals", "approvals", "ready", "mutate", "high", "POST /api/approvals/{id}/approve|reject", "approvals.decide", "Agents may request approval decisions; operator/user policy decides risky approvals."),
-        _contract("plugins.list.refresh", "Refresh plugins", "plugins", "ready", "read", "low", "GET /api/plugins", "plugins.list", "Reads plugin configuration/readiness state."),
-        _contract("notifications.list.refresh", "Refresh notifications", "notifications", "ready", "read", "low", "GET /api/notifications", "notifications.list", "Reads the live notification inbox."),
-        _contract("proof.bundles.refresh", "Refresh proof bundles", "proof", "ready", "read", "low", "GET /api/proof/bundles", "proof.bundles", "Reads latest proof bundles and file metadata."),
-        _contract("workflows.list.refresh", "Refresh workflows", "workflows", "ready", "read", "low", "GET /api/workflows", "workflows.list", "Reads workflow rows for agent planning context."),
-        _contract("voice.catalog.refresh", "Refresh Azure voice catalog", "voice", "ready" if runtime.get("azure_speech") == "ready" else "blocked", "read", "low", "GET /api/voice/voices", "voice.catalog", "Reads available Azure voices without exposing Azure credentials."),
-        _contract("voice.agents.refresh", "Refresh agent voice assignments", "voice", "ready", "read", "low", "GET /api/voice/agents", "voice.agents", "Reads per-agent voice assignment rows."),
-        _contract("voice.preview", "Preview Azure agent voice", "voice", "ready" if runtime.get("azure_speech") == "ready" else "blocked", "artifact", "low", "POST /api/voice/preview", "voice.preview", "Uses backend-only Azure Speech credentials and proof."),
-        _contract("voice.stt", "Transcribe voice note", "voice", "ready" if runtime.get("azure_speech") == "ready" else "blocked", "artifact", "low", "POST /api/voice/stt", "voice.stt", "Uses backend-only Azure Speech credentials and proof."),
-        _contract("roadmap.operator_coverage.refresh", "Refresh operator coverage truth", "roadmap", "ready", "read", "low", "GET /api/roadmap/tab-completion", "roadmap.operator_coverage", "Returns the live operator action contract summary."),
+        _contract(
+            "agents.health.refresh",
+            "Refresh Hermes Agent runtime health",
+            "agents",
+            "ready" if runtime.get("hermes_agent_runtime") == "ready" else "blocked",
+            "read",
+            "low",
+            "GET /api/agents/health",
+            "agents.health",
+            "Checks the configured local/private agent runtime bridge.",
+        ),
+        _contract(
+            "code.programming_readiness.refresh",
+            "Refresh Hermes Agent programming readiness",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "GET /api/code-operator/programming-readiness",
+            "code.programming_readiness",
+            "Checks true source inputs from Nous Hermes Agent and Atomic Hermes plus MiniMax/DeepSeek provider readiness.",
+        ),
+        _contract(
+            "code.teams.readiness.refresh",
+            "Refresh Hermes Agent team readiness",
+            "agents",
+            str(provider_teams.get("status") or "blocked"),
+            "read",
+            "low",
+            "GET /api/code-operator/teams/readiness",
+            "code.teams.readiness",
+            "Checks MiniMax builder and DeepSeek reviewer team readiness without exposing provider secrets.",
+            None
+            if provider_teams.get("ready")
+            else (team_blocked_reason or "Hermes Agent provider teams are not ready."),
+        ),
+        _contract(
+            "code.providers.smoke",
+            "Run live provider smoke proof",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/providers/smoke",
+            "code.providers.smoke",
+            "Calls MiniMax or DeepSeek through the same bounded OpenAI-compatible chat path used by coding/review passes and records pass/blocked evidence without exposing secrets.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason")
+                or "Hermes MCP locks are not ready for provider proof."
+            ),
+        ),
+        _contract(
+            "code.e2e.readiness.refresh",
+            "Refresh Agent Code Workbench readiness",
+            "agents",
+            "ready" if e2e_readiness.get("ready") else "blocked",
+            "read",
+            "low",
+            "GET /api/code-operator/e2e/readiness",
+            "code.e2e.readiness",
+            "Checks folder index, MCP locks, MiniMax builder, DeepSeek reviewer, snapshots, and proof prerequisites for Hermes Agents coding alongside Codex.",
+            None
+            if e2e_readiness.get("ready")
+            else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready."),
+        ),
+        _contract(
+            "code.cli_runners.readiness.refresh",
+            "Refresh OpenHands/OpenCode CLI readiness",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "GET /api/code-operator/cli-runners",
+            "code.cli_runners.readiness",
+            f"Detects OpenHands and OpenCode CLI binaries for future sandboxed agent delegation; current contract is detection/version only, no writes. Detected now: {cli_runner_count}.",
+        ),
+        _contract(
+            "code.e2e.run",
+            "Run proof-gated Agent Code Workbench job",
+            "agents",
+            "ready" if e2e_readiness.get("ready") else "blocked",
+            "artifact",
+            "high",
+            "POST /api/code-operator/e2e/jobs",
+            "code.e2e.run",
+            "Runs the real folder-index -> task claim -> file lock -> pre-snapshot -> MiniMax coding pass -> DeepSeek review pass loop and returns a reviewed patch-planning artifact. It does not mutate source directly.",
+            None
+            if e2e_readiness.get("ready")
+            else (e2e_blocked_reason or "Hermes Agent E2E workbench is not ready."),
+        ),
+        _contract(
+            "code.teams.assign_task",
+            "Assign provider-backed code task",
+            "agents",
+            "ready" if provider_teams.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/teams/assign-task",
+            "code.teams.assign_task",
+            "Records a proof-backed provider-team coding task only after selected source, provider, and MCP lock prerequisites are ready.",
+            None
+            if provider_teams.get("ready")
+            else (team_blocked_reason or "Hermes Agent provider teams are not ready."),
+        ),
+        _contract(
+            "code.teams.request_review",
+            "Request second-team code review",
+            "agents",
+            "ready" if provider_teams.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/teams/request-review",
+            "code.teams.request_review",
+            "Requests a proof-backed DeepSeek/Atomic Hermes review for files and proof ids before PR shipping.",
+            None
+            if provider_teams.get("ready")
+            else (team_blocked_reason or "Hermes Agent reviewer team is not ready."),
+        ),
+        _contract(
+            "code.teams.run_coding_pass",
+            "Run MiniMax coding plan pass",
+            "agents",
+            "ready" if provider_teams.get("ready") else "blocked",
+            "artifact",
+            "medium",
+            "POST /api/code-operator/teams/run-coding-pass",
+            "code.teams.run_coding_pass",
+            "Calls the configured MiniMax builder through a bounded OpenAI-compatible chat request and records a code-plan artifact; it does not edit source files.",
+            None
+            if provider_teams.get("ready")
+            else (team_blocked_reason or "MiniMax builder team is not ready."),
+        ),
+        _contract(
+            "code.teams.run_review_pass",
+            "Run DeepSeek review pass",
+            "agents",
+            "ready" if provider_teams.get("ready") else "blocked",
+            "artifact",
+            "medium",
+            "POST /api/code-operator/teams/run-review-pass",
+            "code.teams.run_review_pass",
+            "Calls the configured DeepSeek reviewer through a bounded OpenAI-compatible chat request and records a review artifact tied to proof ids.",
+            None
+            if provider_teams.get("ready")
+            else (team_blocked_reason or "DeepSeek reviewer team is not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.readiness.refresh",
+            "Refresh Hermes MCP lock readiness",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "partial",
+            "read",
+            "low",
+            "GET /api/code-operator/mcp-locks/readiness",
+            "code.mcp_locks.readiness",
+            "Checks that the Hermes Agent runtime has hermes3d-locks source/server access and that MCP_LOCK_WORKSPACE matches the actual edit workspace before write tools can enable.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes."
+            ),
+        ),
+        _contract(
+            "code.write_readiness.refresh",
+            "Refresh Hermes Agent write readiness",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "read",
+            "low",
+            "GET /api/code-operator/write/readiness",
+            "code.write.readiness",
+            "Explains whether Hermes Agents may enable patch/apply/command/git coding tools yet. Read-only context stays available; write tools stay blocked until locks, source inputs, providers, snapshots, and proof gates are ready.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for code writes."
+            ),
+        ),
+        _contract(
+            "code.history.files.refresh",
+            "Refresh agent-touched file history",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "GET /api/code-operator/history/files",
+            "code.history.files",
+            "Lists files already snapshotted by Hermes Agent code operations.",
+        ),
+        _contract(
+            "code.history.snapshot",
+            "Snapshot a Hermes3D source file",
+            "agents",
+            "ready",
+            "artifact",
+            "medium",
+            "POST /api/code-operator/history/snapshots",
+            "code.history.snapshot",
+            "Creates a pre-change snapshot and proof event before an agent edits a source file.",
+        ),
+        _contract(
+            "code.repo.status.refresh",
+            "Refresh Hermes3D repo status",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "GET /api/code-operator/repo/status",
+            "code.repo.status",
+            "Reads branch, commit, dirty files, and diff stat so agents know the current project state before planning.",
+        ),
+        _contract(
+            "code.repo.tree.refresh",
+            "Read bounded Hermes3D repo tree",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "GET /api/code-operator/repo/tree",
+            "code.repo.tree",
+            "Returns a bounded project-relative file tree while excluding secrets, generated output, caches, node_modules, and VCS internals.",
+        ),
+        _contract(
+            "code.repo.search",
+            "Search Hermes3D source text",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "POST /api/code-operator/repo/search",
+            "code.repo.search",
+            "Runs bounded ripgrep against allowed project paths and returns path, line, column, and excerpt for agent planning.",
+        ),
+        _contract(
+            "code.file.read",
+            "Read bounded Hermes3D source slice",
+            "agents",
+            "ready",
+            "read",
+            "low",
+            "POST /api/code-operator/files/read",
+            "code.file.read",
+            "Reads a bounded line slice from an allowed project text file with a content hash for proof.",
+        ),
+        _contract(
+            "code.patch.propose",
+            "Propose a Hermes3D source patch",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "artifact",
+            "medium",
+            "POST /api/code-operator/patch/proposals",
+            "code.patch.propose",
+            "Creates a pre-snapshot, hash-checks the target, writes a reviewable patch proposal artifact, and appends proof without mutating source files.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason")
+                or "Hermes MCP locks are not ready for code patch proposals."
+            ),
+        ),
+        _contract(
+            "code.patch.apply",
+            "Apply MCP-locked Hermes3D source patch",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "mutate",
+            "high",
+            "POST /api/code-operator/patch/apply",
+            "code.patch.apply",
+            "Applies an existing patch proposal only with a same-owner Hermes MCP file lock for the target, records pre/post snapshots, and appends chained MCP evidence.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason")
+                or "Hermes MCP locks are not ready for code patch apply."
+            ),
+        ),
+        _contract(
+            "code.patch.apply_reviewed",
+            "Apply reviewed MCP-locked patch",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "mutate",
+            "high",
+            "POST /api/code-operator/patch/apply-reviewed",
+            "code.patch.apply_reviewed",
+            "Applies a patch proposal only after same-owner MCP lock checks and at least one review/proof id, then records reviewed-apply evidence for gate/PR shipping.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason")
+                or "Hermes MCP locks are not ready for reviewed patch apply."
+            ),
+        ),
+        _contract(
+            "code.gates.list.refresh",
+            "List Hermes MCP code gates",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "read",
+            "low",
+            "GET /api/code-operator/gates",
+            "code.gates.list",
+            "Lists gates exposed by the exact-worktree hermes3d-locks MCP server; no arbitrary shell is exposed.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates."
+            ),
+        ),
+        _contract(
+            "code.gate.run",
+            "Run Hermes MCP allowlisted gate",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/gates/run",
+            "code.gate.run",
+            "Runs one allowlisted hermes3d-locks MCP gate in the exact edit worktree and stores the gate result in the MCP evidence ledger.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for gates."
+            ),
+        ),
+        _contract(
+            "code.git.readiness.refresh",
+            "Refresh Hermes Agent git shipping readiness",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "read",
+            "low",
+            "GET /api/code-operator/git/readiness",
+            "code.git.readiness",
+            "Shows whether the current branch, dirty files, snapshots, and MCP lock prerequisites allow agent branch/commit/push/PR work.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work."
+            ),
+        ),
+        _contract(
+            "code.git.branch",
+            "Create Hermes Agent git branch",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "mutate",
+            "high",
+            "POST /api/code-operator/git/branch",
+            "code.git.branch",
+            "Creates only codex/ or hermes-agent/ branches from a clean worktree and records MCP evidence.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work."
+            ),
+        ),
+        _contract(
+            "code.git.stage_owned",
+            "Stage snapshotted locked files",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "mutate",
+            "high",
+            "POST /api/code-operator/git/stage-owned",
+            "code.git.stage_owned",
+            "Stages only files that are changed, source-allowed, snapshotted by the same agent, and covered by an active same-owner MCP file lock.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work."
+            ),
+        ),
+        _contract(
+            "code.git.commit_owned",
+            "Commit snapshotted Hermes Agent changes",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "mutate",
+            "high",
+            "POST /api/code-operator/git/commit-owned",
+            "code.git.commit_owned",
+            "Commits only the same snapshotted locked file set and embeds supplied proof ids in the commit message.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work."
+            ),
+        ),
+        _contract(
+            "code.git.push",
+            "Push Hermes Agent branch",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "mutate",
+            "high",
+            "POST /api/code-operator/git/push",
+            "code.git.push",
+            "Pushes the current codex/ or hermes-agent/ branch to origin without force after the worktree is clean.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work."
+            ),
+        ),
+        _contract(
+            "code.git.pr",
+            "Open Hermes Agent pull request",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "high",
+            "POST /api/code-operator/git/pr",
+            "code.git.pr",
+            "Opens a GitHub PR for the current safe agent branch through the authenticated gh CLI and records evidence.",
+            None
+            if mcp_locks.get("ready")
+            else str(
+                mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready for git work."
+            ),
+        ),
+        _contract(
+            "code.mcp_locks.state.refresh",
+            "Refresh Hermes MCP lock state",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "read",
+            "low",
+            "GET /api/code-operator/mcp-locks/state",
+            "code.mcp_locks.state",
+            "Reads exact-worktree Hermes lock/task/evidence state before coding work.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.claim_task",
+            "Claim Hermes MCP code task",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/mcp-locks/claim-task",
+            "code.mcp_locks.claim_task",
+            "Claims a task through hermes3d-locks before any file lock or write.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.lock_files",
+            "Lock Hermes3D code files",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/mcp-locks/lock-files",
+            "code.mcp_locks.lock_files",
+            "Atomically locks project-relative files through hermes3d-locks; denied paths and unsafe file types fail closed.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.heartbeat",
+            "Heartbeat Hermes MCP code task",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "low",
+            "POST /api/code-operator/mcp-locks/heartbeat",
+            "code.mcp_locks.heartbeat",
+            "Refreshes task/file-lock TTL while an agent is working.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.evidence",
+            "Append Hermes MCP evidence",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/mcp-locks/evidence",
+            "code.mcp_locks.evidence",
+            "Appends hash-chained proof to the exact-worktree Hermes ledger.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.release_files",
+            "Release Hermes MCP file locks",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/mcp-locks/release-files",
+            "code.mcp_locks.release_files",
+            "Releases files after evidence and gates are recorded.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "code.mcp_locks.release_task",
+            "Release Hermes MCP code task",
+            "agents",
+            "ready" if mcp_locks.get("ready") else "blocked",
+            "proof",
+            "medium",
+            "POST /api/code-operator/mcp-locks/release-task",
+            "code.mcp_locks.release_task",
+            "Completes a claimed code task after its file locks have been released.",
+            None
+            if mcp_locks.get("ready")
+            else str(mcp_locks.get("blocked_reason") or "Hermes MCP locks are not ready."),
+        ),
+        _contract(
+            "dashboard.snapshot.refresh",
+            "Refresh dashboard truth snapshot",
+            "dashboard",
+            "ready",
+            "read",
+            "low",
+            "GET dashboard aggregate",
+            "dashboard.snapshot",
+            "Reads system, printer, job, and notification state for the main dashboard.",
+        ),
+        _contract(
+            "agents.playwright.observe",
+            "Run Observe Playwright proof",
+            "agents",
+            "ready",
+            "proof",
+            "low",
+            "POST /api/agents/{persona_id}/playwright-run",
+            "agents.playwright.observe",
+            "Use the existing persona-scoped Playwright runner with scope=observe.",
+        ),
+        _contract(
+            "agents.playwright.smoke",
+            "Run smoke Playwright proof",
+            "agents",
+            "ready",
+            "proof",
+            "medium",
+            "POST /api/agents/{persona_id}/playwright-run",
+            "agents.playwright.smoke",
+            "Use the existing persona-scoped Playwright runner with scope=smoke.",
+        ),
+        _contract(
+            "agents.playwright.full",
+            "Run full Playwright proof",
+            "agents",
+            "ready",
+            "proof",
+            "medium",
+            "POST /api/agents/{persona_id}/playwright-run",
+            "agents.playwright.full",
+            "Use the existing persona-scoped Playwright runner with scope=full.",
+        ),
+        _contract(
+            "source.modules.refresh",
+            "Refresh Source OS module rows",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules",
+            "source.modules",
+            "Returns the 60 source-backed module registry rows.",
+        ),
+        _contract(
+            "source.verify_all",
+            "Verify all Source OS runtimes",
+            "source_os",
+            "ready",
+            "proof",
+            "low",
+            "POST /api/modules/runtime/verify-all",
+            "source.verify_all",
+            f"Runs registered safe verifiers only. Current proof target: {source_ready} ready rows, {source_gaps} runner gaps.",
+        ),
+        _contract(
+            "source.plan_setup_queue",
+            "Plan Source OS setup queue",
+            "source_os",
+            "ready",
+            "plan",
+            "low",
+            "POST /api/modules/runtime/setup-queue",
+            "source.plan_setup_queue",
+            "Creates a proof-backed plan; it does not run unregistered installers.",
+        ),
+        _contract(
+            "source.update_readiness.refresh",
+            "Refresh Source OS update readiness",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/update/readiness",
+            "source.update_readiness",
+            "Reads update readiness without fetch, pull, build, install, or update side effects.",
+        ),
+        _contract(
+            "source.runtime_gaps.refresh",
+            "Refresh Source OS runner gaps",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/runtime/gaps",
+            "source.runtime_gaps",
+            f"Shows {source_gaps} source-app runner gaps that still block full agent app operation.",
+        ),
+        _contract(
+            "source.runner_contracts.refresh",
+            "Refresh Source OS runner contracts",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/runtime/runner-contracts",
+            "source.runner_contracts",
+            "Returns the 60-row Hermes Agent execution contract matrix; only rows with agent_executable=true may run app actions. read_only_runner_available rows may only re-run metadata/API proof; executable_path_runner_available rows may only read executable metadata; python_import_repair_available rows may only read source/dependency metadata; npm_package_preflight_available rows may only read package metadata/script names.",
+        ),
+        _contract(
+            "source.runner_contract.refresh",
+            "Refresh one Source OS runner contract",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/{module_id}/runtime/runner-contract",
+            "source.runner_contract",
+            "Returns the proof gate, safe actions, and exact blocked reason for one source-backed app.",
+        ),
+        _contract(
+            "source.read_only_runner.smoke",
+            "Run Source OS read-only runner smoke",
+            "source_os",
+            "ready" if read_only_runners else "partial",
+            "proof",
+            "low",
+            "POST /api/modules/{module_id}/runtime/read-only-runner",
+            "source.read_only_runner.smoke",
+            f"Reruns only registered package/import/local API verifier proof for {read_only_runners} eligible rows; no setup, install, update, launch, file output, or printer action.",
+        ),
+        _contract(
+            "source.executable_path_runner.smoke",
+            "Run Source OS executable path smoke",
+            "source_os",
+            "ready" if executable_path_runners else "partial",
+            "proof",
+            "low",
+            "POST /api/modules/{module_id}/runtime/executable-path-runner",
+            "source.executable_path_runner.smoke",
+            f"Reads only installed executable metadata/hash proof for {executable_path_runners} eligible desktop launcher rows; no app launch, setup, install, update, file output, or printer action.",
+        ),
+        _contract(
+            "source.python_import_repair.preflight",
+            "Preflight Source OS Python import repair",
+            "source_os",
+            "ready" if python_import_repairs else "partial",
+            "proof",
+            "low",
+            "POST /api/modules/{module_id}/runtime/python-import-repair-runner",
+            "source.python_import_repair.preflight",
+            f"Reads failed Python import proof plus source/dependency metadata for {python_import_repairs} eligible CAD/modeling rows; no package install, environment creation, worker start, output write, or printer action.",
+        ),
+        _contract(
+            "source.cli_install_config.preflight",
+            "Preflight Source OS slicer CLI install/config",
+            "source_os",
+            "ready" if cli_install_configs else "partial",
+            "proof",
+            "low",
+            "POST /api/modules/{module_id}/runtime/cli-install-config-runner",
+            "source.cli_install_config.preflight",
+            f"Reads Slic3r/SuperSlicer source, adapter schema, profile/config, and candidate executable metadata for {cli_install_configs} eligible rows; no install, launch, slicing, output write, or printer action.",
+        ),
+        _contract(
+            "source.npm_package.preflight",
+            "Preflight Source OS npm package metadata",
+            "source_os",
+            "ready" if npm_package_preflights else "partial",
+            "proof",
+            "low",
+            "POST /api/modules/{module_id}/runtime/npm-package-runner",
+            "source.npm_package.preflight",
+            f"Reads package.json metadata, script names, lockfile/manifests, and local node/npm executable presence for {npm_package_preflights} eligible npm rows; no npm install, npm run, process start, output write, update, or printer action.",
+        ),
+        _contract(
+            "source.service_runner.start",
+            "Start supervised Source OS service runner",
+            "source_os",
+            "partial",
+            "mutate",
+            "high",
+            "POST /api/modules/{module_id}/runtime/start-runner",
+            "source.service_runner.start",
+            "Runs only a registered local/private service command through the Source OS supervisor, then requires live health proof before runtime-ready.",
+            "Per-module start still blocks unless its runner contract preflight passes; use execute=false for proof-only preflight.",
+        ),
+        _contract(
+            "source.service_runner.stop",
+            "Stop supervised Source OS service runner",
+            "source_os",
+            "ready",
+            "mutate",
+            "medium",
+            "POST /api/modules/{module_id}/runtime/stop-runner",
+            "source.service_runner.stop",
+            "Stops only a PID that the Source OS supervisor previously recorded for the same module.",
+        ),
+        _contract(
+            "source.verifiers.refresh",
+            "Refresh Source OS verifier registry",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/runtime/verifiers",
+            "source.verifiers",
+            "Shows registered safe runtime verifier rows.",
+        ),
+        _contract(
+            "source.agent_cli_readiness.refresh",
+            "Refresh agent CLI readiness",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/runtime/agent-cli-readiness",
+            "source.agent_cli_readiness",
+            f"Shows {agent_cli} verified agent CLI runners and {cli_candidates} CLI/service signals needing verifiers.",
+        ),
+        _contract(
+            "source.cli_surface.refresh",
+            "Refresh Source OS CLI surface audit",
+            "source_os",
+            "ready",
+            "read",
+            "low",
+            "GET /api/modules/runtime/cli-surface",
+            "source.cli_surface",
+            "Returns the proof-backed CLI/service surface audit.",
+        ),
+        _contract(
+            "source.update_all",
+            "Update all Source OS apps",
+            "source_os",
+            "partial",
+            "mutate",
+            "high",
+            "PENDING",
+            None,
+            "Blocked until one-click backup, approval, smoke gate, and rollback policy is complete for every app family.",
+            "App update center is partial; agents may plan/check but cannot bulk-update yet.",
+        ),
+        _contract(
+            "source.register_missing_runners",
+            "Execute missing Source OS setup runners",
+            "source_os",
+            "partial",
+            "mutate",
+            "high",
+            "PENDING",
+            None,
+            "Blocked until every runner gap has a registered safe verifier/runner.",
+            f"{source_gaps} Source OS rows still need runner contracts.",
+        ),
+        _contract(
+            "settings.runtime_readiness.refresh",
+            "Refresh runtime readiness ledger",
+            "settings",
+            "ready",
+            "read",
+            "low",
+            "GET /api/system/runtime-readiness",
+            "settings.runtime_readiness",
+            "Shows runtime keys/status without exposing secret values.",
+        ),
+        _contract(
+            "providers.health.refresh",
+            "Refresh provider health",
+            "settings",
+            "ready",
+            "read",
+            "low",
+            "GET /api/providers/health",
+            "providers.health",
+            "Reads local/cloud provider health without exposing secret values.",
+        ),
+        _contract(
+            "learning.idle_workbench.refresh",
+            "Refresh idle workbench",
+            "learning",
+            "ready",
+            "read",
+            "low",
+            "GET /api/learning/idle-workbench",
+            "learning.idle_workbench",
+            "Shows candidate queue, blockers, and per-kind readiness.",
+        ),
+        _contract(
+            "learning.research_report.run",
+            "Run idle research report",
+            "learning",
+            "ready" if idle.get("research") == "ready" else "blocked",
+            "report",
+            "low",
+            "POST /api/learning/idle-workbench/candidates/{id}/run",
+            "learning.research_report",
+            "Runs a report-only idle candidate; no install, merge, upload, move, or print.",
+            None
+            if idle.get("research") == "ready"
+            else "Idle research is blocked until runtime and proof prerequisites are ready.",
+        ),
+        _contract(
+            "learning.documentation.run",
+            "Run idle documentation work",
+            "learning",
+            "ready" if idle.get("documentation") == "ready" else "blocked",
+            "report",
+            "medium",
+            "POST /api/learning/idle-workbench/candidates/{id}/run",
+            None,
+            "Documentation work must wait for quiet-system and proof gates.",
+            None
+            if idle.get("documentation") == "ready"
+            else "Current idle blockers prevent documentation execution.",
+        ),
+        _contract(
+            "learning.app_update.run",
+            "Run idle app update work",
+            "learning",
+            "ready" if idle.get("app_update") == "ready" else "blocked",
+            "mutate",
+            "high",
+            "POST /api/learning/idle-workbench/candidates/{id}/run",
+            None,
+            "App update work stays gated by quiet-system, backup, approval, smoke gate, and rollback.",
+            None
+            if idle.get("app_update") == "ready"
+            else "Current idle blockers or app update gates prevent execution.",
+        ),
+        _contract(
+            "printers.refresh",
+            "Refresh printer fleet",
+            "printers",
+            "ready" if runtime.get("printer_fleet") == "ready" else "partial",
+            "read",
+            "low",
+            "GET /api/printers",
+            "printers.refresh",
+            "Agents can read live/degraded printer telemetry; physical actions use separate gates.",
+        ),
+        _contract(
+            "printers.upload_start",
+            "Upload/start printer job",
+            "printers",
+            "ready",
+            "mutate",
+            "critical",
+            "POST /api/printers/{printer_id}/upload-gcode",
+            "printers.upload_start",
+            "Ready only with job_id, approved PRINT_APPROVAL, passing truth gates, idle printer, and non-S1 target.",
+        ),
+        _contract(
+            "printers.s1_actions",
+            "Move/upload/test/print on S1",
+            "printers",
+            "blocked",
+            "mutate",
+            "critical",
+            "HTTP 423 policy",
+            None,
+            "S1 read-only camera/status remains allowed.",
+            "User policy locks S1 movement, upload, test, and print.",
+        ),
+        _contract(
+            "observe.cameras.refresh",
+            "Refresh Observe camera registry",
+            "observe",
+            "ready",
+            "read",
+            "low",
+            "GET /api/observe/cameras",
+            "observe.cameras",
+            "Returns configured live camera endpoints and view settings.",
+        ),
+        _contract(
+            "observe.capture_evidence",
+            "Capture camera evidence",
+            "observe",
+            "ready",
+            "artifact",
+            "medium",
+            "POST /api/observe/cameras/{printer_id}/capture-evidence",
+            "observe.capture_evidence",
+            "Captures a real camera snapshot artifact when the camera endpoint responds.",
+        ),
+        _contract(
+            "autopilot.guardrails.refresh",
+            "Refresh Autopilot guardrails",
+            "autopilot",
+            "ready",
+            "read",
+            "low",
+            "GET /api/autopilot/readiness + /api/autopilot/guardrails",
+            "autopilot.guardrails",
+            "Shows proof-gated print/action policies.",
+        ),
+        _contract(
+            "design.intake.submit",
+            "Submit bounded design job",
+            "design",
+            "ready" if runtime.get("design_executor") == "ready" else "blocked",
+            "artifact",
+            "medium",
+            "POST /api/design/intake",
+            "design.intake",
+            "Current bounded design executor can generate the supported parametric template with proof.",
+        ),
+        _contract(
+            "design.toolchain.refresh",
+            "Refresh design toolchain",
+            "design",
+            "ready",
+            "read",
+            "low",
+            "GET /api/design/toolchain/status",
+            "design.toolchain",
+            "Reads modeler/CAD/source toolchain status and supported templates.",
+        ),
+        _contract(
+            "generation.services.refresh",
+            "Refresh 3D generation services",
+            "gen3d",
+            "ready",
+            "read",
+            "low",
+            "GET /api/generation/services",
+            "generation.services",
+            "Reads provider/service setup state for 3D generation.",
+        ),
+        _contract(
+            "generation.run.submit",
+            "Submit bounded 3D generation job",
+            "gen3d",
+            "partial" if runtime.get("generation_provider") == "partial" else "ready",
+            "artifact",
+            "medium",
+            "POST /api/generation/run",
+            "generation.run",
+            "Local calibration-cube generation is live; arbitrary external provider generation remains setup-gated.",
+        ),
+        _contract(
+            "jobs.list.refresh",
+            "Refresh jobs",
+            "jobs",
+            "ready",
+            "read",
+            "low",
+            "GET /api/jobs",
+            "jobs.list",
+            "Reads current print/modeling job rows.",
+        ),
+        _contract(
+            "jobs.transition",
+            "Run job repair/retry/rollback transitions",
+            "jobs",
+            "ready",
+            "mutate",
+            "high",
+            "POST /api/jobs/{job_id}/...",
+            "jobs.transition",
+            "Existing transition routes append proof and enforce backend transition state.",
+        ),
+        _contract(
+            "artifacts.list.refresh",
+            "Refresh artifacts",
+            "artifacts",
+            "ready",
+            "read",
+            "low",
+            "GET /api/artifacts",
+            "artifacts.list",
+            "Reads proof/artifact rows for agent context.",
+        ),
+        _contract(
+            "approvals.list.refresh",
+            "Refresh approvals",
+            "approvals",
+            "ready",
+            "read",
+            "low",
+            "GET /api/approvals",
+            "approvals.list",
+            "Reads pending approval rows before any decision action.",
+        ),
+        _contract(
+            "approvals.decide",
+            "Approve or reject pending approvals",
+            "approvals",
+            "ready",
+            "mutate",
+            "high",
+            "POST /api/approvals/{id}/approve|reject",
+            "approvals.decide",
+            "Agents may request approval decisions; operator/user policy decides risky approvals.",
+        ),
+        _contract(
+            "plugins.list.refresh",
+            "Refresh plugins",
+            "plugins",
+            "ready",
+            "read",
+            "low",
+            "GET /api/plugins",
+            "plugins.list",
+            "Reads plugin configuration/readiness state.",
+        ),
+        _contract(
+            "notifications.list.refresh",
+            "Refresh notifications",
+            "notifications",
+            "ready",
+            "read",
+            "low",
+            "GET /api/notifications",
+            "notifications.list",
+            "Reads the live notification inbox.",
+        ),
+        _contract(
+            "proof.bundles.refresh",
+            "Refresh proof bundles",
+            "proof",
+            "ready",
+            "read",
+            "low",
+            "GET /api/proof/bundles",
+            "proof.bundles",
+            "Reads latest proof bundles and file metadata.",
+        ),
+        _contract(
+            "workflows.list.refresh",
+            "Refresh workflows",
+            "workflows",
+            "ready",
+            "read",
+            "low",
+            "GET /api/workflows",
+            "workflows.list",
+            "Reads workflow rows for agent planning context.",
+        ),
+        _contract(
+            "voice.catalog.refresh",
+            "Refresh Azure voice catalog",
+            "voice",
+            "ready" if runtime.get("azure_speech") == "ready" else "blocked",
+            "read",
+            "low",
+            "GET /api/voice/voices",
+            "voice.catalog",
+            "Reads available Azure voices without exposing Azure credentials.",
+        ),
+        _contract(
+            "voice.agents.refresh",
+            "Refresh agent voice assignments",
+            "voice",
+            "ready",
+            "read",
+            "low",
+            "GET /api/voice/agents",
+            "voice.agents",
+            "Reads per-agent voice assignment rows.",
+        ),
+        _contract(
+            "voice.preview",
+            "Preview Azure agent voice",
+            "voice",
+            "ready" if runtime.get("azure_speech") == "ready" else "blocked",
+            "artifact",
+            "low",
+            "POST /api/voice/preview",
+            "voice.preview",
+            "Uses backend-only Azure Speech credentials and proof.",
+        ),
+        _contract(
+            "voice.stt",
+            "Transcribe voice note",
+            "voice",
+            "ready" if runtime.get("azure_speech") == "ready" else "blocked",
+            "artifact",
+            "low",
+            "POST /api/voice/stt",
+            "voice.stt",
+            "Uses backend-only Azure Speech credentials and proof.",
+        ),
+        _contract(
+            "roadmap.operator_coverage.refresh",
+            "Refresh operator coverage truth",
+            "roadmap",
+            "ready",
+            "read",
+            "low",
+            "GET /api/roadmap/tab-completion",
+            "roadmap.operator_coverage",
+            "Returns the live operator action contract summary.",
+        ),
     ]
     _ACTION_CONTRACT_CACHE["contracts"] = [dict(contract) for contract in contracts]
     _ACTION_CONTRACT_CACHE["ts"] = time.monotonic()
@@ -1499,21 +2711,80 @@ def _public_action_contract(contract: dict[str, Any]) -> dict[str, Any]:
 
 def _contract_payload_schema(action_id: str) -> dict[str, Any]:
     schemas: dict[str, dict[str, Any]] = {
-        "agents.playwright.observe": {"required": [], "optional": {"persona_id": "agent persona id; defaults to Oliver QA Agent"}},
-        "agents.playwright.smoke": {"required": [], "optional": {"persona_id": "agent persona id; defaults to Oliver QA Agent"}},
-        "agents.playwright.full": {"required": [], "optional": {"persona_id": "agent persona id; defaults to Oliver QA Agent"}},
-        "source.modules.refresh": {"required": [], "optional": {"section": "source registry section id"}},
-        "source.update_readiness.refresh": {"required": [], "optional": {"section": "source registry section id", "deep": "boolean non-mutating deep check"}},
-        "source.runtime_gaps.refresh": {"required": [], "optional": {"section": "source registry section id"}},
-        "source.runner_contracts.refresh": {"required": [], "optional": {"section": "source registry section id"}, "safety": "Read-only contract matrix; does not run setup, install, update, or launch commands."},
-        "source.runner_contract.refresh": {"required": ["module_id"], "optional": {}, "safety": "Read-only single-module contract; no source or runtime mutation."},
-        "source.read_only_runner.smoke": {"required": ["module_id"], "optional": {}, "safety": "Reruns only registered package/import/local API verifier proof and appends evidence; no setup, install, update, launch, output writes, or printer actions."},
-        "source.executable_path_runner.smoke": {"required": ["module_id"], "optional": {}, "safety": "Reads only configured executable file metadata/hash and appends evidence; no app launch, setup, install, update, output writes, or printer actions."},
-        "source.python_import_repair.preflight": {"required": ["module_id"], "optional": {}, "safety": "Reads only failed Python import proof plus local source/dependency metadata and appends evidence; no package install, environment creation, worker start, output writes, or printer actions."},
-        "source.cli_install_config.preflight": {"required": ["module_id"], "optional": {}, "safety": "Reads only Slic3r/SuperSlicer source, adapter schema, profile/config, and candidate executable metadata; no install, launch, slicing, output writes, updates, or printer actions."},
-        "source.npm_package.preflight": {"required": ["module_id"], "optional": {}, "safety": "Reads only package.json metadata, script names, lockfile/manifests, and local node/npm executable presence; no npm install, npm run, process start, output writes, updates, or printer actions."},
-        "source.service_runner.start": {"required": ["module_id"], "optional": {"execute": "boolean; false writes a preflight proof only, true attempts supervised local start"}, "safety": "No arbitrary command input is accepted. Only registered service/web rows with local/private URL, source checkout, available command, and post-start health proof may start."},
-        "source.service_runner.stop": {"required": ["module_id"], "optional": {}, "safety": "Stops only PIDs previously started and tracked by the Source OS supervisor."},
+        "agents.playwright.observe": {
+            "required": [],
+            "optional": {"persona_id": "agent persona id; defaults to Oliver QA Agent"},
+        },
+        "agents.playwright.smoke": {
+            "required": [],
+            "optional": {"persona_id": "agent persona id; defaults to Oliver QA Agent"},
+        },
+        "agents.playwright.full": {
+            "required": [],
+            "optional": {"persona_id": "agent persona id; defaults to Oliver QA Agent"},
+        },
+        "source.modules.refresh": {
+            "required": [],
+            "optional": {"section": "source registry section id"},
+        },
+        "source.update_readiness.refresh": {
+            "required": [],
+            "optional": {
+                "section": "source registry section id",
+                "deep": "boolean non-mutating deep check",
+            },
+        },
+        "source.runtime_gaps.refresh": {
+            "required": [],
+            "optional": {"section": "source registry section id"},
+        },
+        "source.runner_contracts.refresh": {
+            "required": [],
+            "optional": {"section": "source registry section id"},
+            "safety": "Read-only contract matrix; does not run setup, install, update, or launch commands.",
+        },
+        "source.runner_contract.refresh": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Read-only single-module contract; no source or runtime mutation.",
+        },
+        "source.read_only_runner.smoke": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Reruns only registered package/import/local API verifier proof and appends evidence; no setup, install, update, launch, output writes, or printer actions.",
+        },
+        "source.executable_path_runner.smoke": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Reads only configured executable file metadata/hash and appends evidence; no app launch, setup, install, update, output writes, or printer actions.",
+        },
+        "source.python_import_repair.preflight": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Reads only failed Python import proof plus local source/dependency metadata and appends evidence; no package install, environment creation, worker start, output writes, or printer actions.",
+        },
+        "source.cli_install_config.preflight": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Reads only Slic3r/SuperSlicer source, adapter schema, profile/config, and candidate executable metadata; no install, launch, slicing, output writes, updates, or printer actions.",
+        },
+        "source.npm_package.preflight": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Reads only package.json metadata, script names, lockfile/manifests, and local node/npm executable presence; no npm install, npm run, process start, output writes, updates, or printer actions.",
+        },
+        "source.service_runner.start": {
+            "required": ["module_id"],
+            "optional": {
+                "execute": "boolean; false writes a preflight proof only, true attempts supervised local start"
+            },
+            "safety": "No arbitrary command input is accepted. Only registered service/web rows with local/private URL, source checkout, available command, and post-start health proof may start.",
+        },
+        "source.service_runner.stop": {
+            "required": ["module_id"],
+            "optional": {},
+            "safety": "Stops only PIDs previously started and tracked by the Source OS supervisor.",
+        },
         "printers.upload_start": {
             "required": ["printer_id", "gcode_path"],
             "optional": {
@@ -1523,14 +2794,58 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
             },
             "safety": "S1 aliases and 192.168.0.12 return HTTP 423 before upload/start.",
         },
-        "observe.capture_evidence": {"required": ["printer_id"], "optional": {}, "safety": "Captures a camera snapshot artifact only; no printer movement."},
-        "design.intake.submit": {"required": [], "optional": {"prompt": "bounded supported design prompt", "constraints": "desk_organizer parameter object"}},
-        "generation.run.submit": {"required": [], "optional": {"prompt": "calibration cube prompt unless external providers are configured", "seed": "integer", "constraints": "size_mm etc."}},
-        "jobs.transition": {"required": ["job_id", "transition"], "optional": {"reason": "operator/agent reason", "target_artifact_id": "required for rollback"}, "allowed_transition": ["cancel", "repair_propose", "repair_apply", "retry", "rollback"]},
-        "approvals.decide": {"required": ["approval_id", "decision"], "optional": {"notes": "approval notes or rejection reason"}, "allowed_decision": ["approve", "reject"]},
-        "voice.catalog.refresh": {"required": [], "optional": {"locale": "Azure voice locale prefix, defaults to en"}},
-        "voice.preview": {"required": [], "optional": {"agent_id": "agent id", "voice": "Azure short name", "text": "preview text", "rate": "0.5-2.0", "pitch_pct": "-50..50"}},
-        "voice.stt": {"required": ["artifact_id"], "optional": {"locale": "speech locale, defaults to en-US"}, "safety": "Reads an existing audio artifact; no secret values are returned."},
+        "observe.capture_evidence": {
+            "required": ["printer_id"],
+            "optional": {},
+            "safety": "Captures a camera snapshot artifact only; no printer movement.",
+        },
+        "design.intake.submit": {
+            "required": [],
+            "optional": {
+                "prompt": "bounded supported design prompt",
+                "constraints": "desk_organizer parameter object",
+            },
+        },
+        "generation.run.submit": {
+            "required": [],
+            "optional": {
+                "prompt": "calibration cube prompt unless external providers are configured",
+                "seed": "integer",
+                "constraints": "size_mm etc.",
+            },
+        },
+        "jobs.transition": {
+            "required": ["job_id", "transition"],
+            "optional": {
+                "reason": "operator/agent reason",
+                "target_artifact_id": "required for rollback",
+            },
+            "allowed_transition": ["cancel", "repair_propose", "repair_apply", "retry", "rollback"],
+        },
+        "approvals.decide": {
+            "required": ["approval_id", "decision"],
+            "optional": {"notes": "approval notes or rejection reason"},
+            "allowed_decision": ["approve", "reject"],
+        },
+        "voice.catalog.refresh": {
+            "required": [],
+            "optional": {"locale": "Azure voice locale prefix, defaults to en"},
+        },
+        "voice.preview": {
+            "required": [],
+            "optional": {
+                "agent_id": "agent id",
+                "voice": "Azure short name",
+                "text": "preview text",
+                "rate": "0.5-2.0",
+                "pitch_pct": "-50..50",
+            },
+        },
+        "voice.stt": {
+            "required": ["artifact_id"],
+            "optional": {"locale": "speech locale, defaults to en-US"},
+            "safety": "Reads an existing audio artifact; no secret values are returned.",
+        },
         "code.teams.assign_task": {
             "required": ["team_id", "task_id", "title", "files", "objective"],
             "optional": {"target_branch": "safe git ref", "review_required": "defaults true"},
@@ -1548,7 +2863,10 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         },
         "code.teams.run_coding_pass": {
             "required": ["task_id", "title", "files", "objective"],
-            "optional": {"team_id": "defaults to minimax-builders; dual is accepted", "target_branch": "safe git ref"},
+            "optional": {
+                "team_id": "defaults to minimax-builders; dual is accepted",
+                "target_branch": "safe git ref",
+            },
             "safety": "Creates a provider-backed planning artifact only; no source mutation happens without later patch proposal, MCP lock, snapshot, gate, and PR actions.",
         },
         "code.teams.run_review_pass": {
@@ -1558,28 +2876,122 @@ def _contract_payload_schema(action_id: str) -> dict[str, Any]:
         },
         "code.e2e.run": {
             "required": ["task_id", "title", "files", "objective"],
-            "optional": {"target_branch": "safe git ref", "role_chain": "finder/builder/reviewer/tester role list", "cli_worker": "opencode or openhands preflight only", "release_on_finish": "defaults true"},
+            "optional": {
+                "target_branch": "safe git ref",
+                "role_chain": "finder/builder/reviewer/tester role list",
+                "cli_worker": "opencode or openhands preflight only",
+                "release_on_finish": "defaults true",
+            },
             "safety": "Runs folder-index context, task claim, same-owner file locks, pre-snapshots, MiniMax coding pass, and DeepSeek review pass. It records proof and returns reviewed planning artifacts; source mutation remains blocked until a separate patch proposal/apply/gate/PR workflow.",
         },
-        "code.history.snapshot": {"required": ["relative_path"], "optional": {"action_id": "agent action identifier", "reason": "why this snapshot is needed"}, "safety": "Project-relative source files only; secrets, binary/generated files, .git, node_modules, and printer config writes are blocked."},
-        "code.repo.tree.refresh": {"required": [], "optional": {"root": "project-relative directory or file; defaults to repository root", "limit": "1-1200 returned paths"}, "safety": "Secrets, generated output, caches, node_modules, and VCS internals are excluded."},
-        "code.repo.search": {"required": ["pattern"], "optional": {"root": "project-relative search root", "max_results": "1-200"}, "safety": "Bounded ripgrep only; absolute paths, parent traversal, secrets, and generated folders are blocked."},
-        "code.file.read": {"required": ["relative_path"], "optional": {"start_line": "1-based start line", "line_count": "1-240"}, "safety": "Text file slices only; secrets, binaries, generated files, .git, node_modules, and printer config writes are blocked."},
-        "code.patch.propose": {"required": ["relative_path", "proposed_text"], "optional": {"base_sha256": "current file hash for stale-write protection", "reason": "why this patch is proposed"}, "safety": "Creates a review artifact and proof only; it does not mutate source files. Apply remains a separate gated action."},
-        "code.patch.apply": {"required": ["proposal_id", "task_id"], "optional": {"reason": "why this proposal is being applied"}, "safety": "Requires matching base sha256, active same-owner Hermes MCP file lock, pre/post snapshots, proof event, and chained MCP evidence."},
-        "code.patch.apply_reviewed": {"required": ["proposal_id", "task_id", "review_proof_ids"], "optional": {"reason": "why this reviewed proposal is being applied"}, "safety": "Requires at least one review proof id in addition to the same base sha256, active same-owner lock, snapshots, proof event, and chained evidence required by patch apply."},
-        "code.gate.run": {"required": ["gate_id"], "optional": {"cwd": "project-relative directory; defaults to repository root"}, "safety": "Calls hermes3d-locks hermes_run_gate only. Arbitrary commands and cwd outside the edit workspace are blocked."},
-        "code.git.branch": {"required": ["task_id", "branch_name"], "optional": {"base_ref": "safe git ref", "reason": "why this branch is needed"}, "safety": "Only codex/ and hermes-agent/ branch prefixes are accepted; worktree must be clean."},
-        "code.git.stage_owned": {"required": ["task_id", "files"], "optional": {}, "safety": "Every file must be changed, snapshotted by the same agent, source-allowed, and locked by the same owner/task."},
-        "code.git.commit_owned": {"required": ["task_id", "files", "message"], "optional": {"proof_ids": "list of proof/evidence ids to embed"}, "safety": "Commits only staged files from the owned snapshot/lock set."},
-        "code.git.push": {"required": ["task_id"], "optional": {"remote": "origin only"}, "safety": "No force push; current branch must use codex/ or hermes-agent/ prefix and worktree must be clean."},
-        "code.git.pr": {"required": ["task_id", "base_ref", "title"], "optional": {"body": "PR body", "draft": "defaults true"}, "safety": "Uses gh pr create only for the current safe agent branch."},
-        "code.mcp_locks.claim_task": {"required": ["task_id"], "optional": {"title": "short task title", "files": "project-relative paths", "reason": "why the task is claimed"}, "safety": "Uses hermes_claim_task in the exact edit workspace."},
-        "code.mcp_locks.lock_files": {"required": ["files", "task_id"], "optional": {"ttl_minutes": "5-720", "reason": "why files are locked"}, "safety": "Uses hermes_lock_files only after a claimed task id is provided; secrets, denied paths, and outside-workspace paths fail closed."},
-        "code.mcp_locks.heartbeat": {"required": ["task_id"], "optional": {}, "safety": "Uses hermes_heartbeat only for the server-side actor that owns the claimed task."},
-        "code.mcp_locks.evidence": {"required": ["task_id", "summary"], "optional": {"kind": "proof", "data": "JSON object"}, "safety": "Uses hermes_append_evidence with bounded summary/kind for the server-side actor that owns the claimed task."},
-        "code.mcp_locks.release_files": {"required": ["files"], "optional": {"note": "release note"}, "safety": "Uses hermes_release_files only."},
-        "code.mcp_locks.release_task": {"required": ["task_id"], "optional": {"note": "release note"}, "safety": "Uses hermes_release_task only."},
+        "code.history.snapshot": {
+            "required": ["relative_path"],
+            "optional": {
+                "action_id": "agent action identifier",
+                "reason": "why this snapshot is needed",
+            },
+            "safety": "Project-relative source files only; secrets, binary/generated files, .git, node_modules, and printer config writes are blocked.",
+        },
+        "code.repo.tree.refresh": {
+            "required": [],
+            "optional": {
+                "root": "project-relative directory or file; defaults to repository root",
+                "limit": "1-1200 returned paths",
+            },
+            "safety": "Secrets, generated output, caches, node_modules, and VCS internals are excluded.",
+        },
+        "code.repo.search": {
+            "required": ["pattern"],
+            "optional": {"root": "project-relative search root", "max_results": "1-200"},
+            "safety": "Bounded ripgrep only; absolute paths, parent traversal, secrets, and generated folders are blocked.",
+        },
+        "code.file.read": {
+            "required": ["relative_path"],
+            "optional": {"start_line": "1-based start line", "line_count": "1-240"},
+            "safety": "Text file slices only; secrets, binaries, generated files, .git, node_modules, and printer config writes are blocked.",
+        },
+        "code.patch.propose": {
+            "required": ["relative_path", "proposed_text"],
+            "optional": {
+                "base_sha256": "current file hash for stale-write protection",
+                "reason": "why this patch is proposed",
+            },
+            "safety": "Creates a review artifact and proof only; it does not mutate source files. Apply remains a separate gated action.",
+        },
+        "code.patch.apply": {
+            "required": ["proposal_id", "task_id"],
+            "optional": {"reason": "why this proposal is being applied"},
+            "safety": "Requires matching base sha256, active same-owner Hermes MCP file lock, pre/post snapshots, proof event, and chained MCP evidence.",
+        },
+        "code.patch.apply_reviewed": {
+            "required": ["proposal_id", "task_id", "review_proof_ids"],
+            "optional": {"reason": "why this reviewed proposal is being applied"},
+            "safety": "Requires at least one review proof id in addition to the same base sha256, active same-owner lock, snapshots, proof event, and chained evidence required by patch apply.",
+        },
+        "code.gate.run": {
+            "required": ["gate_id"],
+            "optional": {"cwd": "project-relative directory; defaults to repository root"},
+            "safety": "Calls hermes3d-locks hermes_run_gate only. Arbitrary commands and cwd outside the edit workspace are blocked.",
+        },
+        "code.git.branch": {
+            "required": ["task_id", "branch_name"],
+            "optional": {"base_ref": "safe git ref", "reason": "why this branch is needed"},
+            "safety": "Only codex/ and hermes-agent/ branch prefixes are accepted; worktree must be clean.",
+        },
+        "code.git.stage_owned": {
+            "required": ["task_id", "files"],
+            "optional": {},
+            "safety": "Every file must be changed, snapshotted by the same agent, source-allowed, and locked by the same owner/task.",
+        },
+        "code.git.commit_owned": {
+            "required": ["task_id", "files", "message"],
+            "optional": {"proof_ids": "list of proof/evidence ids to embed"},
+            "safety": "Commits only staged files from the owned snapshot/lock set.",
+        },
+        "code.git.push": {
+            "required": ["task_id"],
+            "optional": {"remote": "origin only"},
+            "safety": "No force push; current branch must use codex/ or hermes-agent/ prefix and worktree must be clean.",
+        },
+        "code.git.pr": {
+            "required": ["task_id", "base_ref", "title"],
+            "optional": {"body": "PR body", "draft": "defaults true"},
+            "safety": "Uses gh pr create only for the current safe agent branch.",
+        },
+        "code.mcp_locks.claim_task": {
+            "required": ["task_id"],
+            "optional": {
+                "title": "short task title",
+                "files": "project-relative paths",
+                "reason": "why the task is claimed",
+            },
+            "safety": "Uses hermes_claim_task in the exact edit workspace.",
+        },
+        "code.mcp_locks.lock_files": {
+            "required": ["files", "task_id"],
+            "optional": {"ttl_minutes": "5-720", "reason": "why files are locked"},
+            "safety": "Uses hermes_lock_files only after a claimed task id is provided; secrets, denied paths, and outside-workspace paths fail closed.",
+        },
+        "code.mcp_locks.heartbeat": {
+            "required": ["task_id"],
+            "optional": {},
+            "safety": "Uses hermes_heartbeat only for the server-side actor that owns the claimed task.",
+        },
+        "code.mcp_locks.evidence": {
+            "required": ["task_id", "summary"],
+            "optional": {"kind": "proof", "data": "JSON object"},
+            "safety": "Uses hermes_append_evidence with bounded summary/kind for the server-side actor that owns the claimed task.",
+        },
+        "code.mcp_locks.release_files": {
+            "required": ["files"],
+            "optional": {"note": "release note"},
+            "safety": "Uses hermes_release_files only.",
+        },
+        "code.mcp_locks.release_task": {
+            "required": ["task_id"],
+            "optional": {"note": "release note"},
+            "safety": "Uses hermes_release_task only.",
+        },
     }
     return schemas.get(action_id, {"required": [], "optional": {}})
 
@@ -1594,15 +3006,43 @@ def _source_action_counts() -> dict[str, int]:
         surface_summary = cli_surface.get("summary", {})
         nested_surface_summary = cli_surface.get("cli_surface", {}).get("summary", {})
         return {
-            "runtime_ready": int(queue_counts.get("runtime_ready") or completion.get("completion", {}).get("runtime_ready") or 0),
-            "runner_gaps": int(queue_counts.get("runner_not_registered") or readiness_summary.get("runner_gaps") or completion.get("completion", {}).get("remaining_runner_gap") or 0),
-            "verified_agent_cli": int(readiness_summary.get("verified_agent_cli") or nested_surface_summary.get("agent_enabled_cli") or surface_summary.get("agent_enabled_cli") or 0),
-            "cli_candidates": int(surface_summary.get("candidate_needs_verifier") or nested_surface_summary.get("candidate_needs_verifier") or 0),
-            "read_only_runner_available": int(readiness_summary.get("read_only_runner_available") or 0),
-            "executable_path_runner_available": int(readiness_summary.get("executable_path_runner_available") or 0),
-            "python_import_repair_available": int(readiness_summary.get("python_import_repair_available") or 0),
-            "cli_install_config_available": int(readiness_summary.get("cli_install_config_available") or 0),
-            "npm_package_preflight_available": int(readiness_summary.get("npm_package_preflight_available") or 0),
+            "runtime_ready": int(
+                queue_counts.get("runtime_ready")
+                or completion.get("completion", {}).get("runtime_ready")
+                or 0
+            ),
+            "runner_gaps": int(
+                queue_counts.get("runner_not_registered")
+                or readiness_summary.get("runner_gaps")
+                or completion.get("completion", {}).get("remaining_runner_gap")
+                or 0
+            ),
+            "verified_agent_cli": int(
+                readiness_summary.get("verified_agent_cli")
+                or nested_surface_summary.get("agent_enabled_cli")
+                or surface_summary.get("agent_enabled_cli")
+                or 0
+            ),
+            "cli_candidates": int(
+                surface_summary.get("candidate_needs_verifier")
+                or nested_surface_summary.get("candidate_needs_verifier")
+                or 0
+            ),
+            "read_only_runner_available": int(
+                readiness_summary.get("read_only_runner_available") or 0
+            ),
+            "executable_path_runner_available": int(
+                readiness_summary.get("executable_path_runner_available") or 0
+            ),
+            "python_import_repair_available": int(
+                readiness_summary.get("python_import_repair_available") or 0
+            ),
+            "cli_install_config_available": int(
+                readiness_summary.get("cli_install_config_available") or 0
+            ),
+            "npm_package_preflight_available": int(
+                readiness_summary.get("npm_package_preflight_available") or 0
+            ),
         }
     try:
         from hermes3d.api.routes import modules as modules_route
@@ -1615,15 +3055,29 @@ def _source_action_counts() -> dict[str, int]:
             "runtime_ready": int(counts.get("runtime_ready") or 0),
             "runner_gaps": int(counts.get("runner_not_registered") or cli.get("runner_gaps") or 0),
             "verified_agent_cli": int(cli.get("verified_agent_cli") or 0),
-            "cli_candidates": int((surface.get("summary") or {}).get("candidate_needs_verifier") or 0),
+            "cli_candidates": int(
+                (surface.get("summary") or {}).get("candidate_needs_verifier") or 0
+            ),
             "read_only_runner_available": int(cli.get("read_only_runner_available") or 0),
-            "executable_path_runner_available": int(cli.get("executable_path_runner_available") or 0),
+            "executable_path_runner_available": int(
+                cli.get("executable_path_runner_available") or 0
+            ),
             "python_import_repair_available": int(cli.get("python_import_repair_available") or 0),
             "cli_install_config_available": int(cli.get("cli_install_config_available") or 0),
             "npm_package_preflight_available": int(cli.get("npm_package_preflight_available") or 0),
         }
     except Exception:
-        return {"runtime_ready": 0, "runner_gaps": 0, "verified_agent_cli": 0, "cli_candidates": 0, "read_only_runner_available": 0, "executable_path_runner_available": 0, "python_import_repair_available": 0, "cli_install_config_available": 0, "npm_package_preflight_available": 0}
+        return {
+            "runtime_ready": 0,
+            "runner_gaps": 0,
+            "verified_agent_cli": 0,
+            "cli_candidates": 0,
+            "read_only_runner_available": 0,
+            "executable_path_runner_available": 0,
+            "python_import_repair_available": 0,
+            "cli_install_config_available": 0,
+            "npm_package_preflight_available": 0,
+        }
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -1641,7 +3095,11 @@ def _runtime_action_counts() -> dict[str, str]:
 
         payload = system_route.runtime_readiness()
         runtimes = payload.get("runtimes") if isinstance(payload, dict) else []
-        return {str(item.get("id")): str(item.get("status")) for item in runtimes if isinstance(item, dict)}
+        return {
+            str(item.get("id")): str(item.get("status"))
+            for item in runtimes
+            if isinstance(item, dict)
+        }
     except Exception:
         return {}
 
@@ -1651,22 +3109,34 @@ def _idle_action_counts() -> dict[str, str]:
         from hermes3d.api.routes import learning as learning_route
 
         payload = learning_route.idle_workbench()
-        capabilities = ((payload.get("automation") or {}).get("capabilities") or []) if isinstance(payload, dict) else []
-        return {str(item.get("kind")): str(item.get("execution_status")) for item in capabilities if isinstance(item, dict)}
+        capabilities = (
+            ((payload.get("automation") or {}).get("capabilities") or [])
+            if isinstance(payload, dict)
+            else []
+        )
+        return {
+            str(item.get("kind")): str(item.get("execution_status"))
+            for item in capabilities
+            if isinstance(item, dict)
+        }
     except Exception:
         return {}
 
 
 def _result_status(result: Any) -> str:
     if isinstance(result, dict):
-        return str(result.get("status") or result.get("state") or result.get("accepted") or "returned")
+        return str(
+            result.get("status") or result.get("state") or result.get("accepted") or "returned"
+        )
     return "returned"
 
 
 def _required_payload_text(payload: dict[str, Any], key: str) -> str:
     value = str(payload.get(key) or "").strip()
     if not value:
-        raise HTTPException(status_code=422, detail={"reason": f"{key} is required for this Hermes Agent action."})
+        raise HTTPException(
+            status_code=422, detail={"reason": f"{key} is required for this Hermes Agent action."}
+        )
     return value
 
 
@@ -1691,7 +3161,11 @@ def _proof_safe_result(result: Any) -> Any:
     encoded = json.dumps(result, default=str, sort_keys=True)
     if len(encoded) <= 12000:
         return result
-    return {"truncated": True, "sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(), "bytes": len(encoded)}
+    return {
+        "truncated": True,
+        "sha256": hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+        "bytes": len(encoded),
+    }
 
 
 def _playwright_scopes() -> set[str]:
@@ -1777,7 +3251,9 @@ def health() -> dict:
     return {
         "healthy": runtime_configured,
         "status": "bridge_ready" if runtime_configured else probe["status"],
-        "agents": {persona: "idle" if runtime_configured else "not_configured" for persona in PERSONAS},
+        "agents": {
+            persona: "idle" if runtime_configured else "not_configured" for persona in PERSONAS
+        },
         "setup": {
             "env": "HERMES3D_AGENT_RUNTIME_URL",
             "model_env": "HERMES3D_AGENT_RUNTIME_MODEL",
@@ -1812,19 +3288,28 @@ def _pending_action(persona_id: str, action_id: str) -> dict:
     if not action:
         raise HTTPException(
             status_code=404,
-            detail={"status": "not_found", "reason": "No matching Hermes agent action exists for this persona."},
+            detail={
+                "status": "not_found",
+                "reason": "No matching Hermes agent action exists for this persona.",
+            },
         )
     if action.get("outcome") != "pending":
         raise HTTPException(
             status_code=409,
-            detail={"status": "not_pending", "reason": f"Action outcome is already {action.get('outcome')}."},
+            detail={
+                "status": "not_pending",
+                "reason": f"Action outcome is already {action.get('outcome')}.",
+            },
         )
     return action
 
 
 def _require_persona(persona_id: str) -> None:
     if persona_id not in PERSONAS:
-        raise HTTPException(status_code=404, detail={"status": "not_found", "reason": "Hermes agent persona not found."})
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "not_found", "reason": "Hermes agent persona not found."},
+        )
 
 
 def _safe_filename(value: str) -> str:
@@ -1844,7 +3329,10 @@ def _attachment_context(context: dict) -> list[dict]:
         artifact_id = str(item.get("id") or item.get("artifact_id") or "").strip()
         if not artifact_id:
             continue
-        artifact = row("SELECT * FROM artifacts WHERE id = ? AND evidence_type = 'agent_attachment'", (artifact_id,))
+        artifact = row(
+            "SELECT * FROM artifacts WHERE id = ? AND evidence_type = 'agent_attachment'",
+            (artifact_id,),
+        )
         if artifact:
             artifacts.append(artifact)
     return artifacts

@@ -25,7 +25,9 @@ FORBIDDEN_TERMS = (
     "fixture",
     "lorem",
 )
-TERM_RE = re.compile(r"\b(" + "|".join(re.escape(term) for term in FORBIDDEN_TERMS) + r")\b", re.IGNORECASE)
+TERM_RE = re.compile(
+    r"\b(" + "|".join(re.escape(term) for term in FORBIDDEN_TERMS) + r")\b", re.IGNORECASE
+)
 IMPORT_RE = re.compile(
     r"""
     (?:\bimport\s+(?:type\s+)?(?:[\s\S]*?\s+from\s+)?|\bexport\s+(?:type\s+)?[\s\S]*?\s+from\s+)
@@ -154,7 +156,11 @@ def resolve_import(importer: Path, specifier: str, ui_src: Path) -> Path | None:
         candidates.extend(base.with_suffix(ext) for ext in EXTENSIONS)
         candidates.extend(base / f"index{ext}" for ext in EXTENSIONS)
     for candidate in candidates:
-        if candidate.exists() and candidate.is_file() and candidate.resolve().is_relative_to(ui_src):
+        if (
+            candidate.exists()
+            and candidate.is_file()
+            and candidate.resolve().is_relative_to(ui_src)
+        ):
             return candidate.resolve()
     return None
 
@@ -179,7 +185,9 @@ def discover_active_files(entry: Path, ui_src: Path) -> tuple[set[Path], list[Fi
         for specifier in imports:
             normalized = specifier.replace("\\", "/")
             if "data/mock" in normalized:
-                line = source[: source.find(specifier)].count("\n") + 1 if specifier in source else 1
+                line = (
+                    source[: source.find(specifier)].count("\n") + 1 if specifier in source else 1
+                )
                 findings.append(
                     Finding(
                         kind="mock-data-import",
@@ -258,7 +266,9 @@ def main() -> int:
     if args.json:
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        print(f"Active UI no-fake scan: {len(active_files)} production files from {entry.relative_to(repo_root)}")
+        print(
+            f"Active UI no-fake scan: {len(active_files)} production files from {entry.relative_to(repo_root)}"
+        )
         if findings:
             for finding in findings:
                 rel = finding.path.relative_to(repo_root)

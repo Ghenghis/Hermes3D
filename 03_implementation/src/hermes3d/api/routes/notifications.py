@@ -50,7 +50,15 @@ async def _publish(notification: dict) -> None:
 
 
 @router.get("/api/notifications")
-def list_notifications(unread: bool | None = None, priority: str | None = None, type: str | None = None, tab: str | None = None, limit: int = 50, offset: int = 0, include_dismissed: bool = False) -> dict:
+def list_notifications(
+    unread: bool | None = None,
+    priority: str | None = None,
+    type: str | None = None,
+    tab: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    include_dismissed: bool = False,
+) -> dict:
     data = rows(
         """
         SELECT * FROM notifications
@@ -62,16 +70,35 @@ def list_notifications(unread: bool | None = None, priority: str | None = None, 
         ORDER BY created_at DESC
         LIMIT ? OFFSET ?
         """,
-        (True if unread else None, priority, priority, type, type, tab, tab, include_dismissed, min(limit, 200), offset),
+        (
+            True if unread else None,
+            priority,
+            priority,
+            type,
+            type,
+            tab,
+            tab,
+            include_dismissed,
+            min(limit, 200),
+            offset,
+        ),
     )
-    unread_count = row("SELECT COUNT(*) AS count FROM notifications WHERE read_at IS NULL AND dismissed_at IS NULL")
+    unread_count = row(
+        "SELECT COUNT(*) AS count FROM notifications WHERE read_at IS NULL AND dismissed_at IS NULL"
+    )
     total = row("SELECT COUNT(*) AS count FROM notifications WHERE dismissed_at IS NULL")
-    return {"notifications": data, "total": (total or {}).get("count", 0), "unread": (unread_count or {}).get("count", 0)}
+    return {
+        "notifications": data,
+        "total": (total or {}).get("count", 0),
+        "unread": (unread_count or {}).get("count", 0),
+    }
 
 
 @router.get("/api/notifications/unread-count")
 def unread_count() -> dict:
-    total = row("SELECT COUNT(*) AS count FROM notifications WHERE read_at IS NULL AND dismissed_at IS NULL")
+    total = row(
+        "SELECT COUNT(*) AS count FROM notifications WHERE read_at IS NULL AND dismissed_at IS NULL"
+    )
     by_tab = rows(
         """
         SELECT source_tab, COUNT(*) AS count FROM notifications
@@ -79,7 +106,10 @@ def unread_count() -> dict:
         GROUP BY source_tab
         """
     )
-    return {"total": (total or {}).get("count", 0), "by_tab": {item["source_tab"]: item["count"] for item in by_tab}}
+    return {
+        "total": (total or {}).get("count", 0),
+        "by_tab": {item["source_tab"]: item["count"] for item in by_tab},
+    }
 
 
 @router.post("/api/notifications", status_code=201)
@@ -92,7 +122,17 @@ async def create_notification(body: NotificationCreate) -> dict:
             (id, type, priority, title, body, source_agent_id, source_tab, action_url, action_label)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (notification_id, body.type, priority, body.title, body.body, body.source_agent_id, body.source_tab, body.action_url, body.action_label),
+        (
+            notification_id,
+            body.type,
+            priority,
+            body.title,
+            body.body,
+            body.source_agent_id,
+            body.source_tab,
+            body.action_url,
+            body.action_label,
+        ),
     )
     notification = row("SELECT * FROM notifications WHERE id = ?", (notification_id,)) or {}
     await _publish(notification)
@@ -109,14 +149,20 @@ def _notification_or_404(notification_id: str) -> dict:
 @router.patch("/api/notifications/{notification_id}/read")
 def mark_read(notification_id: str) -> dict:
     _notification_or_404(notification_id)
-    execute("UPDATE notifications SET read_at = COALESCE(read_at, datetime('now')) WHERE id = ?", (notification_id,))
+    execute(
+        "UPDATE notifications SET read_at = COALESCE(read_at, datetime('now')) WHERE id = ?",
+        (notification_id,),
+    )
     return _notification_or_404(notification_id)
 
 
 @router.patch("/api/notifications/{notification_id}/dismiss")
 def dismiss(notification_id: str) -> dict:
     _notification_or_404(notification_id)
-    execute("UPDATE notifications SET read_at = COALESCE(read_at, datetime('now')), dismissed_at = COALESCE(dismissed_at, datetime('now')) WHERE id = ?", (notification_id,))
+    execute(
+        "UPDATE notifications SET read_at = COALESCE(read_at, datetime('now')), dismissed_at = COALESCE(dismissed_at, datetime('now')) WHERE id = ?",
+        (notification_id,),
+    )
     return _notification_or_404(notification_id)
 
 

@@ -25,14 +25,10 @@ References:
 
 from __future__ import annotations
 
-import importlib
-import os
 from pathlib import Path
 
 import pytest
-
 from hermes3d.services import agent_checkout as ac
-
 
 # Post Wave 1 promotion (2026-05-09): v0.13 is the default; v0.12 is
 # the opt-in fallback path.

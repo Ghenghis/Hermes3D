@@ -21,9 +21,9 @@ from typing import Any
 
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows, utc_now
 from hermes3d.db.init import DB_PATH
-from hermes3d.services.agent_runtime import env_value, private_env
-from hermes3d.services.agent_checkout import hermes_agent_checkout
 from hermes3d.gateways.redaction import redact_text
+from hermes3d.services.agent_checkout import hermes_agent_checkout
+from hermes3d.services.agent_runtime import env_value, private_env
 from hermes3d.services.canary_dirt_filter import compute_dirty as _compute_canary_dirty
 
 # Hermes Agent v0.13 canary switch (Wave A4 finding): captured at import
@@ -62,7 +62,9 @@ SOURCE_OS_FOLDER_INDEX_FILES = [
     f"{FOLDER_INDEX_ROOT}/source-os-60-apps/README.md",
     f"{FOLDER_INDEX_ROOT}/source-os-60-apps/REGISTRY.md",
 ]
-HERMES_AGENT_E2E_PLAN = "03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md"
+HERMES_AGENT_E2E_PLAN = (
+    "03_implementation/docs/handoffs/HERMES_AGENT_E2E_TRUTH_PROOF_PLAN_2026-05-08.md"
+)
 CLI_RUNNER_COMMANDS = {
     "opencode": {
         "label": "OpenCode",
@@ -158,9 +160,7 @@ DENIED_NAMES = {
     "id_rsa",
     "known_hosts",
 }
-DENIED_NAME_PREFIXES = (
-    ".env.",
-)
+DENIED_NAME_PREFIXES = (".env.",)
 DENIED_SUFFIXES = {
     ".env",
     ".env.local",
@@ -206,7 +206,14 @@ SOURCE_REPOS = (
         local_path=_HERMES_AGENT_CHECKOUT_AT_IMPORT,
         remote_url="https://github.com/NousResearch/hermes-agent.git",
         role="primary agent runtime, tools, skills, MCP, delegation, terminal/code loop",
-        required_files=("run_agent.py", "model_tools.py", "toolsets.py", "tools/registry.py", "tools/file_tools.py", "tools/terminal_tool.py"),
+        required_files=(
+            "run_agent.py",
+            "model_tools.py",
+            "toolsets.py",
+            "tools/registry.py",
+            "tools/file_tools.py",
+            "tools/terminal_tool.py",
+        ),
     ),
     SourceRepo(
         id="atomic_hermes",
@@ -283,7 +290,10 @@ PROVIDER_DEFAULT_MODELS = {
 def programming_readiness() -> dict[str, Any]:
     private_values = private_env()
     source_results = [_source_repo_status(source) for source in SOURCE_REPOS]
-    provider_results = [_provider_status("minimax", private_values), _provider_status("deepseek", private_values)]
+    provider_results = [
+        _provider_status("minimax", private_values),
+        _provider_status("deepseek", private_values),
+    ]
     lock_status = mcp_lock_readiness(private_values)
     missing_sources = [item["id"] for item in source_results if item["status"] == "missing"]
     source_warnings = [item["id"] for item in source_results if item["status"] == "source_tree"]
@@ -323,14 +333,20 @@ def programming_readiness() -> dict[str, Any]:
         "blocked_reasons": [
             *[f"Source input {source_id} is missing." for source_id in missing_sources],
             *provider_blockers,
-            *([] if lock_status["ready"] else [str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready.")]),
+            *(
+                []
+                if lock_status["ready"]
+                else [str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready.")]
+            ),
         ],
     }
 
 
 def provider_team_readiness() -> dict[str, Any]:
     private_values = private_env()
-    source_by_id = {item["id"]: item for item in (_source_repo_status(source) for source in SOURCE_REPOS)}
+    source_by_id = {
+        item["id"]: item for item in (_source_repo_status(source) for source in SOURCE_REPOS)
+    }
     provider_by_id = {
         "minimax": _provider_status("minimax", private_values),
         "deepseek": _provider_status("deepseek", private_values),
@@ -346,10 +362,15 @@ def provider_team_readiness() -> dict[str, Any]:
             team_blockers.append(f"Source input {config['source_input']} is missing.")
         if provider.get("status") != "ready":
             team_blockers.append(
-                str(provider.get("blocked_reason") or f"Provider {config['provider_id']} status is {provider.get('status', 'not_ready')}.")
+                str(
+                    provider.get("blocked_reason")
+                    or f"Provider {config['provider_id']} status is {provider.get('status', 'not_ready')}."
+                )
             )
         if not lock_status["ready"]:
-            team_blockers.append(str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready."))
+            team_blockers.append(
+                str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready.")
+            )
         ready = not team_blockers
         blocked_reasons.extend(f"{team_id}: {reason}" for reason in team_blockers)
         teams.append(
@@ -368,12 +389,13 @@ def provider_team_readiness() -> dict[str, Any]:
         )
     ready_team_ids = [team["id"] for team in teams if team["ready"]]
     return {
-        "status": "ready" if len(ready_team_ids) == len(teams) else ("partial" if ready_team_ids else "blocked"),
+        "status": "ready"
+        if len(ready_team_ids) == len(teams)
+        else ("partial" if ready_team_ids else "blocked"),
         "ready": len(ready_team_ids) == len(teams),
         "teams": teams,
         "team_groups": {
-            group_id: list(team_ids)
-            for group_id, team_ids in PROVIDER_TEAM_GROUPS.items()
+            group_id: list(team_ids) for group_id, team_ids in PROVIDER_TEAM_GROUPS.items()
         },
         "mcp_locks": lock_status,
         "required_flow": [
@@ -448,20 +470,34 @@ def code_sandbox_readiness() -> dict[str, Any]:
     private_values = private_env()
     docker = shutil.which("docker")
     configured_image = env_value("HERMES3D_AGENT_SANDBOX_IMAGE", private_values).strip()
-    network_mode = env_value("HERMES3D_AGENT_SANDBOX_NETWORK", private_values, "none").strip() or "none"
-    mode = env_value("HERMES3D_AGENT_SANDBOX_MODE", private_values, "docker").strip().lower() or "docker"
+    network_mode = (
+        env_value("HERMES3D_AGENT_SANDBOX_NETWORK", private_values, "none").strip() or "none"
+    )
+    mode = (
+        env_value("HERMES3D_AGENT_SANDBOX_MODE", private_values, "docker").strip().lower()
+        or "docker"
+    )
     blocked: list[str] = []
     docker_version: str | None = None
     image_status = "not_configured"
     image_id: str | None = None
     image_size_bytes: int | None = None
     if mode not in {"docker", "container"}:
-        blocked.append("Only docker/container sandbox mode is accepted for OpenHands/OpenCode runner execution.")
+        blocked.append(
+            "Only docker/container sandbox mode is accepted for OpenHands/OpenCode runner execution."
+        )
     if not docker:
         blocked.append("Docker executable is not on PATH.")
     else:
         try:
-            result = subprocess.run([docker, "version", "--format", "{{.Server.Version}}"], cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=5, check=False)
+            result = subprocess.run(
+                [docker, "version", "--format", "{{.Server.Version}}"],
+                cwd=PROJECT_ROOT,
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
             if result.returncode == 0:
                 docker_version = (result.stdout or "").strip()[:80] or None
             else:
@@ -494,7 +530,9 @@ def code_sandbox_readiness() -> dict[str, Any]:
                         image_size_bytes = None
             else:
                 image_status = "missing"
-                blocked.append("Configured sandbox image is not present locally or cannot be inspected.")
+                blocked.append(
+                    "Configured sandbox image is not present locally or cannot be inspected."
+                )
         except (OSError, subprocess.TimeoutExpired):
             image_status = "missing"
             blocked.append("Configured sandbox image inspect probe could not complete.")
@@ -513,8 +551,21 @@ def code_sandbox_readiness() -> dict[str, Any]:
         "image_size_bytes": image_size_bytes,
         "network_mode": network_mode,
         "workspace_mount": str(PROJECT_ROOT),
-        "denied_paths": sorted(["G:/private", ".git", "node_modules", "03_implementation/proof", "03_implementation/var"]),
-        "allowed_command_families": ["version", "read_only_analysis", "bounded_patch_proposal", "tests_via_gate_runner"],
+        "denied_paths": sorted(
+            [
+                "G:/private",
+                ".git",
+                "node_modules",
+                "03_implementation/proof",
+                "03_implementation/var",
+            ]
+        ),
+        "allowed_command_families": [
+            "version",
+            "read_only_analysis",
+            "bounded_patch_proposal",
+            "tests_via_gate_runner",
+        ],
         "blocked_reasons": blocked,
     }
 
@@ -536,14 +587,16 @@ def opencode_openhands_sandbox_readiness() -> dict[str, Any]:
     openhands_status = _cli_runner_status("openhands")
     # OpenHands may run via Docker image rather than a local bin; surface the configured image name.
     openhands_image = env_value("HERMES3D_AGENT_SANDBOX_IMAGE", private_values).strip() or None
-    denied_paths = sorted([
-        ".git",
-        ".venv",
-        "G:/private",
-        "node_modules",
-        "03_implementation/proof",
-        "03_implementation/var",
-    ])
+    denied_paths = sorted(
+        [
+            ".git",
+            ".venv",
+            "G:/private",
+            "node_modules",
+            "03_implementation/proof",
+            "03_implementation/var",
+        ]
+    )
     ready = bool(opencode_status["detected"] and openhands_status["detected"])
     return {
         "opencode_detected": bool(opencode_status["detected"]),
@@ -736,7 +789,9 @@ def run_bounded_code_cli_task(
     sandbox = code_sandbox_readiness()
     blocked_reasons: list[str] = []
     if not runner_status["detected"]:
-        blocked_reasons.append(runner_status["blocked_reason"] or f"{runner} CLI runner is not detected.")
+        blocked_reasons.append(
+            runner_status["blocked_reason"] or f"{runner} CLI runner is not detected."
+        )
     if not sandbox.get("ready"):
         for reason in sandbox.get("blocked_reasons") or []:
             blocked_reasons.append(str(reason))
@@ -818,20 +873,37 @@ def run_bounded_code_cli_task(
         exit_code = int(result.returncode)
     except subprocess.TimeoutExpired as exc:
         elapsed_ms = round((time.monotonic() - start) * 1000, 1)
-        raw_stdout = (exc.stdout.decode("utf-8", "replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")) if exc.stdout else ""
-        raw_stderr = (exc.stderr.decode("utf-8", "replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")) if exc.stderr else ""
+        raw_stdout = (
+            (
+                exc.stdout.decode("utf-8", "replace")
+                if isinstance(exc.stdout, bytes)
+                else (exc.stdout or "")
+            )
+            if exc.stdout
+            else ""
+        )
+        raw_stderr = (
+            (
+                exc.stderr.decode("utf-8", "replace")
+                if isinstance(exc.stderr, bytes)
+                else (exc.stderr or "")
+            )
+            if exc.stderr
+            else ""
+        )
         exit_code = -1
         timeout_hit = True
 
     stdout_sha256 = hashlib.sha256(raw_stdout.encode("utf-8", "replace")).hexdigest()
     stderr_sha256 = hashlib.sha256(raw_stderr.encode("utf-8", "replace")).hexdigest()
     redacted_stdout = redact_text(raw_stdout)[:BOUNDED_TASK_MAX_STDOUT_BYTES]
-    stdout_truncated = len(redacted_stdout.encode("utf-8", "replace")) >= BOUNDED_TASK_MAX_STDOUT_BYTES or len(redact_text(raw_stdout)) > BOUNDED_TASK_MAX_STDOUT_BYTES
+    stdout_truncated = (
+        len(redacted_stdout.encode("utf-8", "replace")) >= BOUNDED_TASK_MAX_STDOUT_BYTES
+        or len(redact_text(raw_stdout)) > BOUNDED_TASK_MAX_STDOUT_BYTES
+    )
 
     status = "timeout" if timeout_hit else ("ok" if exit_code == 0 else "exit_nonzero")
-    summary = (
-        f"Bounded {runner_status['label']} task {status} for {task_id} ({rel})"
-    )
+    summary = f"Bounded {runner_status['label']} task {status} for {task_id} ({rel})"
     evidence = append_mcp_evidence(
         owner=owner,
         task_id=task_id,
@@ -1053,7 +1125,9 @@ def run_agent_e2e_job(
     readiness = agent_e2e_readiness()
     blocked = list(readiness.get("blocked_reasons") or [])
     if cli:
-        runner = next((item for item in readiness["cli_runners"]["runners"] if item["id"] == cli), None)
+        runner = next(
+            (item for item in readiness["cli_runners"]["runners"] if item["id"] == cli), None
+        )
         if not runner or not runner.get("detected"):
             blocked.append(f"CLI worker {cli} is not detected.")
         blocked.append(
@@ -1066,9 +1140,20 @@ def run_agent_e2e_job(
             task_id=task_id,
             kind="code_e2e",
             summary=f"Blocked Hermes Agent E2E job {task_id}",
-            data={"files": safe_files, "blocked_reasons": blocked, "role_chain": roles, "cli_worker": cli},
+            data={
+                "files": safe_files,
+                "blocked_reasons": blocked,
+                "role_chain": roles,
+                "cli_worker": cli,
+            },
         )
-        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "readiness": readiness, "mcp_evidence": evidence}
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "blocked_reasons": blocked,
+            "readiness": readiness,
+            "mcp_evidence": evidence,
+        }
     assignment = assign_provider_team_task(
         owner=owner,
         team_id="dual",
@@ -1120,14 +1205,23 @@ def run_agent_e2e_job(
                 "role_chain": roles,
                 "folder_index_context_sent": index_context["provider_context_files"],
                 "pre_snapshot_ids": [item["id"] for item in snapshots],
-                "blocked_reasons": coding.get("blocked_reasons") or ["MiniMax coding pass was blocked."],
+                "blocked_reasons": coding.get("blocked_reasons")
+                or ["MiniMax coding pass was blocked."],
             },
         )
         release: dict[str, Any] | None = None
         task_release: dict[str, Any] | None = None
         if release_on_finish:
-            release = release_mcp_files(owner=owner, files=safe_files, note="Provider coding pass blocked; no source mutation applied.")
-            task_release = release_mcp_task(owner=owner, task_id=task_id, note="Provider coding pass blocked; fix provider readiness and retry.")
+            release = release_mcp_files(
+                owner=owner,
+                files=safe_files,
+                note="Provider coding pass blocked; no source mutation applied.",
+            )
+            task_release = release_mcp_task(
+                owner=owner,
+                task_id=task_id,
+                note="Provider coding pass blocked; fix provider readiness and retry.",
+            )
         return {
             "status": "blocked",
             "accepted": False,
@@ -1143,7 +1237,8 @@ def run_agent_e2e_job(
             "pre_snapshots": snapshots,
             "coding_pass": coding,
             "review_pass": None,
-            "blocked_reasons": coding.get("blocked_reasons") or ["MiniMax coding pass was blocked."],
+            "blocked_reasons": coding.get("blocked_reasons")
+            or ["MiniMax coding pass was blocked."],
             "mcp_evidence": evidence,
             "release": release,
             "task_release": task_release,
@@ -1170,14 +1265,23 @@ def run_agent_e2e_job(
                 "folder_index_context_sent": index_context["provider_context_files"],
                 "pre_snapshot_ids": [item["id"] for item in snapshots],
                 "coding_artifact_id": (coding.get("artifact") or {}).get("id"),
-                "blocked_reasons": review.get("blocked_reasons") or ["DeepSeek review pass was blocked."],
+                "blocked_reasons": review.get("blocked_reasons")
+                or ["DeepSeek review pass was blocked."],
             },
         )
         release = None
         task_release = None
         if release_on_finish:
-            release = release_mcp_files(owner=owner, files=safe_files, note="Provider review pass blocked; no source mutation applied.")
-            task_release = release_mcp_task(owner=owner, task_id=task_id, note="Provider review pass blocked; fix provider readiness and retry.")
+            release = release_mcp_files(
+                owner=owner,
+                files=safe_files,
+                note="Provider review pass blocked; no source mutation applied.",
+            )
+            task_release = release_mcp_task(
+                owner=owner,
+                task_id=task_id,
+                note="Provider review pass blocked; fix provider readiness and retry.",
+            )
         return {
             "status": "blocked",
             "accepted": False,
@@ -1193,7 +1297,8 @@ def run_agent_e2e_job(
             "pre_snapshots": snapshots,
             "coding_pass": coding,
             "review_pass": review,
-            "blocked_reasons": review.get("blocked_reasons") or ["DeepSeek review pass was blocked."],
+            "blocked_reasons": review.get("blocked_reasons")
+            or ["DeepSeek review pass was blocked."],
             "mcp_evidence": evidence,
             "release": release,
             "task_release": task_release,
@@ -1218,8 +1323,16 @@ def run_agent_e2e_job(
     release: dict[str, Any] | None = None
     task_release: dict[str, Any] | None = None
     if release_on_finish:
-        release = release_mcp_files(owner=owner, files=safe_files, note="Provider planning/review completed; no source mutation applied by this E2E job.")
-        task_release = release_mcp_task(owner=owner, task_id=task_id, note="Provider planning/review completed; next step is reviewed patch proposal/apply.")
+        release = release_mcp_files(
+            owner=owner,
+            files=safe_files,
+            note="Provider planning/review completed; no source mutation applied by this E2E job.",
+        )
+        task_release = release_mcp_task(
+            owner=owner,
+            task_id=task_id,
+            note="Provider planning/review completed; next step is reviewed patch proposal/apply.",
+        )
     return {
         "status": "needs_reviewed_patch_proposal",
         "accepted": True,
@@ -1276,7 +1389,7 @@ def _git_common_dir(path: Path) -> Path | None:
         return None
     candidate = Path(raw)
     if not candidate.is_absolute():
-        candidate = (path / candidate)
+        candidate = path / candidate
     try:
         return candidate.resolve(strict=False)
     except OSError:
@@ -1325,7 +1438,9 @@ def mcp_lock_readiness(private_values: dict[str, str] | None = None) -> dict[str
         or env_value("HERMES3D_WORKSPACE", values)
         or env_value("HERMES_LOCK_WORKSPACE", values)
     )
-    configured_server = env_value("MCP_LOCK_SERVER", values) or env_value("HERMES3D_MCP_SERVER", values)
+    configured_server = env_value("MCP_LOCK_SERVER", values) or env_value(
+        "HERMES3D_MCP_SERVER", values
+    )
     trusted_server = _trusted_lock_server_entry()
     workspace_matches = False
     if configured_workspace:
@@ -1421,14 +1536,18 @@ def git_ship_readiness() -> dict[str, Any]:
     }
 
 
-def git_create_branch(*, owner: str, task_id: str, branch_name: str, base_ref: str | None = None, reason: str = "") -> dict[str, Any]:
+def git_create_branch(
+    *, owner: str, task_id: str, branch_name: str, base_ref: str | None = None, reason: str = ""
+) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
     _validate_task_id(task_id)
     branch = _validate_agent_branch_name(branch_name)
     base = _validate_git_ref(base_ref) if base_ref else None
     if _changed_git_files():
-        raise ValueError("Create an agent branch only from a clean worktree; commit or restore current changes first.")
+        raise ValueError(
+            "Create an agent branch only from a clean worktree; commit or restore current changes first."
+        )
     args = ["switch", "-c", branch]
     if base:
         args.append(base)
@@ -1483,7 +1602,9 @@ def git_commit_owned_files(
     staged = _staged_git_files()
     unexpected = sorted(staged - set(safe_files))
     if unexpected:
-        raise ValueError(f"Refusing to commit staged files outside the owned snapshot set: {', '.join(unexpected[:10])}")
+        raise ValueError(
+            f"Refusing to commit staged files outside the owned snapshot set: {', '.join(unexpected[:10])}"
+        )
     if not staged:
         raise ValueError("No staged files are available for commit.")
     full_message = message.strip()
@@ -1507,7 +1628,12 @@ def git_commit_owned_files(
         task_id=task_id,
         kind="code_git",
         summary=f"Committed Hermes Agent changes on {branch}",
-        data={"branch": branch, "commit": commit, "files": sorted(staged), "proof_event_id": proof_event_id},
+        data={
+            "branch": branch,
+            "commit": commit,
+            "files": sorted(staged),
+            "proof_event_id": proof_event_id,
+        },
     )
     return {
         "status": "committed",
@@ -1542,7 +1668,14 @@ def git_push_current_branch(*, owner: str, task_id: str, remote: str = "origin")
         summary=f"Pushed Hermes Agent branch {branch}",
         data={"branch": branch, "remote": remote, "proof_event_id": proof_event_id},
     )
-    return {"status": "pushed", "branch": branch, "remote": remote, "stdout": result["stdout"], "proof_event_id": proof_event_id, "mcp_evidence": evidence}
+    return {
+        "status": "pushed",
+        "branch": branch,
+        "remote": remote,
+        "stdout": result["stdout"],
+        "proof_event_id": proof_event_id,
+        "mcp_evidence": evidence,
+    }
 
 
 def git_open_pull_request(
@@ -1590,16 +1723,36 @@ def git_open_pull_request(
     proof_event_id = _record_git_proof(
         owner=owner,
         event_type="code_git.pr_opened",
-        payload={"task_id": task_id, "branch": branch, "base_ref": base, "url": url, "draft": draft},
+        payload={
+            "task_id": task_id,
+            "branch": branch,
+            "base_ref": base,
+            "url": url,
+            "draft": draft,
+        },
     )
     evidence = append_mcp_evidence(
         owner=owner,
         task_id=task_id,
         kind="code_git",
         summary=f"Opened Hermes Agent PR for {branch}",
-        data={"branch": branch, "base_ref": base, "url": url, "draft": draft, "proof_event_id": proof_event_id},
+        data={
+            "branch": branch,
+            "base_ref": base,
+            "url": url,
+            "draft": draft,
+            "proof_event_id": proof_event_id,
+        },
     )
-    return {"status": "opened", "branch": branch, "base_ref": base, "url": url, "draft": draft, "proof_event_id": proof_event_id, "mcp_evidence": evidence}
+    return {
+        "status": "opened",
+        "branch": branch,
+        "base_ref": base,
+        "url": url,
+        "draft": draft,
+        "proof_event_id": proof_event_id,
+        "mcp_evidence": evidence,
+    }
 
 
 def code_write_readiness() -> dict[str, Any]:
@@ -1608,18 +1761,24 @@ def code_write_readiness() -> dict[str, Any]:
     blockers: list[str] = []
     warnings: list[str] = []
     if not readiness["mcp_locks"]["ready"]:
-        blockers.append(str(readiness["mcp_locks"].get("blocked_reason") or "Hermes MCP locks are not ready."))
+        blockers.append(
+            str(readiness["mcp_locks"].get("blocked_reason") or "Hermes MCP locks are not ready.")
+        )
     missing_sources = readiness["next_missing"].get("source_inputs") or []
     if missing_sources:
         blockers.append(f"Missing required source inputs: {', '.join(missing_sources)}.")
     source_warnings = readiness["next_missing"].get("source_warnings") or []
     if source_warnings:
-        warnings.append(f"Source trees without git metadata are usable but cannot report upstream ref: {', '.join(source_warnings)}.")
+        warnings.append(
+            f"Source trees without git metadata are usable but cannot report upstream ref: {', '.join(source_warnings)}."
+        )
     missing_providers = readiness["next_missing"].get("providers") or []
     if missing_providers:
         blockers.append(f"Missing coding provider configuration: {', '.join(missing_providers)}.")
     if repo.get("dirty"):
-        warnings.append("Current worktree is dirty; autonomous write lanes must snapshot/stage only owned files and avoid unrelated edits.")
+        warnings.append(
+            "Current worktree is dirty; autonomous write lanes must snapshot/stage only owned files and avoid unrelated edits."
+        )
     status = "ready" if not blockers else "blocked"
     return {
         "status": status,
@@ -1662,7 +1821,9 @@ def propose_file_replacement(
 ) -> dict[str, Any]:
     readiness = code_write_readiness()
     if not readiness["ready"]:
-        raise ValueError("Code write readiness is blocked: " + "; ".join(readiness["blocked_reasons"]))
+        raise ValueError(
+            "Code write readiness is blocked: " + "; ".join(readiness["blocked_reasons"])
+        )
     _validate_owner(agent_id)
     target = _resolve_project_path(relative_path, write=False)
     proposed_bytes = proposed_text.encode("utf-8")
@@ -1671,7 +1832,9 @@ def propose_file_replacement(
     current_bytes = target.read_bytes()
     current_sha = hashlib.sha256(current_bytes).hexdigest()
     if base_sha256 and base_sha256.lower() != current_sha:
-        raise ValueError("Base sha256 does not match the current file; refresh before proposing a patch.")
+        raise ValueError(
+            "Base sha256 does not match the current file; refresh before proposing a patch."
+        )
     proposed_sha = hashlib.sha256(proposed_bytes).hexdigest()
     rel = _relative_to_project(target)
     snapshot = snapshot_file(
@@ -1709,7 +1872,9 @@ def propose_file_replacement(
         "diff": diff,
         "proposed_text": proposed_text,
     }
-    tmp_path = proposal_path.with_suffix(proposal_path.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}")
+    tmp_path = proposal_path.with_suffix(
+        proposal_path.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}"
+    )
     tmp_path.write_text(as_json(proposal_payload), encoding="utf-8")
     os.replace(tmp_path, proposal_path)
     proof_event_id = new_id()
@@ -1755,7 +1920,9 @@ def apply_patch_proposal(
 ) -> dict[str, Any]:
     readiness = code_write_readiness()
     if not readiness["ready"]:
-        raise ValueError("Code write readiness is blocked: " + "; ".join(readiness["blocked_reasons"]))
+        raise ValueError(
+            "Code write readiness is blocked: " + "; ".join(readiness["blocked_reasons"])
+        )
     _validate_owner(agent_id)
     _validate_task_id(task_id)
     proposal = _patch_proposal_payload(proposal_id)
@@ -1765,7 +1932,9 @@ def apply_patch_proposal(
     rel = str(proposal.get("relative_path") or "")
     proposed_text = proposal.get("proposed_text")
     if not isinstance(proposed_text, str):
-        raise ValueError("Patch proposal is missing proposed_text; regenerate the proposal before applying.")
+        raise ValueError(
+            "Patch proposal is missing proposed_text; regenerate the proposal before applying."
+        )
     target = _resolve_project_path(rel, write=True)
     rel = _relative_to_project(target)
     if rel != proposal.get("relative_path"):
@@ -1825,17 +1994,19 @@ def apply_patch_proposal(
             inflight_event_id,
             "code_patch.replace_inflight",
             agent_id,
-            as_json({
-                "proposal_id": proposal_id,
-                "relative_path": rel,
-                "task_id": task_id,
-                "owner": agent_id,
-                "pre_apply_snapshot_id": pre_snapshot["id"],
-                "base_sha256": base_sha,
-                "proposed_sha256": proposed_sha,
-                "tmp_path": str(tmp_path),
-                "lock_id": lock.get("lock_id"),
-            }),
+            as_json(
+                {
+                    "proposal_id": proposal_id,
+                    "relative_path": rel,
+                    "task_id": task_id,
+                    "owner": agent_id,
+                    "pre_apply_snapshot_id": pre_snapshot["id"],
+                    "base_sha256": base_sha,
+                    "proposed_sha256": proposed_sha,
+                    "tmp_path": str(tmp_path),
+                    "lock_id": lock.get("lock_id"),
+                }
+            ),
         ),
     )
     os.replace(tmp_path, target)
@@ -1859,9 +2030,7 @@ def apply_patch_proposal(
         rollback_path = target.with_name(f"{target.name}.rollback.{os.getpid()}.{new_id()[:8]}")
         rollback_path.write_bytes(current_bytes)
         os.replace(rollback_path, target)
-        raise RuntimeError(
-            "Filesystem drift after os.replace; rolled back to pre-snapshot bytes."
-        )
+        raise RuntimeError("Filesystem drift after os.replace; rolled back to pre-snapshot bytes.")
     post_snapshot = snapshot_file(
         rel,
         agent_id=agent_id,
@@ -1987,7 +2156,9 @@ def run_mcp_gate(gate_id: str, *, owner: str, cwd: str | None = None) -> dict[st
     if not isinstance(result, dict):
         raise RuntimeError("Hermes MCP gate returned a non-object result.")
     return {
-        "status": "pass" if result.get("ok") is True and result.get("status") == "pass" else str(result.get("status") or "failed"),
+        "status": "pass"
+        if result.get("ok") is True and result.get("status") == "pass"
+        else str(result.get("status") or "failed"),
         "ok": result.get("ok") is True,
         "server_name": "hermes3d-locks",
         "workspace": str(PROJECT_ROOT),
@@ -2010,7 +2181,15 @@ def mcp_lock_state() -> dict[str, Any]:
     }
 
 
-def claim_mcp_task(*, owner: str, task_id: str, title: str = "", files: list[str] | None = None, reason: str = "", role: str = "agent") -> dict[str, Any]:
+def claim_mcp_task(
+    *,
+    owner: str,
+    task_id: str,
+    title: str = "",
+    files: list[str] | None = None,
+    reason: str = "",
+    role: str = "agent",
+) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
     _validate_task_id(task_id)
@@ -2025,7 +2204,11 @@ def claim_mcp_task(*, owner: str, task_id: str, title: str = "", files: list[str
             "reason": reason or "",
         },
     )
-    return {"status": "claimed" if result.get("ok") is True else str(result.get("status") or "partial"), "workspace": str(PROJECT_ROOT), "result": result}
+    return {
+        "status": "claimed" if result.get("ok") is True else str(result.get("status") or "partial"),
+        "workspace": str(PROJECT_ROOT),
+        "result": result,
+    }
 
 
 def assign_provider_team_task(
@@ -2154,7 +2337,11 @@ def request_provider_team_review(
         owner=owner,
         task_id=task_id,
         kind="code_review",
-        summary=(f"Blocked Hermes Agent review {task_id}" if blocked else f"Requested Hermes Agent review {task_id}"),
+        summary=(
+            f"Blocked Hermes Agent review {task_id}"
+            if blocked
+            else f"Requested Hermes Agent review {task_id}"
+        ),
         data=payload,
     )
     return {
@@ -2192,16 +2379,32 @@ def run_provider_team_coding_pass(
     readiness = provider_team_readiness()
     team = next((item for item in readiness["teams"] if item["id"] == "minimax-builders"), None)
     if not team or team.get("blocked_reasons"):
-        blocked = [f"minimax-builders: {reason}" for reason in ((team or {}).get("blocked_reasons") or ["Team readiness is unavailable."])]
+        blocked = [
+            f"minimax-builders: {reason}"
+            for reason in (
+                (team or {}).get("blocked_reasons") or ["Team readiness is unavailable."]
+            )
+        ]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
             kind="code_provider",
             summary=f"Blocked provider coding pass {task_id}",
-            data={"team_id": team_id, "files": [item["path"] for item in context], "blocked_reasons": blocked},
+            data={
+                "team_id": team_id,
+                "files": [item["path"] for item in context],
+                "blocked_reasons": blocked,
+            },
         )
-        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
-    prompt = _coding_pass_prompt(title=clean_title, objective=clean_objective, files=context, target_branch=branch)
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "blocked_reasons": blocked,
+            "mcp_evidence": evidence,
+        }
+    prompt = _coding_pass_prompt(
+        title=clean_title, objective=clean_objective, files=context, target_branch=branch
+    )
     try:
         response = _call_provider_chat(
             "minimax",
@@ -2227,7 +2430,12 @@ def run_provider_team_coding_pass(
                 "blocked_reasons": blocked,
             },
         )
-        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "blocked_reasons": blocked,
+            "mcp_evidence": evidence,
+        }
     artifact = _record_provider_run_artifact(
         owner=owner,
         task_id=task_id,
@@ -2286,15 +2494,30 @@ def run_provider_team_review_pass(
     readiness = provider_team_readiness()
     team = next((item for item in readiness["teams"] if item["id"] == "deepseek-reviewers"), None)
     if not team or team.get("blocked_reasons"):
-        blocked = [f"deepseek-reviewers: {reason}" for reason in ((team or {}).get("blocked_reasons") or ["Team readiness is unavailable."])]
+        blocked = [
+            f"deepseek-reviewers: {reason}"
+            for reason in (
+                (team or {}).get("blocked_reasons") or ["Team readiness is unavailable."]
+            )
+        ]
         evidence = append_mcp_evidence(
             owner=owner,
             task_id=task_id,
             kind="code_provider",
             summary=f"Blocked provider review pass {task_id}",
-            data={"reviewer_team_id": reviewer_team_id, "files": [item["path"] for item in context], "proof_ids": safe_proofs, "blocked_reasons": blocked},
+            data={
+                "reviewer_team_id": reviewer_team_id,
+                "files": [item["path"] for item in context],
+                "proof_ids": safe_proofs,
+                "blocked_reasons": blocked,
+            },
         )
-        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "blocked_reasons": blocked,
+            "mcp_evidence": evidence,
+        }
     prompt = _review_pass_prompt(summary=clean_summary, files=context, proof_ids=safe_proofs)
     try:
         response = _call_provider_chat(
@@ -2321,7 +2544,12 @@ def run_provider_team_review_pass(
                 "blocked_reasons": blocked,
             },
         )
-        return {"status": "blocked", "accepted": False, "blocked_reasons": blocked, "mcp_evidence": evidence}
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "blocked_reasons": blocked,
+            "mcp_evidence": evidence,
+        }
     artifact = _record_provider_run_artifact(
         owner=owner,
         task_id=task_id,
@@ -2417,7 +2645,10 @@ def provider_execution_smoke(
         response = _call_provider_chat(
             provider,
             [
-                {"role": "system", "content": "You are a provider health probe. Reply with exactly: HERMES3D_PROVIDER_SMOKE_OK"},
+                {
+                    "role": "system",
+                    "content": "You are a provider health probe. Reply with exactly: HERMES3D_PROVIDER_SMOKE_OK",
+                },
                 {"role": "user", "content": "Return the exact smoke token and no secrets."},
             ],
             temperature=0.0,
@@ -2430,7 +2661,11 @@ def provider_execution_smoke(
             task_id=task_id,
             kind="code_provider_smoke",
             summary=f"Blocked {provider} provider smoke",
-            data={"provider_id": provider, "blocked_reasons": blocked, "auth_contract": auth_contract},
+            data={
+                "provider_id": provider,
+                "blocked_reasons": blocked,
+                "auth_contract": auth_contract,
+            },
         )
         _write_provider_smoke_status(
             provider,
@@ -2480,7 +2715,15 @@ def provider_execution_smoke(
     }
 
 
-def lock_mcp_files(*, owner: str, files: list[str], task_id: str = "", reason: str = "", role: str = "agent", ttl_minutes: int = 90) -> dict[str, Any]:
+def lock_mcp_files(
+    *,
+    owner: str,
+    files: list[str],
+    task_id: str = "",
+    reason: str = "",
+    role: str = "agent",
+    ttl_minutes: int = 90,
+) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
     if task_id:
@@ -2497,7 +2740,12 @@ def lock_mcp_files(*, owner: str, files: list[str], task_id: str = "", reason: s
             "ttlMinutes": max(5, min(int(ttl_minutes), 720)),
         },
     )
-    return {"status": "locked" if result.get("ok") is True else str(result.get("status") or "blocked"), "workspace": str(PROJECT_ROOT), "files": safe_files, "result": result}
+    return {
+        "status": "locked" if result.get("ok") is True else str(result.get("status") or "blocked"),
+        "workspace": str(PROJECT_ROOT),
+        "files": safe_files,
+        "result": result,
+    }
 
 
 def heartbeat_mcp_task(*, owner: str, task_id: str = "") -> dict[str, Any]:
@@ -2505,26 +2753,54 @@ def heartbeat_mcp_task(*, owner: str, task_id: str = "") -> dict[str, Any]:
     _validate_owner(owner)
     _validate_task_id(task_id)
     result = _call_mcp_tool("hermes_heartbeat", {"owner": owner, "taskId": task_id})
-    return {"status": str(result.get("status") or ("heartbeat" if result.get("ok") else "partial")), "workspace": str(PROJECT_ROOT), "result": result}
+    return {
+        "status": str(result.get("status") or ("heartbeat" if result.get("ok") else "partial")),
+        "workspace": str(PROJECT_ROOT),
+        "result": result,
+    }
 
 
 def release_mcp_files(*, owner: str, files: list[str], note: str = "") -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
     safe_files = _safe_mcp_files(files, must_exist=False)
-    result = _call_mcp_tool("hermes_release_files", {"owner": owner, "files": safe_files, "note": note or ""})
-    return {"status": "released" if result.get("ok") is True else str(result.get("status") or "partial"), "workspace": str(PROJECT_ROOT), "files": safe_files, "result": result}
+    result = _call_mcp_tool(
+        "hermes_release_files", {"owner": owner, "files": safe_files, "note": note or ""}
+    )
+    return {
+        "status": "released"
+        if result.get("ok") is True
+        else str(result.get("status") or "partial"),
+        "workspace": str(PROJECT_ROOT),
+        "files": safe_files,
+        "result": result,
+    }
 
 
 def release_mcp_task(*, owner: str, task_id: str, note: str = "") -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
     _validate_task_id(task_id)
-    result = _call_mcp_tool("hermes_release_task", {"owner": owner, "taskId": task_id, "note": note or ""})
-    return {"status": "released" if result.get("ok") is True else str(result.get("status") or "partial"), "workspace": str(PROJECT_ROOT), "result": result}
+    result = _call_mcp_tool(
+        "hermes_release_task", {"owner": owner, "taskId": task_id, "note": note or ""}
+    )
+    return {
+        "status": "released"
+        if result.get("ok") is True
+        else str(result.get("status") or "partial"),
+        "workspace": str(PROJECT_ROOT),
+        "result": result,
+    }
 
 
-def append_mcp_evidence(*, owner: str, summary: str, task_id: str = "", kind: str = "proof", data: dict[str, Any] | None = None) -> dict[str, Any]:
+def append_mcp_evidence(
+    *,
+    owner: str,
+    summary: str,
+    task_id: str = "",
+    kind: str = "proof",
+    data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     _require_mcp_locks_ready()
     _validate_owner(owner)
     _validate_task_id(task_id)
@@ -2534,11 +2810,19 @@ def append_mcp_evidence(*, owner: str, summary: str, task_id: str = "", kind: st
         raise ValueError("Evidence kind must be 1-80 safe characters.")
     result = _call_mcp_tool(
         "hermes_append_evidence",
-        {"owner": owner, "taskId": task_id or "", "kind": kind, "summary": summary, "data": data or {}},
+        {
+            "owner": owner,
+            "taskId": task_id or "",
+            "kind": kind,
+            "summary": summary,
+            "data": data or {},
+        },
     )
     evidence = result.get("evidence") if isinstance(result.get("evidence"), dict) else {}
     return {
-        "status": "recorded" if result.get("ok") is True else str(result.get("status") or "partial"),
+        "status": "recorded"
+        if result.get("ok") is True
+        else str(result.get("status") or "partial"),
         "workspace": str(PROJECT_ROOT),
         "evidence_id": evidence.get("id"),
         "result": result,
@@ -2553,7 +2837,11 @@ def repo_tree(root: str = ".", limit: int = 400) -> dict[str, Any]:
     items: list[dict[str, Any]] = []
     for current_root, dir_names, file_names in os.walk(base):
         current_path = Path(current_root)
-        dir_names[:] = [name for name in sorted(dir_names, key=str.lower) if not _is_denied_path(current_path / name)]
+        dir_names[:] = [
+            name
+            for name in sorted(dir_names, key=str.lower)
+            if not _is_denied_path(current_path / name)
+        ]
         for name in [*dir_names, *sorted(file_names, key=str.lower)]:
             child = current_path / name
             if _is_denied_path(child):
@@ -2574,7 +2862,13 @@ def repo_tree(root: str = ".", limit: int = 400) -> dict[str, Any]:
                 break
         if len(items) >= max_items:
             break
-    return {"status": "ready", "root": _relative_to_project(base), "count": len(items), "limit": max_items, "items": items}
+    return {
+        "status": "ready",
+        "root": _relative_to_project(base),
+        "count": len(items),
+        "limit": max_items,
+        "items": items,
+    }
 
 
 def search_text(pattern: str, root: str = ".", max_results: int = 100) -> dict[str, Any]:
@@ -2616,7 +2910,9 @@ def search_text(pattern: str, root: str = ".", max_results: int = 100) -> dict[s
         "." if base == PROJECT_ROOT else _relative_to_project(base),
     ]
     try:
-        result = subprocess.run(command, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False)
+        result = subprocess.run(
+            command, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False
+        )
     except FileNotFoundError as exc:
         raise RuntimeError("ripgrep is required for Hermes Agent repo search.") from exc
     lines = result.stdout.splitlines()[:max_items]
@@ -2633,7 +2929,9 @@ def search_text(pattern: str, root: str = ".", max_results: int = 100) -> dict[s
     }
 
 
-def read_file_slice(relative_path: str, start_line: int = 1, line_count: int = 120) -> dict[str, Any]:
+def read_file_slice(
+    relative_path: str, start_line: int = 1, line_count: int = 120
+) -> dict[str, Any]:
     target = _resolve_project_path(relative_path, write=False)
     stat = target.stat()
     if stat.st_size > MAX_FILE_VIEW_BYTES:
@@ -2656,7 +2954,9 @@ def read_file_slice(relative_path: str, start_line: int = 1, line_count: int = 1
     }
 
 
-def snapshot_file(relative_path: str, *, agent_id: str, action_id: str | None = None, reason: str | None = None) -> dict[str, Any]:
+def snapshot_file(
+    relative_path: str, *, agent_id: str, action_id: str | None = None, reason: str | None = None
+) -> dict[str, Any]:
     _validate_owner(agent_id)
     target = _resolve_project_path(relative_path, write=False)
     stat = target.stat()
@@ -2671,7 +2971,9 @@ def snapshot_file(relative_path: str, *, agent_id: str, action_id: str | None = 
     snapshot_dir = HISTORY_ROOT / _safe_bucket(rel)
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     snapshot_path = snapshot_dir / f"{snapshot_id}_{digest[:12]}.snap"
-    tmp_path = snapshot_path.with_suffix(snapshot_path.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}")
+    tmp_path = snapshot_path.with_suffix(
+        snapshot_path.suffix + f".tmp.{os.getpid()}.{new_id()[:8]}"
+    )
     tmp_path.write_bytes(data)
     os.replace(tmp_path, snapshot_path)
     proof_event_id = new_id()
@@ -2775,7 +3077,9 @@ def snapshot_diff(relative_path: str, snapshot_id: str) -> dict[str, Any]:
     }
 
 
-def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, task_id: str, reason: str | None = None) -> dict[str, Any]:
+def restore_snapshot(
+    relative_path: str, snapshot_id: str, *, agent_id: str, task_id: str, reason: str | None = None
+) -> dict[str, Any]:
     _validate_owner(agent_id)
     _validate_task_id(task_id)
     target = _resolve_project_path(relative_path, write=True)
@@ -2785,7 +3089,12 @@ def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, tas
     snapshot_path = Path(snapshot["snapshot_path"])
     if not snapshot_path.exists():
         raise FileNotFoundError("Snapshot file is missing from code history storage.")
-    pre_restore = snapshot_file(rel, agent_id=agent_id, action_id="code.history.restore.pre", reason="Pre-restore safety snapshot")
+    pre_restore = snapshot_file(
+        rel,
+        agent_id=agent_id,
+        action_id="code.history.restore.pre",
+        reason="Pre-restore safety snapshot",
+    )
     data = snapshot_path.read_bytes()
     tmp_path = target.with_name(f"{target.name}.tmp.{os.getpid()}.{new_id()[:8]}")
     tmp_path.write_bytes(data)
@@ -2828,9 +3137,15 @@ def restore_snapshot(relative_path: str, snapshot_id: str, *, agent_id: str, tas
 def _source_repo_status(source: SourceRepo) -> dict[str, Any]:
     exists = source.local_path.exists() and source.local_path.is_dir()
     git_dir = source.local_path / ".git"
-    missing_required = [
-        item for item in source.required_files if not (source.local_path / item.replace("/", os.sep)).exists()
-    ] if exists else list(source.required_files)
+    missing_required = (
+        [
+            item
+            for item in source.required_files
+            if not (source.local_path / item.replace("/", os.sep)).exists()
+        ]
+        if exists
+        else list(source.required_files)
+    )
     head = _git_head(source.local_path) if git_dir.exists() else None
     status = "ready" if exists and not missing_required else "missing"
     if exists and not git_dir.exists():
@@ -2860,7 +3175,9 @@ def _cli_runner_status(runner_id: str) -> dict[str, Any]:
         executable = exe
         for args in ([executable, "--version"], [executable, "version"]):
             try:
-                result = subprocess.run(args, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False)
+                result = subprocess.run(
+                    args, cwd=PROJECT_ROOT, capture_output=True, text=True, timeout=8, check=False
+                )
             except (OSError, subprocess.TimeoutExpired):
                 continue
             output = (result.stdout or result.stderr or "").strip()
@@ -2872,7 +3189,9 @@ def _cli_runner_status(runner_id: str) -> dict[str, Any]:
     blocked_reason = None
     if not exe:
         if configured_path:
-            blocked_reason = f"{config['env_keys'][0]} is configured but does not point to an executable file."
+            blocked_reason = (
+                f"{config['env_keys'][0]} is configured but does not point to an executable file."
+            )
         else:
             blocked_reason = f"{command} executable is not on PATH and no private {config['env_keys'][0]} path is configured."
     return {
@@ -2966,10 +3285,14 @@ def _cli_provider_env_exports(provider_id: str, config: dict[str, Any]) -> list[
         return [
             _redacted_env_export("OPENAI_API_KEY", config["api_key_source"], required=True),
             _redacted_env_export("OPENAI_BASE_URL", config["base_url_source"], required=True),
-            _redacted_env_export("OPENAI_MODEL", config["model_source"] or "default", required=True),
+            _redacted_env_export(
+                "OPENAI_MODEL", config["model_source"] or "default", required=True
+            ),
             _redacted_env_export("MINIMAX_API_KEY", config["api_key_source"], required=True),
             _redacted_env_export("MINIMAX_BASE_URL", config["base_url_source"], required=True),
-            _redacted_env_export("MINIMAX_MODEL", config["model_source"] or "default", required=True),
+            _redacted_env_export(
+                "MINIMAX_MODEL", config["model_source"] or "default", required=True
+            ),
         ]
     return [
         _redacted_env_export("DEEPSEEK_API_KEY", config["api_key_source"], required=True),
@@ -3019,7 +3342,9 @@ def _folder_index_doc_payload(rel: str, path: Path) -> dict[str, Any]:
     }
 
 
-def _folder_index_provider_files(target_files: list[str], loaded: list[dict[str, Any]]) -> list[str]:
+def _folder_index_provider_files(
+    target_files: list[str], loaded: list[dict[str, Any]]
+) -> list[str]:
     loaded_paths = {str(item.get("path") or "") for item in loaded}
     selected = [
         f"{FOLDER_INDEX_ROOT}/00_INDEX.md",
@@ -3033,7 +3358,9 @@ def _folder_index_provider_files(target_files: list[str], loaded: list[dict[str,
         f"{FOLDER_INDEX_ROOT}/agent-infra/hermes3d-mcp-lock-orchestrator.md",
     ]
     targets = "\n".join(str(item).lower() for item in target_files)
-    if any(token in targets for token in ("source", "modules", "runner", "03_implementation/proof")):
+    if any(
+        token in targets for token in ("source", "modules", "runner", "03_implementation/proof")
+    ):
         selected.extend(SOURCE_OS_FOLDER_INDEX_FILES)
     deduped: list[str] = []
     for rel in selected:
@@ -3089,8 +3416,12 @@ def _validate_cli_worker(cli_worker: str | None) -> str | None:
     return worker
 
 
-def _e2e_objective_with_index(objective: str, index_context: dict[str, Any], roles: list[str]) -> str:
-    context_files = index_context.get("provider_context_files") or [item["path"] for item in index_context.get("loaded", [])]
+def _e2e_objective_with_index(
+    objective: str, index_context: dict[str, Any], roles: list[str]
+) -> str:
+    context_files = index_context.get("provider_context_files") or [
+        item["path"] for item in index_context.get("loaded", [])
+    ]
     loaded = ", ".join(str(item) for item in context_files)
     roots = ", ".join(index_context.get("target_roots", [])) or "repository root"
     return (
@@ -3116,7 +3447,9 @@ def _provider_proof_ids(coding: dict[str, Any]) -> list[str]:
     if isinstance(evidence_id, str) and evidence_id:
         proof_ids.append(evidence_id)
     if not proof_ids:
-        raise ValueError("MiniMax coding pass did not return an artifact or evidence id for review.")
+        raise ValueError(
+            "MiniMax coding pass did not return an artifact or evidence id for review."
+        )
     return proof_ids
 
 
@@ -3143,7 +3476,9 @@ def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[s
         status = "smoke_required"
         blocked_reason = "Provider is configured but has not passed a live smoke proof."
         if smoke:
-            smoke_contract = smoke.get("auth_contract") if isinstance(smoke.get("auth_contract"), dict) else {}
+            smoke_contract = (
+                smoke.get("auth_contract") if isinstance(smoke.get("auth_contract"), dict) else {}
+            )
             same_contract = (
                 smoke_contract.get("base_url_label") == auth_contract["base_url_label"]
                 and smoke_contract.get("chat_path") == auth_contract["chat_path"]
@@ -3155,12 +3490,16 @@ def _provider_status(provider_id: str, private_values: dict[str, str]) -> dict[s
                 blocked_reason = None
             elif same_contract:
                 reason_text = " ".join(str(item) for item in smoke.get("blocked_reasons") or [])
-                status = "auth_failed" if _provider_smoke_auth_failed(reason_text) else "smoke_failed"
+                status = (
+                    "auth_failed" if _provider_smoke_auth_failed(reason_text) else "smoke_failed"
+                )
                 live_status = "failed"
                 blocked_reason = f"Last live smoke failed: {reason_text[:240] or status}"
             else:
                 live_status = "stale_smoke"
-                blocked_reason = "Provider config changed or smoke proof is stale; rerun provider smoke."
+                blocked_reason = (
+                    "Provider config changed or smoke proof is stale; rerun provider smoke."
+                )
     return {
         "id": provider_id,
         "status": status,
@@ -3260,7 +3599,9 @@ def _provider_smoke_auth_failed(reason_text: str) -> bool:
     )
 
 
-def _provider_chat_config(provider_id: str, private_values: dict[str, str] | None = None, *, require_ready: bool = True) -> dict[str, Any]:
+def _provider_chat_config(
+    provider_id: str, private_values: dict[str, str] | None = None, *, require_ready: bool = True
+) -> dict[str, Any]:
     provider = str(provider_id or "").strip().lower()
     if provider not in PROVIDER_DEFAULT_BASE_URLS:
         raise ValueError("Unsupported provider id.")
@@ -3328,7 +3669,9 @@ def _provider_chat_config(provider_id: str, private_values: dict[str, str] | Non
         if not model:
             missing.append(f"HERMES3D_{prefix}_MODEL or {prefix}_MODEL")
         if missing:
-            raise ValueError(f"Provider {provider} is missing required private env keys: {', '.join(missing)}.")
+            raise ValueError(
+                f"Provider {provider} is missing required private env keys: {', '.join(missing)}."
+            )
     return config
 
 
@@ -3386,7 +3729,9 @@ def _call_provider_chat(
             http_status = int(response.status)
     except urllib.error.HTTPError as exc:
         detail = exc.read(2000).decode("utf-8", errors="replace")
-        raise RuntimeError(f"Provider {provider_id} returned HTTP {exc.code}: {_redact_provider_text(detail)}") from exc
+        raise RuntimeError(
+            f"Provider {provider_id} returned HTTP {exc.code}: {_redact_provider_text(detail)}"
+        ) from exc
     except Exception as exc:
         raise RuntimeError(f"Provider {provider_id} request failed: {type(exc).__name__}.") from exc
     if len(raw) > MAX_PROVIDER_RESPONSE_BYTES:
@@ -3531,7 +3876,9 @@ def _provider_system_prompt(mode: str) -> str:
     )
 
 
-def _coding_pass_prompt(*, title: str, objective: str, files: list[dict[str, Any]], target_branch: str | None) -> str:
+def _coding_pass_prompt(
+    *, title: str, objective: str, files: list[dict[str, Any]], target_branch: str | None
+) -> str:
     return as_json(
         {
             "task": {"title": title, "objective": objective, "target_branch": target_branch},
@@ -3663,7 +4010,9 @@ def _git_head(path: Path) -> str | None:
 def _require_mcp_locks_ready() -> None:
     lock_status = mcp_lock_readiness()
     if not lock_status["ready"]:
-        raise ValueError(str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready."))
+        raise ValueError(
+            str(lock_status.get("blocked_reason") or "Hermes MCP locks are not ready.")
+        )
 
 
 def _trusted_lock_server_entry() -> Path:
@@ -3671,7 +4020,9 @@ def _trusted_lock_server_entry() -> Path:
     try:
         server.relative_to(LOCK_ORCHESTRATOR_ROOT.resolve())
     except ValueError as exc:
-        raise ValueError("Trusted Hermes MCP lock server must stay inside the lock orchestrator source tree.") from exc
+        raise ValueError(
+            "Trusted Hermes MCP lock server must stay inside the lock orchestrator source tree."
+        ) from exc
     if server.name != "server.mjs":
         raise ValueError("Trusted Hermes MCP lock server entry must be server.mjs.")
     return server
@@ -3712,10 +4063,16 @@ def _safe_mcp_files(files: list[str], *, must_exist: bool) -> list[str]:
     return safe
 
 
-def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int = 30) -> dict[str, Any]:
+def _call_mcp_tool(
+    tool_name: str, arguments: dict[str, Any], *, timeout_s: int = 30
+) -> dict[str, Any]:
     private_values = private_env()
     server = _trusted_lock_server_entry()
-    workspace = env_value("MCP_LOCK_WORKSPACE", private_values) or env_value("HERMES3D_WORKSPACE", private_values) or str(PROJECT_ROOT)
+    workspace = (
+        env_value("MCP_LOCK_WORKSPACE", private_values)
+        or env_value("HERMES3D_WORKSPACE", private_values)
+        or str(PROJECT_ROOT)
+    )
     # W8-7 fix (2026-05-09): accept any worktree of the same git repo, not
     # just byte-equal resolved paths. ``_workspace_paths_equivalent`` falls
     # back to ``git rev-parse --git-common-dir`` for paths that disagree on
@@ -3727,9 +4084,23 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
     init_id = 1
     call_id = 2
     messages = [
-        {"jsonrpc": "2.0", "id": init_id, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "hermes3d-code-operator", "version": "1"}}},
+        {
+            "jsonrpc": "2.0",
+            "id": init_id,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "hermes3d-code-operator", "version": "1"},
+            },
+        },
         {"jsonrpc": "2.0", "method": "notifications/initialized"},
-        {"jsonrpc": "2.0", "id": call_id, "method": "tools/call", "params": {"name": tool_name, "arguments": arguments}},
+        {
+            "jsonrpc": "2.0",
+            "id": call_id,
+            "method": "tools/call",
+            "params": {"name": tool_name, "arguments": arguments},
+        },
     ]
     stdin = "".join(json.dumps(message, separators=(",", ":")) + "\n" for message in messages)
     env = {
@@ -3744,10 +4115,12 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
         }.items()
         if value
     }
-    env.update({
-        "MCP_LOCK_WORKSPACE": str(PROJECT_ROOT),
-        "MCP_LOCK_SERVER": str(server),
-    })
+    env.update(
+        {
+            "MCP_LOCK_WORKSPACE": str(PROJECT_ROOT),
+            "MCP_LOCK_SERVER": str(server),
+        }
+    )
     # Bonus 12 finding #8 (Audit PR #135) — escalated to follow-up.
     #
     # The audit recommended replacing the manual Popen+thread+sleep+terminate
@@ -3800,8 +4173,12 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
     assert process.stdin is not None
     assert process.stdout is not None
     assert process.stderr is not None
-    stdout_thread = threading.Thread(target=collect, args=(process.stdout, stdout_lines), daemon=True)
-    stderr_thread = threading.Thread(target=collect, args=(process.stderr, stderr_lines), daemon=True)
+    stdout_thread = threading.Thread(
+        target=collect, args=(process.stdout, stdout_lines), daemon=True
+    )
+    stderr_thread = threading.Thread(
+        target=collect, args=(process.stderr, stderr_lines), daemon=True
+    )
     stdout_thread.start()
     stderr_thread.start()
     try:
@@ -3823,7 +4200,9 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
             except subprocess.TimeoutExpired:
                 process.kill()
             stderr_head = "".join(stderr_lines).splitlines()[:5]
-            raise RuntimeError(f"Hermes MCP tool {tool_name} returned no JSON-RPC response: {stderr_head}")
+            raise RuntimeError(
+                f"Hermes MCP tool {tool_name} returned no JSON-RPC response: {stderr_head}"
+            )
     finally:
         try:
             process.stdin.close()
@@ -3842,7 +4221,7 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
         stderr_thread.join(timeout=1)
     if response.get("error"):
         raise RuntimeError(f"Hermes MCP tool {tool_name} failed: {response['error']}")
-    content = ((response.get("result") or {}).get("content") or [])
+    content = (response.get("result") or {}).get("content") or []
     text = content[0].get("text") if content and isinstance(content[0], dict) else "{}"
     try:
         return json.loads(text or "{}")
@@ -3894,7 +4273,11 @@ def _run_git(args: list[str], *, timeout_s: int = 30) -> dict[str, Any]:
         raise RuntimeError("Git command could not run.") from exc
     if result.returncode != 0:
         raise RuntimeError((result.stderr or result.stdout or "Git command failed.").strip()[:2000])
-    return {"stdout": result.stdout[:12000], "stderr": result.stderr[:4000], "returncode": result.returncode}
+    return {
+        "stdout": result.stdout[:12000],
+        "stderr": result.stderr[:4000],
+        "returncode": result.returncode,
+    }
 
 
 def _run_gh(args: list[str], *, timeout_s: int = 60) -> dict[str, Any]:
@@ -3910,8 +4293,14 @@ def _run_gh(args: list[str], *, timeout_s: int = 60) -> dict[str, Any]:
     except (OSError, subprocess.SubprocessError) as exc:
         raise RuntimeError("GitHub CLI command could not run.") from exc
     if result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "GitHub CLI command failed.").strip()[:2000])
-    return {"stdout": result.stdout[:12000], "stderr": result.stderr[:4000], "returncode": result.returncode}
+        raise RuntimeError(
+            (result.stderr or result.stdout or "GitHub CLI command failed.").strip()[:2000]
+        )
+    return {
+        "stdout": result.stdout[:12000],
+        "stderr": result.stderr[:4000],
+        "returncode": result.returncode,
+    }
 
 
 def _current_branch() -> str:
@@ -3926,7 +4315,9 @@ def _changed_git_files() -> set[str]:
         ["ls-files", "--others", "--exclude-standard"],
     ):
         value = _git_value(args, allow_multiline=True) or ""
-        changed.update(line.strip().replace("\\", "/") for line in value.splitlines() if line.strip())
+        changed.update(
+            line.strip().replace("\\", "/") for line in value.splitlines() if line.strip()
+        )
     return changed
 
 
@@ -3938,7 +4329,9 @@ def _staged_git_files() -> set[str]:
 def _validate_agent_branch_name(branch_name: str | None) -> str:
     branch = str(branch_name or "").strip()
     if not _is_allowed_agent_branch(branch):
-        raise ValueError("Agent git branches must start with codex/ or hermes-agent/ and use safe ref characters.")
+        raise ValueError(
+            "Agent git branches must start with codex/ or hermes-agent/ and use safe ref characters."
+        )
     try:
         result = subprocess.run(
             ["git", "check-ref-format", "--branch", branch],
@@ -4022,7 +4415,9 @@ def _agent_snapshot_files(owner: str) -> set[str]:
         """,
         (str(PROJECT_ROOT), owner),
     )
-    return {str(record.get("relative_path") or "") for record in records if record.get("relative_path")}
+    return {
+        str(record.get("relative_path") or "") for record in records if record.get("relative_path")
+    }
 
 
 def _record_git_proof(*, owner: str, event_type: str, payload: dict[str, Any]) -> str:
@@ -4107,11 +4502,17 @@ def _enforce_path_policy(path: Path, *, write: bool) -> None:
         raise ValueError("Path is blocked by Hermes Agent code policy.")
     name = path.name.lower()
     if _is_sensitive_name(name):
-        raise ValueError("Sensitive, binary, or generated file type is blocked by Hermes Agent code policy.")
+        raise ValueError(
+            "Sensitive, binary, or generated file type is blocked by Hermes Agent code policy."
+        )
     if write and not _is_editable_source_path(path):
-        raise ValueError("Hermes Agent code writes are limited to source, test, docs, scripts, and workflow text files.")
+        raise ValueError(
+            "Hermes Agent code writes are limited to source, test, docs, scripts, and workflow text files."
+        )
     if write and "config" in lowered_parts and "printers.toml" in name:
-        raise ValueError("Printer configuration writes require a dedicated printer-policy approval lane.")
+        raise ValueError(
+            "Printer configuration writes require a dedicated printer-policy approval lane."
+        )
 
 
 def _is_denied_path(path: Path) -> bool:
@@ -4162,7 +4563,9 @@ def _parse_rg_line(line: str) -> dict[str, Any]:
     path_text, line_text, column_text, text = parts
     try:
         parsed_path = Path(path_text)
-        rel = _relative_to_project(parsed_path if parsed_path.is_absolute() else PROJECT_ROOT / parsed_path)
+        rel = _relative_to_project(
+            parsed_path if parsed_path.is_absolute() else PROJECT_ROOT / parsed_path
+        )
     except Exception:
         rel = path_text
     return {
@@ -4367,78 +4770,89 @@ def _recovery_ledger_lock() -> _RecoveryLedgerLock:
     """Return a context manager holding the recovery ledger exclusive lock."""
     return _RecoveryLedgerLock()
 
-RECOVERY_FAILURE_CLASSES = frozenset({
-    "missing_proof",
-    "patch_rejected",
-    "gate_fail",
-    "merge_git_fail",
-    "runner_fail",
-    "sandbox_fail",
-    "provider_auth",
-    "ui_fail",
-    "secret_risk",
-})
 
-RECOVERY_OUTCOME_STATUSES = frozenset({
-    "recovered",
-    "retry_failed",
-    "escalated",
-})
+RECOVERY_FAILURE_CLASSES = frozenset(
+    {
+        "missing_proof",
+        "patch_rejected",
+        "gate_fail",
+        "merge_git_fail",
+        "runner_fail",
+        "sandbox_fail",
+        "provider_auth",
+        "ui_fail",
+        "secret_risk",
+    }
+)
 
-RECOVERY_FAILED_STEP_TYPES = frozenset({
-    "provider_smoke",
-    "builder_pass",
-    "reviewer_pass",
-    "patch_apply",
-    "gate_run",
-    "git_branch",
-    "git_push",
-    "pr_open",
-    "visual_proof",
-    "unknown",
-})
+RECOVERY_OUTCOME_STATUSES = frozenset(
+    {
+        "recovered",
+        "retry_failed",
+        "escalated",
+    }
+)
 
-RECOVERY_RECOMMENDED_ACTIONS = frozenset({
-    "retry_review",
-    "split_patch_by_file",
-    "rollback_and_retry",
-    "run_gate_again",
-    "escalate_user",
-    "refresh_context",
-    "reduce_review_context",
-    "none",
-})
+RECOVERY_FAILED_STEP_TYPES = frozenset(
+    {
+        "provider_smoke",
+        "builder_pass",
+        "reviewer_pass",
+        "patch_apply",
+        "gate_run",
+        "git_branch",
+        "git_push",
+        "pr_open",
+        "visual_proof",
+        "unknown",
+    }
+)
+
+RECOVERY_RECOMMENDED_ACTIONS = frozenset(
+    {
+        "retry_review",
+        "split_patch_by_file",
+        "rollback_and_retry",
+        "run_gate_again",
+        "escalate_user",
+        "refresh_context",
+        "reduce_review_context",
+        "none",
+    }
+)
 
 RECOVERY_REDACTION_STATUSES = frozenset({"pass", "warning", "blocked"})
 
-RECOVERY_WORKER_OUTPUT_STATUSES = frozenset({
-    "complete",
-    "truncated",
-    "timeout",
-    "empty",
-    "malformed_json",
-    "rejected",
-})
+RECOVERY_WORKER_OUTPUT_STATUSES = frozenset(
+    {
+        "complete",
+        "truncated",
+        "timeout",
+        "empty",
+        "malformed_json",
+        "rejected",
+    }
+)
 
-RECOVERY_AGENT_STACK_VALUES = frozenset({
-    "MiniMax",
-    "DeepSeek",
-    "OpenCode",
-    "OpenHands",
-    "Gate Runner",
-    "Human",
-    "Claude",
-    "Codex",
-})
+RECOVERY_AGENT_STACK_VALUES = frozenset(
+    {
+        "MiniMax",
+        "DeepSeek",
+        "OpenCode",
+        "OpenHands",
+        "Gate Runner",
+        "Human",
+        "Claude",
+        "Codex",
+    }
+)
 
 _RECOVERY_MAX_ATTEMPTS_DEFAULT = 3
 
 
 def _validate_recovery_enum(value: str, choices: frozenset[str], label: str) -> str:
     if value not in choices:
-        raise ValueError(
-            f"{label} must be one of {sorted(choices)}; got {value!r}."
-        )
+        raise ValueError(f"{label} must be one of {sorted(choices)}; got {value!r}.")
     return value
 
 
@@ -4458,7 +4872,9 @@ def _validate_recovery_agent_stack(stack: list[str] | None) -> list[str]:
     return cleaned
 
 
-def _validate_recovery_id_list(values: list[str] | None, *, label: str, max_items: int = 32) -> list[str]:
+def _validate_recovery_id_list(
+    values: list[str] | None, *, label: str, max_items: int = 32
+) -> list[str]:
     if not values:
         return []
     if len(values) > max_items:
@@ -4498,12 +4914,14 @@ def _recovery_failure_fingerprint(
     failure_summary: str,
 ) -> str:
     """Stable short hash so repeated failures group together in the UI."""
-    payload = "|".join((
-        failure_class,
-        failed_step_type,
-        failed_step.strip().lower(),
-        failure_summary.strip().lower()[:200],
-    ))
+    payload = "|".join(
+        (
+            failure_class,
+            failed_step_type,
+            failed_step.strip().lower(),
+            failure_summary.strip().lower()[:200],
+        )
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
@@ -4542,15 +4960,23 @@ def record_step_failure(
     _validate_recovery_enum(failure_class, RECOVERY_FAILURE_CLASSES, "failure_class")
     _validate_recovery_enum(failed_step_type, RECOVERY_FAILED_STEP_TYPES, "failed_step_type")
     _validate_recovery_enum(redaction_status, RECOVERY_REDACTION_STATUSES, "redaction_status")
-    _validate_recovery_enum(worker_output_status, RECOVERY_WORKER_OUTPUT_STATUSES, "worker_output_status")
-    _validate_recovery_enum(recommended_next_action, RECOVERY_RECOMMENDED_ACTIONS, "recommended_next_action")
-    clean_summary = redact_text(_validate_bounded_text(failure_summary, "failure_summary", max_chars=400))
+    _validate_recovery_enum(
+        worker_output_status, RECOVERY_WORKER_OUTPUT_STATUSES, "worker_output_status"
+    )
+    _validate_recovery_enum(
+        recommended_next_action, RECOVERY_RECOMMENDED_ACTIONS, "recommended_next_action"
+    )
+    clean_summary = redact_text(
+        _validate_bounded_text(failure_summary, "failure_summary", max_chars=400)
+    )
     clean_resume = ""
     if resume_from_step:
         clean_resume = _validate_bounded_text(resume_from_step, "resume_from_step", max_chars=120)
     clean_stack = _validate_recovery_agent_stack(agent_stack)
     clean_context = _validate_recovery_id_list(context_pack, label="context_pack", max_items=64)
-    clean_provenance = _validate_recovery_id_list(provenance_ids, label="provenance_ids", max_items=64)
+    clean_provenance = _validate_recovery_id_list(
+        provenance_ids, label="provenance_ids", max_items=64
+    )
     safe_evidence_id = ""
     if evidence_id:
         safe_evidence_id = _validate_bounded_text(evidence_id, "evidence_id", max_chars=120)
@@ -4641,9 +5067,13 @@ def mark_recovery_outcome(
     _validate_recovery_enum(status, RECOVERY_OUTCOME_STATUSES, "status")
     if not re.fullmatch(r"[a-f0-9]{32}", attempt_id or ""):
         raise ValueError("attempt_id must be a 32-character lowercase hex string.")
-    clean_summary = redact_text(_validate_bounded_text(recovery_summary, "recovery_summary", max_chars=400))
+    clean_summary = redact_text(
+        _validate_bounded_text(recovery_summary, "recovery_summary", max_chars=400)
+    )
     if not _RECOVERY_LEDGER_PATH.exists():
-        raise FileNotFoundError(f"Recovery ledger does not exist; cannot find attempt {attempt_id}.")
+        raise FileNotFoundError(
+            f"Recovery ledger does not exist; cannot find attempt {attempt_id}."
+        )
 
     optional_ids = {
         "proposal_id": proposal_id,

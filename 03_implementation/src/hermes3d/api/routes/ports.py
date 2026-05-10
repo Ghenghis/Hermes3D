@@ -28,5 +28,8 @@ def put_ports(update: dict[str, int]) -> dict:
     if conflicts:
         return {"saved": False, "restart_required": False, "conflicts": conflicts}
     for name, port in update.items():
-        execute("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))", (f"ports.{name}", str(port)))
+        execute(
+            "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+            (f"ports.{name}", str(port)),
+        )
     return {"saved": True, "restart_required": "api" in update, "conflicts": []}

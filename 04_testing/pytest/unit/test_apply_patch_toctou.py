@@ -25,15 +25,11 @@ References:
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
-
 from hermes3d.services import code_history
-
 
 # ---------------------------------------------------------------------------
 # Fixture: build the minimal test scaffolding around apply_patch_proposal
@@ -50,9 +46,7 @@ def applier_setup(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> dict[str, 
     target = tmp_path / "target.py"
     target.write_text("original-content\n", encoding="utf-8")
 
-    project_root = tmp_path
     rel = "target.py"
-    base_sha = "0" * 64  # placeholder; tests override per-case
 
     captured_execs: list[tuple[str, tuple[Any, ...]]] = []
     captured_evidence: list[dict[str, Any]] = []
@@ -129,20 +123,15 @@ def test_apply_clean_writes_target_and_records_inflight_then_applied(
     target = applier_setup["target"]
     proposal = _make_proposal(target, "patched-content\n")
     monkeypatch.setattr(code_history, "_patch_proposal_payload", lambda pid: proposal)
-    result = code_history.apply_patch_proposal(
-        "prop-1", agent_id="claude-test", task_id="task-1"
-    )
+    result = code_history.apply_patch_proposal("prop-1", agent_id="claude-test", task_id="task-1")
     assert target.read_text(encoding="utf-8") == "patched-content\n"
     # Both replace_inflight (Bonus 12 #7 fix) and applied events must land.
-    sqls = [sql for sql, _ in applier_setup["captured_execs"]]
     payloads = [params for _, params in applier_setup["captured_execs"]]
     inflight_writes = [
-        params for params in payloads
-        if any("replace_inflight" in str(field) for field in params)
+        params for params in payloads if any("replace_inflight" in str(field) for field in params)
     ]
     applied_writes = [
-        params for params in payloads
-        if any("code_patch.applied" in str(field) for field in params)
+        params for params in payloads if any("code_patch.applied" in str(field) for field in params)
     ]
     assert inflight_writes, "Bonus 12 #7: inflight intent must be recorded BEFORE replace"
     assert applied_writes, "code_patch.applied event must be recorded after success"
@@ -179,7 +168,8 @@ def test_apply_hash_mismatch_blocks_before_replace(
     assert target.read_bytes() == original
     # No replace_inflight row should be written when we reject up-front.
     inflight_writes = [
-        params for _, params in applier_setup["captured_execs"]
+        params
+        for _, params in applier_setup["captured_execs"]
         if any("replace_inflight" in str(field) for field in params)
     ]
     assert not inflight_writes, (
@@ -210,8 +200,7 @@ def test_apply_calls_os_fsync_on_tmp_fd(
     monkeypatch.setattr(code_history.os, "fsync", tracking_fsync)
     code_history.apply_patch_proposal("prop-3", agent_id="claude-test", task_id="task-1")
     assert fsync_calls, (
-        "Bonus 12 #7: os.fsync must be called at least once "
-        "(on the tmp fd before os.replace)"
+        "Bonus 12 #7: os.fsync must be called at least once (on the tmp fd before os.replace)"
     )
 
 
@@ -251,7 +240,8 @@ def test_apply_crash_during_replace_leaves_inflight_marker(
     # Bonus 12 #7: the inflight marker MUST be in the DB so a recovery
     # worker can detect the orphan tmp file and roll forward / back.
     inflight_writes = [
-        params for _, params in applier_setup["captured_execs"]
+        params
+        for _, params in applier_setup["captured_execs"]
         if any("replace_inflight" in str(field) for field in params)
     ]
     assert inflight_writes, (

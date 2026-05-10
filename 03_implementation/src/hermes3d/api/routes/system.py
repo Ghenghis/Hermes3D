@@ -69,14 +69,18 @@ def system_snapshot() -> dict[str, Any]:
         "database": {"path": str(DB_PATH), "exists": DB_PATH.exists()},
         "printers": {
             "total": len(printers),
-            "online": sum(1 for printer in printers if printer["status"] in {"online", "printing", "paused"}),
+            "online": sum(
+                1 for printer in printers if printer["status"] in {"online", "printing", "paused"}
+            ),
             "locked": sum(1 for printer in printers if printer["maintenance_flag"]),
         },
         "jobs": {
             "queued": _count("SELECT COUNT(*) AS count FROM jobs WHERE status = 'queued'"),
             "running": _count("SELECT COUNT(*) AS count FROM jobs WHERE status = 'running'"),
         },
-        "approvals": {"pending": _count("SELECT COUNT(*) AS count FROM approvals WHERE status = 'pending'")},
+        "approvals": {
+            "pending": _count("SELECT COUNT(*) AS count FROM approvals WHERE status = 'pending'")
+        },
     }
 
 
@@ -87,7 +91,9 @@ def runtime_identity(request: Request) -> dict[str, Any]:
     branch = _git_value(repo_root, ["branch", "--show-current"])
     commit = _git_value(repo_root, ["rev-parse", "--short=12", "HEAD"])
     dirty = bool(_git_value(repo_root, ["status", "--porcelain"]))
-    missing_agent_routes = [path for path in AGENT_WORKBENCH_REQUIRED_ROUTES if path not in route_paths]
+    missing_agent_routes = [
+        path for path in AGENT_WORKBENCH_REQUIRED_ROUTES if path not in route_paths
+    ]
     return {
         "status": "fresh" if not missing_agent_routes else "stale",
         "fresh": not missing_agent_routes,
@@ -197,10 +203,16 @@ def workflows() -> list[dict[str, Any]]:
 @router.get("/api/dimensional-reports")
 def dimensional_reports() -> list[dict[str, Any]]:
     report_dir = implementation_path("var", "dimensional_reports")
-    reports = [
-        _file_report(path)
-        for path in sorted(report_dir.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
-    ] if report_dir.exists() else []
+    reports = (
+        [
+            _file_report(path)
+            for path in sorted(
+                report_dir.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True
+            )
+        ]
+        if report_dir.exists()
+        else []
+    )
     artifact_reports = rows(
         """
         SELECT id, file_path, file_size, created_at, notes
@@ -255,20 +267,75 @@ def env_status() -> dict[str, list[dict[str, Any]]]:
         ("HERMES3D_PROFILE", (), False, "Active runtime profile."),
         ("HERMES3D_LM_STUDIO_BASE_URL", (), False, "Local LM Studio base URL."),
         ("OLLAMA_BASE_URL", (), False, "Local Ollama base URL."),
-        ("HERMES3D_MINIMAX_API_KEY", ("MINIMAX_API_KEY",), True, "MiniMax API key. Alias accepted: MINIMAX_API_KEY."),
-        ("HERMES3D_MINIMAX_BASE_URL", ("MINIMAX_BASE_URL",), False, "MiniMax OpenAI-compatible base URL. Alias accepted: MINIMAX_BASE_URL."),
-        ("HERMES3D_MINIMAX_MODEL", ("MINIMAX_MODEL",), False, "MiniMax model name. Alias accepted: MINIMAX_MODEL."),
-        ("HERMES3D_DEEPSEEK_API_KEY", ("DEEPSEEK_API_KEY",), True, "DeepSeek API key. Alias accepted: DEEPSEEK_API_KEY."),
-        ("HERMES3D_DEEPSEEK_BASE_URL", ("DEEPSEEK_BASE_URL",), False, "DeepSeek OpenAI-compatible base URL. Alias accepted: DEEPSEEK_BASE_URL."),
-        ("HERMES3D_DEEPSEEK_MODEL", ("DEEPSEEK_MODEL",), False, "DeepSeek model name. Alias accepted: DEEPSEEK_MODEL."),
+        (
+            "HERMES3D_MINIMAX_API_KEY",
+            ("MINIMAX_API_KEY",),
+            True,
+            "MiniMax API key. Alias accepted: MINIMAX_API_KEY.",
+        ),
+        (
+            "HERMES3D_MINIMAX_BASE_URL",
+            ("MINIMAX_BASE_URL",),
+            False,
+            "MiniMax OpenAI-compatible base URL. Alias accepted: MINIMAX_BASE_URL.",
+        ),
+        (
+            "HERMES3D_MINIMAX_MODEL",
+            ("MINIMAX_MODEL",),
+            False,
+            "MiniMax model name. Alias accepted: MINIMAX_MODEL.",
+        ),
+        (
+            "HERMES3D_DEEPSEEK_API_KEY",
+            ("DEEPSEEK_API_KEY",),
+            True,
+            "DeepSeek API key. Alias accepted: DEEPSEEK_API_KEY.",
+        ),
+        (
+            "HERMES3D_DEEPSEEK_BASE_URL",
+            ("DEEPSEEK_BASE_URL",),
+            False,
+            "DeepSeek OpenAI-compatible base URL. Alias accepted: DEEPSEEK_BASE_URL.",
+        ),
+        (
+            "HERMES3D_DEEPSEEK_MODEL",
+            ("DEEPSEEK_MODEL",),
+            False,
+            "DeepSeek model name. Alias accepted: DEEPSEEK_MODEL.",
+        ),
         ("AZURE_SPEECH_KEY", (), True, "Azure Speech key for local voice runtime."),
         ("AZURE_SPEECH_REGION", (), False, "Azure Speech region."),
         ("HERMES3D_PROOF_KEY", (), True, "Proof envelope HMAC key."),
-        ("HERMES3D_AGENT_RUNTIME_URL", (), False, "Trusted local/private OpenAI-compatible agent runtime URL."),
-        ("HERMES3D_AGENT_RUNTIME_MODEL", (), False, "Concrete local model used for Hermes Agent personas."),
-        ("HERMES3D_OPENCODE_BIN", ("OPENCODE_BIN",), False, "OpenCode CLI executable path. Alias accepted: OPENCODE_BIN."),
-        ("HERMES3D_OPENHANDS_BIN", ("OPENHANDS_BIN",), False, "OpenHands CLI executable path. Alias accepted: OPENHANDS_BIN."),
-        ("HERMES3D_LEARNING_RUNNER_ENABLED", (), False, "Enables idle learning report execution after runtime gates pass."),
+        (
+            "HERMES3D_AGENT_RUNTIME_URL",
+            (),
+            False,
+            "Trusted local/private OpenAI-compatible agent runtime URL.",
+        ),
+        (
+            "HERMES3D_AGENT_RUNTIME_MODEL",
+            (),
+            False,
+            "Concrete local model used for Hermes Agent personas.",
+        ),
+        (
+            "HERMES3D_OPENCODE_BIN",
+            ("OPENCODE_BIN",),
+            False,
+            "OpenCode CLI executable path. Alias accepted: OPENCODE_BIN.",
+        ),
+        (
+            "HERMES3D_OPENHANDS_BIN",
+            ("OPENHANDS_BIN",),
+            False,
+            "OpenHands CLI executable path. Alias accepted: OPENHANDS_BIN.",
+        ),
+        (
+            "HERMES3D_LEARNING_RUNNER_ENABLED",
+            (),
+            False,
+            "Enables idle learning report execution after runtime gates pass.",
+        ),
     ]
     return {
         "variables": [
@@ -290,15 +357,28 @@ def env_status() -> dict[str, list[dict[str, Any]]]:
 def runtime_readiness() -> dict[str, Any]:
     private_env = _private_env()
     agent_probe = runtime_probe(private_env)
-    learning_runner_ready = _env_value("HERMES3D_LEARNING_RUNNER_ENABLED", private_env).strip() == "1"
-    azure_ready = bool(_env_value("AZURE_SPEECH_KEY", private_env) and _env_value("AZURE_SPEECH_REGION", private_env))
+    learning_runner_ready = (
+        _env_value("HERMES3D_LEARNING_RUNNER_ENABLED", private_env).strip() == "1"
+    )
+    azure_ready = bool(
+        _env_value("AZURE_SPEECH_KEY", private_env)
+        and _env_value("AZURE_SPEECH_REGION", private_env)
+    )
     proof_ready = bool(_env_value("HERMES3D_PROOF_KEY", private_env))
-    lm_studio = _probe_provider("lm_studio", _env_value("HERMES3D_LM_STUDIO_BASE_URL", private_env, "http://127.0.0.1:1234/v1"), "/models")
-    ollama = _probe_provider("ollama", _env_value("OLLAMA_BASE_URL", private_env, "http://127.0.0.1:11434"), "/api/tags")
+    lm_studio = _probe_provider(
+        "lm_studio",
+        _env_value("HERMES3D_LM_STUDIO_BASE_URL", private_env, "http://127.0.0.1:1234/v1"),
+        "/models",
+    )
+    ollama = _probe_provider(
+        "ollama", _env_value("OLLAMA_BASE_URL", private_env, "http://127.0.0.1:11434"), "/api/tags"
+    )
     local_llm_ready = any(item["status"] == "green" for item in [lm_studio, ollama])
     design_ready = _python_importable("trimesh")
     printers = local_printers()
-    online_printers = [printer for printer in printers if printer.get("status") in {"online", "printing", "paused"}]
+    online_printers = [
+        printer for printer in printers if printer.get("status") in {"online", "printing", "paused"}
+    ]
     runtimes = [
         _runtime_row(
             "hermes_agent_runtime",
@@ -316,7 +396,9 @@ def runtime_readiness() -> dict[str, Any]:
             "agents",
             "ready" if learning_runner_ready else "blocked",
             "env/private_env",
-            "Idle Learning runner execution is enabled." if learning_runner_ready else "Set HERMES3D_LEARNING_RUNNER_ENABLED=1 only after the real report runner is installed and gate-tested.",
+            "Idle Learning runner execution is enabled."
+            if learning_runner_ready
+            else "Set HERMES3D_LEARNING_RUNNER_ENABLED=1 only after the real report runner is installed and gate-tested.",
             ["HERMES3D_LEARNING_RUNNER_ENABLED"],
             "/api/learning/idle-workbench",
         ),
@@ -326,7 +408,9 @@ def runtime_readiness() -> dict[str, Any]:
             "voice",
             "ready" if azure_ready else "blocked",
             "private_env" if azure_ready else "env/private_env",
-            "Azure Speech key and region are available to the backend only." if azure_ready else "Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION in G:/private/.env.",
+            "Azure Speech key and region are available to the backend only."
+            if azure_ready
+            else "Set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION in G:/private/.env.",
             ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"],
             "/api/voice/providers",
         ),
@@ -336,7 +420,9 @@ def runtime_readiness() -> dict[str, Any]:
             "proof",
             "ready" if proof_ready else "blocked",
             "env/private_env",
-            "HERMES3D_PROOF_KEY is configured." if proof_ready else "Set HERMES3D_PROOF_KEY in private env to replace the local development proof key.",
+            "HERMES3D_PROOF_KEY is configured."
+            if proof_ready
+            else "Set HERMES3D_PROOF_KEY in private env to replace the local development proof key.",
             ["HERMES3D_PROOF_KEY"],
             "python -m hermes3d.cli proof verify",
         ),
@@ -346,7 +432,9 @@ def runtime_readiness() -> dict[str, Any]:
             "providers",
             "ready" if local_llm_ready else "blocked",
             "local_http_probe",
-            "LM Studio or Ollama responded to backend probe." if local_llm_ready else "Start LM Studio/Ollama or configure their base URLs in private env.",
+            "LM Studio or Ollama responded to backend probe."
+            if local_llm_ready
+            else "Start LM Studio/Ollama or configure their base URLs in private env.",
             ["HERMES3D_LM_STUDIO_BASE_URL", "OLLAMA_BASE_URL"],
             "/api/providers/health",
         ),
@@ -366,7 +454,9 @@ def runtime_readiness() -> dict[str, Any]:
             "modeling",
             "ready" if design_ready else "blocked",
             "python_runtime",
-            "Parametric executor and trimesh proof gate are importable." if design_ready else "Install the Python mesh validation/runtime dependencies used by Design.",
+            "Parametric executor and trimesh proof gate are importable."
+            if design_ready
+            else "Install the Python mesh validation/runtime dependencies used by Design.",
             [],
             "/api/design/toolchain/status",
         ),
@@ -408,7 +498,12 @@ def _count(sql: str) -> int:
 
 def _api_auth_enforced() -> bool:
     token = os.environ.get("HERMES3D_API_TOKEN") or os.environ.get("HERMES3D_API_KEY")
-    required = os.environ.get("HERMES3D_REQUIRE_API_AUTH", "").strip().lower() in {"1", "true", "yes", "on"}
+    required = os.environ.get("HERMES3D_REQUIRE_API_AUTH", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
     return bool(token and required)
 
 
@@ -497,7 +592,14 @@ def _trusted_runtime_url(private_env: dict[str, str]) -> str | None:
     if not value:
         return None
     parsed = urlparse(value)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
         return None
     try:
         host = ipaddress.ip_address(parsed.hostname)
@@ -554,14 +656,22 @@ def _host_telemetry() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: psutil import/probe is optional; log for observability
         try:
             import logging
+
             logging.getLogger(__name__).debug(
                 "system.metrics: psutil unavailable; cpu/ram default to 0: %s: %s",
-                type(exc).__name__, exc,
+                type(exc).__name__,
+                exc,
             )
         except Exception:  # noqa: BLE001
             pass
     try:
-        disk_pct = int(round(shutil.disk_usage(implementation_path()).used / shutil.disk_usage(implementation_path()).total * 100))
+        disk_pct = int(
+            round(
+                shutil.disk_usage(implementation_path()).used
+                / shutil.disk_usage(implementation_path()).total
+                * 100
+            )
+        )
     except OSError:
         disk_pct = 0
     return {

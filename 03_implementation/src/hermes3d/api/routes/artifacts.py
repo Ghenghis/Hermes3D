@@ -73,7 +73,9 @@ def get_proof_file(filename: str) -> FileResponse:
 
 
 @router.get("/api/artifacts")
-def list_artifacts(job_id: str | None = None, grouped: str | None = None) -> list[dict] | dict[str, list[dict]]:
+def list_artifacts(
+    job_id: str | None = None, grouped: str | None = None
+) -> list[dict] | dict[str, list[dict]]:
     data = rows(
         "SELECT * FROM artifacts WHERE (? IS NULL OR job_id = ?) ORDER BY created_at DESC",
         (job_id, job_id),
@@ -109,7 +111,18 @@ async def upload_artifact(request: Request) -> dict:
         INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (artifact_id, job_id, evidence_type, agent, stage, gate, label, str(target), len(body), notes),
+        (
+            artifact_id,
+            job_id,
+            evidence_type,
+            agent,
+            stage,
+            gate,
+            label,
+            str(target),
+            len(body),
+            notes,
+        ),
     )
     return row("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)) or {}
 

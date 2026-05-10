@@ -40,15 +40,30 @@ _PROOF_FILE = _IMPL_ROOT / "proof" / "SLICERS_VERIFY_2026-05-06.json"
 def test_probes_table_completeness() -> None:
     """All required slicers are registered."""
     ids = {p["id"] for p in _PROBES}
-    required = {"prusaslicer", "orcaslicer", "flsun_slicer", "curaengine", "superslicer", "slic3r", "bambustudio"}
+    required = {
+        "prusaslicer",
+        "orcaslicer",
+        "flsun_slicer",
+        "curaengine",
+        "superslicer",
+        "slic3r",
+        "bambustudio",
+    }
     assert required.issubset(ids), f"Missing probe entries: {required - ids}"
 
 
 def test_probes_no_destructive_args() -> None:
     """No probe may contain slicing or output flags."""
     forbidden = {
-        "--export-gcode", "--gcode", "-g", "--slice", "--export-sla",
-        "--output", "-o", "--gcode-output-folder", "slice",
+        "--export-gcode",
+        "--gcode",
+        "-g",
+        "--slice",
+        "--export-sla",
+        "--output",
+        "-o",
+        "--gcode-output-folder",
+        "slice",
     }
     for entry in _PROBES:
         args_lower = {str(a).lower() for a in entry.get("args") or []}
@@ -127,7 +142,16 @@ def test_run_all_probes_count() -> None:
 
 def test_run_all_probes_each_result_has_required_keys() -> None:
     """Every slicer result has the required keys."""
-    required_keys = {"id", "name", "status", "version", "exe_path", "return_code", "output_head", "note"}
+    required_keys = {
+        "id",
+        "name",
+        "status",
+        "version",
+        "exe_path",
+        "return_code",
+        "output_head",
+        "note",
+    }
     report = run_all_probes()
     for slicer in report["slicers"]:
         missing = required_keys - set(slicer.keys())
@@ -182,7 +206,15 @@ def test_proof_file_task_id() -> None:
 def test_proof_file_all_slicers_present() -> None:
     data = json.loads(_PROOF_FILE.read_text(encoding="utf-8"))
     ids_in_proof = {s["id"] for s in data["slicers"]}
-    required = {"prusaslicer", "orcaslicer", "flsun_slicer", "curaengine", "superslicer", "slic3r", "bambustudio"}
+    required = {
+        "prusaslicer",
+        "orcaslicer",
+        "flsun_slicer",
+        "curaengine",
+        "superslicer",
+        "slic3r",
+        "bambustudio",
+    }
     assert required.issubset(ids_in_proof), f"Missing from proof: {required - ids_in_proof}"
 
 

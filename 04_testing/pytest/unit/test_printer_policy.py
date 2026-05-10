@@ -95,6 +95,7 @@ def test_probe_endpoint_blocks_s1_ip():
     """GET /api/printers/probe?ip=192.168.0.12 must return 403 CAMERA_ONLY_IP."""
     # Import probe_printer_by_ip directly for unit testing
     from hermes3d.api.routes.printers import probe_printer_by_ip
+
     with pytest.raises(HTTPException) as exc_info:
         probe_printer_by_ip("192.168.0.12")
     assert exc_info.value.status_code == 403
@@ -107,6 +108,7 @@ def test_probe_endpoint_blocks_s1_ip():
 def test_probe_endpoint_rejects_invalid_ip():
     """Malformed IP addresses must return 400."""
     from hermes3d.api.routes.printers import probe_printer_by_ip
+
     with pytest.raises(HTTPException) as exc_info:
         probe_printer_by_ip("not-an-ip")
     assert exc_info.value.status_code == 400
@@ -155,6 +157,7 @@ def test_probe_endpoint_is_read_only_no_gcode():
         patch("hermes3d.api.routes.printers.is_s1_target", side_effect=_not_s1),
     ):
         from hermes3d.api.routes.printers import probe_printer_by_ip
+
         result = probe_printer_by_ip("192.168.0.99")
 
     # Verify send_gcode / upload_gcode / start_print were NEVER called (read-only proof)
@@ -213,7 +216,9 @@ def test_validate_camera_uses_head_request(monkeypatch):
 
     monkeypatch.setattr(_urllib_request, "urlopen", mock_urlopen)
 
-    result = validate_camera_url(CameraValidateRequest(camera_url="http://192.168.0.10/webcam/?action=stream"))
+    result = validate_camera_url(
+        CameraValidateRequest(camera_url="http://192.168.0.10/webcam/?action=stream")
+    )
 
     assert len(captured_requests) == 1, "Exactly one request must be made"
     assert captured_requests[0] == "HEAD", f"Expected HEAD, got {captured_requests[0]}"
@@ -244,7 +249,9 @@ def test_validate_camera_detects_mjpeg():
             return default
 
     with patch.object(_urllib_request, "urlopen", return_value=_FakeMjpegResponse()):
-        result = validate_camera_url(CameraValidateRequest(camera_url="http://192.168.0.10/webcam/?action=stream"))
+        result = validate_camera_url(
+            CameraValidateRequest(camera_url="http://192.168.0.10/webcam/?action=stream")
+        )
 
     assert result["is_mjpeg"] is True
     assert result["ok"] is True
@@ -259,6 +266,7 @@ def test_validate_camera_detects_mjpeg():
 def client():
     """Minimal FastAPI test client wrapping just the printers router."""
     from fastapi import FastAPI
+
     app = FastAPI()
     app.include_router(router)
     return TestClient(app, raise_server_exceptions=False)
@@ -286,7 +294,9 @@ def test_validate_camera_route_returns_400_for_empty(client):
 
 def test_validate_camera_route_returns_400_for_rtsp(client):
     """POST /api/printers/validate-camera with rtsp:// → 400."""
-    response = client.post("/api/printers/validate-camera", json={"camera_url": "rtsp://192.168.0.10/stream"})
+    response = client.post(
+        "/api/printers/validate-camera", json={"camera_url": "rtsp://192.168.0.10/stream"}
+    )
     assert response.status_code == 400
 
 
@@ -311,6 +321,7 @@ class TestS1ActionHardLock:
     def _is_s1_stub(self, printer_id: str | None) -> bool:
         """Mimic safety.is_s1_target for unit-test isolation."""
         from hermes3d.api.safety import S1_ALT_IDS
+
         return bool(printer_id and printer_id.lower() in S1_ALT_IDS)
 
     @pytest.mark.parametrize("s1_id", S1_ALIASES)
@@ -322,11 +333,18 @@ class TestS1ActionHardLock:
         with patch("hermes3d.api.routes.printers.is_s1_target", side_effect=self._is_s1_stub):
             with pytest.raises(HTTPException) as exc_info:
                 move_printer(s1_id)
-        assert exc_info.value.status_code == 423, f"Expected 423 for {s1_id!r}, got {exc_info.value.status_code}"
+        assert exc_info.value.status_code == 423, (
+            f"Expected 423 for {s1_id!r}, got {exc_info.value.status_code}"
+        )
         detail = exc_info.value.detail
         assert isinstance(detail, dict)
-        assert detail.get("error") == "PRINTER_LOCKED", f"Expected PRINTER_LOCKED in detail for {s1_id!r}"
-        assert "movement" in detail.get("reason", "").lower() or "locked" in detail.get("reason", "").lower()
+        assert detail.get("error") == "PRINTER_LOCKED", (
+            f"Expected PRINTER_LOCKED in detail for {s1_id!r}"
+        )
+        assert (
+            "movement" in detail.get("reason", "").lower()
+            or "locked" in detail.get("reason", "").lower()
+        )
 
     @pytest.mark.parametrize("s1_id", S1_ALIASES)
     def test_upload_to_printer_raises_423_for_s1(self, s1_id):
@@ -439,6 +457,7 @@ class TestT1V400PolicyGates:
     def test_s1_ip_not_in_write_allowed_set(self, printer_id):
         """The S1 IP must never appear in BASE_WRITE_ALLOWED_PRINTERS."""
         from hermes3d.api.routes.printers import BASE_WRITE_ALLOWED_PRINTERS
+
         assert "192.168.0.12" not in BASE_WRITE_ALLOWED_PRINTERS
         assert "flsun_s1" not in BASE_WRITE_ALLOWED_PRINTERS
         assert "flsun-s1" not in BASE_WRITE_ALLOWED_PRINTERS

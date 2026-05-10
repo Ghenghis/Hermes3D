@@ -104,7 +104,9 @@ def test_completion_caller_defaults_to_deepseek_v4_pro(monkeypatch) -> None:
 
     monkeypatch.setattr(deepseek.httpx, "Client", _Client)
 
-    response = deepseek.completion_caller(_config())(LLMRequest(prompt="hello", max_completion_tokens=8, token_id="tok"))
+    response = deepseek.completion_caller(_config())(
+        LLMRequest(prompt="hello", max_completion_tokens=8, token_id="tok")
+    )
 
     assert response.redacted_text == "ok"
     assert captured["json"]["model"] == "deepseek-v4-pro"

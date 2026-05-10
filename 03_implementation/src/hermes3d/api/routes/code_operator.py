@@ -184,7 +184,9 @@ class AgentE2EJobRequest(StrictBody):
     files: list[str] = Field(min_length=1)
     objective: str = Field(min_length=1, max_length=2400)
     target_branch: str | None = None
-    role_chain: list[str] = Field(default_factory=lambda: ["finder", "builder", "reviewer", "tester"])
+    role_chain: list[str] = Field(
+        default_factory=lambda: ["finder", "builder", "reviewer", "tester"]
+    )
     cli_worker: str | None = None
     release_on_finish: bool = True
 
@@ -461,7 +463,9 @@ def mcp_heartbeat(body: McpHeartbeatRequest) -> dict[str, Any]:
 @router.post("/mcp-locks/release-files")
 def mcp_release_files(body: McpReleaseFilesRequest) -> dict[str, Any]:
     try:
-        return code_history.release_mcp_files(owner=CODE_OPERATOR_ACTOR, files=body.files, note=body.note)
+        return code_history.release_mcp_files(
+            owner=CODE_OPERATOR_ACTOR, files=body.files, note=body.note
+        )
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
@@ -469,7 +473,9 @@ def mcp_release_files(body: McpReleaseFilesRequest) -> dict[str, Any]:
 @router.post("/mcp-locks/release-task")
 def mcp_release_task(body: McpReleaseTaskRequest) -> dict[str, Any]:
     try:
-        return code_history.release_mcp_task(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, note=body.note)
+        return code_history.release_mcp_task(
+            owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, note=body.note
+        )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
@@ -523,7 +529,9 @@ def repo_search(body: SearchRequest) -> dict[str, Any]:
 @router.post("/files/read")
 def read_file(body: ReadFileRequest) -> dict[str, Any]:
     try:
-        return code_history.read_file_slice(body.relative_path, start_line=body.start_line, line_count=body.line_count)
+        return code_history.read_file_slice(
+            body.relative_path, start_line=body.start_line, line_count=body.line_count
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail={"reason": str(exc)}) from exc
     except ValueError as exc:
@@ -619,7 +627,9 @@ def git_branch(body: GitBranchRequest) -> dict[str, Any]:
 @router.post("/git/stage-owned")
 def git_stage_owned(body: GitStageRequest) -> dict[str, Any]:
     try:
-        return code_history.git_stage_owned_files(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, files=body.files)
+        return code_history.git_stage_owned_files(
+            owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, files=body.files
+        )
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
@@ -641,7 +651,9 @@ def git_commit_owned(body: GitCommitRequest) -> dict[str, Any]:
 @router.post("/git/push")
 def git_push(body: GitPushRequest) -> dict[str, Any]:
     try:
-        return code_history.git_push_current_branch(owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, remote=body.remote)
+        return code_history.git_push_current_branch(
+            owner=CODE_OPERATOR_ACTOR, task_id=body.task_id, remote=body.remote
+        )
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
 
@@ -993,8 +1005,7 @@ def recovery_apply(body: RecoveryApplyRequest) -> dict[str, Any]:
             status_code=409,
             detail={
                 "reason": (
-                    "Run is not in 'awaiting_human_confirm' state; review the "
-                    "proposal first."
+                    "Run is not in 'awaiting_human_confirm' state; review the proposal first."
                 ),
                 "current_state": result.get("current_state"),
             },
@@ -1065,8 +1076,7 @@ def recovery_resume(body: RecoveryResumeRequest) -> dict[str, Any]:
             status_code=409,
             detail={
                 "reason": (
-                    "Run is not in 're_running_gate' state; apply a reviewed "
-                    "proposal first."
+                    "Run is not in 're_running_gate' state; apply a reviewed proposal first."
                 ),
                 "current_state": result.get("current_state"),
             },

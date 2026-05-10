@@ -15,7 +15,6 @@ References:
 from __future__ import annotations
 
 import pytest
-
 from hermes3d.gateways.redaction import redact_text
 
 
@@ -105,9 +104,7 @@ def test_env_style_secret_kv_is_redacted(raw: str, expected_field: str) -> None:
     assert "<redacted>" in redacted, f"value not redacted for {raw!r}: got {redacted!r}"
     # Original value substring should be gone.
     original_value = raw.split("=", 1)[1]
-    assert original_value not in redacted, (
-        f"original value still present in {redacted!r}"
-    )
+    assert original_value not in redacted, f"original value still present in {redacted!r}"
 
 
 @pytest.mark.parametrize(

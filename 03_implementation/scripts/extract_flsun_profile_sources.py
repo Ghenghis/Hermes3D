@@ -117,7 +117,7 @@ def _source_ini_contains(printer_id: str) -> bool:
     if printer_id == "flsun_v400":
         return "V400" in text
     if printer_id == "flsun_s1":
-        return "[printer:FLSun S1]" in text or "printer_model==\"S1\"" in text
+        return "[printer:FLSun S1]" in text or 'printer_model=="S1"' in text
     return False
 
 

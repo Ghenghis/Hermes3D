@@ -114,19 +114,23 @@ def get_sources_readiness() -> dict[str, Any]:
                     bool(row.get("executed")),
                     row.get("return_code"),
                 )
-                key_tools_detail.append({
-                    "module_id": module_id,
-                    "display": row.get("display", module_id),
-                    "status": status,
-                    "runtime_status": row.get("runtime_status", ""),
-                    "agent_execution_tier": row.get("agent_execution_tier", ""),
-                    "path": row.get("path"),
-                    "verifier": row.get("verifier"),
-                    "return_code": row.get("return_code"),
-                    "executed": bool(row.get("executed")),
-                    "cli_surface_status": surface.get("cli_surface_status") if surface else None,
-                    "next_action": row.get("next_action"),
-                })
+                key_tools_detail.append(
+                    {
+                        "module_id": module_id,
+                        "display": row.get("display", module_id),
+                        "status": status,
+                        "runtime_status": row.get("runtime_status", ""),
+                        "agent_execution_tier": row.get("agent_execution_tier", ""),
+                        "path": row.get("path"),
+                        "verifier": row.get("verifier"),
+                        "return_code": row.get("return_code"),
+                        "executed": bool(row.get("executed")),
+                        "cli_surface_status": surface.get("cli_surface_status")
+                        if surface
+                        else None,
+                        "next_action": row.get("next_action"),
+                    }
+                )
             else:
                 # Tool not in proof yet — check local tooling audit
                 # local tools use slightly different naming conventions
@@ -144,33 +148,39 @@ def get_sources_readiness() -> dict[str, Any]:
                         executed,
                         rc,
                     )
-                    key_tools_detail.append({
-                        "module_id": module_id,
-                        "display": module_id.replace("_", " ").title(),
-                        "status": status,
-                        "runtime_status": "ready" if detected else "not_installed",
-                        "agent_execution_tier": "launcher_metadata_only" if detected and not executed else "",
-                        "path": local_entry.get("path"),
-                        "verifier": "local_tooling_audit",
-                        "return_code": rc,
-                        "executed": executed,
-                        "cli_surface_status": None,
-                        "next_action": None,
-                    })
+                    key_tools_detail.append(
+                        {
+                            "module_id": module_id,
+                            "display": module_id.replace("_", " ").title(),
+                            "status": status,
+                            "runtime_status": "ready" if detected else "not_installed",
+                            "agent_execution_tier": "launcher_metadata_only"
+                            if detected and not executed
+                            else "",
+                            "path": local_entry.get("path"),
+                            "verifier": "local_tooling_audit",
+                            "return_code": rc,
+                            "executed": executed,
+                            "cli_surface_status": None,
+                            "next_action": None,
+                        }
+                    )
                 else:
-                    key_tools_detail.append({
-                        "module_id": module_id,
-                        "display": module_id.replace("_", " ").title(),
-                        "status": "unavailable",
-                        "runtime_status": "not_installed",
-                        "agent_execution_tier": "",
-                        "path": None,
-                        "verifier": None,
-                        "return_code": None,
-                        "executed": False,
-                        "cli_surface_status": None,
-                        "next_action": "Tool not found in proof files; run tooling audit.",
-                    })
+                    key_tools_detail.append(
+                        {
+                            "module_id": module_id,
+                            "display": module_id.replace("_", " ").title(),
+                            "status": "unavailable",
+                            "runtime_status": "not_installed",
+                            "agent_execution_tier": "",
+                            "path": None,
+                            "verifier": None,
+                            "return_code": None,
+                            "executed": False,
+                            "cli_surface_status": None,
+                            "next_action": "Tool not found in proof files; run tooling audit.",
+                        }
+                    )
 
         # Count readiness states across all rows in this section
         status_counts: dict[str, int] = {

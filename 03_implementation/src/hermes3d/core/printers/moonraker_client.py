@@ -284,7 +284,11 @@ class MoonrakerClient:
         # or an empty body after a successful upload on some FLSUN builds.
         r = (result.get("result") or {}) if isinstance(result, dict) else {}
         item = r.get("item") or {}
-        fallback_path = f"{remote_subdir.strip('/')}/{gcode_path.name}" if remote_subdir.strip("/") else gcode_path.name
+        fallback_path = (
+            f"{remote_subdir.strip('/')}/{gcode_path.name}"
+            if remote_subdir.strip("/")
+            else gcode_path.name
+        )
         return UploadResult(
             item_path=str(item.get("path") or fallback_path),
             item_root=str(item.get("root", "gcodes")),

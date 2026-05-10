@@ -77,10 +77,17 @@ def create_gui_app() -> FastAPI:
     @app.middleware("http")
     async def _optional_api_auth(request: Request, call_next):
         token = _api_token()
-        if not _api_auth_required() or not token or request.method == "OPTIONS" or request.url.path in {"/health"}:
+        if (
+            not _api_auth_required()
+            or not token
+            or request.method == "OPTIONS"
+            or request.url.path in {"/health"}
+        ):
             return await call_next(request)
         header = request.headers.get("authorization", "")
-        supplied = header.removeprefix("Bearer ").strip() if header.lower().startswith("bearer ") else ""
+        supplied = (
+            header.removeprefix("Bearer ").strip() if header.lower().startswith("bearer ") else ""
+        )
         if not supplied or not hmac.compare_digest(supplied, token):
             return JSONResponse(
                 status_code=401,
@@ -133,7 +140,12 @@ def _api_token() -> str:
 
 
 def _api_auth_required() -> bool:
-    return os.environ.get("HERMES3D_REQUIRE_API_AUTH", "").strip().lower() in {"1", "true", "yes", "on"}
+    return os.environ.get("HERMES3D_REQUIRE_API_AUTH", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 app = create_gui_app()

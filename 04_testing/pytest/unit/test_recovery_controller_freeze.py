@@ -31,9 +31,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
 from hermes3d.services import code_history, recovery_controller
-
 
 # ---------------------------------------------------------------------------
 # Fixture: stub all v1 collaborators so freeze_run runs against fakes
@@ -70,7 +68,10 @@ def freeze_setup(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def stub_snapshot(rel: str, **kwargs: Any) -> dict[str, Any]:
         captured["snapshot_calls"].append({"rel": rel, **kwargs})
-        return {"id": f"snap-{rel}-{len(captured['snapshot_calls'])}", "ts_utc": "2026-05-09T00:00:00Z"}
+        return {
+            "id": f"snap-{rel}-{len(captured['snapshot_calls'])}",
+            "ts_utc": "2026-05-09T00:00:00Z",
+        }
 
     def stub_record_step_failure(**kwargs: Any) -> dict[str, Any]:
         captured["step_failure_calls"].append(kwargs)
@@ -96,7 +97,11 @@ def freeze_setup(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def stub_mark_outcome(**kwargs: Any) -> dict[str, Any]:
         captured["mark_outcome_calls"].append(kwargs)
-        return {"status": "recorded", "outcome": {"attempt_id": kwargs.get("attempt_id")}, "mcp_evidence": {}}
+        return {
+            "status": "recorded",
+            "outcome": {"attempt_id": kwargs.get("attempt_id")},
+            "mcp_evidence": {},
+        }
 
     def stub_evidence(**kwargs: Any) -> dict[str, Any]:
         captured["evidence_calls"].append(kwargs)
@@ -165,9 +170,7 @@ def test_freeze_refuses_when_run_not_in_created(
 ) -> None:
     attempt_id = _start_run()
     # First freeze succeeds and transitions to PROPOSING.
-    recovery_controller.freeze_run(
-        attempt_id=attempt_id, owner="claude-test", files=("src/a.py",)
-    )
+    recovery_controller.freeze_run(attempt_id=attempt_id, owner="claude-test", files=("src/a.py",))
     # Second freeze must refuse — already past CREATED.
     pre_lock_count = len(freeze_setup["lock_calls"])
     result = recovery_controller.freeze_run(
@@ -269,9 +272,7 @@ def test_thaw_releases_locked_files_and_is_idempotent(
     freeze_setup: dict[str, Any],
 ) -> None:
     attempt_id = _start_run()
-    recovery_controller.freeze_run(
-        attempt_id=attempt_id, owner="claude-test", files=("src/a.py",)
-    )
+    recovery_controller.freeze_run(attempt_id=attempt_id, owner="claude-test", files=("src/a.py",))
     # First thaw releases.
     out1 = recovery_controller.thaw_run(attempt_id=attempt_id, owner="claude-test")
     assert out1["status"] == "thawed"

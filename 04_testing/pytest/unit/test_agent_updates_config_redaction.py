@@ -30,9 +30,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from hermes3d.api.routes import agent_updates
-
 
 # ---------------------------------------------------------------------------
 # Stubs / helpers
@@ -80,7 +78,9 @@ def _make_stage_setup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> tuple[
     monkeypatch.setattr(agent_updates, "_repo_state", _stub_repo_state)
     monkeypatch.setattr(agent_updates, "_ensure_remote", lambda _r: None)
     monkeypatch.setattr(agent_updates, "_run_git", lambda *a, **kw: "")
-    monkeypatch.setattr(agent_updates, "_remote_release_tags", lambda _r: ["v2026.5.7", "v2026.5.8"])
+    monkeypatch.setattr(
+        agent_updates, "_remote_release_tags", lambda _r: ["v2026.5.7", "v2026.5.8"]
+    )
     monkeypatch.setattr(
         agent_updates,
         "_latest_release",
@@ -140,8 +140,7 @@ def test_staged_update_agent_config_uses_proof_summary(
 
     # The agent_config row written via execute(...)
     cfg_writes = [
-        params for sql, params in captured
-        if "agent_config" in sql and "last_run" in str(params)
+        params for sql, params in captured if "agent_config" in sql and "last_run" in str(params)
     ]
     assert cfg_writes, "agent_config last_run row was not written"
     _key, value = cfg_writes[-1][0], cfg_writes[-1][1]
@@ -182,7 +181,8 @@ def test_staged_update_agent_config_preserves_actionable_fields(
     agent_updates.staged_update(body)
     cfg_value = json.loads(
         next(
-            params[1] for sql, params in captured
+            params[1]
+            for sql, params in captured
             if "agent_config" in sql and "last_run" in str(params)
         )
     )
@@ -225,7 +225,8 @@ def test_staged_update_proof_events_match_agent_config(
     agent_updates.staged_update(body)
     cfg_value = json.loads(
         next(
-            params[1] for sql, params in captured
+            params[1]
+            for sql, params in captured
             if "agent_config" in sql and "last_run" in str(params)
         )
     )
@@ -256,7 +257,10 @@ def test_rollback_update_agent_config_uses_proof_summary(
         agent_updates,
         "_find_backup",
         lambda _bid: {
-            "backup_id": "test-backup", "tag": "v2026.5.6", "branch": "main", "commit": "abc"
+            "backup_id": "test-backup",
+            "tag": "v2026.5.6",
+            "branch": "main",
+            "commit": "abc",
         },
     )
     monkeypatch.setattr(agent_updates, "_create_backup", _stub_create_backup)
@@ -273,11 +277,14 @@ def test_rollback_update_agent_config_uses_proof_summary(
         lambda sql, params=(): captured.append((sql, params)),
     )
 
-    body = agent_updates.RollbackRequest(actor="claude-test", backup_id="test-backup", tag="v2026.5.6")
+    body = agent_updates.RollbackRequest(
+        actor="claude-test", backup_id="test-backup", tag="v2026.5.6"
+    )
     agent_updates.rollback_update(body)
 
     cfg_writes = [
-        params for sql, params in captured
+        params
+        for sql, params in captured
         if "agent_config" in sql and "last_rollback" in str(params)
     ]
     assert cfg_writes, "agent_config last_rollback row was not written"

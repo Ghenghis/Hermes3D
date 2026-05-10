@@ -33,10 +33,8 @@ import inspect
 import re
 
 import pytest
-
 from hermes3d.api.routes import agent_updates
 from hermes3d.gateways.redaction import redact_text
-
 
 # ---------------------------------------------------------------------------
 # Source-level pin: the local SECRET_RE + _redact must be gone.
@@ -84,10 +82,7 @@ def test_agent_updates_source_has_no_secret_re_or_redact_call() -> None:
     # Allow ONLY the historical comment lines that mention the deleted
     # symbol; reject any executable usage. We strip lines that are
     # clearly comments (start with optional whitespace + ``#``).
-    code_only = "\n".join(
-        line for line in src.splitlines()
-        if not line.lstrip().startswith("#")
-    )
+    code_only = "\n".join(line for line in src.splitlines() if not line.lstrip().startswith("#"))
     assert "SECRET_RE" not in code_only, (
         "F3 regression: SECRET_RE re-introduced in executable code "
         "(allowed only inside historical comments)."
@@ -101,9 +96,7 @@ def test_agent_updates_source_has_no_secret_re_or_redact_call() -> None:
     # ``_redact``).
     legacy_call_re = re.compile(r"(?<![_a-zA-Z0-9])_redact\(")
     matches = legacy_call_re.findall(code_only)
-    assert not matches, (
-        f"F3 regression: legacy _redact() call site(s) found: {len(matches)}"
-    )
+    assert not matches, f"F3 regression: legacy _redact() call site(s) found: {len(matches)}"
 
 
 # ---------------------------------------------------------------------------
@@ -120,11 +113,7 @@ def test_proof_summary_redacts_check_output_via_redact_text() -> None:
     """``_proof_summary`` should funnel each ``check.output`` through
     ``redact_text`` and truncate to 180 chars (``output_head``).
     """
-    secret_payload = (
-        "MY_API_KEY=fake_value_for_test "
-        "Bearer abcdefghij1234 "
-        "?token=zzz_synthetic"
-    )
+    secret_payload = "MY_API_KEY=fake_value_for_test Bearer abcdefghij1234 ?token=zzz_synthetic"
     payload = {
         "checks": [
             {

@@ -13,11 +13,7 @@ from pathlib import Path
 
 import pytest
 
-PROOF_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "proof"
-    / "MODELERS_VERIFY_2026-05-06.json"
-)
+PROOF_PATH = Path(__file__).resolve().parents[2] / "proof" / "MODELERS_VERIFY_2026-05-06.json"
 
 EXPECTED_MODELERS = {
     "blender",
@@ -67,9 +63,10 @@ def test_proof_top_level_shape(proof: dict) -> None:
 def test_proof_policy_forbids_downloads(proof: dict) -> None:
     policy = proof.get("policy") or {}
     assert policy.get("downloads") == "forbidden", "policy must declare downloads forbidden"
-    assert "version" in str(policy.get("cli", "")).lower() or "probe" in str(
-        policy.get("cli", "")
-    ).lower(), "cli policy must mention version or probe"
+    assert (
+        "version" in str(policy.get("cli", "")).lower()
+        or "probe" in str(policy.get("cli", "")).lower()
+    ), "cli policy must mention version or probe"
     assert "show" in str(policy.get("pip", "")).lower(), "pip policy must mention 'show'"
 
 

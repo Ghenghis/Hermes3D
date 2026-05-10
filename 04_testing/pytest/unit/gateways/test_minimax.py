@@ -112,7 +112,9 @@ def test_completion_caller_uses_highspeed_model_and_openai_token_field(monkeypat
 
     monkeypatch.setattr(minimax.httpx, "Client", _Client)
 
-    response = minimax.completion_caller(_config())(LLMRequest(prompt="hello", max_completion_tokens=8, token_id="tok"))
+    response = minimax.completion_caller(_config())(
+        LLMRequest(prompt="hello", max_completion_tokens=8, token_id="tok")
+    )
 
     assert response.redacted_text == "ok"
     assert captured["json"]["model"] == "MiniMax-M2.7-highspeed"

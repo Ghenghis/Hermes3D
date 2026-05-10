@@ -118,7 +118,9 @@ def audit_tool(config: dict[str, object]) -> dict[str, object]:
 
 def head_lines(value: str, *, max_lines: int = 25, max_chars: int = 240) -> list[str]:
     lines = value.splitlines()
-    return [f"{line[:max_chars]}..." if len(line) > max_chars else line for line in lines[:max_lines]]
+    return [
+        f"{line[:max_chars]}..." if len(line) > max_chars else line for line in lines[:max_lines]
+    ]
 
 
 if __name__ == "__main__":

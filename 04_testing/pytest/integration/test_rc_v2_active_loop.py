@@ -53,9 +53,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-
 from hermes3d.services import code_history, recovery_controller
-
 
 # ---------------------------------------------------------------------------
 # Fixture: TestClient + full set of stubs (v1 ledger + provider adapters)
@@ -165,9 +163,7 @@ def harness(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     def stub_apply_reviewed(proposal_id: str, **kwargs: Any) -> dict[str, Any]:
         captured["apply_calls"].append({"proposal_id": proposal_id, **kwargs})
         if state["fail_apply"]:
-            raise RuntimeError(
-                "synthetic apply failure: file conflict during reviewed patch apply"
-            )
+            raise RuntimeError("synthetic apply failure: file conflict during reviewed patch apply")
         state["apply_seq"] += 1
         return {
             "status": "reviewed_applied",
@@ -220,6 +216,7 @@ def harness(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
 def _install_minimax_mock(monkeypatch: pytest.MonkeyPatch, captured: list[Any]) -> None:
     """Install a deterministic MiniMax mock that records calls + returns a canned proposal."""
+
     def mock_propose(request: dict[str, Any]) -> dict[str, Any]:
         captured.append(request)
         return {
@@ -247,6 +244,7 @@ def _install_deepseek_mock(
     verdict: str = "approved",
 ) -> None:
     """Install a deterministic DeepSeek mock with the given verdict."""
+
     def mock_review(request: dict[str, Any]) -> dict[str, Any]:
         captured.append(request)
         return {
@@ -472,9 +470,7 @@ def test_apply_with_approved_review_modifies_files(
     _install_deepseek_mock(monkeypatch, captured["deepseek_calls"], verdict="approved")
 
     attempt_id = _start_and_freeze()
-    prop = client.post(
-        "/api/code-operator/recovery/propose", json={"run_id": attempt_id}
-    ).json()
+    prop = client.post("/api/code-operator/recovery/propose", json={"run_id": attempt_id}).json()
     proposal_id = prop["proposal_record"]["proposal_id"]
     rev = client.post(
         "/api/code-operator/recovery/review",
@@ -544,9 +540,7 @@ def test_resume_runs_gate_and_terminates_recovered_or_escalated(
     # Sub-case A: gate green -> resumed (RECOVERED).
     state["gate_status"] = "pass"
     attempt_a = _drive_to_re_running_gate()
-    resp_a = client.post(
-        "/api/code-operator/recovery/resume", json={"run_id": attempt_a}
-    )
+    resp_a = client.post("/api/code-operator/recovery/resume", json={"run_id": attempt_a})
     assert resp_a.status_code == 200, f"got {resp_a.status_code} body={resp_a.text}"
     body_a = resp_a.json()
     assert body_a["status"] == "resumed"
@@ -560,9 +554,7 @@ def test_resume_runs_gate_and_terminates_recovered_or_escalated(
     recovery_controller._reset_registry_for_tests()
     state["gate_status"] = "failed"
     attempt_b = _drive_to_re_running_gate()
-    resp_b = client.post(
-        "/api/code-operator/recovery/resume", json={"run_id": attempt_b}
-    )
+    resp_b = client.post("/api/code-operator/recovery/resume", json={"run_id": attempt_b})
     assert resp_b.status_code == 200
     body_b = resp_b.json()
     assert body_b["status"] == "escalated"
@@ -589,9 +581,7 @@ def test_end_to_end_failure_through_resume_emits_phases_in_order(
     state["gate_status"] = "pass"
 
     attempt_id = _start_and_freeze()
-    prop = client.post(
-        "/api/code-operator/recovery/propose", json={"run_id": attempt_id}
-    ).json()
+    prop = client.post("/api/code-operator/recovery/propose", json={"run_id": attempt_id}).json()
     proposal_id = prop["proposal_record"]["proposal_id"]
     rev = client.post(
         "/api/code-operator/recovery/review",
@@ -648,9 +638,7 @@ def test_credit_spent_usd_zero_for_every_mocked_llm_call(
     _install_deepseek_mock(monkeypatch, captured["deepseek_calls"], verdict="approved")
 
     attempt_id = _start_and_freeze()
-    prop = client.post(
-        "/api/code-operator/recovery/propose", json={"run_id": attempt_id}
-    ).json()
+    prop = client.post("/api/code-operator/recovery/propose", json={"run_id": attempt_id}).json()
     rev = client.post(
         "/api/code-operator/recovery/review",
         json={"run_id": attempt_id, "proposal_id": prop["proposal_record"]["proposal_id"]},
@@ -677,8 +665,9 @@ def test_credit_spent_usd_zero_for_every_mocked_llm_call(
         out: list[tuple[str, Any]] = []
         if isinstance(obj, dict):
             for k, v in obj.items():
-                if isinstance(k, str) and ("cost" in k.lower() or "usd" in k.lower()
-                                           or "credit" in k.lower()):
+                if isinstance(k, str) and (
+                    "cost" in k.lower() or "usd" in k.lower() or "credit" in k.lower()
+                ):
                     out.append((k, v))
                 out.extend(_walk(v))
         elif isinstance(obj, list):
@@ -688,6 +677,4 @@ def test_credit_spent_usd_zero_for_every_mocked_llm_call(
 
     for k, v in _walk(prop) + _walk(rev):
         if isinstance(v, (int, float)):
-            assert v == 0 or v == 0.0, (
-                f"no_paid_services rule violated: field {k!r} was {v!r}"
-            )
+            assert v == 0 or v == 0.0, f"no_paid_services rule violated: field {k!r} was {v!r}"

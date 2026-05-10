@@ -160,7 +160,9 @@ def _run_safe(exe: str, args: list[str], *, timeout_s: int) -> subprocess.Comple
             check=False,
         )
     except subprocess.TimeoutExpired as exc:
-        return subprocess.CompletedProcess(cmd, 124, stdout=str(exc.stdout or ""), stderr=f"probe timed out after {timeout_s}s")
+        return subprocess.CompletedProcess(
+            cmd, 124, stdout=str(exc.stdout or ""), stderr=f"probe timed out after {timeout_s}s"
+        )
     except OSError as exc:
         return subprocess.CompletedProcess(cmd, 127, stdout="", stderr=str(exc))
 
@@ -261,7 +263,7 @@ def main() -> None:
     total = report["summary"]["total"]
     not_found_names = [r["name"] for r in report["slicers"] if r["status"] != "found"]
 
-    print(f"\n{'='*60}", file=sys.stderr)
+    print(f"\n{'=' * 60}", file=sys.stderr)
     print(f"Slicer CLI verification: {found}/{total} found", file=sys.stderr)
     if not_found_names:
         print(f"Not found: {', '.join(not_found_names)}", file=sys.stderr)

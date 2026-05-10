@@ -323,9 +323,7 @@ def test_firmware_probe_returns_ready_when_files_exist_and_verifier_index_empty(
     cannot silently re-break the 5 parametrized firmware rows.
     """
 
-    monkeypatch.setattr(
-        module_runtime, "_runtime_verifier_index", lambda: (False, {})
-    )
+    monkeypatch.setattr(module_runtime, "_runtime_verifier_index", lambda: (False, {}))
     # The Marlin entry registers args=["README.md", "docs"]. Create both under
     # tmp_path so _source_inventory_probe falls back to mod.local_path and
     # finds them — proving probe.path is empty (not hardcoded) and the kind
@@ -565,7 +563,9 @@ def test_slicer_cli_install_config_preflight_keeps_runtime_blocked(
     cli_path: str,
 ) -> None:
     (tmp_path / "README.md").write_text(f"# {display_name}\n", encoding="utf-8")
-    (tmp_path / "CMakeLists.txt").write_text("cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8")
+    (tmp_path / "CMakeLists.txt").write_text(
+        "cmake_minimum_required(VERSION 3.20)\n", encoding="utf-8"
+    )
 
     def _missing_cli(_mod: dict, *, live: bool = False) -> dict:
         return {

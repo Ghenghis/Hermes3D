@@ -30,7 +30,9 @@ router = APIRouter()
 DEFAULT_MODEL = "hermes3d-desktop-bridge"
 DESKTOP_CONTRACT = "fathah/hermes-desktop@v0.3.4"
 DEFAULT_CHAT_TIMEOUT_SECONDS = 12.0
-SECRET_RE = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+")
+SECRET_RE = re.compile(
+    r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+"
+)
 
 
 class ChatCompletionRequest(BaseModel):
@@ -134,7 +136,11 @@ async def _stream_chat_response(body: ChatCompletionRequest, session_id: str) ->
                 yield frame
             return
         except Exception as exc:
-            yield _sse_delta(body, session_id, f"Hermes3D Desktop bridge could not reach the configured Hermes Agent runtime: {exc}")
+            yield _sse_delta(
+                body,
+                session_id,
+                f"Hermes3D Desktop bridge could not reach the configured Hermes Agent runtime: {exc}",
+            )
             yield "data: [DONE]\n\n"
             return
 
@@ -230,8 +236,12 @@ def _sse_delta(body: ChatCompletionRequest, session_id: str, content: str) -> st
     return f"data: {json.dumps(payload, separators=(',', ':'))}\n\n"
 
 
-async def _proxy_runtime_stream(runtime_url: str, body: ChatCompletionRequest) -> AsyncIterator[str]:
-    request_body = json.dumps(runtime_request_body({**body.model_dump(), "stream": True})).encode("utf-8")
+async def _proxy_runtime_stream(
+    runtime_url: str, body: ChatCompletionRequest
+) -> AsyncIterator[str]:
+    request_body = json.dumps(runtime_request_body({**body.model_dump(), "stream": True})).encode(
+        "utf-8"
+    )
     request = urllib.request.Request(
         chat_completions_url(runtime_url),
         method="POST",
@@ -247,7 +257,9 @@ async def _proxy_runtime_stream(runtime_url: str, body: ChatCompletionRequest) -
 
 
 def _proxy_runtime_non_stream(runtime_url: str, body: ChatCompletionRequest) -> str:
-    request_body = json.dumps(runtime_request_body({**body.model_dump(), "stream": False})).encode("utf-8")
+    request_body = json.dumps(runtime_request_body({**body.model_dump(), "stream": False})).encode(
+        "utf-8"
+    )
     request = urllib.request.Request(
         chat_completions_url(runtime_url),
         method="POST",
@@ -280,7 +292,9 @@ def _chat_timeout_seconds() -> float:
 
 
 def _redact(value: str) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value)
+    return SECRET_RE.sub(
+        lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value
+    )
 
 
 def _append_desktop_proof(event_type: str, body: ChatCompletionRequest, session_id: str) -> None:
@@ -295,7 +309,9 @@ def _append_desktop_proof(event_type: str, body: ChatCompletionRequest, session_
                 {
                     "session_id": session_id,
                     "requested_model": body.model or DEFAULT_MODEL,
-                    "resolved_model": configured_runtime_model(fallback=body.model or DEFAULT_MODEL),
+                    "resolved_model": configured_runtime_model(
+                        fallback=body.model or DEFAULT_MODEL
+                    ),
                     "stream": body.stream,
                     "message_sha256": digest,
                     "runtime_configured": bool(_runtime_url()),

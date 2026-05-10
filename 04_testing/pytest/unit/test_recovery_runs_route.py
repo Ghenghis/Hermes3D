@@ -21,7 +21,6 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
-
 from hermes3d.services import code_history, recovery_controller
 
 
@@ -119,9 +118,7 @@ def test_recovery_runs_route_filters_by_task_id(client: TestClient) -> None:
     resp = client.get("/api/code-operator/recovery/runs?task_id=task-A")
     assert resp.status_code == 200
     runs = resp.json().get("runs") or resp.json().get("active_runs") or []
-    assert all(r.get("task_id") == "task-A" for r in runs), (
-        f"Filter failed; got runs: {runs!r}"
-    )
+    assert all(r.get("task_id") == "task-A" for r in runs), f"Filter failed; got runs: {runs!r}"
 
 
 def test_recovery_runs_route_no_mutation_in_path(client: TestClient) -> None:

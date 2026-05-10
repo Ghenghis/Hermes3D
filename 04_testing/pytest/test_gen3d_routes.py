@@ -34,19 +34,23 @@ TestClient = starlette_tc.TestClient
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_test_connect(db_path: Path):
     """Return a connect() factory that always uses db_path."""
+
     def _connect() -> sqlite3.Connection:
         conn = sqlite3.connect(str(db_path))
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
     return _connect
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def app_client(tmp_path, monkeypatch):
@@ -64,7 +68,11 @@ def app_client(tmp_path, monkeypatch):
     # FK constraints (we don't need roadmap/modules data for gen3d route tests)
     schema_file = (
         Path(__file__).resolve().parent.parent.parent
-        / "03_implementation" / "src" / "hermes3d" / "db" / "schema.sql"
+        / "03_implementation"
+        / "src"
+        / "hermes3d"
+        / "db"
+        / "schema.sql"
     )
     conn0 = sqlite3.connect(str(db_file))
     conn0.execute("PRAGMA foreign_keys = OFF")
@@ -78,11 +86,16 @@ def app_client(tmp_path, monkeypatch):
     # Patch _common so rows()/row()/execute() use the test DB
     monkeypatch.setattr(common_mod, "ensure_db", lambda: None)
     monkeypatch.setattr("hermes3d.db.init.connect", test_connect)
-    monkeypatch.setattr(common_mod, "connect" if hasattr(common_mod, "connect") else "_connect",
-                        test_connect, raising=False)
+    monkeypatch.setattr(
+        common_mod,
+        "connect" if hasattr(common_mod, "connect") else "_connect",
+        test_connect,
+        raising=False,
+    )
 
     # _common imports connect directly at module level; patch the name it uses
     import hermes3d.api.routes._common as _cm_reimport
+
     _cm_orig_connect = getattr(_cm_reimport, "connect", None)
     # The module does `from hermes3d.db.init import connect, init_db`
     # so we patch the names in the _common module namespace
@@ -187,10 +200,12 @@ def fake_proof_file(tmp_path):
 # /api/gen3d/providers tests
 # ---------------------------------------------------------------------------
 
+
 class TestGen3DProviders:
     def test_returns_list(self, app_client, fake_proof_file, monkeypatch):
         """Endpoint returns a list of provider objects."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
 
@@ -203,6 +218,7 @@ class TestGen3DProviders:
     def test_required_fields_present(self, app_client, fake_proof_file, monkeypatch):
         """Each provider entry has the required fields."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
 
@@ -212,9 +228,12 @@ class TestGen3DProviders:
             for field in ("provider_id", "label", "readiness", "installed", "repo_reachable"):
                 assert field in provider, f"Missing field {field!r} in {provider}"
 
-    def test_comfyui_not_available_when_port_unreachable(self, app_client, fake_proof_file, monkeypatch):
+    def test_comfyui_not_available_when_port_unreachable(
+        self, app_client, fake_proof_file, monkeypatch
+    ):
         """ComfyUI readiness is not_installed when port is unreachable and proof says not installed."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
 
@@ -228,6 +247,7 @@ class TestGen3DProviders:
     def test_comfyui_available_when_port_reachable(self, app_client, fake_proof_file, monkeypatch):
         """ComfyUI readiness is 'available' when the port probe succeeds."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: True)
 
@@ -241,6 +261,7 @@ class TestGen3DProviders:
     def test_bambustudio_installed_from_proof(self, app_client, fake_proof_file, monkeypatch):
         """Bambu Studio shows installed=True based on Lane 04 proof executable probe."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
 
@@ -253,6 +274,7 @@ class TestGen3DProviders:
     def test_proof_source_field_reflects_file(self, app_client, fake_proof_file, monkeypatch):
         """proof_source field is set when proof file is present."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
 
@@ -265,6 +287,7 @@ class TestGen3DProviders:
     def test_gracefully_handles_missing_proof_file(self, app_client, tmp_path, monkeypatch):
         """If Lane 04 proof file is missing, endpoint still returns without error."""
         import hermes3d.api.routes.generation as gen_mod
+
         monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", tmp_path / "nonexistent.json")
         monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
 
@@ -280,6 +303,7 @@ class TestGen3DProviders:
 # ---------------------------------------------------------------------------
 # /api/gen3d/templates tests
 # ---------------------------------------------------------------------------
+
 
 class TestGen3DTemplates:
     def test_returns_list(self, app_client, monkeypatch):
@@ -319,7 +343,9 @@ class TestGen3DTemplates:
         data = res.json()
         for template in data:
             for field in ("id", "name", "source", "description", "outputs", "requires_provider"):
-                assert field in template, f"Missing field {field!r} in template {template.get('id')}"
+                assert field in template, (
+                    f"Missing field {field!r} in template {template.get('id')}"
+                )
 
     def test_provider_backed_templates_reference_known_providers(self, app_client):
         """Provider-backed templates reference known provider IDs."""

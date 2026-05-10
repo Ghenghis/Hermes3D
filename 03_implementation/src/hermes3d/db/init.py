@@ -103,10 +103,14 @@ def reset_initialization_state() -> None:
 
 
 def _migrate(conn: sqlite3.Connection) -> None:
-    columns = {row["name"] for row in conn.execute("PRAGMA table_info(onboarded_printers)").fetchall()}
+    columns = {
+        row["name"] for row in conn.execute("PRAGMA table_info(onboarded_printers)").fetchall()
+    }
     if "ip" not in columns:
         conn.execute("ALTER TABLE onboarded_printers ADD COLUMN ip TEXT")
-    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_onboarded_printers_ip ON onboarded_printers(ip)")
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_onboarded_printers_ip ON onboarded_printers(ip)"
+    )
     _migrate_modules_w6_7(conn)
 
 
@@ -132,17 +136,13 @@ def _migrate_modules_w6_7(conn: sqlite3.Connection) -> None:
     if "proof_command" not in module_cols:
         conn.execute("ALTER TABLE modules ADD COLUMN proof_command TEXT")
     if "update_lane" not in module_cols:
-        conn.execute(
-            "ALTER TABLE modules ADD COLUMN update_lane TEXT NOT NULL DEFAULT 'frozen'"
-        )
+        conn.execute("ALTER TABLE modules ADD COLUMN update_lane TEXT NOT NULL DEFAULT 'frozen'")
     if "last_proof_status" not in module_cols:
         conn.execute("ALTER TABLE modules ADD COLUMN last_proof_status TEXT")
     if "last_proof_at" not in module_cols:
         conn.execute("ALTER TABLE modules ADD COLUMN last_proof_at TEXT")
     # Index for `update_lane` queries (stable/canary/frozen filters).
-    conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_modules_update_lane ON modules(update_lane)"
-    )
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_modules_update_lane ON modules(update_lane)")
 
 
 def _seed(conn: sqlite3.Connection) -> None:
@@ -177,7 +177,12 @@ def _seed_roadmap(conn: sqlite3.Connection) -> None:
         (15, "Fleet onboarding wizard for new Moonraker printers", "printers", "onboarding"),
         (16, "Jobs/Autopilot proof-gated repair pipeline", "jobs", "proof_pipeline"),
         (17, "Idle Hermes Agent workbench with daily user review queue", "learning", "idle_queue"),
-        (18, "Voice and Observe operator assist linked to live camera proof", "voice", "operator_assist"),
+        (
+            18,
+            "Voice and Observe operator assist linked to live camera proof",
+            "voice",
+            "operator_assist",
+        ),
     ]
     conn.executemany(
         """
@@ -385,9 +390,13 @@ def _seed_module_providers(conn: sqlite3.Connection) -> None:
 
 def _seed_module_provider_targets(conn: sqlite3.Connection, providers: list[tuple]) -> None:
     module_ids = sorted({str(provider[1]) for provider in providers})
-    missing_metadata = [module_id for module_id in module_ids if module_id not in MODULE_PROVIDER_TARGETS]
+    missing_metadata = [
+        module_id for module_id in module_ids if module_id not in MODULE_PROVIDER_TARGETS
+    ]
     if missing_metadata:
-        raise ValueError(f"module provider target metadata missing for: {', '.join(missing_metadata)}")
+        raise ValueError(
+            f"module provider target metadata missing for: {', '.join(missing_metadata)}"
+        )
     conn.executemany(
         """
         INSERT OR IGNORE INTO modules

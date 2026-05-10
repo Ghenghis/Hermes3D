@@ -89,8 +89,12 @@ class AutonomousLoop:
     ) -> ActionProposal:
         printer_id = str(payload.get("printer_id", ""))
         if printer_id in {"flsun-s1", "flsun_s1", "s1"}:
-            return ActionProposal(persona_id, action_type, payload, risk_level, "vetoed", "FLSUN S1 is locked.")
-        return ActionProposal(persona_id, action_type, payload, risk_level, "approved", "Safe action scope.")
+            return ActionProposal(
+                persona_id, action_type, payload, risk_level, "vetoed", "FLSUN S1 is locked."
+            )
+        return ActionProposal(
+            persona_id, action_type, payload, risk_level, "approved", "Safe action scope."
+        )
 
     def _execute_action(self, session_id: str, proposal: ActionProposal) -> dict[str, Any]:
         self._in_action = True

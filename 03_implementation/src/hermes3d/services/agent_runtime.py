@@ -44,7 +44,14 @@ def trusted_runtime_url(private_values: dict[str, str] | None = None) -> str | N
     if not value:
         return None
     parsed = urlparse(value)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+    ):
         return None
     try:
         host = ipaddress.ip_address(parsed.hostname)
@@ -57,7 +64,9 @@ def trusted_runtime_url(private_values: dict[str, str] | None = None) -> str | N
     return None
 
 
-def configured_runtime_model(private_values: dict[str, str] | None = None, fallback: str = DEFAULT_AGENT_MODEL) -> str:
+def configured_runtime_model(
+    private_values: dict[str, str] | None = None, fallback: str = DEFAULT_AGENT_MODEL
+) -> str:
     return env_value("HERMES3D_AGENT_RUNTIME_MODEL", private_values, fallback).strip() or fallback
 
 
@@ -71,13 +80,19 @@ def models_url(runtime_url: str) -> str:
     return f"{base}/models" if base.endswith("/v1") else f"{base}/v1/models"
 
 
-def runtime_request_body(payload: dict[str, Any], private_values: dict[str, str] | None = None) -> dict[str, Any]:
+def runtime_request_body(
+    payload: dict[str, Any], private_values: dict[str, str] | None = None
+) -> dict[str, Any]:
     """Map Hermes persona model aliases onto the configured concrete local model."""
-    resolved_model = configured_runtime_model(private_values, str(payload.get("model") or DEFAULT_AGENT_MODEL))
+    resolved_model = configured_runtime_model(
+        private_values, str(payload.get("model") or DEFAULT_AGENT_MODEL)
+    )
     return {**payload, "model": resolved_model}
 
 
-def runtime_probe(private_values: dict[str, str] | None = None, timeout: float = 1.5) -> dict[str, Any]:
+def runtime_probe(
+    private_values: dict[str, str] | None = None, timeout: float = 1.5
+) -> dict[str, Any]:
     runtime_url = trusted_runtime_url(private_values)
     configured_model = configured_runtime_model(private_values, "")
     if not runtime_url:
@@ -92,7 +107,9 @@ def runtime_probe(private_values: dict[str, str] | None = None, timeout: float =
         }
     started = time.perf_counter()
     try:
-        request = urllib.request.Request(models_url(runtime_url), headers={"Accept": "application/json"})
+        request = urllib.request.Request(
+            models_url(runtime_url), headers={"Accept": "application/json"}
+        )
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
             http_status = int(response.status)

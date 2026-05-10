@@ -24,7 +24,6 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
-
 from hermes3d.api.routes import agent_updates
 
 
@@ -50,6 +49,7 @@ def _stub_command_pass(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
 # Skip-path tests — FAIL-CLOSED behavior when HERMES_AGENT_RUN_PYTEST is unset
 # ---------------------------------------------------------------------------
 
+
 def test_skip_path_returns_fail_when_run_pytest_unset(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -61,8 +61,10 @@ def test_skip_path_returns_fail_when_run_pytest_unset(
     repo = _make_repo(tmp_path)
     monkeypatch.delenv("HERMES_AGENT_RUN_PYTEST", raising=False)
     monkeypatch.delenv("HERMES_AGENT_DIAGNOSTIC", raising=False)
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _stub_external_pass):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _stub_external_pass),
+    ):
         checks = agent_updates._run_update_checks(repo)
     pytest_check = next((c for c in checks if c["name"] == "python pytest non-integration"), None)
     assert pytest_check is not None, "pytest gate must be present when tests/ exists"
@@ -82,8 +84,10 @@ def test_skip_path_returns_fail_when_run_pytest_is_zero(
     repo = _make_repo(tmp_path)
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "0")
     monkeypatch.delenv("HERMES_AGENT_DIAGNOSTIC", raising=False)
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _stub_external_pass):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _stub_external_pass),
+    ):
         checks = agent_updates._run_update_checks(repo)
     pytest_check = next((c for c in checks if c["name"] == "python pytest non-integration"), None)
     assert pytest_check is not None
@@ -101,8 +105,10 @@ def test_skipped_pytest_cannot_make_update_verified(
     """
     repo = _make_repo(tmp_path)
     monkeypatch.delenv("HERMES_AGENT_RUN_PYTEST", raising=False)
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _stub_external_pass):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _stub_external_pass),
+    ):
         checks = agent_updates._run_update_checks(repo)
     all_ok = all(item.get("status") == "pass" for item in checks)
     assert all_ok is False, (
@@ -115,6 +121,7 @@ def test_skipped_pytest_cannot_make_update_verified(
 # Worker-count guards — production rejects 0/1; diagnostic mode allows
 # ---------------------------------------------------------------------------
 
+
 def test_workers_zero_rejected_in_production(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -123,8 +130,10 @@ def test_workers_zero_rejected_in_production(
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "1")
     monkeypatch.setenv("HERMES_AGENT_PYTEST_WORKERS", "0")
     monkeypatch.delenv("HERMES_AGENT_DIAGNOSTIC", raising=False)
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _stub_external_pass):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _stub_external_pass),
+    ):
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._run_update_checks(repo)
     assert exc_info.value.status_code == 400
@@ -139,8 +148,10 @@ def test_workers_one_rejected_in_production(
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "1")
     monkeypatch.setenv("HERMES_AGENT_PYTEST_WORKERS", "1")
     monkeypatch.delenv("HERMES_AGENT_DIAGNOSTIC", raising=False)
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _stub_external_pass):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _stub_external_pass),
+    ):
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._run_update_checks(repo)
     assert exc_info.value.status_code == 400
@@ -160,24 +171,26 @@ def test_workers_zero_allowed_in_diagnostic_mode(
         captured_args.append(args)
         return {"name": "python pytest non-integration", "status": "pass", "output": ""}
 
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _capture):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _capture),
+    ):
         agent_updates._run_update_checks(repo)
     pytest_call = next((a for a in captured_args if "pytest" in a), None)
     assert pytest_call is not None, "pytest gate must run under diagnostic mode"
     assert "-n" in pytest_call and "0" in pytest_call
 
 
-def test_workers_garbage_string_raises_400(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_workers_garbage_string_raises_400(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """HERMES_AGENT_PYTEST_WORKERS=non-int-non-'auto' raises HTTPException(400)."""
     repo = _make_repo(tmp_path)
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "1")
     monkeypatch.setenv("HERMES_AGENT_PYTEST_WORKERS", "not-a-number")
     monkeypatch.delenv("HERMES_AGENT_DIAGNOSTIC", raising=False)
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _stub_external_pass):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _stub_external_pass),
+    ):
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._run_update_checks(repo)
     assert exc_info.value.status_code == 400
@@ -188,9 +201,8 @@ def test_workers_garbage_string_raises_400(
 # Production default — workers=4, maxfail=1, path-ignores present
 # ---------------------------------------------------------------------------
 
-def test_production_default_workers_is_4(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+
+def test_production_default_workers_is_4(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """No HERMES_AGENT_PYTEST_WORKERS + HERMES_AGENT_RUN_PYTEST=1 -> -n 4."""
     repo = _make_repo(tmp_path)
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "1")
@@ -202,8 +214,10 @@ def test_production_default_workers_is_4(
         captured_args.append(args)
         return {"name": "python pytest non-integration", "status": "pass", "output": ""}
 
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _capture):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _capture),
+    ):
         agent_updates._run_update_checks(repo)
     pytest_call = next((a for a in captured_args if "pytest" in a), None)
     assert pytest_call is not None
@@ -227,8 +241,10 @@ def test_production_pytest_args_have_path_ignores(
         captured_args.append(args)
         return {"name": "python pytest non-integration", "status": "pass", "output": ""}
 
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _capture):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _capture),
+    ):
         agent_updates._run_update_checks(repo)
     pytest_call = next((a for a in captured_args if "pytest" in a), None)
     assert pytest_call is not None
@@ -239,9 +255,7 @@ def test_production_pytest_args_have_path_ignores(
     assert "--maxfail=1" in pytest_call  # production default per spec point #1
 
 
-def test_diagnostic_mode_uses_maxfail_5(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_diagnostic_mode_uses_maxfail_5(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """HERMES_AGENT_DIAGNOSTIC=1 swaps --maxfail=1 -> --maxfail=5 for triage."""
     repo = _make_repo(tmp_path)
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "1")
@@ -252,8 +266,10 @@ def test_diagnostic_mode_uses_maxfail_5(
         captured_args.append(args)
         return {"name": "python pytest non-integration", "status": "pass", "output": ""}
 
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _capture):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _capture),
+    ):
         agent_updates._run_update_checks(repo)
     pytest_call = next((a for a in captured_args if "pytest" in a), None)
     assert pytest_call is not None
@@ -261,9 +277,7 @@ def test_diagnostic_mode_uses_maxfail_5(
     assert "--maxfail=1" not in pytest_call
 
 
-def test_workers_auto_is_accepted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_workers_auto_is_accepted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """HERMES_AGENT_PYTEST_WORKERS='auto' must NOT raise (sentinel value)."""
     repo = _make_repo(tmp_path)
     monkeypatch.setenv("HERMES_AGENT_RUN_PYTEST", "1")
@@ -275,8 +289,10 @@ def test_workers_auto_is_accepted(
         captured_args.append(args)
         return {"name": "python pytest non-integration", "status": "pass", "output": ""}
 
-    with patch.object(agent_updates, "_check_command", _stub_command_pass), \
-         patch.object(agent_updates, "_check_external", _capture):
+    with (
+        patch.object(agent_updates, "_check_command", _stub_command_pass),
+        patch.object(agent_updates, "_check_external", _capture),
+    ):
         agent_updates._run_update_checks(repo)
     pytest_call = next((a for a in captured_args if "pytest" in a), None)
     assert pytest_call is not None

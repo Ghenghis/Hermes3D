@@ -49,7 +49,9 @@ def _make_db(tmp_path: Path) -> tuple[sqlite3.Connection, Path]:
     return conn, db_path
 
 
-def _insert_job(conn: sqlite3.Connection, job_id: str, status: str = "failed", printer_id: str | None = None) -> None:
+def _insert_job(
+    conn: sqlite3.Connection, job_id: str, status: str = "failed", printer_id: str | None = None
+) -> None:
     conn.execute(
         "INSERT INTO jobs (id, name, job_type, status, printer_id) VALUES (?, ?, 'print', ?, ?)",
         (job_id, f"job-{job_id[:8]}", status, printer_id),
@@ -91,7 +93,14 @@ def _insert_checkpoint_artifact(conn: sqlite3.Connection, job_id: str) -> str:
 # Printer stub factory
 # ---------------------------------------------------------------------------
 
-def _make_printer(printer_id: str, *, write_enabled: bool = True, safety_policy: str = "write_enabled", state: str = "standby") -> dict[str, Any]:
+
+def _make_printer(
+    printer_id: str,
+    *,
+    write_enabled: bool = True,
+    safety_policy: str = "write_enabled",
+    state: str = "standby",
+) -> dict[str, Any]:
     return {
         "id": printer_id,
         "name": printer_id,
@@ -106,8 +115,10 @@ def _make_printer(printer_id: str, *, write_enabled: bool = True, safety_policy:
 # Context manager: patch the jobs routes to use a test DB and stubbed printers
 # ---------------------------------------------------------------------------
 
+
 def _job_patches(conn: sqlite3.Connection, printer_stub: dict | None, is_s1: bool = False):
     """Return a list of patch context managers for isolating jobs route calls."""
+
     def _rows(sql, params=()):
         return [dict(r) for r in conn.execute(sql, params).fetchall()]
 
@@ -143,14 +154,17 @@ def _ctx(conn, printer_stub, is_s1=False):
 # Import the jobs routes module
 # ---------------------------------------------------------------------------
 
+
 def _routes():
     import hermes3d.api.routes.jobs as m
+
     return m
 
 
 # ===========================================================================
 # Tests: S1 hard lock — all write actions must be blocked for S1 printer IDs
 # ===========================================================================
+
 
 class TestS1HardLock:
     """S1 (192.168.0.12 / flsun-s1) must NEVER receive job commands."""
@@ -160,6 +174,7 @@ class TestS1HardLock:
     @pytest.mark.parametrize("s1_id", S1_IDS)
     def test_propose_repair_blocked_for_s1(self, tmp_path, s1_id):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id=s1_id)
@@ -177,6 +192,7 @@ class TestS1HardLock:
     @pytest.mark.parametrize("s1_id", S1_IDS)
     def test_retry_blocked_for_s1(self, tmp_path, s1_id):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id=s1_id)
@@ -192,6 +208,7 @@ class TestS1HardLock:
     @pytest.mark.parametrize("s1_id", S1_IDS)
     def test_rollback_blocked_for_s1(self, tmp_path, s1_id):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id=s1_id)
@@ -208,6 +225,7 @@ class TestS1HardLock:
     @pytest.mark.parametrize("s1_id", S1_IDS)
     def test_apply_repair_blocked_for_s1(self, tmp_path, s1_id):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id=s1_id)
@@ -227,16 +245,20 @@ class TestS1HardLock:
 # Tests: read-only printer policy
 # ===========================================================================
 
+
 class TestReadOnlyPrinterPolicy:
     """A printer with safety_policy=read_only must not receive job commands."""
 
     def test_retry_blocked_for_read_only_printer(self, tmp_path):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="mystery_printer")
 
-        printer_stub = _make_printer("mystery_printer", write_enabled=False, safety_policy="read_only", state="standby")
+        printer_stub = _make_printer(
+            "mystery_printer", write_enabled=False, safety_policy="read_only", state="standby"
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator", reason="test")
 
@@ -248,12 +270,15 @@ class TestReadOnlyPrinterPolicy:
 
     def test_rollback_blocked_for_read_only_printer(self, tmp_path):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="mystery_printer")
         _insert_checkpoint_artifact(conn, job_id)
 
-        printer_stub = _make_printer("mystery_printer", write_enabled=False, safety_policy="read_only", state="standby")
+        printer_stub = _make_printer(
+            "mystery_printer", write_enabled=False, safety_policy="read_only", state="standby"
+        )
         jobs = _routes()
         body = jobs.JobRollbackRequest(actor="operator")
 
@@ -265,13 +290,16 @@ class TestReadOnlyPrinterPolicy:
 
     def test_apply_repair_blocked_for_read_only_printer(self, tmp_path):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="mystery_printer")
         _insert_failed_step(conn, job_id)
         _insert_approved_repair(conn, job_id)
 
-        printer_stub = _make_printer("mystery_printer", write_enabled=False, safety_policy="read_only", state="standby")
+        printer_stub = _make_printer(
+            "mystery_printer", write_enabled=False, safety_policy="read_only", state="standby"
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator")
 
@@ -286,17 +314,21 @@ class TestReadOnlyPrinterPolicy:
 # Tests: PRINTER_IDLE gate
 # ===========================================================================
 
+
 class TestPrinterIdleGate:
     """Retry/repair-apply/rollback must be blocked when printer is not idle."""
 
     @pytest.mark.parametrize("active_state", ["printing", "paused", "busy", "homing"])
     def test_retry_blocked_when_printer_not_idle(self, tmp_path, active_state):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="flsun_t1_a")
 
-        printer_stub = _make_printer("flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=active_state)
+        printer_stub = _make_printer(
+            "flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=active_state
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator", reason="test")
 
@@ -310,11 +342,14 @@ class TestPrinterIdleGate:
     @pytest.mark.parametrize("active_state", ["printing", "paused"])
     def test_apply_repair_blocked_when_printer_not_idle(self, tmp_path, active_state):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="flsun_t1_a")
 
-        printer_stub = _make_printer("flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=active_state)
+        printer_stub = _make_printer(
+            "flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=active_state
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator", reason="test")
 
@@ -327,12 +362,15 @@ class TestPrinterIdleGate:
     @pytest.mark.parametrize("active_state", ["printing", "busy"])
     def test_rollback_blocked_when_printer_not_idle(self, tmp_path, active_state):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="flsun_t1_a")
         _insert_checkpoint_artifact(conn, job_id)
 
-        printer_stub = _make_printer("flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=active_state)
+        printer_stub = _make_printer(
+            "flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=active_state
+        )
         jobs = _routes()
         body = jobs.JobRollbackRequest(actor="operator")
 
@@ -346,6 +384,7 @@ class TestPrinterIdleGate:
 # ===========================================================================
 # Tests: no printer — policy gate passes
 # ===========================================================================
+
 
 class TestNoPrinterPassesGate:
     """Jobs without a printer_id should pass the policy gate (no printer targeted)."""
@@ -382,6 +421,7 @@ class TestNoPrinterPassesGate:
 # Tests: write-enabled idle printer — all actions pass policy gate
 # ===========================================================================
 
+
 class TestWriteEnabledIdlePrinterPasses:
     """A write-enabled printer in an idle state should pass the policy gate."""
 
@@ -391,7 +431,9 @@ class TestWriteEnabledIdlePrinterPasses:
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="flsun_t1_a")
 
-        printer_stub = _make_printer("flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=idle_state)
+        printer_stub = _make_printer(
+            "flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=idle_state
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator", reason="test")
 
@@ -407,7 +449,9 @@ class TestWriteEnabledIdlePrinterPasses:
         _insert_job(conn, job_id, status="failed", printer_id="flsun_t1_a")
         _insert_checkpoint_artifact(conn, job_id)
 
-        printer_stub = _make_printer("flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=idle_state)
+        printer_stub = _make_printer(
+            "flsun_t1_a", write_enabled=True, safety_policy="write_enabled", state=idle_state
+        )
         jobs = _routes()
         body = jobs.JobRollbackRequest(actor="operator")
 
@@ -421,16 +465,20 @@ class TestWriteEnabledIdlePrinterPasses:
 # Tests: proof events are recorded on policy violation
 # ===========================================================================
 
+
 class TestProofEventsOnPolicyBlock:
     """Policy gate blocks must record proof events in proof_events table."""
 
     def test_proof_event_written_on_write_denied(self, tmp_path):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="locked_printer")
 
-        printer_stub = _make_printer("locked_printer", write_enabled=False, safety_policy="read_only", state="standby")
+        printer_stub = _make_printer(
+            "locked_printer", write_enabled=False, safety_policy="read_only", state="standby"
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator", reason="test")
 
@@ -441,7 +489,12 @@ class TestProofEventsOnPolicyBlock:
             proof_event_id = exc_info.value.detail.get("proof_event_id")
             assert proof_event_id, "proof_event_id must be returned in 423 response detail"
 
-            events = [dict(r) for r in conn.execute("SELECT * FROM proof_events WHERE id = ?", (proof_event_id,)).fetchall()]
+            events = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT * FROM proof_events WHERE id = ?", (proof_event_id,)
+                ).fetchall()
+            ]
             assert len(events) == 1
             payload = json.loads(events[0]["payload"])
             assert payload["job_id"] == job_id
@@ -449,11 +502,14 @@ class TestProofEventsOnPolicyBlock:
 
     def test_proof_event_written_on_printer_not_idle(self, tmp_path):
         from fastapi import HTTPException
+
         conn, _ = _make_db(tmp_path)
         job_id = _new_id()
         _insert_job(conn, job_id, status="failed", printer_id="flsun_t1_b")
 
-        printer_stub = _make_printer("flsun_t1_b", write_enabled=True, safety_policy="write_enabled", state="printing")
+        printer_stub = _make_printer(
+            "flsun_t1_b", write_enabled=True, safety_policy="write_enabled", state="printing"
+        )
         jobs = _routes()
         body = jobs.JobActorRequest(actor="operator")
 
@@ -464,7 +520,12 @@ class TestProofEventsOnPolicyBlock:
             proof_event_id = exc_info.value.detail.get("proof_event_id")
             assert proof_event_id, "proof_event_id must be in 409 detail"
 
-            events = [dict(r) for r in conn.execute("SELECT * FROM proof_events WHERE id = ?", (proof_event_id,)).fetchall()]
+            events = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT * FROM proof_events WHERE id = ?", (proof_event_id,)
+                ).fetchall()
+            ]
             assert len(events) == 1
             payload = json.loads(events[0]["payload"])
             assert payload["printer_state"] == "printing"

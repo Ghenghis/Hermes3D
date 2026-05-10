@@ -55,9 +55,7 @@ def test_call_mcp_tool_env_pinning_whitelist_unchanged() -> None:
     src = inspect.getsource(code_history._call_mcp_tool)
     # Whitelist keys (security-relevant)
     for required in ('"PATH"', '"PATHEXT"', '"SystemRoot"', '"COMSPEC"', '"TEMP"', '"TMP"'):
-        assert required in src, (
-            f"Bonus 12 #8 regression: env whitelist missing {required}"
-        )
+        assert required in src, f"Bonus 12 #8 regression: env whitelist missing {required}"
     # Overrides (must be set last)
     assert '"MCP_LOCK_WORKSPACE"' in src
     assert '"MCP_LOCK_SERVER"' in src

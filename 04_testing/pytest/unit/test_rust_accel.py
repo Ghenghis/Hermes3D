@@ -44,9 +44,7 @@ def test_rust_binary_smoke_when_built(tmp_path: Path) -> None:
 
     gcode = tmp_path / "part.gcode"
     gcode.write_text(
-        "; num layers: 12\n"
-        "; filament used [mm] = 100.5\n"
-        "; estimated printing time = 00:02:30\n",
+        "; num layers: 12\n; filament used [mm] = 100.5\n; estimated printing time = 00:02:30\n",
         encoding="utf-8",
     )
     proc = subprocess.run(

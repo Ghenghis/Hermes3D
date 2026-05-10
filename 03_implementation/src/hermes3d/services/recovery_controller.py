@@ -40,10 +40,10 @@ from typing import Any, Callable
 
 from hermes3d.services import code_history
 
-
 # ---------------------------------------------------------------------------
 # State machine types
 # ---------------------------------------------------------------------------
+
 
 class RecoveryState(str, Enum):
     """Live state of a recovery run.
@@ -75,26 +75,31 @@ class RecoveryState(str, Enum):
         return self in _CANCELLABLE_STATES
 
 
-_TERMINAL_STATES: frozenset[RecoveryState] = frozenset({
-    RecoveryState.RECOVERED,
-    RecoveryState.RETRY_FAILED,
-    RecoveryState.ESCALATED,
-    RecoveryState.CANCELLED,
-})
+_TERMINAL_STATES: frozenset[RecoveryState] = frozenset(
+    {
+        RecoveryState.RECOVERED,
+        RecoveryState.RETRY_FAILED,
+        RecoveryState.ESCALATED,
+        RecoveryState.CANCELLED,
+    }
+)
 
-_CANCELLABLE_STATES: frozenset[RecoveryState] = frozenset({
-    RecoveryState.CREATED,
-    RecoveryState.PROPOSING,
-    RecoveryState.REVIEWING,
-    RecoveryState.AWAITING_HUMAN_CONFIRM,
-    RecoveryState.RE_RUNNING_GATE,
-    # APPLYING is intentionally NOT cancellable.
-})
+_CANCELLABLE_STATES: frozenset[RecoveryState] = frozenset(
+    {
+        RecoveryState.CREATED,
+        RecoveryState.PROPOSING,
+        RecoveryState.REVIEWING,
+        RecoveryState.AWAITING_HUMAN_CONFIRM,
+        RecoveryState.RE_RUNNING_GATE,
+        # APPLYING is intentionally NOT cancellable.
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # Failure-class -> initial branch decision table
 # ---------------------------------------------------------------------------
+
 
 class RecoveryBranch(str, Enum):
     """Which playbook branch the controller takes after recording a failure."""
@@ -110,11 +115,13 @@ class RecoveryBranch(str, Enum):
 
 # Hard rule: classes in this set ALWAYS escalate, regardless of caller intent.
 # These are the security/auth/env classes where auto-recovery is unsafe.
-_HARD_ESCALATE_CLASSES: frozenset[str] = frozenset({
-    "provider_auth",
-    "secret_risk",
-    "sandbox_fail",
-})
+_HARD_ESCALATE_CLASSES: frozenset[str] = frozenset(
+    {
+        "provider_auth",
+        "secret_risk",
+        "sandbox_fail",
+    }
+)
 
 
 # Auto-attemptable classes (can enter the propose/review loop). The mapping
@@ -153,6 +160,7 @@ def select_branch_for_class(failure_class: str) -> RecoveryBranch:
 # ---------------------------------------------------------------------------
 # Run dataclasses
 # ---------------------------------------------------------------------------
+
 
 @dataclass(frozen=True)
 class RecoveryRunSpec:
@@ -306,6 +314,7 @@ def _autonomous_mode_enabled() -> bool:
 # Public API (read+write surface; routes in commit 2 wrap these)
 # ---------------------------------------------------------------------------
 
+
 def start_recovery(
     *,
     spec: RecoveryRunSpec,
@@ -435,12 +444,14 @@ def start_recovery(
         last_event_utc=started_utc,
         last_event_summary="run created from failure record",
     )
-    run.history.append({
-        "ts_utc": started_utc,
-        "from": None,
-        "to": RecoveryState.CREATED.value,
-        "note": f"created branch={branch.value} fingerprint={canonical_fingerprint}",
-    })
+    run.history.append(
+        {
+            "ts_utc": started_utc,
+            "from": None,
+            "to": RecoveryState.CREATED.value,
+            "note": f"created branch={branch.value} fingerprint={canonical_fingerprint}",
+        }
+    )
 
     with _REGISTRY_LOCK:
         _RUNS[attempt_id] = run
@@ -596,6 +607,7 @@ def list_active_runs(*, task_id: str | None = None) -> dict[str, Any]:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _transition(
     run: RecoveryRun,
     *,
@@ -624,12 +636,14 @@ def _transition(
     run.state = new_state
     run.last_event_utc = code_history.utc_now()
     run.last_event_summary = note[:400]
-    run.history.append({
-        "ts_utc": run.last_event_utc,
-        "from": from_state.value,
-        "to": new_state.value,
-        "note": run.last_event_summary,
-    })
+    run.history.append(
+        {
+            "ts_utc": run.last_event_utc,
+            "from": from_state.value,
+            "to": new_state.value,
+            "note": run.last_event_summary,
+        }
+    )
     if new_state.is_terminal:
         run.terminal_status = terminal_status
         key = (run.spec.task_id, run.failure_fingerprint)
@@ -641,6 +655,7 @@ def _transition(
 # ---------------------------------------------------------------------------
 # Test-only utilities (kept module-private; covered by commit 3 tests)
 # ---------------------------------------------------------------------------
+
 
 def _reset_registry_for_tests() -> None:
     """Clear in-memory state. Tests call this in setUp/setdown."""
@@ -687,9 +702,7 @@ def freeze_run(
         if run is None:
             return {"status": "unknown_attempt", "attempt_id": attempt_id}
         if run.branch == RecoveryBranch.ESCALATE_IMMEDIATELY:
-            raise ValueError(
-                "freeze_run: hard-escalate branch is already terminal; cannot freeze."
-            )
+            raise ValueError("freeze_run: hard-escalate branch is already terminal; cannot freeze.")
         if run.state != RecoveryState.CREATED:
             return {
                 "status": "not_in_created",
@@ -950,6 +963,7 @@ def _redact_for_payload(text: str | None, *, max_len: int = 280) -> str:
     raw = str(text)[:max_len]
     try:
         from hermes3d.gateways.redaction import redact_text  # noqa: PLC0415
+
         return redact_text(raw)[:max_len]
     except Exception:  # noqa: BLE001 -- best-effort
         return raw
@@ -1005,9 +1019,7 @@ def propose_fix(
             "reason": str(exc),
         }
     if not isinstance(proposal, dict) or not proposal.get("proposal_id"):
-        raise ValueError(
-            "propose_fix: adapter must return dict with non-empty 'proposal_id'."
-        )
+        raise ValueError("propose_fix: adapter must return dict with non-empty 'proposal_id'.")
     proposal_id = str(proposal["proposal_id"])
     files_touched = list(proposal.get("files_touched", []) or [])
     record = {
@@ -1148,12 +1160,14 @@ def review_proposal(
             # with a fresh proposal_id is the caller's next move.
             run.last_event_utc = code_history.utc_now()
             run.last_event_summary = f"review {verdict}: {review_id[:12]}"[:400]
-            run.history.append({
-                "ts_utc": run.last_event_utc,
-                "from": RecoveryState.REVIEWING.value,
-                "to": RecoveryState.REVIEWING.value,
-                "note": run.last_event_summary,
-            })
+            run.history.append(
+                {
+                    "ts_utc": run.last_event_utc,
+                    "from": RecoveryState.REVIEWING.value,
+                    "to": RecoveryState.REVIEWING.value,
+                    "note": run.last_event_summary,
+                }
+            )
         payload = run.to_state_payload()
     return {
         "status": "reviewed",
@@ -1260,8 +1274,7 @@ def apply_proposal(
                 attempt_id=attempt_id,
                 status="retry_failed",
                 recovery_summary=(
-                    f"apply_failed: {type(exc).__name__}: "
-                    f"{_redact_for_payload(str(exc))[:200]}"
+                    f"apply_failed: {type(exc).__name__}: {_redact_for_payload(str(exc))[:200]}"
                 ),
                 proposal_id=proposal_id,
                 review_evidence_id=run.review_evidence_id,
@@ -1393,9 +1406,7 @@ def resume_run(
             "proof_event_id": proof_event_id,
         }
 
-    gate_status = (
-        gate_result.get("status") if isinstance(gate_result, dict) else None
-    ) or "failed"
+    gate_status = (gate_result.get("status") if isinstance(gate_result, dict) else None) or "failed"
     gate_passed = gate_status == "pass"
 
     record = {
@@ -1415,9 +1426,7 @@ def resume_run(
                 owner=owner,
                 attempt_id=attempt_id,
                 status="recovered",
-                recovery_summary=(
-                    f"resumed: gate {target_gate} passed after RC v2 active loop"
-                ),
+                recovery_summary=(f"resumed: gate {target_gate} passed after RC v2 active loop"),
                 proposal_id=run.proposal_id,
                 review_evidence_id=run.review_evidence_id,
                 apply_evidence_id=run.apply_evidence_id,
@@ -1472,9 +1481,7 @@ def resume_run(
             owner=owner,
             attempt_id=attempt_id,
             status="escalated",
-            recovery_summary=(
-                f"escalated: gate {target_gate} returned {gate_status} after apply"
-            ),
+            recovery_summary=(f"escalated: gate {target_gate} returned {gate_status} after apply"),
             proposal_id=run.proposal_id,
             review_evidence_id=run.review_evidence_id,
             apply_evidence_id=run.apply_evidence_id,

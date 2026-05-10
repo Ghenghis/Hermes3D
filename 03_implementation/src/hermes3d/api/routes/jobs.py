@@ -142,9 +142,15 @@ def get_job(job_id: str) -> dict:
         raise HTTPException(status_code=404, detail="job not found")
     job["steps"] = rows("SELECT * FROM job_steps WHERE job_id = ? ORDER BY step_number", (job_id,))
     job["events"] = rows("SELECT * FROM job_events WHERE job_id = ? ORDER BY created_at", (job_id,))
-    job["artifacts"] = rows("SELECT * FROM artifacts WHERE job_id = ? ORDER BY created_at", (job_id,))
-    job["approvals"] = rows("SELECT * FROM approvals WHERE job_id = ? ORDER BY requested_at DESC", (job_id,))
-    job["transition_state"] = _transition_state(job, job["steps"], job["artifacts"], job["approvals"])
+    job["artifacts"] = rows(
+        "SELECT * FROM artifacts WHERE job_id = ? ORDER BY created_at", (job_id,)
+    )
+    job["approvals"] = rows(
+        "SELECT * FROM approvals WHERE job_id = ? ORDER BY requested_at DESC", (job_id,)
+    )
+    job["transition_state"] = _transition_state(
+        job, job["steps"], job["artifacts"], job["approvals"]
+    )
     return job
 
 
@@ -171,11 +177,27 @@ def cancel_job(job_id: str) -> dict:
             "jobs-api",
             {"job_id": job_id, "status": job["status"], "reason": "job is not cancellable"},
         )
-        _append_job_event(job_id, "cancel_blocked", "jobs-api", f"Cancel blocked for status {job['status']}; proof_event_id={proof_event_id}")
-        raise HTTPException(status_code=409, detail={"reason": "job is not cancellable", "proof_event_id": proof_event_id})
-    execute("UPDATE jobs SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?", (job_id,))
-    proof_event_id = _append_proof_event("jobs.cancel.accepted", "jobs-api", {"job_id": job_id, "previous_status": job["status"], "status": "cancelled"})
-    _append_job_event(job_id, "cancelled", "jobs-api", f"Job cancelled; proof_event_id={proof_event_id}")
+        _append_job_event(
+            job_id,
+            "cancel_blocked",
+            "jobs-api",
+            f"Cancel blocked for status {job['status']}; proof_event_id={proof_event_id}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={"reason": "job is not cancellable", "proof_event_id": proof_event_id},
+        )
+    execute(
+        "UPDATE jobs SET status = 'cancelled', updated_at = datetime('now') WHERE id = ?", (job_id,)
+    )
+    proof_event_id = _append_proof_event(
+        "jobs.cancel.accepted",
+        "jobs-api",
+        {"job_id": job_id, "previous_status": job["status"], "status": "cancelled"},
+    )
+    _append_job_event(
+        job_id, "cancelled", "jobs-api", f"Job cancelled; proof_event_id={proof_event_id}"
+    )
     return {"job_id": job_id, "status": "cancelled", "proof_event_id": proof_event_id}
 
 
@@ -191,12 +213,24 @@ def propose_repair(job_id: str, body: JobActorRequest) -> dict:
         proof_event_id = _append_proof_event(
             "jobs.repair.proposal.blocked",
             body.actor,
-            {"job_id": job_id, "status": job["status"], "reason": "No failed job step or failed job status is available for repair proposal."},
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "reason": "No failed job step or failed job status is available for repair proposal.",
+            },
         )
-        _append_job_event(job_id, "repair_proposal_blocked", body.actor, f"Repair proposal blocked; proof_event_id={proof_event_id}")
+        _append_job_event(
+            job_id,
+            "repair_proposal_blocked",
+            body.actor,
+            f"Repair proposal blocked; proof_event_id={proof_event_id}",
+        )
         raise HTTPException(
             status_code=409,
-            detail={"reason": "No failed job step or failed job status is available for repair proposal.", "proof_event_id": proof_event_id},
+            detail={
+                "reason": "No failed job step or failed job status is available for repair proposal.",
+                "proof_event_id": proof_event_id,
+            },
         )
     existing = row(
         "SELECT * FROM approvals WHERE job_id = ? AND approval_type = 'REPAIR_APPROVAL' AND status = 'pending' ORDER BY requested_at DESC LIMIT 1",
@@ -208,8 +242,19 @@ def propose_repair(job_id: str, body: JobActorRequest) -> dict:
             body.actor,
             {"job_id": job_id, "approval_id": existing["id"], "status": existing["status"]},
         )
-        _append_job_event(job_id, "repair_proposal_existing", body.actor, f"Repair approval already pending: {existing['id']}; proof_event_id={proof_event_id}")
-        return {"job_id": job_id, "status": "pending", "approval_id": existing["id"], "proof_event_id": proof_event_id, "created": False}
+        _append_job_event(
+            job_id,
+            "repair_proposal_existing",
+            body.actor,
+            f"Repair approval already pending: {existing['id']}; proof_event_id={proof_event_id}",
+        )
+        return {
+            "job_id": job_id,
+            "status": "pending",
+            "approval_id": existing["id"],
+            "proof_event_id": proof_event_id,
+            "created": False,
+        }
     approval_id = new_id()
     summary = _repair_summary(job, failed_step, body.reason or body.notes)
     execute(
@@ -224,8 +269,20 @@ def propose_repair(job_id: str, body: JobActorRequest) -> dict:
         body.actor,
         {"job_id": job_id, "approval_id": approval_id, **summary},
     )
-    _append_job_event(job_id, "repair_proposal_requested", body.actor, f"Repair approval requested: {approval_id}; proof_event_id={proof_event_id}")
-    return {"job_id": job_id, "status": "pending", "approval_id": approval_id, "proof_event_id": proof_event_id, "created": True, "proposal": summary}
+    _append_job_event(
+        job_id,
+        "repair_proposal_requested",
+        body.actor,
+        f"Repair approval requested: {approval_id}; proof_event_id={proof_event_id}",
+    )
+    return {
+        "job_id": job_id,
+        "status": "pending",
+        "approval_id": approval_id,
+        "proof_event_id": proof_event_id,
+        "created": True,
+        "proposal": summary,
+    }
 
 
 @router.post("/api/jobs/{job_id}/repair/apply")
@@ -240,18 +297,49 @@ def apply_repair(job_id: str, body: JobActorRequest) -> dict:
         proof_event_id = _append_proof_event(
             "jobs.repair.apply.blocked",
             body.actor,
-            {"job_id": job_id, "status": job["status"], "reason": "Approved REPAIR_APPROVAL is required before repair execution."},
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "reason": "Approved REPAIR_APPROVAL is required before repair execution.",
+            },
         )
-        _append_job_event(job_id, "repair_apply_blocked", body.actor, f"Repair apply blocked: approval required; proof_event_id={proof_event_id}")
-        raise HTTPException(status_code=409, detail={"reason": "Approved REPAIR_APPROVAL is required before repair execution.", "proof_event_id": proof_event_id})
+        _append_job_event(
+            job_id,
+            "repair_apply_blocked",
+            body.actor,
+            f"Repair apply blocked: approval required; proof_event_id={proof_event_id}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Approved REPAIR_APPROVAL is required before repair execution.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     if not failed_step:
         proof_event_id = _append_proof_event(
             "jobs.repair.apply.blocked",
             body.actor,
-            {"job_id": job_id, "status": job["status"], "approval_id": approval["id"], "reason": "No failed job step remains to repair."},
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "approval_id": approval["id"],
+                "reason": "No failed job step remains to repair.",
+            },
         )
-        _append_job_event(job_id, "repair_apply_blocked", body.actor, f"Repair apply blocked: no failed step; proof_event_id={proof_event_id}")
-        raise HTTPException(status_code=409, detail={"reason": "No failed job step remains to repair.", "proof_event_id": proof_event_id})
+        _append_job_event(
+            job_id,
+            "repair_apply_blocked",
+            body.actor,
+            f"Repair apply blocked: no failed step; proof_event_id={proof_event_id}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "No failed job step remains to repair.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     result = _repair_agent_result(job, failed_step)
     status = "repair_ready_for_retry" if result["outcome"] == "fixed" else "repair_escalated"
     if result["outcome"] == "fixed":
@@ -263,14 +351,28 @@ def apply_repair(job_id: str, body: JobActorRequest) -> dict:
             """,
             (failed_step["id"],),
         )
-        execute("UPDATE jobs SET status = 'queued', updated_at = datetime('now') WHERE id = ?", (job_id,))
+        execute(
+            "UPDATE jobs SET status = 'queued', updated_at = datetime('now') WHERE id = ?",
+            (job_id,),
+        )
     proof_event_id = _append_proof_event(
         "jobs.repair.apply.completed",
         body.actor,
         {"job_id": job_id, "approval_id": approval["id"], "status": status, "repair": result},
     )
-    _append_job_event(job_id, "repair_apply_completed", body.actor, f"Repair result {result['outcome']}; proof_event_id={proof_event_id}")
-    return {"job_id": job_id, "status": status, "approval_id": approval["id"], "proof_event_id": proof_event_id, "repair": result}
+    _append_job_event(
+        job_id,
+        "repair_apply_completed",
+        body.actor,
+        f"Repair result {result['outcome']}; proof_event_id={proof_event_id}",
+    )
+    return {
+        "job_id": job_id,
+        "status": status,
+        "approval_id": approval["id"],
+        "proof_event_id": proof_event_id,
+        "repair": result,
+    }
 
 
 @router.post("/api/jobs/{job_id}/retry")
@@ -283,20 +385,48 @@ def retry_job(job_id: str, body: JobActorRequest) -> dict:
         proof_event_id = _append_proof_event(
             "jobs.retry.blocked",
             body.actor,
-            {"job_id": job_id, "approval_id": pending["id"], "reason": "Pending REPAIR_APPROVAL must be decided before retry."},
+            {
+                "job_id": job_id,
+                "approval_id": pending["id"],
+                "reason": "Pending REPAIR_APPROVAL must be decided before retry.",
+            },
         )
-        _append_job_event(job_id, "retry_blocked", body.actor, f"Retry blocked by pending repair approval {pending['id']}; proof_event_id={proof_event_id}")
-        raise HTTPException(status_code=409, detail={"reason": "Pending REPAIR_APPROVAL must be decided before retry.", "approval_id": pending["id"], "proof_event_id": proof_event_id})
+        _append_job_event(
+            job_id,
+            "retry_blocked",
+            body.actor,
+            f"Retry blocked by pending repair approval {pending['id']}; proof_event_id={proof_event_id}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Pending REPAIR_APPROVAL must be decided before retry.",
+                "approval_id": pending["id"],
+                "proof_event_id": proof_event_id,
+            },
+        )
     if job["status"] not in {"failed", "cancelled", "rolled_back", "waiting_approval"}:
         proof_event_id = _append_proof_event(
             "jobs.retry.blocked",
             body.actor,
-            {"job_id": job_id, "status": job["status"], "reason": "Only failed, cancelled, rolled_back, or waiting_approval jobs can be retried."},
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "reason": "Only failed, cancelled, rolled_back, or waiting_approval jobs can be retried.",
+            },
         )
-        _append_job_event(job_id, "retry_blocked", body.actor, f"Retry blocked for status {job['status']}; proof_event_id={proof_event_id}")
+        _append_job_event(
+            job_id,
+            "retry_blocked",
+            body.actor,
+            f"Retry blocked for status {job['status']}; proof_event_id={proof_event_id}",
+        )
         raise HTTPException(
             status_code=409,
-            detail={"reason": "Only failed, cancelled, rolled_back, or waiting_approval jobs can be retried.", "proof_event_id": proof_event_id},
+            detail={
+                "reason": "Only failed, cancelled, rolled_back, or waiting_approval jobs can be retried.",
+                "proof_event_id": proof_event_id,
+            },
         )
     execute(
         """
@@ -306,13 +436,22 @@ def retry_job(job_id: str, body: JobActorRequest) -> dict:
         """,
         (job_id,),
     )
-    execute("UPDATE jobs SET status = 'queued', updated_at = datetime('now') WHERE id = ?", (job_id,))
+    execute(
+        "UPDATE jobs SET status = 'queued', updated_at = datetime('now') WHERE id = ?", (job_id,)
+    )
     proof_event_id = _append_proof_event(
         "jobs.retry.accepted",
         body.actor,
-        {"job_id": job_id, "previous_status": job["status"], "status": "queued", "reason": body.reason or body.notes},
+        {
+            "job_id": job_id,
+            "previous_status": job["status"],
+            "status": "queued",
+            "reason": body.reason or body.notes,
+        },
     )
-    _append_job_event(job_id, "retry_queued", body.actor, f"Retry queued; proof_event_id={proof_event_id}")
+    _append_job_event(
+        job_id, "retry_queued", body.actor, f"Retry queued; proof_event_id={proof_event_id}"
+    )
     return {"job_id": job_id, "status": "queued", "proof_event_id": proof_event_id}
 
 
@@ -326,10 +465,26 @@ def rollback_job(job_id: str, body: JobRollbackRequest) -> dict:
         proof_event_id = _append_proof_event(
             "jobs.rollback.blocked",
             body.actor,
-            {"job_id": job_id, "status": job["status"], "target_artifact_id": body.target_artifact_id, "reason": "No rollback checkpoint artifact is recorded for this job."},
+            {
+                "job_id": job_id,
+                "status": job["status"],
+                "target_artifact_id": body.target_artifact_id,
+                "reason": "No rollback checkpoint artifact is recorded for this job.",
+            },
         )
-        _append_job_event(job_id, "rollback_blocked", body.actor, f"Rollback blocked: no checkpoint; proof_event_id={proof_event_id}")
-        raise HTTPException(status_code=409, detail={"reason": "No rollback checkpoint artifact is recorded for this job.", "proof_event_id": proof_event_id})
+        _append_job_event(
+            job_id,
+            "rollback_blocked",
+            body.actor,
+            f"Rollback blocked: no checkpoint; proof_event_id={proof_event_id}",
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "No rollback checkpoint artifact is recorded for this job.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     step_id = new_id()
     execute(
         """
@@ -338,14 +493,33 @@ def rollback_job(job_id: str, body: JobRollbackRequest) -> dict:
         """,
         (step_id, job_id, job_id, f"Rollback to {target['label'] or target['id']}", 0.0),
     )
-    execute("UPDATE jobs SET status = 'rolled_back', updated_at = datetime('now') WHERE id = ?", (job_id,))
+    execute(
+        "UPDATE jobs SET status = 'rolled_back', updated_at = datetime('now') WHERE id = ?",
+        (job_id,),
+    )
     proof_event_id = _append_proof_event(
         "jobs.rollback.accepted",
         body.actor,
-        {"job_id": job_id, "previous_status": job["status"], "status": "rolled_back", "target_artifact_id": target["id"], "target_path": target["file_path"]},
+        {
+            "job_id": job_id,
+            "previous_status": job["status"],
+            "status": "rolled_back",
+            "target_artifact_id": target["id"],
+            "target_path": target["file_path"],
+        },
     )
-    _append_job_event(job_id, "rollback_completed", body.actor, f"Rolled back to artifact {target['id']}; proof_event_id={proof_event_id}")
-    return {"job_id": job_id, "status": "rolled_back", "target_artifact_id": target["id"], "proof_event_id": proof_event_id}
+    _append_job_event(
+        job_id,
+        "rollback_completed",
+        body.actor,
+        f"Rolled back to artifact {target['id']}; proof_event_id={proof_event_id}",
+    )
+    return {
+        "job_id": job_id,
+        "status": "rolled_back",
+        "target_artifact_id": target["id"],
+        "proof_event_id": proof_event_id,
+    }
 
 
 @router.get("/api/jobs/{job_id}/artifacts/{artifact_id}/download")
@@ -392,11 +566,32 @@ def _append_proof_event(event_type: str, source_agent: str, payload: dict[str, A
     return event_id
 
 
-def _transition_state(job: dict[str, Any], steps: list[dict[str, Any]], artifacts: list[dict[str, Any]], approvals: list[dict[str, Any]]) -> dict[str, Any]:
+def _transition_state(
+    job: dict[str, Any],
+    steps: list[dict[str, Any]],
+    artifacts: list[dict[str, Any]],
+    approvals: list[dict[str, Any]],
+) -> dict[str, Any]:
     failed = _failed_step(job, steps)
-    pending_repair = next((approval for approval in approvals if approval["approval_type"] == "REPAIR_APPROVAL" and approval["status"] == "pending"), None)
-    approved_repair = next((approval for approval in approvals if approval["approval_type"] == "REPAIR_APPROVAL" and approval["status"] == "approved"), None)
-    rollback_targets = [_artifact_summary(artifact) for artifact in artifacts if _is_rollback_target(artifact)]
+    pending_repair = next(
+        (
+            approval
+            for approval in approvals
+            if approval["approval_type"] == "REPAIR_APPROVAL" and approval["status"] == "pending"
+        ),
+        None,
+    )
+    approved_repair = next(
+        (
+            approval
+            for approval in approvals
+            if approval["approval_type"] == "REPAIR_APPROVAL" and approval["status"] == "approved"
+        ),
+        None,
+    )
+    rollback_targets = [
+        _artifact_summary(artifact) for artifact in artifacts if _is_rollback_target(artifact)
+    ]
     return {
         "failed_step_id": failed["id"] if failed else None,
         "failed_step": _step_summary(failed) if failed else None,
@@ -405,9 +600,12 @@ def _transition_state(job: dict[str, Any], steps: list[dict[str, Any]], artifact
         "rollback_targets": rollback_targets,
         "can_request_repair": bool(failed and pending_repair is None),
         "can_apply_repair": bool(failed and approved_repair is not None),
-        "can_retry": job["status"] in {"failed", "cancelled", "rolled_back", "waiting_approval"} and pending_repair is None,
+        "can_retry": job["status"] in {"failed", "cancelled", "rolled_back", "waiting_approval"}
+        and pending_repair is None,
         "can_rollback": bool(rollback_targets),
-        "blocker": _transition_blocker(job, failed, pending_repair, approved_repair, rollback_targets),
+        "blocker": _transition_blocker(
+            job, failed, pending_repair, approved_repair, rollback_targets
+        ),
     }
 
 
@@ -419,24 +617,45 @@ def _transition_blocker(
     rollback_targets: list[dict[str, Any]],
 ) -> dict[str, str]:
     if pending_repair:
-        return {"gate": "REPAIR_APPROVAL", "reason": f"Repair approval {pending_repair['id']} is pending operator decision."}
+        return {
+            "gate": "REPAIR_APPROVAL",
+            "reason": f"Repair approval {pending_repair['id']} is pending operator decision.",
+        }
     if failed and not approved_repair:
-        return {"gate": "REPAIR_PROPOSAL", "reason": "A failed step needs a repair proposal and approval before retry or mutation."}
+        return {
+            "gate": "REPAIR_PROPOSAL",
+            "reason": "A failed step needs a repair proposal and approval before retry or mutation.",
+        }
     if failed and approved_repair:
-        return {"gate": "REPAIR_EXECUTION", "reason": f"Approved repair {approved_repair['id']} can be applied or the job can be retried."}
+        return {
+            "gate": "REPAIR_EXECUTION",
+            "reason": f"Approved repair {approved_repair['id']} can be applied or the job can be retried.",
+        }
     if job["status"] in {"failed", "cancelled"} and not rollback_targets:
-        return {"gate": "ROLLBACK_TARGET", "reason": "No rollback checkpoint artifact is recorded for this job."}
+        return {
+            "gate": "ROLLBACK_TARGET",
+            "reason": "No rollback checkpoint artifact is recorded for this job.",
+        }
     return {"gate": "NONE", "reason": "No job transition blocker is active."}
 
 
 def _failed_step(job: dict[str, Any], steps: list[dict[str, Any]]) -> dict[str, Any] | None:
-    return next((step for step in steps if step["status"] == "failed"), None) or ({"id": None, "name": job["name"], "status": job["status"], "error": None} if job["status"] == "failed" else None)
+    return next((step for step in steps if step["status"] == "failed"), None) or (
+        {"id": None, "name": job["name"], "status": job["status"], "error": None}
+        if job["status"] == "failed"
+        else None
+    )
 
 
 def _step_summary(step: dict[str, Any] | None) -> dict[str, Any] | None:
     if not step:
         return None
-    return {"id": step.get("id"), "name": step.get("name"), "status": step.get("status"), "error": step.get("error")}
+    return {
+        "id": step.get("id"),
+        "name": step.get("name"),
+        "status": step.get("status"),
+        "error": step.get("error"),
+    }
 
 
 def _artifact_summary(artifact: dict[str, Any]) -> dict[str, Any]:
@@ -449,7 +668,9 @@ def _artifact_summary(artifact: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _repair_summary(job: dict[str, Any], failed_step: dict[str, Any], reason: str) -> dict[str, Any]:
+def _repair_summary(
+    job: dict[str, Any], failed_step: dict[str, Any], reason: str
+) -> dict[str, Any]:
     return {
         "job_id": job["id"],
         "job_name": job["name"],
@@ -483,7 +704,11 @@ def _repair_agent_result(job: dict[str, Any], failed_step: dict[str, Any]) -> di
         escalation = RepairEscalation(
             cause=cause,
             attempts=1,
-            context={"job_id": job["id"], "node_name": failed_step.get("name") or job["name"], "printer_id": job.get("printer_id")},
+            context={
+                "job_id": job["id"],
+                "node_name": failed_step.get("name") or job["name"],
+                "printer_id": job.get("printer_id"),
+            },
         )
         result = RepairAgent().repair(escalation)
         return {
@@ -503,7 +728,9 @@ def _repair_agent_result(job: dict[str, Any], failed_step: dict[str, Any]) -> di
 
 def _rollback_target(job_id: str, target_artifact_id: str | None) -> dict[str, Any] | None:
     if target_artifact_id:
-        artifact = row("SELECT * FROM artifacts WHERE id = ? AND job_id = ?", (target_artifact_id, job_id))
+        artifact = row(
+            "SELECT * FROM artifacts WHERE id = ? AND job_id = ?", (target_artifact_id, job_id)
+        )
         return artifact if artifact and _is_rollback_target(artifact) else None
     return row(
         """

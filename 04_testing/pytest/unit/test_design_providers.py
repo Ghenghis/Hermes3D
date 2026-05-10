@@ -26,6 +26,7 @@ try:
         _probe_providers,
         _probe_python_provider,
     )
+
     _MODULE_AVAILABLE = True
 except ImportError:
     _MODULE_AVAILABLE = False
@@ -54,7 +55,14 @@ class TestDiscoverTemplates:
     def test_each_entry_has_required_keys(self) -> None:
         result = _discover_templates()
         for entry in result:
-            for key in ("id", "name", "executor_available", "executor_detail", "deps_ok", "missing_deps"):
+            for key in (
+                "id",
+                "name",
+                "executor_available",
+                "executor_detail",
+                "deps_ok",
+                "missing_deps",
+            ):
                 assert key in entry, f"Template {entry.get('id')!r} missing key {key!r}"
 
     def test_executor_available_is_bool(self) -> None:
@@ -104,7 +112,17 @@ class TestProbeProviders:
             assert expected in ids, f"Expected provider id {expected!r} in {ids}"
 
     def test_each_provider_has_required_keys(self) -> None:
-        required = ("id", "name", "kind", "status", "detected", "path", "capabilities", "detail", "probed_at")
+        required = (
+            "id",
+            "name",
+            "kind",
+            "status",
+            "detected",
+            "path",
+            "capabilities",
+            "detail",
+            "probed_at",
+        )
         result = _probe_providers()
         for provider in result:
             for key in required:

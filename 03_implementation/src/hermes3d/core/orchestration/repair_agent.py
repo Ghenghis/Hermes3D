@@ -182,7 +182,8 @@ class RepairAgent:
         except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log suggestion extraction failure
             log.debug(
                 "repair_agent.extract_json fallback: %s: %s",
-                type(exc).__name__, exc,
+                type(exc).__name__,
+                exc,
             )
         return RepairResult(
             outcome="fixed",

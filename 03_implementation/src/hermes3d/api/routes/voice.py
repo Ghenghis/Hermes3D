@@ -50,7 +50,10 @@ def save_voice(agent_id: str, body: VoiceUpdate) -> dict:
     existing = rows("SELECT agent_id FROM voice_assignments WHERE agent_id = ?", (agent_id,))
     if not existing:
         raise HTTPException(status_code=404, detail=f"voice agent not found: {agent_id}")
-    execute("UPDATE voice_assignments SET voice_name = ?, updated_at = datetime('now') WHERE agent_id = ?", (body.voice, agent_id))
+    execute(
+        "UPDATE voice_assignments SET voice_name = ?, updated_at = datetime('now') WHERE agent_id = ?",
+        (body.voice, agent_id),
+    )
     return {"agent_id": agent_id, "voice_name": body.voice, "saved": True}
 
 
@@ -69,7 +72,12 @@ def preview_voice(body: VoicePreview):
         )
         return JSONResponse(
             status_code=409,
-            content=_blocked("not_configured", "Azure Speech credentials are not configured in the private runtime env.", body.voice, proof_event_id=proof_event_id),
+            content=_blocked(
+                "not_configured",
+                "Azure Speech credentials are not configured in the private runtime env.",
+                body.voice,
+                proof_event_id=proof_event_id,
+            ),
         )
     try:
         token = _azure_issue_token(config)
@@ -87,7 +95,13 @@ def preview_voice(body: VoicePreview):
         )
         return JSONResponse(
             status_code=502,
-            content=_blocked("azure_error", f"Azure Speech returned HTTP {exc.code}.", body.voice, exc.code, proof_event_id=proof_event_id),
+            content=_blocked(
+                "azure_error",
+                f"Azure Speech returned HTTP {exc.code}.",
+                body.voice,
+                exc.code,
+                proof_event_id=proof_event_id,
+            ),
         )
     except OSError as exc:
         proof_event_id = _append_voice_proof(
@@ -101,7 +115,12 @@ def preview_voice(body: VoicePreview):
         )
         return JSONResponse(
             status_code=502,
-            content=_blocked("unreachable", f"Azure Speech request failed: {exc}", body.voice, proof_event_id=proof_event_id),
+            content=_blocked(
+                "unreachable",
+                f"Azure Speech request failed: {exc}",
+                body.voice,
+                proof_event_id=proof_event_id,
+            ),
         )
     proof_event_id = _append_voice_proof(
         "voice.tts.synthesized",
@@ -132,7 +151,9 @@ async def speech_to_text(request: Request) -> dict:
     config = _azure_config()
     locale = _clean_locale(request.query_params.get("locale") or "en-US")
     if not config["configured"]:
-        proof_event_id = _append_voice_proof("voice.stt.blocked", {"status": "not_configured", "locale": locale})
+        proof_event_id = _append_voice_proof(
+            "voice.stt.blocked", {"status": "not_configured", "locale": locale}
+        )
         return JSONResponse(
             status_code=409,
             content={
@@ -145,32 +166,91 @@ async def speech_to_text(request: Request) -> dict:
         )
     audio = await request.body()
     if not audio:
-        proof_event_id = _append_voice_proof("voice.stt.blocked", {"status": "empty_audio", "locale": locale})
-        raise HTTPException(status_code=400, detail={"status": "empty_audio", "reason": "Audio body is required.", "proof_event_id": proof_event_id})
+        proof_event_id = _append_voice_proof(
+            "voice.stt.blocked", {"status": "empty_audio", "locale": locale}
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "empty_audio",
+                "reason": "Audio body is required.",
+                "proof_event_id": proof_event_id,
+            },
+        )
     if len(audio) > MAX_STT_AUDIO_BYTES:
-        proof_event_id = _append_voice_proof("voice.stt.blocked", {"status": "too_large", "bytes": len(audio), "locale": locale})
-        raise HTTPException(status_code=413, detail={"status": "too_large", "reason": f"Audio body exceeds {MAX_STT_AUDIO_BYTES} bytes.", "proof_event_id": proof_event_id})
-    content_type = (request.headers.get("content-type") or "application/octet-stream").split(";", 1)[0].strip().lower()
-    filename = _safe_filename(request.headers.get("x-hermes-filename") or f"voice-note.{_audio_extension(content_type)}")
+        proof_event_id = _append_voice_proof(
+            "voice.stt.blocked", {"status": "too_large", "bytes": len(audio), "locale": locale}
+        )
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "status": "too_large",
+                "reason": f"Audio body exceeds {MAX_STT_AUDIO_BYTES} bytes.",
+                "proof_event_id": proof_event_id,
+            },
+        )
+    content_type = (
+        (request.headers.get("content-type") or "application/octet-stream")
+        .split(";", 1)[0]
+        .strip()
+        .lower()
+    )
+    filename = _safe_filename(
+        request.headers.get("x-hermes-filename") or f"voice-note.{_audio_extension(content_type)}"
+    )
     try:
-        transcript = await asyncio.to_thread(_azure_fast_transcribe, config, audio, content_type, filename, locale)
+        transcript = await asyncio.to_thread(
+            _azure_fast_transcribe, config, audio, content_type, filename, locale
+        )
     except urllib.error.HTTPError as exc:
-        proof_event_id = _append_voice_proof("voice.stt.failed", {"status": "azure_error", "http_status": exc.code, "bytes": len(audio), "locale": locale})
+        proof_event_id = _append_voice_proof(
+            "voice.stt.failed",
+            {
+                "status": "azure_error",
+                "http_status": exc.code,
+                "bytes": len(audio),
+                "locale": locale,
+            },
+        )
         return JSONResponse(
             status_code=502,
-            content={"accepted": False, "configured": True, "status": "azure_error", "http_status": exc.code, "reason": f"Azure Speech fast transcription returned HTTP {exc.code}.", "proof_event_id": proof_event_id},
+            content={
+                "accepted": False,
+                "configured": True,
+                "status": "azure_error",
+                "http_status": exc.code,
+                "reason": f"Azure Speech fast transcription returned HTTP {exc.code}.",
+                "proof_event_id": proof_event_id,
+            },
         )
     except OSError:
-        proof_event_id = _append_voice_proof("voice.stt.failed", {"status": "unreachable", "bytes": len(audio), "locale": locale})
+        proof_event_id = _append_voice_proof(
+            "voice.stt.failed", {"status": "unreachable", "bytes": len(audio), "locale": locale}
+        )
         return JSONResponse(
             status_code=502,
-            content={"accepted": False, "configured": True, "status": "unreachable", "reason": "Azure Speech fast transcription request failed.", "proof_event_id": proof_event_id},
+            content={
+                "accepted": False,
+                "configured": True,
+                "status": "unreachable",
+                "reason": "Azure Speech fast transcription request failed.",
+                "proof_event_id": proof_event_id,
+            },
         )
     except ValueError as exc:
-        proof_event_id = _append_voice_proof("voice.stt.failed", {"status": "invalid_response", "bytes": len(audio), "locale": locale})
+        proof_event_id = _append_voice_proof(
+            "voice.stt.failed",
+            {"status": "invalid_response", "bytes": len(audio), "locale": locale},
+        )
         return JSONResponse(
             status_code=502,
-            content={"accepted": False, "configured": True, "status": "invalid_response", "reason": str(exc), "proof_event_id": proof_event_id},
+            content={
+                "accepted": False,
+                "configured": True,
+                "status": "invalid_response",
+                "reason": str(exc),
+                "proof_event_id": proof_event_id,
+            },
         )
     proof_event_id = _append_voice_proof(
         "voice.stt.transcribed",
@@ -179,7 +259,9 @@ async def speech_to_text(request: Request) -> dict:
             "bytes": len(audio),
             "locale": locale,
             "provider": "azure_fast_transcription",
-            "transcript_sha256": hashlib.sha256(transcript["transcript"].encode("utf-8")).hexdigest(),
+            "transcript_sha256": hashlib.sha256(
+                transcript["transcript"].encode("utf-8")
+            ).hexdigest(),
             "phrase_count": transcript["phrase_count"],
         },
     )
@@ -220,19 +302,21 @@ def voice_transcripts(limit: int = 50, offset: int = 0) -> list[dict]:
             payload = json.loads(row.get("payload") or "{}")
         except (ValueError, TypeError):
             payload = {}
-        result.append({
-            "id": row.get("id", ""),
-            "event_type": row.get("event_type", ""),
-            "status": payload.get("status", "unknown"),
-            "locale": payload.get("locale", ""),
-            "transcript": payload.get("transcript", ""),
-            "transcript_sha256": payload.get("transcript_sha256"),
-            "phrase_count": payload.get("phrase_count"),
-            "bytes": payload.get("bytes"),
-            "provider": payload.get("provider", ""),
-            "ts_utc": payload.get("ts_utc") or row.get("created_at", ""),
-            "proof_event_id": row.get("id", ""),
-        })
+        result.append(
+            {
+                "id": row.get("id", ""),
+                "event_type": row.get("event_type", ""),
+                "status": payload.get("status", "unknown"),
+                "locale": payload.get("locale", ""),
+                "transcript": payload.get("transcript", ""),
+                "transcript_sha256": payload.get("transcript_sha256"),
+                "phrase_count": payload.get("phrase_count"),
+                "bytes": payload.get("bytes"),
+                "provider": payload.get("provider", ""),
+                "ts_utc": payload.get("ts_utc") or row.get("created_at", ""),
+                "proof_event_id": row.get("id", ""),
+            }
+        )
     return result
 
 
@@ -247,6 +331,7 @@ def voice_recording(recording_id: str):
     from the backend buffer only.
     """
     from fastapi.responses import Response as FastAPIResponse
+
     raw = rows(
         "SELECT payload FROM proof_events WHERE id = ? AND event_type = 'voice.tts.synthesized'",
         (recording_id,),
@@ -266,7 +351,9 @@ def voice_recording(recording_id: str):
         raise HTTPException(status_code=500, detail="Recording audio data is not valid base64.")
     output_format = payload.get("output_format", DEFAULT_OUTPUT_FORMAT)
     mime = "audio/mpeg" if "mp3" in output_format or "mpeg" in output_format else "audio/wav"
-    return FastAPIResponse(content=audio_bytes, media_type=mime, headers={"Cache-Control": "no-store"})
+    return FastAPIResponse(
+        content=audio_bytes, media_type=mime, headers={"Cache-Control": "no-store"}
+    )
 
 
 @router.get("/api/voice/proof-events")
@@ -290,14 +377,16 @@ def voice_proof_events(limit: int = 100, offset: int = 0) -> list[dict]:
             payload = json.loads(row.get("payload") or "{}")
         except (ValueError, TypeError):
             payload = {}
-        result.append({
-            "id": row.get("id", ""),
-            "event_type": row.get("event_type", ""),
-            "source_agent": row.get("source_agent", ""),
-            "status": payload.get("status", "unknown"),
-            "ts_utc": payload.get("ts_utc") or row.get("created_at", ""),
-            "summary": _proof_event_summary(row.get("event_type", ""), payload),
-        })
+        result.append(
+            {
+                "id": row.get("id", ""),
+                "event_type": row.get("event_type", ""),
+                "source_agent": row.get("source_agent", ""),
+                "status": payload.get("status", "unknown"),
+                "ts_utc": payload.get("ts_utc") or row.get("created_at", ""),
+                "summary": _proof_event_summary(row.get("event_type", ""), payload),
+            }
+        )
     return result
 
 
@@ -325,14 +414,16 @@ def _proof_event_summary(event_type: str, payload: dict) -> str:
 @router.get("/api/voice/providers")
 def providers() -> list[dict]:
     config = _azure_config()
-    return [{
-        "id": "azure",
-        "name": "Azure Speech",
-        "configured": config["configured"],
-        "status": "ready" if config["configured"] else "not_configured",
-        "region": config["region"] if config["configured"] else None,
-        "source": config["source"],
-    }]
+    return [
+        {
+            "id": "azure",
+            "name": "Azure Speech",
+            "configured": config["configured"],
+            "status": "ready" if config["configured"] else "not_configured",
+            "region": config["region"] if config["configured"] else None,
+            "source": config["source"],
+        }
+    ]
 
 
 @router.get("/api/voice/voices")
@@ -384,7 +475,13 @@ def voices(locale: str = "en") -> dict[str, Any]:
     }
 
 
-def _blocked(status: str, reason: str, voice: str, http_status: int | None = None, proof_event_id: str | None = None) -> dict[str, Any]:
+def _blocked(
+    status: str,
+    reason: str,
+    voice: str,
+    http_status: int | None = None,
+    proof_event_id: str | None = None,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "queued": False,
         "voice": voice,
@@ -446,9 +543,16 @@ def _azure_synthesize(config: dict[str, Any], token: str, body: VoicePreview) ->
         return response.read()
 
 
-def _azure_fast_transcribe(config: dict[str, Any], audio: bytes, content_type: str, filename: str, locale: str) -> dict[str, Any]:
-    api_version = os.environ.get("AZURE_SPEECH_STT_API_VERSION", FAST_TRANSCRIPTION_API_VERSION).strip() or FAST_TRANSCRIPTION_API_VERSION
-    boundary, body = _multipart_transcription_body(audio, content_type, filename, {"locales": [locale] if locale else []})
+def _azure_fast_transcribe(
+    config: dict[str, Any], audio: bytes, content_type: str, filename: str, locale: str
+) -> dict[str, Any]:
+    api_version = (
+        os.environ.get("AZURE_SPEECH_STT_API_VERSION", FAST_TRANSCRIPTION_API_VERSION).strip()
+        or FAST_TRANSCRIPTION_API_VERSION
+    )
+    boundary, body = _multipart_transcription_body(
+        audio, content_type, filename, {"locales": [locale] if locale else []}
+    )
     request = urllib.request.Request(
         f"https://{config['region']}.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version={api_version}",
         data=body,
@@ -467,25 +571,33 @@ def _azure_fast_transcribe(config: dict[str, Any], audio: bytes, content_type: s
     return {
         "transcript": transcript.strip(),
         "confidence": _transcript_confidence(payload),
-        "duration_ms": _int_value(payload.get("durationMilliseconds")) if isinstance(payload, dict) else None,
+        "duration_ms": _int_value(payload.get("durationMilliseconds"))
+        if isinstance(payload, dict)
+        else None,
         "phrase_count": _phrase_count(payload),
     }
 
 
-def _multipart_transcription_body(audio: bytes, content_type: str, filename: str, definition: dict[str, Any]) -> tuple[str, bytes]:
+def _multipart_transcription_body(
+    audio: bytes, content_type: str, filename: str, definition: dict[str, Any]
+) -> tuple[str, bytes]:
     boundary = f"----Hermes3D{new_id()}"
-    safe_type = content_type if content_type and "\r" not in content_type and "\n" not in content_type else "application/octet-stream"
+    safe_type = (
+        content_type
+        if content_type and "\r" not in content_type and "\n" not in content_type
+        else "application/octet-stream"
+    )
     definition_json = json.dumps(definition, separators=(",", ":"))
     parts = [
         (
             f"--{boundary}\r\n"
-            "Content-Disposition: form-data; name=\"definition\"\r\n"
+            'Content-Disposition: form-data; name="definition"\r\n'
             "Content-Type: application/json\r\n\r\n"
             f"{definition_json}\r\n"
         ).encode("utf-8"),
         (
             f"--{boundary}\r\n"
-            f"Content-Disposition: form-data; name=\"audio\"; filename=\"{filename}\"\r\n"
+            f'Content-Disposition: form-data; name="audio"; filename="{filename}"\r\n'
             f"Content-Type: {safe_type}\r\n\r\n"
         ).encode("utf-8"),
         audio,
@@ -521,11 +633,15 @@ def _voice_row(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": str(item.get("ShortName") or item.get("Name") or ""),
         "short_name": str(item.get("ShortName") or item.get("Name") or ""),
-        "display_name": str(item.get("DisplayName") or item.get("LocalName") or item.get("ShortName") or ""),
+        "display_name": str(
+            item.get("DisplayName") or item.get("LocalName") or item.get("ShortName") or ""
+        ),
         "local_name": str(item.get("LocalName") or ""),
         "locale": str(item.get("Locale") or ""),
         "gender": str(item.get("Gender") or ""),
-        "styles": styles if isinstance(styles, list) and all(isinstance(style, str) for style in styles) else [],
+        "styles": styles
+        if isinstance(styles, list) and all(isinstance(style, str) for style in styles)
+        else [],
     }
 
 

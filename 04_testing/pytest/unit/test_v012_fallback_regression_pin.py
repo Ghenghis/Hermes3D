@@ -60,7 +60,6 @@ References (read for this PR):
 from __future__ import annotations
 
 import importlib
-import os
 from pathlib import Path
 
 import pytest
@@ -184,15 +183,15 @@ def test_surface_5_run_update_checks_v012_no_crash(
         agent_updates,
         "_check_command",
         lambda repo, name, args, expect_returncode=0: {
-            "name": name, "status": "pass", "output": "stubbed"
+            "name": name,
+            "status": "pass",
+            "output": "stubbed",
         },
     )
     monkeypatch.setattr(
         agent_updates,
         "_check_external",
-        lambda repo, name, args, timeout=60: {
-            "name": name, "status": "pass", "output": "stubbed"
-        },
+        lambda repo, name, args, timeout=60: {"name": name, "status": "pass", "output": "stubbed"},
     )
 
     repo = agent_updates._repo_path()
@@ -258,14 +257,19 @@ def test_surface_7_cli_runner_detection_v012_returns_shape(
     # blocked-no-config branch deterministically. shutil.which is
     # likewise stubbed to avoid PATH dependence.
     for key in (
-        "HERMES3D_OPENCODE_BIN", "OPENCODE_BIN",
-        "HERMES3D_OPENHANDS_BIN", "OPENHANDS_BIN",
-        "HERMES3D_OPENCODE_SOURCE", "OPENCODE_SOURCE",
-        "HERMES3D_OPENHANDS_SOURCE", "OPENHANDS_SOURCE",
+        "HERMES3D_OPENCODE_BIN",
+        "OPENCODE_BIN",
+        "HERMES3D_OPENHANDS_BIN",
+        "OPENHANDS_BIN",
+        "HERMES3D_OPENCODE_SOURCE",
+        "OPENCODE_SOURCE",
+        "HERMES3D_OPENHANDS_SOURCE",
+        "OPENHANDS_SOURCE",
     ):
         monkeypatch.delenv(key, raising=False)
 
     from hermes3d.services import code_history
+
     monkeypatch.setattr(code_history, "private_env", lambda: {})
     monkeypatch.setattr(code_history.shutil, "which", lambda _name: None)
 
@@ -274,8 +278,14 @@ def test_surface_7_cli_runner_detection_v012_returns_shape(
         assert status["id"] == runner
         # Shape pin (8 mandatory keys consumers rely on).
         for key in (
-            "id", "label", "detected", "executable",
-            "version_status", "blocked_reason", "policy", "required_env_keys",
+            "id",
+            "label",
+            "detected",
+            "executable",
+            "version_status",
+            "blocked_reason",
+            "policy",
+            "required_env_keys",
         ):
             assert key in status, f"{runner} missing {key} under v0.12"
         # Force-stripped config means detection must be False, never raise.
@@ -301,6 +311,7 @@ def test_surface_8_agent_config_and_proof_events_persist_v012(
     # Redirect DB to tmp so production data is untouched.
     fake_db = tmp_path / "hermes3d_v012_pin.db"
     from hermes3d.db import init as db_init
+
     monkeypatch.setattr(db_init, "DB_PATH", fake_db)
     # _common.execute / .row use the patched DB_PATH via init.connect.
     db_init.init_db()
@@ -319,15 +330,15 @@ def test_surface_8_agent_config_and_proof_events_persist_v012(
 
     # agent_config sink (mirrors agent_updates.staged_update line 192-195)
     import json as _json
+
     from hermes3d.api.routes._common import execute
+
     execute(
         "INSERT OR REPLACE INTO agent_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
         ("hermes_agent.update.last_run", _json.dumps(persisted)),
     )
     # proof_events sink (mirrors agent_updates._append_proof_event)
-    agent_updates._append_proof_event(
-        "hermes_agent_update_run", "p2-3-pin", persisted
-    )
+    agent_updates._append_proof_event("hermes_agent_update_run", "p2-3-pin", persisted)
 
     # Round-trip: agent_config row exists with v0.12 payload.
     cfg = row(
@@ -341,8 +352,7 @@ def test_surface_8_agent_config_and_proof_events_persist_v012(
 
     # Round-trip: proof_events row exists with the v0.12 payload.
     events = rows(
-        "SELECT event_type, source_agent, payload FROM proof_events "
-        "WHERE event_type = ?",
+        "SELECT event_type, source_agent, payload FROM proof_events WHERE event_type = ?",
         ("hermes_agent_update_run",),
     )
     assert events, "proof_events insert did not persist under v0.12"

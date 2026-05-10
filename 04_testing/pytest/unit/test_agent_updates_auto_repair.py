@@ -21,13 +21,10 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
-
 from hermes3d.api.routes import agent_updates
-
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -196,7 +193,7 @@ def test_failed_run_update_checks_http_exception_also_pivots(
         raise HTTPException(
             status_code=400,
             detail="HERMES_AGENT_PYTEST_WORKERS<2 disables xdist isolation; "
-                   "set HERMES_AGENT_DIAGNOSTIC=1 to override in triage.",
+            "set HERMES_AGENT_DIAGNOSTIC=1 to override in triage.",
         )
 
     monkeypatch.setattr(agent_updates, "_run_update_checks", failing_checks)
@@ -347,7 +344,9 @@ def test_blk023_auto_backup_emits_proof_event(
     monkeypatch.setattr(
         agent_updates,
         "_append_proof_event",
-        lambda event_type, source_agent, payload: proof_events.append((event_type, source_agent, payload)),
+        lambda event_type, source_agent, payload: proof_events.append(
+            (event_type, source_agent, payload)
+        ),
     )
     monkeypatch.setattr(agent_updates, "execute", lambda *a, **kw: None)
     monkeypatch.setattr(agent_updates, "_auto_repair_to_backup", lambda *a, **kw: None)

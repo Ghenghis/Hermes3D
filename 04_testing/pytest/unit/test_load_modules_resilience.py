@@ -33,12 +33,9 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock
 
 import pytest
-
 from hermes3d.db import load_modules as lm
-
 
 # ---------------------------------------------------------------------------
 # #9 — _registry_path frozen-build IndexError fallback
@@ -54,7 +51,6 @@ def test_registry_path_falls_back_when_parents5_raises_indexerror(
 
     # Force the "real" candidate path (Path("G:/Github/Hermes3D/...")) NOT to exist.
     real_exists = Path.exists
-    fake_path = Path("/not/a/real/registry.yaml")
 
     def patched_exists(self: Path) -> bool:
         # Both candidate paths report "does not exist" so the function
@@ -70,8 +66,10 @@ def test_registry_path_falls_back_when_parents5_raises_indexerror(
             class ShallowParents:
                 def __getitem__(self, index: int) -> Path:
                     raise IndexError(f"parents[{index}] not available on frozen build")
+
                 def __len__(self) -> int:
                     return 0
+
             return ShallowParents()
 
         def resolve(self, strict: bool = False) -> Path:  # type: ignore[override]
@@ -181,12 +179,19 @@ def _wire_load_modules_stubs(
     monkeypatch.setattr(
         lm,
         "inspect_source_path",
-        lambda *a, **kw: {"install_state": "installed", "install_progress": 100, "detected_version": "x", "health": "ok"},
+        lambda *a, **kw: {
+            "install_state": "installed",
+            "install_progress": 100,
+            "detected_version": "x",
+            "health": "ok",
+        },
     )
     monkeypatch.setattr(lm, "connect", lambda: fake_conn)
 
 
-def test_load_modules_rollback_on_partial_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_modules_rollback_on_partial_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Bonus 12 #10: an exception mid-loop must trigger conn.rollback()
     and re-raise; conn must still be closed by the with-closing context."""
     # Fail on the 3rd execute call (after 2 successful inserts).
@@ -205,7 +210,9 @@ def test_load_modules_rollback_on_partial_failure(monkeypatch: pytest.MonkeyPatc
     )
 
 
-def test_load_modules_clean_path_commits_and_closes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_load_modules_clean_path_commits_and_closes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Smoke: happy path commits once and closes."""
     fake = _FailingExecuteConn(fail_after=10_000)  # never fails
     _wire_load_modules_stubs(monkeypatch, fake, tmp_path)

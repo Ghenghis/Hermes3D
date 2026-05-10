@@ -36,7 +36,9 @@ def sha256_file(path: Path) -> str:
 
 def git_value(args: list[str], cwd: Path, default: str) -> str:
     try:
-        return subprocess.check_output(["git", *args], cwd=cwd, text=True, stderr=subprocess.DEVNULL).strip()
+        return subprocess.check_output(
+            ["git", *args], cwd=cwd, text=True, stderr=subprocess.DEVNULL
+        ).strip()
     except Exception:
         return default
 
@@ -76,7 +78,9 @@ def build_ledger(files: list[tuple[Path, str]]) -> str:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--repo-root", default=None, help="Repository root. Defaults to script ancestor.")
+    parser.add_argument(
+        "--repo-root", default=None, help="Repository root. Defaults to script ancestor."
+    )
     parser.add_argument("--test-results", default="03_implementation/ui/test-results/e2e")
     parser.add_argument("--proof-root", default="03_implementation/proof")
     parser.add_argument("--output", default="03_implementation/proof")
@@ -159,7 +163,12 @@ def main() -> int:
                 zf.write(src, rel)
 
     digest = sha256_file(bundle_path)
-    print(json.dumps({"bundle": str(bundle_path), "sha256": digest, "size": bundle_path.stat().st_size}, indent=2))
+    print(
+        json.dumps(
+            {"bundle": str(bundle_path), "sha256": digest, "size": bundle_path.stat().st_size},
+            indent=2,
+        )
+    )
     return 0
 
 

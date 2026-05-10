@@ -42,10 +42,27 @@ def main() -> int:
     api_modules = read_modules()
     records = runtime_queue.get("records") if isinstance(runtime_queue, dict) else []
     records = records if isinstance(records, list) else []
-    runner_counts = Counter(str(record.get("runner_status") or "blocked") for record in records if isinstance(record, dict))
+    runner_counts = Counter(
+        str(record.get("runner_status") or "blocked")
+        for record in records
+        if isinstance(record, dict)
+    )
     queue_counts = runtime_queue.get("counts", {}) if isinstance(runtime_queue, dict) else {}
-    runtime_ready_count = int(queue_counts.get("runtime_ready", runner_counts.get("runtime_ready", 0)) or 0) if runtime_queue else None
-    remaining_runner_gap = int(queue_counts.get("runner_not_registered", max(0, 60 - runner_counts.get("runtime_ready", 0))) or 0) if runtime_queue else None
+    runtime_ready_count = (
+        int(queue_counts.get("runtime_ready", runner_counts.get("runtime_ready", 0)) or 0)
+        if runtime_queue
+        else None
+    )
+    remaining_runner_gap = (
+        int(
+            queue_counts.get(
+                "runner_not_registered", max(0, 60 - runner_counts.get("runtime_ready", 0))
+            )
+            or 0
+        )
+        if runtime_queue
+        else None
+    )
     launch_kind_counts = Counter(
         str(record.get("launchKind") or record.get("launch_kind") or "unknown")
         for record in api_modules
@@ -60,31 +77,64 @@ def main() -> int:
         },
         "source_registry": {
             "path": str(SOURCE_AUDIT_PATH),
-            "registry_entries_unique": int(source_audit.get("summary", {}).get("registry_entries_unique", len(modules))) if isinstance(source_audit.get("summary"), dict) else len(modules),
-            "installed_git": int(source_audit.get("summary", {}).get("installed_git", 0)) if isinstance(source_audit.get("summary"), dict) else 0,
-            "not_operational": len(source_audit.get("not_operational", [])) if isinstance(source_audit, dict) and isinstance(source_audit.get("not_operational"), list) else 0,
-            "by_section": source_audit.get("by_section", {}) if isinstance(source_audit, dict) else {},
+            "registry_entries_unique": int(
+                source_audit.get("summary", {}).get("registry_entries_unique", len(modules))
+            )
+            if isinstance(source_audit.get("summary"), dict)
+            else len(modules),
+            "installed_git": int(source_audit.get("summary", {}).get("installed_git", 0))
+            if isinstance(source_audit.get("summary"), dict)
+            else 0,
+            "not_operational": len(source_audit.get("not_operational", []))
+            if isinstance(source_audit, dict)
+            and isinstance(source_audit.get("not_operational"), list)
+            else 0,
+            "by_section": source_audit.get("by_section", {})
+            if isinstance(source_audit, dict)
+            else {},
         },
         "runtime_setup_queue": {
-            "source": (runtime_queue.get("_source") or RUNTIME_QUEUE_URL) if runtime_queue else "unavailable",
+            "source": (runtime_queue.get("_source") or RUNTIME_QUEUE_URL)
+            if runtime_queue
+            else "unavailable",
             "count": int(runtime_queue.get("count", 0)) if isinstance(runtime_queue, dict) else 0,
             "counts": queue_counts if isinstance(queue_counts, dict) else {},
             "runner_status_counts": dict(sorted(runner_counts.items())),
             "registered_runtime_probe_ids": registered_runtime_probe_ids(),
             "registered_runtime_verifiers": {
-                "source": (runtime_verifiers.get("_source") or RUNTIME_VERIFIERS_URL) if runtime_verifiers else "service fallback",
-                "count": int(runtime_verifiers.get("count", 0)) if isinstance(runtime_verifiers, dict) else len(registered_runtime_probe_ids()),
-                "enabled_count": int(runtime_verifiers.get("enabled_count", 0)) if isinstance(runtime_verifiers, dict) else len(registered_runtime_probe_ids()),
-                "registered_ids": runtime_verifiers.get("registered_ids", registered_runtime_probe_ids()) if isinstance(runtime_verifiers, dict) else registered_runtime_probe_ids(),
+                "source": (runtime_verifiers.get("_source") or RUNTIME_VERIFIERS_URL)
+                if runtime_verifiers
+                else "service fallback",
+                "count": int(runtime_verifiers.get("count", 0))
+                if isinstance(runtime_verifiers, dict)
+                else len(registered_runtime_probe_ids()),
+                "enabled_count": int(runtime_verifiers.get("enabled_count", 0))
+                if isinstance(runtime_verifiers, dict)
+                else len(registered_runtime_probe_ids()),
+                "registered_ids": runtime_verifiers.get(
+                    "registered_ids", registered_runtime_probe_ids()
+                )
+                if isinstance(runtime_verifiers, dict)
+                else registered_runtime_probe_ids(),
             },
-            "execution_mode": runtime_queue.get("execution_mode") if isinstance(runtime_queue, dict) else None,
-            "agent_gate": runtime_queue.get("agent_gate") if isinstance(runtime_queue, dict) else "Local runtime setup queue API was not reachable during this audit.",
+            "execution_mode": runtime_queue.get("execution_mode")
+            if isinstance(runtime_queue, dict)
+            else None,
+            "agent_gate": runtime_queue.get("agent_gate")
+            if isinstance(runtime_queue, dict)
+            else "Local runtime setup queue API was not reachable during this audit.",
         },
         "cli_surface": {
-            "source": (cli_surface.get("_source") or CLI_SURFACE_URL) if cli_surface else "unavailable",
-            "proof_source": cli_surface.get("proof_source") if isinstance(cli_surface, dict) else None,
+            "source": (cli_surface.get("_source") or CLI_SURFACE_URL)
+            if cli_surface
+            else "unavailable",
+            "proof_source": cli_surface.get("proof_source")
+            if isinstance(cli_surface, dict)
+            else None,
             "summary": cli_surface.get("summary", {}) if isinstance(cli_surface, dict) else {},
-            "rule": cli_surface.get("target", {}).get("rule") if isinstance(cli_surface.get("target"), dict) else None,
+            "rule": cli_surface.get("target", {}).get("rule")
+            if isinstance(cli_surface.get("target"), dict)
+            else None,
         },
         "launch_kind_classification": {
             "source": "local checkout database" if api_modules else "unavailable",
@@ -98,7 +148,11 @@ def main() -> int:
             "remaining_runner_gap": remaining_runner_gap,
             "blocked_rows": runner_counts.get("blocked", 0),
             "unknown_launch_kind_rows": launch_kind_counts.get("unknown", 0),
-            "status": "api_unavailable" if runtime_ready_count is None else "runner_gap" if runtime_ready_count < 60 else "complete",
+            "status": "api_unavailable"
+            if runtime_ready_count is None
+            else "runner_gap"
+            if runtime_ready_count < 60
+            else "complete",
         },
         "next_actions": [
             "Keep the visible Source OS app count at 60 until SOURCE_REGISTRY_TRUTH_AUDIT.json and /api/modules agree.",
@@ -111,13 +165,19 @@ def main() -> int:
 
     PROOF_DIR.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-    print(json.dumps({
-        "path": str(OUTPUT_PATH),
-        "source_backed_apps": payload["target"]["source_backed_apps"],
-        "runtime_ready": payload["runtime_setup_queue"]["counts"].get("runtime_ready"),
-        "remaining_runner_gap": payload["completion"]["remaining_runner_gap"],
-        "status": payload["completion"]["status"],
-    }, indent=2, sort_keys=True))
+    print(
+        json.dumps(
+            {
+                "path": str(OUTPUT_PATH),
+                "source_backed_apps": payload["target"]["source_backed_apps"],
+                "runtime_ready": payload["runtime_setup_queue"]["counts"].get("runtime_ready"),
+                "remaining_runner_gap": payload["completion"]["remaining_runner_gap"],
+                "status": payload["completion"]["status"],
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
     return 0
 
 

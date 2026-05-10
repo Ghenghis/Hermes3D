@@ -117,7 +117,9 @@ def test_moonraker_printers_use_get_only(proof: dict) -> None:
         assert printer["skipped"] is False
         assert printer["method"] in (None, "GET"), f"non-GET method on {printer['name']}"
         assert printer["url"] is not None
-        assert printer["url"].endswith("/server/info"), f"unexpected url on {printer['name']}: {printer['url']}"
+        assert printer["url"].endswith("/server/info"), (
+            f"unexpected url on {printer['name']}: {printer['url']}"
+        )
         assert printer["port"] == 7125
         assert isinstance(printer["reachable"], bool)
 
@@ -139,7 +141,11 @@ def test_summary_consistency(proof: dict) -> None:
     assert summary["printers_total"] == len(printers)
     assert summary["printers_skipped"] == sum(1 for p in printers if p.get("skipped"))
     assert summary["printers_reachable"] == sum(1 for p in printers if p.get("reachable") is True)
-    assert summary["printers_unreachable"] == sum(1 for p in printers if p.get("reachable") is False)
+    assert summary["printers_unreachable"] == sum(
+        1 for p in printers if p.get("reachable") is False
+    )
     assert summary["services_total"] == len(services)
     assert summary["services_reachable"] == sum(1 for s in services if s.get("reachable") is True)
-    assert summary["services_unreachable"] == sum(1 for s in services if s.get("reachable") is False)
+    assert summary["services_unreachable"] == sum(
+        1 for s in services if s.get("reachable") is False
+    )

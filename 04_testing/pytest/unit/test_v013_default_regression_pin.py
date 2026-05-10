@@ -48,7 +48,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from hermes3d.services import agent_checkout as ac
 
 V013_DEFAULT = "G:/Github/hermes-agent-v013-canary"
@@ -229,7 +228,9 @@ def test_v013_default_cli_runner_detection_under_v013(monkeypatch: pytest.Monkey
 # ---- Surface 8: BLK-013 bounded-task route + --network=none docker argv ----
 
 
-def test_v013_default_blk013_route_registered_with_network_none(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_v013_default_blk013_route_registered_with_network_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _clean_env(monkeypatch)
     from hermes3d.api.routes import code_operator
     from hermes3d.services import code_history
@@ -249,28 +250,57 @@ def test_v013_default_blk013_route_registered_with_network_none(monkeypatch: pyt
         return subprocess.CompletedProcess(args, 0, stdout="[]", stderr="")
 
     ready_sandbox = {
-        "ready": True, "mode": "docker", "docker_executable": "docker", "docker_version": "29.4.1",
-        "image_configured": True, "image": "ghcr.io/openhands/openhands:test",
-        "image_status": "present", "image_id": "sha256:abc", "image_size_bytes": 1,
-        "network_mode": "none", "workspace_mount": str(code_history.PROJECT_ROOT),
-        "denied_paths": [], "allowed_command_families": [], "blocked_reasons": [], "status": "ready",
+        "ready": True,
+        "mode": "docker",
+        "docker_executable": "docker",
+        "docker_version": "29.4.1",
+        "image_configured": True,
+        "image": "ghcr.io/openhands/openhands:test",
+        "image_status": "present",
+        "image_id": "sha256:abc",
+        "image_size_bytes": 1,
+        "network_mode": "none",
+        "workspace_mount": str(code_history.PROJECT_ROOT),
+        "denied_paths": [],
+        "allowed_command_families": [],
+        "blocked_reasons": [],
+        "status": "ready",
     }
     detected_runner = {
-        "id": "openhands", "label": "OpenHands", "detected": True, "executable": "/fake/openhands",
-        "path_source": "PATH", "configured_path": None, "source_path": None,
-        "required_env_keys": ["HERMES3D_OPENHANDS_BIN"], "version": "openhands 0.1",
-        "version_status": "pass", "write_allowed": False, "blocked_reason": None, "policy": "test",
+        "id": "openhands",
+        "label": "OpenHands",
+        "detected": True,
+        "executable": "/fake/openhands",
+        "path_source": "PATH",
+        "configured_path": None,
+        "source_path": None,
+        "required_env_keys": ["HERMES3D_OPENHANDS_BIN"],
+        "version": "openhands 0.1",
+        "version_status": "pass",
+        "write_allowed": False,
+        "blocked_reason": None,
+        "policy": "test",
     }
-    monkeypatch.setattr(code_history, "_cli_runner_status", lambda rid: dict(detected_runner, id=rid))
+    monkeypatch.setattr(
+        code_history, "_cli_runner_status", lambda rid: dict(detected_runner, id=rid)
+    )
     monkeypatch.setattr(code_history, "code_sandbox_readiness", lambda: dict(ready_sandbox))
-    monkeypatch.setattr(code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files])
-    monkeypatch.setattr(code_history, "append_mcp_evidence",
-                        lambda **_kw: {"status": "recorded", "evidence_id": "ev_pin", "result": {"ok": True}})
+    monkeypatch.setattr(
+        code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files]
+    )
+    monkeypatch.setattr(
+        code_history,
+        "append_mcp_evidence",
+        lambda **_kw: {"status": "recorded", "evidence_id": "ev_pin", "result": {"ok": True}},
+    )
     monkeypatch.setattr(code_history.subprocess, "run", capturing_run)
 
     code_history.run_bounded_code_cli_task(
-        runner_id="openhands", owner="hermes-agent", task_id="TASK-PIN013",
-        title="Pin", files=["README.md.py"],
+        runner_id="openhands",
+        owner="hermes-agent",
+        task_id="TASK-PIN013",
+        title="Pin",
+        files=["README.md.py"],
     )
     assert captured, "subprocess.run was not invoked under v0.13 default."
     argv = captured[0]

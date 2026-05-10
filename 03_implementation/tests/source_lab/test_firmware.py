@@ -117,6 +117,7 @@ def test_toolchain_install_check_is_version_only(schema_file: str) -> None:
 
 def test_verify_firmware_module_imports_and_policy_constants() -> None:
     import importlib.util
+
     spec = importlib.util.spec_from_file_location("verify_firmware_mod", SCRIPT_PATH)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
@@ -135,6 +136,7 @@ def test_verify_firmware_module_imports_and_policy_constants() -> None:
 
 def test_verify_firmware_no_network_run_writes_valid_proof(tmp_path: Path) -> None:
     import importlib.util
+
     spec = importlib.util.spec_from_file_location("verify_firmware_mod2", SCRIPT_PATH)
     assert spec and spec.loader
     mod = importlib.util.module_from_spec(spec)
@@ -172,4 +174,6 @@ def test_verifier_source_has_no_live_flash_command() -> None:
         r"os\.system\(\s*[\"'][^\"']*\b(?:make\s+flash|avrdude|st-flash|dfu-util|bossac)\b",
     ]
     for pat in bad_patterns:
-        assert re.search(pat, src) is None, f"verify_firmware.py contains live flash invocation matching {pat!r}"
+        assert re.search(pat, src) is None, (
+            f"verify_firmware.py contains live flash invocation matching {pat!r}"
+        )

@@ -24,7 +24,6 @@ from typing import Any
 import pytest
 from hermes3d.services import code_history
 
-
 _READY_SANDBOX = {
     "status": "ready",
     "ready": True,
@@ -72,9 +71,13 @@ def _patch_evidence_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, A
 
 
 def _patch_ready_runner(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(code_history, "_cli_runner_status", lambda runner_id: dict(_DETECTED_RUNNER, id=runner_id))
+    monkeypatch.setattr(
+        code_history, "_cli_runner_status", lambda runner_id: dict(_DETECTED_RUNNER, id=runner_id)
+    )
     monkeypatch.setattr(code_history, "code_sandbox_readiness", lambda: dict(_READY_SANDBOX))
-    monkeypatch.setattr(code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files])
+    monkeypatch.setattr(
+        code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files]
+    )
 
 
 def test_bounded_task_happy_path_records_evidence(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -110,14 +113,20 @@ def test_bounded_task_happy_path_records_evidence(monkeypatch: pytest.MonkeyPatc
     assert captured_evidence[-1]["data"]["status"] == "ok"
 
 
-def test_bounded_task_sandbox_not_ready_blocks_without_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(code_history, "_cli_runner_status", lambda runner_id: dict(_DETECTED_RUNNER, id=runner_id))
+def test_bounded_task_sandbox_not_ready_blocks_without_subprocess(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        code_history, "_cli_runner_status", lambda runner_id: dict(_DETECTED_RUNNER, id=runner_id)
+    )
     monkeypatch.setattr(
         code_history,
         "code_sandbox_readiness",
         lambda: {"ready": False, "blocked_reasons": ["docker daemon not reachable"], "image": None},
     )
-    monkeypatch.setattr(code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files])
+    monkeypatch.setattr(
+        code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files]
+    )
     _patch_evidence_capture(monkeypatch)
 
     def explode(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -139,10 +148,16 @@ def test_bounded_task_sandbox_not_ready_blocks_without_subprocess(monkeypatch: p
 
 
 def test_bounded_task_runner_not_detected_blocks(monkeypatch: pytest.MonkeyPatch) -> None:
-    blocked_runner = dict(_DETECTED_RUNNER, detected=False, executable=None, blocked_reason="openhands not installed")
-    monkeypatch.setattr(code_history, "_cli_runner_status", lambda runner_id: dict(blocked_runner, id=runner_id))
+    blocked_runner = dict(
+        _DETECTED_RUNNER, detected=False, executable=None, blocked_reason="openhands not installed"
+    )
+    monkeypatch.setattr(
+        code_history, "_cli_runner_status", lambda runner_id: dict(blocked_runner, id=runner_id)
+    )
     monkeypatch.setattr(code_history, "code_sandbox_readiness", lambda: dict(_READY_SANDBOX))
-    monkeypatch.setattr(code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files])
+    monkeypatch.setattr(
+        code_history, "_safe_mcp_files", lambda files, must_exist: [str(f) for f in files]
+    )
     _patch_evidence_capture(monkeypatch)
 
     def explode(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
@@ -168,7 +183,9 @@ def test_bounded_task_timeout_is_reaped(monkeypatch: pytest.MonkeyPatch) -> None
     _patch_evidence_capture(monkeypatch)
 
     def fake_run(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
-        raise subprocess.TimeoutExpired(cmd=args, timeout=kwargs.get("timeout", 30), output=b"", stderr=b"warn")
+        raise subprocess.TimeoutExpired(
+            cmd=args, timeout=kwargs.get("timeout", 30), output=b"", stderr=b"warn"
+        )
 
     monkeypatch.setattr(code_history.subprocess, "run", fake_run)
 

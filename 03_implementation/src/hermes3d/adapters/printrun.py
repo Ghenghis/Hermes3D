@@ -45,7 +45,13 @@ def _existing_candidates() -> dict[str, Path]:
 
 def _preferred_launcher() -> Path | None:
     candidates = _existing_candidates()
-    for key in ("pronterface_windows", "pronterface_path", "source_pronterface", "pronsole_windows", "pronsole_path"):
+    for key in (
+        "pronterface_windows",
+        "pronterface_path",
+        "source_pronterface",
+        "pronsole_windows",
+        "pronsole_path",
+    ):
         path = candidates.get(key)
         if path:
             return path
@@ -56,7 +62,10 @@ def _source_version() -> str | None:
     version_path = SOURCE_ROOT / "printrun" / "printcore.py"
     if not version_path.exists():
         return None
-    match = re.search(r"__version__\s*=\s*['\"]([^'\"]+)['\"]", version_path.read_text(encoding="utf-8", errors="ignore"))
+    match = re.search(
+        r"__version__\s*=\s*['\"]([^'\"]+)['\"]",
+        version_path.read_text(encoding="utf-8", errors="ignore"),
+    )
     return match.group(1) if match else None
 
 
@@ -121,7 +130,16 @@ class PrintrunAdapter(SkeletonAdapter):
         global _LAUNCHED_PROCESS
         if not _LAUNCHED_PROCESS or _LAUNCHED_PROCESS.poll() is not None:
             _LAUNCHED_PROCESS = None
-            return LaunchResult(ok=False, mode="external", detail="No Hermes3D-launched Printrun process is running.")
+            return LaunchResult(
+                ok=False,
+                mode="external",
+                detail="No Hermes3D-launched Printrun process is running.",
+            )
         pid = _LAUNCHED_PROCESS.pid
         _LAUNCHED_PROCESS.terminate()
-        return LaunchResult(ok=True, mode="external", pid=pid, detail="Terminate signal sent to Hermes3D-launched Printrun process.")
+        return LaunchResult(
+            ok=True,
+            mode="external",
+            pid=pid,
+            detail="Terminate signal sent to Hermes3D-launched Printrun process.",
+        )

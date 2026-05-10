@@ -58,9 +58,7 @@ import re
 from typing import Any
 
 import pytest
-
 from hermes3d.services import code_history, recovery_controller
-
 
 # ---------------------------------------------------------------------------
 # Phase enum: the canonical event sequence the drill asserts on.
@@ -82,9 +80,9 @@ DRILL_PHASES: tuple[str, ...] = (
 # payload. These match the project's existing redaction surface; the drill
 # walks every captured payload and asserts none of them appear.
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"sk-[A-Za-z0-9]{20,}"),         # OpenAI/Anthropic-style keys
-    re.compile(r"AKIA[0-9A-Z]{16}"),            # AWS access key IDs
-    re.compile(r"ghp_[A-Za-z0-9]{36,}"),        # GitHub PATs
+    re.compile(r"sk-[A-Za-z0-9]{20,}"),  # OpenAI/Anthropic-style keys
+    re.compile(r"AKIA[0-9A-Z]{16}"),  # AWS access key IDs
+    re.compile(r"ghp_[A-Za-z0-9]{36,}"),  # GitHub PATs
     re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),  # Slack tokens
     re.compile(r"-----BEGIN [A-Z ]+PRIVATE KEY-----"),  # PEM material
 )
@@ -141,11 +139,13 @@ def drill_setup(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def stub_lock(**kwargs: Any) -> dict[str, Any]:
         captured["lock_calls"].append(kwargs)
-        events.append({
-            "phase": "freeze",
-            "files": list(kwargs.get("files", [])),
-            "ttl_minutes": kwargs.get("ttl_minutes"),
-        })
+        events.append(
+            {
+                "phase": "freeze",
+                "files": list(kwargs.get("files", [])),
+                "ttl_minutes": kwargs.get("ttl_minutes"),
+            }
+        )
         return {
             "status": "locked",
             "files": kwargs.get("files", []),
@@ -154,31 +154,37 @@ def drill_setup(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def stub_release(**kwargs: Any) -> dict[str, Any]:
         captured["release_calls"].append(kwargs)
-        events.append({
-            "phase": "thaw",
-            "files": list(kwargs.get("files", [])),
-            "note": kwargs.get("note", ""),
-        })
+        events.append(
+            {
+                "phase": "thaw",
+                "files": list(kwargs.get("files", [])),
+                "note": kwargs.get("note", ""),
+            }
+        )
         return {"status": "released", "files": kwargs.get("files", [])}
 
     def stub_snapshot(rel: str, **kwargs: Any) -> dict[str, Any]:
         captured["snapshot_calls"].append({"rel": rel, **kwargs})
-        events.append({
-            "phase": "snapshot",
-            "rel": rel,
-            "action_id": kwargs.get("action_id"),
-        })
+        events.append(
+            {
+                "phase": "snapshot",
+                "rel": rel,
+                "action_id": kwargs.get("action_id"),
+            }
+        )
         snap_id = f"snap-{rel.replace('/', '_')}-{len(captured['snapshot_calls'])}"
         return {"id": snap_id, "ts_utc": "2026-05-09T00:00:00Z"}
 
     def stub_record_step_failure(**kwargs: Any) -> dict[str, Any]:
         captured["step_failure_calls"].append(kwargs)
-        events.append({
-            "phase": "failure_classified",
-            "task_id": kwargs.get("task_id"),
-            "failure_class": kwargs.get("failure_class"),
-            "failed_step_type": kwargs.get("failed_step_type"),
-        })
+        events.append(
+            {
+                "phase": "failure_classified",
+                "task_id": kwargs.get("task_id"),
+                "failure_class": kwargs.get("failure_class"),
+                "failed_step_type": kwargs.get("failed_step_type"),
+            }
+        )
         attempt_id = f"{len(captured['step_failure_calls']):032x}"
         return {
             "status": "recorded",
@@ -201,12 +207,14 @@ def drill_setup(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
 
     def stub_mark_outcome(**kwargs: Any) -> dict[str, Any]:
         captured["mark_outcome_calls"].append(kwargs)
-        events.append({
-            "phase": "resume",
-            "attempt_id": kwargs.get("attempt_id"),
-            "status": kwargs.get("status"),
-            "summary": kwargs.get("recovery_summary", "")[:80],
-        })
+        events.append(
+            {
+                "phase": "resume",
+                "attempt_id": kwargs.get("attempt_id"),
+                "status": kwargs.get("status"),
+                "summary": kwargs.get("recovery_summary", "")[:80],
+            }
+        )
         return {
             "status": "recorded",
             "outcome": {
@@ -262,7 +270,9 @@ def _mock_minimax_fix_proposal(
             "credit_spent_usd": 0.0,
         },
     }
-    events.append({"phase": "fix_proposal", **{k: v for k, v in proposal.items() if k != "diff_preview"}})
+    events.append(
+        {"phase": "fix_proposal", **{k: v for k, v in proposal.items() if k != "diff_preview"}}
+    )
     return proposal
 
 
@@ -395,9 +405,7 @@ def test_recovery_loop_drill_end_to_end(drill_setup: dict[str, Any]) -> None:
     assert review["model_meta"]["credit_spent_usd"] == 0.0
 
     # --------- Phase 6: apply (mocked no-op) ---------
-    apply_record = _mock_apply_reviewed_patch(
-        events=events, proposal=proposal, review=review
-    )
+    apply_record = _mock_apply_reviewed_patch(events=events, proposal=proposal, review=review)
     assert apply_record["applied"] is True
 
     # --------- Phase 7: thaw (real thaw_run) ---------

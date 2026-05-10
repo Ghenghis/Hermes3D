@@ -27,7 +27,11 @@ DEFAULT_LOCAL_OVERRIDES: dict[str, dict[str, str]] = {
     "flsun_t1_a": {"name": "T1 #1", "moonraker_url": "http://192.168.0.10", "status": "active"},
     "flsun_t1_b": {"name": "T1 #2", "moonraker_url": "http://192.168.0.11", "status": "active"},
     "flsun_s1": {"name": "FLSUN S1", "moonraker_url": "http://192.168.0.12", "status": "offline"},
-    "flsun_v400": {"name": "FLSUN V400", "moonraker_url": "http://192.168.0.34", "status": "active"},
+    "flsun_v400": {
+        "name": "FLSUN V400",
+        "moonraker_url": "http://192.168.0.34",
+        "status": "active",
+    },
 }
 
 DEFAULT_CAMERA_VIEW: dict[str, Any] = {
@@ -208,7 +212,9 @@ def canonical_printer_id(printer_id: str | None) -> str | None:
 
 
 def is_s1_printer(printer_id: str | None) -> bool:
-    return canonical_printer_id(printer_id) == "flsun_s1" or bool(printer_id and printer_id.lower() in S1_IDS)
+    return canonical_printer_id(printer_id) == "flsun_s1" or bool(
+        printer_id and printer_id.lower() in S1_IDS
+    )
 
 
 def printer_ip(url: str | None) -> str | None:
@@ -329,7 +335,9 @@ def _moonraker_snapshot(url: str | None, *, locked: bool) -> dict[str, Any]:
         }
 
     raw_status = state.raw.get("status", {}) if isinstance(state.raw, dict) else {}
-    extruder = raw_status.get("extruder", {}) if isinstance(raw_status.get("extruder"), dict) else {}
+    extruder = (
+        raw_status.get("extruder", {}) if isinstance(raw_status.get("extruder"), dict) else {}
+    )
     bed = raw_status.get("heater_bed", {}) if isinstance(raw_status.get("heater_bed"), dict) else {}
     print_state = state.state.lower()
     if str(printer_info_state).lower() != "ready":
@@ -354,10 +362,18 @@ def _moonraker_snapshot(url: str | None, *, locked: bool) -> dict[str, Any]:
 
 def _moonraker_printer_info_state(url: str, timeout_s: float = 1.5) -> str | None:
     try:
-        request = urllib.request.Request(f"{url.rstrip('/')}/printer/info", headers={"Accept": "application/json"})
+        request = urllib.request.Request(
+            f"{url.rstrip('/')}/printer/info", headers={"Accept": "application/json"}
+        )
         with urllib.request.urlopen(request, timeout=timeout_s) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+    except (
+        urllib.error.HTTPError,
+        urllib.error.URLError,
+        TimeoutError,
+        OSError,
+        json.JSONDecodeError,
+    ):
         return None
     result = payload.get("result") if isinstance(payload, dict) else None
     if isinstance(result, dict):
@@ -369,7 +385,9 @@ def _moonraker_printer_info_state(url: str, timeout_s: float = 1.5) -> str | Non
 def _moonraker_snapshots(config: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     requests: list[tuple[str, str | None, bool]] = []
     for printer_id, item in config.items():
-        url = _setting(f"printer.{printer_id}.moonraker_url") or str(item.get("moonraker_url") or "")
+        url = _setting(f"printer.{printer_id}.moonraker_url") or str(
+            item.get("moonraker_url") or ""
+        )
         requests.append((printer_id, url or None, printer_id == "flsun_s1"))
     if not requests:
         return {}
@@ -397,8 +415,12 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
     live_snapshots = _moonraker_snapshots(config) if live else {}
     result: list[dict[str, Any]] = []
     for printer_id, item in config.items():
-        url = _setting(f"printer.{printer_id}.moonraker_url") or str(item.get("moonraker_url") or "")
-        configured_status = _setting(f"printer.{printer_id}.status") or str(item.get("status") or "offline")
+        url = _setting(f"printer.{printer_id}.moonraker_url") or str(
+            item.get("moonraker_url") or ""
+        )
+        configured_status = _setting(f"printer.{printer_id}.status") or str(
+            item.get("status") or "offline"
+        )
         status = STATUS_MAP.get(configured_status.lower(), "offline")
         ip = printer_ip(url)
         locked = printer_id == "flsun_s1"
@@ -412,8 +434,16 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
             model = "FLSUN V400"
         live_source = str(live_snapshot.get("data_source") or "")
         effective_status = str(live_snapshot.get("status") or status)
-        effective_data_source = str(live_snapshot.get("data_source") or ("policy" if locked else "config"))
-        effective_status_source = live_source if live_source else "settings" if _setting(f"printer.{printer_id}.status") else "local_config"
+        effective_data_source = str(
+            live_snapshot.get("data_source") or ("policy" if locked else "config")
+        )
+        effective_status_source = (
+            live_source
+            if live_source
+            else "settings"
+            if _setting(f"printer.{printer_id}.status")
+            else "local_config"
+        )
         if live and live_source == "error" and status in {"online", "active"}:
             effective_status = "online"
             effective_data_source = "degraded"
@@ -424,7 +454,9 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
         result.append(
             {
                 "id": printer_id,
-                "name": str(item.get("name") or f"{item.get('manufacturer', '')} {item.get('model', '')}").strip(),
+                "name": str(
+                    item.get("name") or f"{item.get('manufacturer', '')} {item.get('model', '')}"
+                ).strip(),
                 "model": model if model in {"FLSUN T1", "FLSUN S1", "FLSUN V400"} else "Generic",
                 "ip": ip,
                 "status": effective_status,
@@ -439,8 +471,11 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
                 "moonraker_url": url or None,
                 "source_refs": source_refs,
                 "status_source": effective_status_source,
-                "safety_policy": "locked" if locked else str(item.get("safety_policy") or "write_enabled"),
-                "write_enabled": (not locked) and str(item.get("safety_policy") or "write_enabled") == "write_enabled",
+                "safety_policy": "locked"
+                if locked
+                else str(item.get("safety_policy") or "write_enabled"),
+                "write_enabled": (not locked)
+                and str(item.get("safety_policy") or "write_enabled") == "write_enabled",
                 "onboarded": bool(item.get("onboarded")),
             }
         )
@@ -449,10 +484,14 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
 
 def local_printer(printer_id: str, *, live: bool = True) -> dict[str, Any] | None:
     canonical = canonical_printer_id(printer_id)
-    return next((printer for printer in local_printers(live=live) if printer["id"] == canonical), None)
+    return next(
+        (printer for printer in local_printers(live=live) if printer["id"] == canonical), None
+    )
 
 
-def build_plate_clearance_rows(printers: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+def build_plate_clearance_rows(
+    printers: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     printers = printers or local_printers()
     existing = {item["printer_id"]: item for item in rows("SELECT * FROM build_plate_clearance")}
     result: list[dict[str, Any]] = []
@@ -460,9 +499,18 @@ def build_plate_clearance_rows(printers: list[dict[str, Any]] | None = None) -> 
         current_job = printer.get("current_job")
         progress = printer.get("progress")
         existing_row = existing.get(str(printer["id"]))
-        completed_job = isinstance(current_job, str) and current_job != "" and isinstance(progress, int | float) and float(progress) >= 99.5
+        completed_job = (
+            isinstance(current_job, str)
+            and current_job != ""
+            and isinstance(progress, int | float)
+            and float(progress) >= 99.5
+        )
         if completed_job:
-            if not existing_row or existing_row.get("last_job_filename") != current_job or existing_row.get("state") != "clear":
+            if (
+                not existing_row
+                or existing_row.get("last_job_filename") != current_job
+                or existing_row.get("state") != "clear"
+            ):
                 existing_row = _upsert_build_plate_clearance(
                     str(printer["id"]),
                     "needs_clearance",
@@ -489,10 +537,14 @@ def build_plate_clearance(printer_id: str) -> dict[str, Any] | None:
     canonical = canonical_printer_id(printer_id)
     if not canonical:
         return None
-    return next((item for item in build_plate_clearance_rows() if item["printer_id"] == canonical), None)
+    return next(
+        (item for item in build_plate_clearance_rows() if item["printer_id"] == canonical), None
+    )
 
 
-def mark_build_plate_clear(printer_id: str, actor: str, reason: str | None = None) -> dict[str, Any] | None:
+def mark_build_plate_clear(
+    printer_id: str, actor: str, reason: str | None = None
+) -> dict[str, Any] | None:
     printer = local_printer(printer_id)
     if not printer:
         return None
@@ -532,7 +584,8 @@ def assert_build_plate_clear(printer_id: str) -> None:
                 "printer_id": plate["printer_id"],
                 "state": plate["state"],
                 "last_job_filename": plate.get("last_job_filename"),
-                "reason": plate.get("reason") or "Build plate must be checked before starting another print.",
+                "reason": plate.get("reason")
+                or "Build plate must be checked before starting another print.",
             },
         )
 

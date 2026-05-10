@@ -22,7 +22,9 @@ def list_approvals(status: str = "pending") -> list[dict]:
     )
 
 
-def _decide(approval_id: str, status: str, decided_by: str, notes: str | None, reason: str | None) -> dict:
+def _decide(
+    approval_id: str, status: str, decided_by: str, notes: str | None, reason: str | None
+) -> dict:
     existing = row("SELECT * FROM approvals WHERE id = ?", (approval_id,))
     if not existing:
         raise HTTPException(status_code=404, detail="approval not found")

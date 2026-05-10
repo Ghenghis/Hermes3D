@@ -188,7 +188,12 @@ def validate_camera_url(body: CameraValidateRequest) -> dict[str, Any]:
 
     try:
         address = ipaddress.ip_address(parsed.hostname)
-        if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
+        if (
+            address.is_loopback
+            or address.is_multicast
+            or address.is_unspecified
+            or address.is_reserved
+        ):
             raise HTTPException(status_code=400, detail="Camera URL host is not allowed.")
     except ValueError:
         pass  # hostname — allowed for camera URLs
@@ -223,7 +228,9 @@ def validate_camera_url(body: CameraValidateRequest) -> dict[str, Any]:
         "http_status": http_status,
         "content_type": content_type or None,
         "is_mjpeg": is_mjpeg,
-        "reason": None if (is_mjpeg or (200 <= http_status < 400)) else f"Unexpected content-type: {content_type!r}",
+        "reason": None
+        if (is_mjpeg or (200 <= http_status < 400))
+        else f"Unexpected content-type: {content_type!r}",
     }
 
 
@@ -237,7 +244,9 @@ def onboard_printer(body: PrinterOnboardRequest) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail="Printer name is required.")
     model = _validated_onboard_model(body.model)
     _assert_onboarding_does_not_overwrite_static_printer(printer_id, host)
-    probe_summary = _probe_onboarded_printer(moonraker_url, camera_url, write_enabled=body.write_enabled)
+    probe_summary = _probe_onboarded_printer(
+        moonraker_url, camera_url, write_enabled=body.write_enabled
+    )
     safety_policy = "write_enabled" if body.write_enabled else "read_only"
     printer = save_onboarded_printer(
         printer_id=printer_id,
@@ -255,7 +264,10 @@ def onboard_printer(body: PrinterOnboardRequest) -> dict[str, Any]:
         },
     )
     if printer is None:
-        raise HTTPException(status_code=500, detail="Printer was saved but could not be loaded back from the local database.")
+        raise HTTPException(
+            status_code=500,
+            detail="Printer was saved but could not be loaded back from the local database.",
+        )
     proof_event_id = new_id()
     execute(
         "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
@@ -286,12 +298,24 @@ def onboard_printer(body: PrinterOnboardRequest) -> dict[str, Any]:
 @router.get("/api/printers/{printer_id}/status")
 def printer_status(printer_id: str) -> dict[str, Any]:
     printer = _printer(printer_id)
-    return {"printer_id": printer["id"], "status": printer["status"], "locked": is_s1_target(printer_id)}
+    return {
+        "printer_id": printer["id"],
+        "status": printer["status"],
+        "locked": is_s1_target(printer_id),
+    }
 
 
 @router.put("/api/printers/{printer_id}/status")
 def update_printer_status(printer_id: str, body: StatusUpdate) -> dict[str, Any]:
-    if body.status not in {"online", "printing", "paused", "maintenance", "offline", "error", "active"}:
+    if body.status not in {
+        "online",
+        "printing",
+        "paused",
+        "maintenance",
+        "offline",
+        "error",
+        "active",
+    }:
         raise HTTPException(status_code=400, detail="invalid printer status")
     canonical = canonical_printer_id(printer_id)
     if not is_s1_target(canonical or printer_id):
@@ -332,7 +356,9 @@ def printer_lock(printer_id: str) -> dict[str, Any]:
     return {
         "printer_id": printer["id"] if printer else printer_id,
         "locked": locked,
-        "reason": "Maintenance lock: do not test or move. Movement may damage the hotend." if locked else None,
+        "reason": "Maintenance lock: do not test or move. Movement may damage the hotend."
+        if locked
+        else None,
         "locked_by": "backend-safety-policy" if locked else None,
         "ip": "192.168.0.12" if locked else None,
     }
@@ -359,13 +385,23 @@ def test_printer(printer_id: str) -> dict[str, Any]:
 @router.post("/api/printers/{printer_id}/move")
 def move_printer(printer_id: str) -> dict[str, Any]:
     check_s1_lock(printer_id)
-    return {"printer_id": printer_id, "accepted": False, "status": "not_configured", "reason": "Movement bridge not configured."}
+    return {
+        "printer_id": printer_id,
+        "accepted": False,
+        "status": "not_configured",
+        "reason": "Movement bridge not configured.",
+    }
 
 
 @router.post("/api/printers/{printer_id}/upload")
 def upload_to_printer(printer_id: str) -> dict[str, Any]:
     check_s1_lock(printer_id)
-    return {"printer_id": printer_id, "accepted": False, "status": "not_configured", "reason": "Upload bridge not configured."}
+    return {
+        "printer_id": printer_id,
+        "accepted": False,
+        "status": "not_configured",
+        "reason": "Upload bridge not configured.",
+    }
 
 
 @router.post("/api/printers/{printer_id}/upload-gcode")
@@ -374,7 +410,9 @@ def upload_gcode_to_printer(printer_id: str, body: GcodeUploadRequest) -> dict[s
     printer = _write_enabled_printer(printer_id)
     gcode_path = _validated_gcode_path(body.gcode_path)
     remote_subdir = _validated_remote_subdir(body.remote_subdir)
-    bounds, used_fallback_bounds = resolve_bounds(printer_id=printer["id"], fleet_lookup=get_profile)
+    bounds, used_fallback_bounds = resolve_bounds(
+        printer_id=printer["id"], fleet_lookup=get_profile
+    )
     bounds_report = check_gcode_file(gcode_path, bounds)
     if not bounds_report.passed:
         raise HTTPException(
@@ -398,7 +436,9 @@ def upload_gcode_to_printer(printer_id: str, body: GcodeUploadRequest) -> dict[s
             _fresh_idle_state(client, printer["id"], require_idle=True)
             start_result = client.start_print(upload.item_path)
     except (MoonrakerError, OSError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=f"Moonraker upload/start failed: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Moonraker upload/start failed: {exc}"
+        ) from exc
 
     return {
         "printer_id": printer["id"],
@@ -472,7 +512,12 @@ def update_printer_url(printer_id: str, body: UrlUpdate) -> dict[str, Any]:
     printer = set_printer_url(printer_id, body.url)
     if not printer:
         raise HTTPException(status_code=404, detail="printer not found")
-    return {"printer_id": printer["id"], "url": body.url, "saved": True, "locked": is_s1_target(printer["id"])}
+    return {
+        "printer_id": printer["id"],
+        "url": body.url,
+        "saved": True,
+        "locked": is_s1_target(printer["id"]),
+    }
 
 
 def _validate_moonraker_url(printer_id: str, url: str) -> None:
@@ -487,11 +532,16 @@ def _validate_moonraker_url(printer_id: str, url: str) -> None:
     printer = next((item for item in local_printers() if item["id"] == canonical), None)
     expected_ip = str(printer.get("ip")) if printer and printer.get("ip") else None
     if expected_ip and parsed.hostname != expected_ip:
-        raise HTTPException(status_code=400, detail=f"Moonraker URL host must match configured printer IP {expected_ip}")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Moonraker URL host must match configured printer IP {expected_ip}",
+        )
     try:
         address = ipaddress.ip_address(parsed.hostname)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Moonraker URL host must be a configured printer IP address") from exc
+        raise HTTPException(
+            status_code=400, detail="Moonraker URL host must be a configured printer IP address"
+        ) from exc
     if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
         raise HTTPException(status_code=400, detail="Moonraker URL host is not allowed")
 
@@ -506,12 +556,16 @@ def _validate_onboard_moonraker_url(raw_url: str) -> tuple[str, str]:
     if parsed.username or parsed.password:
         raise HTTPException(status_code=400, detail="Moonraker URL must not include credentials.")
     if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
-        raise HTTPException(status_code=400, detail="Moonraker URL must be the printer API root, not a nested path.")
+        raise HTTPException(
+            status_code=400, detail="Moonraker URL must be the printer API root, not a nested path."
+        )
     host = parsed.hostname
     try:
         address = ipaddress.ip_address(host)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Moonraker URL host must be a printer IP address.") from exc
+        raise HTTPException(
+            status_code=400, detail="Moonraker URL host must be a printer IP address."
+        ) from exc
     if str(address) in CAMERA_ONLY_IPS or is_s1_target(str(address)):
         raise HTTPException(
             status_code=403,
@@ -525,7 +579,9 @@ def _validate_onboard_moonraker_url(raw_url: str) -> tuple[str, str]:
     if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
         raise HTTPException(status_code=400, detail="Moonraker URL host is not allowed.")
     if not (address.is_private or address.is_link_local):
-        raise HTTPException(status_code=400, detail="Moonraker URL host must be a local/private printer IP address.")
+        raise HTTPException(
+            status_code=400, detail="Moonraker URL host must be a local/private printer IP address."
+        )
     return cleaned, str(address)
 
 
@@ -539,11 +595,15 @@ def _validated_onboard_camera_url(raw_url: str | None, moonraker_host: str) -> s
     try:
         address = ipaddress.ip_address(parsed.hostname)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail="Camera URL host must be a printer or LAN camera IP address.") from exc
+        raise HTTPException(
+            status_code=400, detail="Camera URL host must be a printer or LAN camera IP address."
+        ) from exc
     if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
         raise HTTPException(status_code=400, detail="Camera URL host is not allowed.")
     if not (address.is_private or address.is_link_local):
-        raise HTTPException(status_code=400, detail="Camera URL host must be a local/private IP address.")
+        raise HTTPException(
+            status_code=400, detail="Camera URL host must be a local/private IP address."
+        )
     return cleaned
 
 
@@ -553,7 +613,10 @@ def _validated_onboard_printer_id(raw_id: str | None, name: str, host: str) -> s
     if not candidate:
         candidate = re.sub(r"[^a-z0-9._-]+", "_", name.strip().lower()).strip("._-")
     if not ONBOARD_ID_RE.fullmatch(candidate):
-        raise HTTPException(status_code=400, detail="Printer ID must be 2-64 chars using letters, numbers, dot, underscore, or dash.")
+        raise HTTPException(
+            status_code=400,
+            detail="Printer ID must be 2-64 chars using letters, numbers, dot, underscore, or dash.",
+        )
     if is_s1_target(candidate):
         raise HTTPException(
             status_code=423,
@@ -600,7 +663,9 @@ def _assert_onboarding_does_not_overwrite_static_printer(printer_id: str, host: 
                         "reason": "A printer with this ID or IP is already onboarded.",
                     },
                 )
-        if existing_id in BASE_WRITE_ALLOWED_PRINTERS and (printer_id == existing_id or host == existing_ip):
+        if existing_id in BASE_WRITE_ALLOWED_PRINTERS and (
+            printer_id == existing_id or host == existing_ip
+        ):
             raise HTTPException(
                 status_code=409,
                 detail={
@@ -612,7 +677,9 @@ def _assert_onboarding_does_not_overwrite_static_printer(printer_id: str, host: 
             )
 
 
-def _probe_onboarded_printer(moonraker_url: str, camera_url: str, *, write_enabled: bool) -> dict[str, Any]:
+def _probe_onboarded_printer(
+    moonraker_url: str, camera_url: str, *, write_enabled: bool
+) -> dict[str, Any]:
     probes: list[dict[str, Any]] = []
     client = MoonrakerClient(moonraker_url, timeout_s=4.0)
     try:
@@ -673,7 +740,9 @@ def _probe_onboarded_printer(moonraker_url: str, camera_url: str, *, write_enabl
     }
 
 
-def _raise_onboard_probe_failed(probe_name: str, exc: BaseException, probes: list[dict[str, Any]]) -> None:
+def _raise_onboard_probe_failed(
+    probe_name: str, exc: BaseException, probes: list[dict[str, Any]]
+) -> None:
     detail = {
         "error": "ONBOARDING_PROBE_FAILED",
         "failed_probe": probe_name,
@@ -687,11 +756,28 @@ def _probe_optional_http(url: str, probe_name: str) -> dict[str, Any]:
     try:
         request = urllib.request.Request(url, headers={"Accept": "*/*"})
         with urllib.request.urlopen(request, timeout=2.5) as response:
-            return {"name": probe_name, "ok": 200 <= int(response.status) < 400, "http_status": int(response.status), "required": False}
+            return {
+                "name": probe_name,
+                "ok": 200 <= int(response.status) < 400,
+                "http_status": int(response.status),
+                "required": False,
+            }
     except urllib.error.HTTPError as exc:
-        return {"name": probe_name, "ok": False, "http_status": int(exc.code), "required": False, "reason": f"HTTP {exc.code}"}
+        return {
+            "name": probe_name,
+            "ok": False,
+            "http_status": int(exc.code),
+            "required": False,
+            "reason": f"HTTP {exc.code}",
+        }
     except OSError as exc:
-        return {"name": probe_name, "ok": False, "http_status": None, "required": False, "reason": str(exc)}
+        return {
+            "name": probe_name,
+            "ok": False,
+            "http_status": None,
+            "required": False,
+            "reason": str(exc),
+        }
 
 
 def _probe_moonraker(moonraker_url: str) -> tuple[bool, str, int | None]:
@@ -704,7 +790,11 @@ def _probe_moonraker(moonraker_url: str) -> tuple[bool, str, int | None]:
             with urllib.request.urlopen(request, timeout=2.0) as response:
                 if 200 <= int(response.status) < 400:
                     return True, f"Moonraker responded at {path}.", int(response.status)
-                return False, f"Moonraker returned HTTP {response.status} at {path}.", int(response.status)
+                return (
+                    False,
+                    f"Moonraker returned HTTP {response.status} at {path}.",
+                    int(response.status),
+                )
         except urllib.error.HTTPError as exc:
             if exc.code in {401, 403}:
                 return False, f"Moonraker requires authentication at {path}.", int(exc.code)
@@ -728,14 +818,18 @@ def _write_enabled_printer(printer_id: str) -> dict[str, Any]:
         )
     moonraker_url = printer.get("moonraker_url")
     if not moonraker_url:
-        raise HTTPException(status_code=409, detail="Moonraker URL is not configured for this printer.")
+        raise HTTPException(
+            status_code=409, detail="Moonraker URL is not configured for this printer."
+        )
     return printer
 
 
 def _validated_gcode_path(raw_path: str) -> Path:
     path = Path(raw_path).expanduser().resolve()
     if path.suffix.lower() not in {".gcode", ".g"}:
-        raise HTTPException(status_code=400, detail="Only .gcode or .g files can be uploaded to a printer.")
+        raise HTTPException(
+            status_code=400, detail="Only .gcode or .g files can be uploaded to a printer."
+        )
     if not path.is_file():
         raise HTTPException(status_code=404, detail=f"G-code file not found: {path}")
     if path.stat().st_size <= 0:
@@ -746,16 +840,22 @@ def _validated_gcode_path(raw_path: str) -> Path:
 def _validated_remote_subdir(value: str) -> str:
     cleaned = value.strip().strip("/")
     if not cleaned or ".." in cleaned or "\\" in cleaned or not REMOTE_SUBDIR_RE.match(cleaned):
-        raise HTTPException(status_code=400, detail="remote_subdir must be a safe printer-relative path.")
+        raise HTTPException(
+            status_code=400, detail="remote_subdir must be a safe printer-relative path."
+        )
     return cleaned
 
 
-def _fresh_idle_state(client: MoonrakerClient, printer_id: str, *, require_idle: bool) -> tuple[Any, Any]:
+def _fresh_idle_state(
+    client: MoonrakerClient, printer_id: str, *, require_idle: bool
+) -> tuple[Any, Any]:
     try:
         info = client.server_info()
         state = client.printer_state(("print_stats", "virtual_sdcard", "toolhead"))
     except MoonrakerError as exc:
-        raise HTTPException(status_code=502, detail=f"Moonraker probe failed for {printer_id}: {exc}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"Moonraker probe failed for {printer_id}: {exc}"
+        ) from exc
     if not info.klippy_connected or info.klippy_state.lower() != "ready":
         raise HTTPException(
             status_code=409,

@@ -22,7 +22,6 @@ References (per brief constraint "2 sources"):
 from __future__ import annotations
 
 import pytest
-
 from hermes3d.services.canary_dirt_filter import (
     NOISE_PATTERNS,
     compute_dirty,
@@ -30,7 +29,6 @@ from hermes3d.services.canary_dirt_filter import (
     filter_path_list,
     is_noise_path,
 )
-
 
 CANARY_PORCELAIN = "?? .venv-canary/\n?? _pip_install.log\n"
 """The exact porcelain blob ``git status --short`` produces against the

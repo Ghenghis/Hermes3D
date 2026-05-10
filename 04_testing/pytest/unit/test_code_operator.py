@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from uuid import uuid4 as _recovery_uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -124,7 +125,9 @@ def test_provider_team_routes_reject_spoofed_actor_fields(path: str) -> None:
     assert response.status_code == 422
 
 
-def test_provider_coding_pass_records_artifact_without_mutating(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_provider_coding_pass_records_artifact_without_mutating(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
     monkeypatch.setattr(
         code_history,
@@ -141,13 +144,27 @@ def test_provider_coding_pass_records_artifact_without_mutating(monkeypatch: pyt
     monkeypatch.setattr(
         code_history,
         "_provider_file_context",
-        lambda files: [{"path": "README.md", "exists": True, "sha256": "0" * 64, "size_bytes": 10, "truncated": False, "content": "# readme"}],
+        lambda files: [
+            {
+                "path": "README.md",
+                "exists": True,
+                "sha256": "0" * 64,
+                "size_bytes": 10,
+                "truncated": False,
+                "content": "# readme",
+            }
+        ],
     )
     monkeypatch.setattr(
         code_history,
         "_call_provider_chat",
         lambda provider_id, messages, **kwargs: {
-            "provider": {"id": provider_id, "model": "minimax-test", "base_url_label": "api.example", "http_status": 200},
+            "provider": {
+                "id": provider_id,
+                "model": "minimax-test",
+                "base_url_label": "api.example",
+                "http_status": 200,
+            },
             "content": '{"plan":["do work"]}',
             "content_sha256": "a" * 64,
             "raw_usage": {},
@@ -156,9 +173,18 @@ def test_provider_coding_pass_records_artifact_without_mutating(monkeypatch: pyt
     monkeypatch.setattr(
         code_history,
         "_record_provider_run_artifact",
-        lambda **kwargs: {"id": "run-1", "path": "03_implementation/var/code-history/provider-runs/run-1.json", "proof_event_id": "proof-1", "response_sha256": "a" * 64},
+        lambda **kwargs: {
+            "id": "run-1",
+            "path": "03_implementation/var/code-history/provider-runs/run-1.json",
+            "proof_event_id": "proof-1",
+            "response_sha256": "a" * 64,
+        },
     )
-    monkeypatch.setattr(code_history, "append_mcp_evidence", lambda **kwargs: {"status": "recorded", "evidence_id": "ev_coding"})
+    monkeypatch.setattr(
+        code_history,
+        "append_mcp_evidence",
+        lambda **kwargs: {"status": "recorded", "evidence_id": "ev_coding"},
+    )
 
     result = code_history.run_provider_team_coding_pass(
         owner="hermes-agent",
@@ -189,7 +215,9 @@ def test_provider_review_pass_requires_deepseek_team(monkeypatch: pytest.MonkeyP
         )
 
 
-def test_provider_team_readiness_uses_mocked_inputs_not_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_provider_team_readiness_uses_mocked_inputs_not_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(code_history, "private_env", lambda: {})
     monkeypatch.setattr(
         code_history,
@@ -231,16 +259,26 @@ def test_provider_team_readiness_uses_mocked_inputs_not_environment(monkeypatch:
     assert response.status_code == 200
     assert payload["ready"] is True
     assert {team["id"] for team in payload["teams"]} == {"minimax-builders", "deepseek-reviewers"}
-    assert all("api_key" not in str(team["provider"].get("base_url_label", "")).lower() for team in payload["teams"])
+    assert all(
+        "api_key" not in str(team["provider"].get("base_url_label", "")).lower()
+        for team in payload["teams"]
+    )
 
 
-def test_provider_team_assignment_blocks_when_provider_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_provider_team_assignment_blocks_when_provider_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
     monkeypatch.setattr(code_history, "private_env", lambda: {})
     monkeypatch.setattr(
         code_history,
         "_source_repo_status",
-        lambda source: {"id": source.id, "status": "ready", "exists": True, "missing_required_files": []},
+        lambda source: {
+            "id": source.id,
+            "status": "ready",
+            "exists": True,
+            "missing_required_files": [],
+        },
     )
     monkeypatch.setattr(
         code_history,
@@ -258,7 +296,12 @@ def test_provider_team_assignment_blocks_when_provider_missing(monkeypatch: pyte
     monkeypatch.setattr(
         code_history,
         "mcp_lock_readiness",
-        lambda _private_values=None: {"status": "ready", "ready": True, "blocked_reason": None, "required_workflow": []},
+        lambda _private_values=None: {
+            "status": "ready",
+            "ready": True,
+            "blocked_reason": None,
+            "required_workflow": [],
+        },
     )
     monkeypatch.setattr(
         code_history,
@@ -281,8 +324,12 @@ def test_provider_team_assignment_blocks_when_provider_missing(monkeypatch: pyte
     assert result["mcp_evidence"]["evidence_id"] == "ev_team_blocked"
 
 
-def test_provider_status_requires_live_smoke_proof(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+def test_provider_status_requires_live_smoke_proof(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json"
+    )
 
     status = code_history._provider_status(
         "minimax",
@@ -297,8 +344,12 @@ def test_provider_status_requires_live_smoke_proof(monkeypatch: pytest.MonkeyPat
     assert "smoke proof" in status["blocked_reason"]
 
 
-def test_provider_status_accepts_private_env_aliases(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+def test_provider_status_accepts_private_env_aliases(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json"
+    )
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
 
@@ -340,7 +391,9 @@ def test_minimax_chat_payload_uses_current_openai_compatible_fields() -> None:
     assert "max_tokens" not in payload
 
 
-def test_minimax_provider_accepts_openai_token_plan_aliases(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_minimax_provider_accepts_openai_token_plan_aliases(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "token-plan-key")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.minimax.io/v1")
 
@@ -373,7 +426,9 @@ def test_minimax_provider_prefers_explicit_token_plan_key(monkeypatch: pytest.Mo
 
 
 def test_deepseek_v4_pro_is_current_default_model() -> None:
-    config = code_history._provider_chat_config("deepseek", {"DEEPSEEK_API_KEY": "configured"}, require_ready=False)
+    config = code_history._provider_chat_config(
+        "deepseek", {"DEEPSEEK_API_KEY": "configured"}, require_ready=False
+    )
 
     assert config["model"] == "deepseek-v4-pro"
 
@@ -393,7 +448,9 @@ def test_deepseek_v4_pro_payload_uses_official_reasoning_fields() -> None:
     assert payload["reasoning_effort"] == "high"
 
 
-def test_cli_provider_env_contract_redacts_task_scoped_keys(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_provider_env_contract_redacts_task_scoped_keys(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     for name in [
         "OPENAI_API_KEY",
         "OPENAI_BASE_URL",
@@ -419,13 +476,23 @@ def test_cli_provider_env_contract_redacts_task_scoped_keys(monkeypatch: pytest.
     assert "DEEPSEEK_API_KEY" in contract["exported_env_names"]
     assert "secret-minimax-token-plan" not in str(contract)
     assert "secret-deepseek-key" not in str(contract)
-    assert all(item["value"] == "<redacted>" for profile in contract["profiles"] for item in profile["exports"])
-    minimax = next(profile for profile in contract["profiles"] if profile["provider_id"] == "minimax")
+    assert all(
+        item["value"] == "<redacted>"
+        for profile in contract["profiles"]
+        for item in profile["exports"]
+    )
+    minimax = next(
+        profile for profile in contract["profiles"] if profile["provider_id"] == "minimax"
+    )
     assert minimax["api_key_source"] == "private_env:HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY"
 
 
-def test_provider_status_blocks_after_failed_smoke(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    monkeypatch.setattr(code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json")
+def test_provider_status_blocks_after_failed_smoke(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(
+        code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json"
+    )
     auth_contract = {
         "provider_id": "minimax",
         "base_url_label": "api.minimax.io",
@@ -602,14 +669,19 @@ def test_same_owner_mcp_lock_accepts_task_id_key_shapes(monkeypatch: pytest.Monk
         },
     )
 
-    lock = code_history._require_active_mcp_lock("README.md", owner="hermes-agent", task_id="TASK-1")
+    lock = code_history._require_active_mcp_lock(
+        "README.md", owner="hermes-agent", task_id="TASK-1"
+    )
 
     assert lock["taskId"] == "TASK-1"
 
 
 def test_git_branch_names_are_limited_to_agent_prefixes() -> None:
     assert code_history._validate_agent_branch_name("codex/test-lane") == "codex/test-lane"
-    assert code_history._validate_agent_branch_name("hermes-agent/test-lane") == "hermes-agent/test-lane"
+    assert (
+        code_history._validate_agent_branch_name("hermes-agent/test-lane")
+        == "hermes-agent/test-lane"
+    )
 
     with pytest.raises(ValueError):
         code_history._validate_agent_branch_name("main")
@@ -622,10 +694,20 @@ def test_git_stage_requires_snapshot_and_same_owner_lock(monkeypatch: pytest.Mon
     monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
     monkeypatch.setattr(code_history, "_agent_snapshot_files", lambda owner: {"README.md"})
     monkeypatch.setattr(code_history, "_changed_git_files", lambda: {"README.md"})
-    monkeypatch.setattr(code_history, "_require_active_mcp_lock", lambda path, *, owner, task_id: {"lock_id": "lock-1"})
-    monkeypatch.setattr(code_history, "_run_git", lambda args, **_kwargs: calls.append(args) or {"stdout": "", "stderr": "", "returncode": 0})
+    monkeypatch.setattr(
+        code_history,
+        "_require_active_mcp_lock",
+        lambda path, *, owner, task_id: {"lock_id": "lock-1"},
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_run_git",
+        lambda args, **_kwargs: calls.append(args) or {"stdout": "", "stderr": "", "returncode": 0},
+    )
 
-    result = code_history.git_stage_owned_files(owner="hermes-agent", task_id="TASK-1", files=["README.md"])
+    result = code_history.git_stage_owned_files(
+        owner="hermes-agent", task_id="TASK-1", files=["README.md"]
+    )
 
     assert result["status"] == "staged"
     assert calls == [["add", "--", "README.md"]]
@@ -637,7 +719,9 @@ def test_git_stage_rejects_unsnapshotted_file(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr(code_history, "_changed_git_files", lambda: {"README.md"})
 
     with pytest.raises(ValueError, match="no pre-change snapshot"):
-        code_history.git_stage_owned_files(owner="hermes-agent", task_id="TASK-1", files=["README.md"])
+        code_history.git_stage_owned_files(
+            owner="hermes-agent", task_id="TASK-1", files=["README.md"]
+        )
 
 
 def test_list_e2e_jobs_returns_proof_events(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -649,7 +733,14 @@ def test_list_e2e_jobs_returns_proof_events(monkeypatch: pytest.MonkeyPatch) -> 
             "id": "ev_e2e_1",
             "event_type": "code_e2e",
             "source_agent": "hermes-agent",
-            "payload": _json.dumps({"task_id": "TASK-1", "title": "Wire gate", "files": ["README.md"], "next_status": "needs_reviewed_patch_proposal"}),
+            "payload": _json.dumps(
+                {
+                    "task_id": "TASK-1",
+                    "title": "Wire gate",
+                    "files": ["README.md"],
+                    "next_status": "needs_reviewed_patch_proposal",
+                }
+            ),
             "created_at": "2026-05-08T22:00:00",
         },
         {
@@ -674,7 +765,6 @@ def test_list_e2e_jobs_returns_proof_events(monkeypatch: pytest.MonkeyPatch) -> 
 
 def test_list_e2e_jobs_route_returns_200() -> None:
     """GET /api/code-operator/e2e/jobs route is registered and returns 200."""
-    import json as _json
 
     app = create_gui_app()
     client = TestClient(app)
@@ -686,6 +776,8 @@ def test_list_e2e_jobs_route_returns_200() -> None:
     assert payload["status"] == "ready"
     assert "jobs" in payload
     assert "state_legend" in payload
+
+
 # ---------------------------------------------------------------------------
 # Recovery Controller v1 tests (lean ledger; no UI, no autonomous apply).
 # Each test uses a unique task_id so ledger entries don't collide. Tests
@@ -693,9 +785,6 @@ def test_list_e2e_jobs_route_returns_200() -> None:
 # read-back. Future v1.5 fields covered: failed_step_type, failure_fingerprint,
 # retry_budget, agent_stack, worker_output_status, recommended_next_action.
 # ---------------------------------------------------------------------------
-
-
-from uuid import uuid4 as _recovery_uuid4
 
 
 def _recovery_task_id(suffix: str) -> str:
@@ -1109,9 +1198,7 @@ def test_git_push_refuses_dirty(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     with pytest.raises(ValueError, match="clean worktree"):
-        code_history.git_push_current_branch(
-            owner="hermes-agent", task_id="W11-3-TEST-PUSH"
-        )
+        code_history.git_push_current_branch(owner="hermes-agent", task_id="W11-3-TEST-PUSH")
     # Push must not have been invoked when the dirty guard fires.
     assert pushed == []
 

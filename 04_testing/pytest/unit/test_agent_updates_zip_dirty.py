@@ -25,10 +25,8 @@ from __future__ import annotations
 import sys
 import zipfile
 from pathlib import Path
-from typing import Iterator
 
 import pytest
-
 from hermes3d.api.routes import agent_updates
 
 
@@ -129,9 +127,7 @@ def test_zip_skips_symlink_pointing_outside_repo(tmp_path: Path) -> None:
     assert target.exists()
     with zipfile.ZipFile(target, "r") as archive:
         names = archive.namelist()
-    assert names == [], (
-        f"Outside-pointing symlink leaked into archive: {names!r}"
-    )
+    assert names == [], f"Outside-pointing symlink leaked into archive: {names!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +172,7 @@ def test_zip_skips_path_outside_repo(tmp_path: Path) -> None:
     agent_updates._zip_dirty_entries(repo, [inside, outside], target)
     with zipfile.ZipFile(target, "r") as archive:
         names = archive.namelist()
-    assert names == ["inside.txt"], (
-        f"Out-of-repo path leaked: {names!r}"
-    )
+    assert names == ["inside.txt"], f"Out-of-repo path leaked: {names!r}"
 
 
 # ---------------------------------------------------------------------------

@@ -10,8 +10,10 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
-from hermes3d.db.init import DB_PATH, connect, init_db
-from hermes3d.services.agent_checkout import hermes_agent_checkout as _hermes_agent_checkout_at_import
+from hermes3d.db.init import connect, init_db
+from hermes3d.services.agent_checkout import (
+    hermes_agent_checkout as _hermes_agent_checkout_at_import,
+)
 
 REFERENCE_LAUNCH_KINDS = {
     "catalog_reference",
@@ -33,7 +35,9 @@ DEFAULT_SOURCE_ROOT = Path(
 )
 SOURCE_REGISTRY_PROOF_PATH = IMPLEMENTATION_ROOT / "proof" / "SOURCE_REGISTRY_TRUTH_AUDIT.json"
 SOURCE_MANIFEST_CANDIDATES = [
-    Path(os.environ["HERMES3D_SOURCE_MANIFEST"]) if os.environ.get("HERMES3D_SOURCE_MANIFEST") else None,
+    Path(os.environ["HERMES3D_SOURCE_MANIFEST"])
+    if os.environ.get("HERMES3D_SOURCE_MANIFEST")
+    else None,
     IMPLEMENTATION_ROOT / "source-lab" / "source_manifest.json",
     Path("G:/Github/Hermes3D-OS/source-lab/source_manifest.json"),
 ]
@@ -120,7 +124,9 @@ def _registry_path() -> Path:
     not propagated.
     """
     candidates: list[Path] = [
-        Path("G:/Github/Hermes3D/Hermes3D-GUI-Wiring-Contract-Kit/03_REPO_REGISTRY/external_repos_registry.yaml"),
+        Path(
+            "G:/Github/Hermes3D/Hermes3D-GUI-Wiring-Contract-Kit/03_REPO_REGISTRY/external_repos_registry.yaml"
+        ),
     ]
     try:
         candidates.append(
@@ -140,13 +146,19 @@ def _registry_path() -> Path:
     raise FileNotFoundError("external_repos_registry.yaml was not found")
 
 
-def _registry_from_committed_proof(path: Path = SOURCE_REGISTRY_PROOF_PATH) -> dict[str, dict[str, dict[str, Any]]]:
+def _registry_from_committed_proof(
+    path: Path = SOURCE_REGISTRY_PROOF_PATH,
+) -> dict[str, dict[str, dict[str, Any]]]:
     if not path.exists():
-        raise FileNotFoundError("external_repos_registry.yaml was not found and SOURCE_REGISTRY_TRUTH_AUDIT.json is absent")
+        raise FileNotFoundError(
+            "external_repos_registry.yaml was not found and SOURCE_REGISTRY_TRUTH_AUDIT.json is absent"
+        )
     proof = json.loads(path.read_text(encoding="utf-8"))
     modules = proof.get("modules")
     if not isinstance(modules, list) or not modules:
-        raise ValueError("SOURCE_REGISTRY_TRUTH_AUDIT.json does not contain a non-empty modules list")
+        raise ValueError(
+            "SOURCE_REGISTRY_TRUTH_AUDIT.json does not contain a non-empty modules list"
+        )
     data: dict[str, dict[str, dict[str, Any]]] = {}
     for module in modules:
         if not isinstance(module, dict):
@@ -262,7 +274,9 @@ def _manifest_index() -> dict[str, dict[str, Any]]:
     return index
 
 
-def _match_manifest_entry(module_id: str, entry: dict[str, Any], manifest: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+def _match_manifest_entry(
+    module_id: str, entry: dict[str, Any], manifest: dict[str, dict[str, Any]]
+) -> dict[str, Any] | None:
     aliased_module_id = MANIFEST_ID_ALIASES.get(module_id, module_id)
     keys = [
         _match_key(module_id),
@@ -382,9 +396,16 @@ def load_modules() -> int:
         try:
             for section_key, entries in registry.items():
                 for module_id, entry in entries.items():
-                    unique_id = module_id if module_id not in seen_ids else f"{section_key}_{module_id}"
+                    unique_id = (
+                        module_id if module_id not in seen_ids else f"{section_key}_{module_id}"
+                    )
                     seen_ids.add(unique_id)
-                    launch_kind = LAUNCH_KIND_OVERRIDES.get(unique_id) or LAUNCH_KIND_OVERRIDES.get(module_id) or entry.get("launch_kind") or "unknown"
+                    launch_kind = (
+                        LAUNCH_KIND_OVERRIDES.get(unique_id)
+                        or LAUNCH_KIND_OVERRIDES.get(module_id)
+                        or entry.get("launch_kind")
+                        or "unknown"
+                    )
                     source = resolve_module_source(section_key, module_id, entry, manifest)
                     source_status = inspect_source_path(source["local_path"], source["repo_url"])
                     install_state = source_status["install_state"]
@@ -454,6 +475,7 @@ def load_modules() -> int:
             # are persisted in the same transaction. Lazy import to avoid a
             # bootstrap-time cycle.
             from hermes3d.db.app_registry_extensions import apply_app_extensions
+
             apply_app_extensions(conn)
             conn.commit()
         except Exception:

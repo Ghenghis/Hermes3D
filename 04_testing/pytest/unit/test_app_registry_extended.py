@@ -76,9 +76,7 @@ def test_defaults_for_unseen_modules(isolated_db: sqlite3.Connection) -> None:
         """
     )
     isolated_db.commit()
-    record = isolated_db.execute(
-        "SELECT * FROM modules WHERE id = 'test_new_app'"
-    ).fetchone()
+    record = isolated_db.execute("SELECT * FROM modules WHERE id = 'test_new_app'").fetchone()
     assert record["tested_versions"] == "[]"
     assert record["license_spdx"] is None
     assert record["rollback_supported"] == 0
@@ -171,7 +169,9 @@ def test_summary_reports_sane_counts() -> None:
     assert summary["total"] >= 60
     # We should have AT LEAST 50/60 with SPDX licensing assigned.
     assert summary["with_license_spdx"] >= 50
-    assert summary["stable_lane"] + summary["canary_lane"] + summary["frozen_lane"] == summary["total"]
+    assert (
+        summary["stable_lane"] + summary["canary_lane"] + summary["frozen_lane"] == summary["total"]
+    )
 
 
 def test_fully_populated_app_ids_returns_strict_subset() -> None:

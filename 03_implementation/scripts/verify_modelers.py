@@ -129,6 +129,7 @@ MODELERS: list[dict[str, Any]] = [
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> int:
     PROOF_DIR.mkdir(parents=True, exist_ok=True)
     pip_cmd = _resolve_pip_command()
@@ -164,6 +165,7 @@ def main() -> int:
 # CLI verifier
 # ---------------------------------------------------------------------------
 
+
 def _verify_cli_modeler(modeler: dict[str, Any]) -> dict[str, Any]:
     schema_path = SCHEMAS_DIR / modeler["schema"]
     schema = _load_schema(schema_path)
@@ -179,7 +181,10 @@ def _verify_cli_modeler(modeler: dict[str, Any]) -> dict[str, Any]:
             "executable_found": None,
             "installed": False,
             "status": "not_found",
-            "version_probe": {"found": False, "reason": "executable not found on PATH or known locations"},
+            "version_probe": {
+                "found": False,
+                "reason": "executable not found on PATH or known locations",
+            },
             "help_probe": {"found": False, "reason": "executable not found"},
             "proof_gate_version": "modelers-source-runtime-verifier-v1",
         }
@@ -290,6 +295,7 @@ def _probe_help_cli(
 # Python-import verifier
 # ---------------------------------------------------------------------------
 
+
 def _verify_python_modeler(
     modeler: dict[str, Any],
     pip_cmd: list[str] | None,
@@ -302,9 +308,7 @@ def _verify_python_modeler(
         pip_probes.append({"package": pkg, **_probe_pip_show(pkg, pip_cmd=pip_cmd)})
 
     primary_pkg = modeler.get("pip_packages", [None])[0]
-    primary_probe = next(
-        (p for p in pip_probes if p["package"] == primary_pkg), {}
-    )
+    primary_probe = next((p for p in pip_probes if p["package"] == primary_pkg), {})
     installed = bool(primary_probe.get("installed"))
 
     smoke_result: dict[str, Any] | None = None
@@ -384,6 +388,7 @@ def _probe_python_smoke(expression: str) -> dict[str, Any]:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _resolve_pip_command() -> list[str] | None:
     candidates: list[list[str]] = [[sys.executable, "-m", "pip"]]
     pip_path = shutil.which("pip")
@@ -434,8 +439,7 @@ def _summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
 def _head_lines(value: str, *, max_lines: int = 6, max_chars: int = 240) -> list[str]:
     lines = value.splitlines()
     return [
-        line if len(line) <= max_chars else f"{line[:max_chars]}..."
-        for line in lines[:max_lines]
+        line if len(line) <= max_chars else f"{line[:max_chars]}..." for line in lines[:max_lines]
     ]
 
 

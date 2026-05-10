@@ -256,7 +256,9 @@ def verify_toolchains() -> list[dict[str, Any]]:
     return results
 
 
-def build_proof(firmwares: list[dict[str, Any]], toolchains: list[dict[str, Any]]) -> dict[str, Any]:
+def build_proof(
+    firmwares: list[dict[str, Any]], toolchains: list[dict[str, Any]]
+) -> dict[str, Any]:
     now = _dt.datetime.now(_dt.timezone.utc)
     return {
         "lane": "H3D-CLAUDE-SOURCE-FIRMWARE",
@@ -278,9 +280,7 @@ def build_proof(firmwares: list[dict[str, Any]], toolchains: list[dict[str, Any]
             "firmware_sources_unreachable": [
                 f["name"] for f in firmwares if not f.get("probe", {}).get("ok")
             ],
-            "toolchains_present": [
-                t["name"] for t in toolchains if t.get("probe", {}).get("ok")
-            ],
+            "toolchains_present": [t["name"] for t in toolchains if t.get("probe", {}).get("ok")],
             "toolchains_absent": [
                 t["name"] for t in toolchains if not t.get("probe", {}).get("ok")
             ],

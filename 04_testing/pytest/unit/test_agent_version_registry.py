@@ -17,7 +17,6 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
-
 from hermes3d.services import agent_version_registry as avr
 from hermes3d.services.agent_checkout import (
     DEFAULT_AGENT_CHECKOUT,
@@ -85,7 +84,8 @@ def test_active_version_v012_when_env_points_to_fresh(
 
 
 def test_active_version_none_for_unknown_checkout(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Operator pointed env at a custom checkout we don't know about."""
     monkeypatch.setenv("HERMES_AGENT_CHECKOUT", str(tmp_path / "custom-fork"))

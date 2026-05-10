@@ -82,9 +82,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from hermes3d.services import code_history, recovery_controller
-
 
 # ---------------------------------------------------------------------------
 # Cross-version path constants (mirrors the v0.12 + v0.13 regression pins)
@@ -182,9 +180,7 @@ def _build_freeze_stubs(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]
     monkeypatch.setattr(code_history, "lock_mcp_files", stub_lock)
     monkeypatch.setattr(code_history, "release_mcp_files", stub_release)
     monkeypatch.setattr(code_history, "snapshot_file", stub_snapshot)
-    monkeypatch.setattr(
-        code_history, "record_step_failure", stub_record_step_failure
-    )
+    monkeypatch.setattr(code_history, "record_step_failure", stub_record_step_failure)
     monkeypatch.setattr(code_history, "mark_recovery_outcome", stub_mark_outcome)
     monkeypatch.setattr(code_history, "append_mcp_evidence", stub_evidence)
     return captured
@@ -333,18 +329,35 @@ def test_freeze_run_creates_record_under_v012_fallback(
     # Payload-shape identity pin: every key that v0.13 produces must exist
     # under v0.12 too. This is the cross-version dataclass-shape contract.
     expected_keys = {
-        "attempt_id", "task_id", "state", "branch", "failure_class",
-        "failed_step_type", "failure_fingerprint", "retry_count",
-        "retry_budget_max", "actor", "confirm", "started_utc",
-        "last_event_utc", "last_event_summary", "proposal_id",
-        "review_evidence_id", "apply_evidence_id", "retry_gate_id",
-        "terminal_status", "cancelled_reason", "is_terminal",
-        "is_cancellable", "locked_files", "pre_snapshot_ids",
-        "freeze_event_utc", "next_action",
+        "attempt_id",
+        "task_id",
+        "state",
+        "branch",
+        "failure_class",
+        "failed_step_type",
+        "failure_fingerprint",
+        "retry_count",
+        "retry_budget_max",
+        "actor",
+        "confirm",
+        "started_utc",
+        "last_event_utc",
+        "last_event_summary",
+        "proposal_id",
+        "review_evidence_id",
+        "apply_evidence_id",
+        "retry_gate_id",
+        "terminal_status",
+        "cancelled_reason",
+        "is_terminal",
+        "is_cancellable",
+        "locked_files",
+        "pre_snapshot_ids",
+        "freeze_event_utc",
+        "next_action",
     }
     assert expected_keys <= set(run.keys()), (
-        f"v0.12 fallback regression: state payload missing keys "
-        f"{expected_keys - set(run.keys())}"
+        f"v0.12 fallback regression: state payload missing keys {expected_keys - set(run.keys())}"
     )
 
 
@@ -364,13 +377,9 @@ def test_thaw_run_releases_locks_v013(monkeypatch: pytest.MonkeyPatch) -> None:
 
     attempt_id = _start_run()
     files = ("src/v013/x.py", "src/v013/y.py", "src/v013/z.py")
-    recovery_controller.freeze_run(
-        attempt_id=attempt_id, owner="claude-cv-test", files=files
-    )
+    recovery_controller.freeze_run(attempt_id=attempt_id, owner="claude-cv-test", files=files)
 
-    out = recovery_controller.thaw_run(
-        attempt_id=attempt_id, owner="claude-cv-test"
-    )
+    out = recovery_controller.thaw_run(attempt_id=attempt_id, owner="claude-cv-test")
     assert out["status"] == "thawed"
     assert len(captured["release_calls"]) == 1, (
         "v0.13 thaw regression: release_mcp_files must be called exactly once"
@@ -397,13 +406,9 @@ def test_thaw_run_releases_locks_v012(monkeypatch: pytest.MonkeyPatch) -> None:
 
     attempt_id = _start_run()
     files = ("src/v012/x.py", "src/v012/y.py", "src/v012/z.py")
-    recovery_controller.freeze_run(
-        attempt_id=attempt_id, owner="claude-cv-test", files=files
-    )
+    recovery_controller.freeze_run(attempt_id=attempt_id, owner="claude-cv-test", files=files)
 
-    out = recovery_controller.thaw_run(
-        attempt_id=attempt_id, owner="claude-cv-test"
-    )
+    out = recovery_controller.thaw_run(attempt_id=attempt_id, owner="claude-cv-test")
     assert out["status"] == "thawed"
     assert len(captured["release_calls"]) == 1
     assert captured["release_calls"][0]["files"] == list(files)
@@ -470,8 +475,7 @@ def test_compensate_freeze_failure_under_both_versions(
     assert run is not None
     # Postgres rollback invariant: terminal RETRY_FAILED state.
     assert run["state"] == "retry_failed", (
-        f"{checkout_label}: saga compensation must end in retry_failed; "
-        f"got {run['state']!r}"
+        f"{checkout_label}: saga compensation must end in retry_failed; got {run['state']!r}"
     )
     assert run["terminal_status"] == "retry_failed"
     assert run["is_terminal"] is True
@@ -486,8 +490,7 @@ def test_compensate_freeze_failure_under_both_versions(
     assert captured["mark_outcome_calls"][0]["attempt_id"] == attempt_id
     # Saga partial-snapshot is NOT applied to the run.
     assert run["pre_snapshot_ids"] == [], (
-        f"{checkout_label}: partial snapshot IDs must NOT be persisted "
-        f"after compensation"
+        f"{checkout_label}: partial snapshot IDs must NOT be persisted after compensation"
     )
 
 
@@ -527,18 +530,21 @@ def test_freeze_run_proof_event_records_active_version(
     # path or label. Cover the common candidate names so this test stays
     # green regardless of which spelling P2-6 chooses.
     found_value = None
-    for key in ("version_label", "version_tag", "active_checkout",
-                "hermes_agent_version"):
+    for key in ("version_label", "version_tag", "active_checkout", "hermes_agent_version"):
         if key in run:
             found_value = str(run[key])
             break
-    assert found_value, "P2-6 fence: a version field exists on the dataclass " \
+    assert found_value, (
+        "P2-6 fence: a version field exists on the dataclass "
         "but no version-named key surfaced in to_state_payload"
+    )
     # The recorded value should reference v0.13 (default path or canary
     # label), never the v0.12 path while env is unset.
     assert (
-        "v013" in found_value or "Tenacity" in found_value
-        or "v2026.5" in found_value or V013_DEFAULT in found_value
+        "v013" in found_value
+        or "Tenacity" in found_value
+        or "v2026.5" in found_value
+        or V013_DEFAULT in found_value
     ), (
         f"P2-6 regression: v0.13-default freeze recorded version "
         f"{found_value!r}; expected a v0.13-style label"
@@ -664,9 +670,7 @@ def _round_trip_call_sequence(
     monkeypatch.setattr(code_history, "lock_mcp_files", stub_lock)
     monkeypatch.setattr(code_history, "release_mcp_files", stub_release)
     monkeypatch.setattr(code_history, "snapshot_file", stub_snapshot)
-    monkeypatch.setattr(
-        code_history, "record_step_failure", stub_record_step_failure
-    )
+    monkeypatch.setattr(code_history, "record_step_failure", stub_record_step_failure)
     monkeypatch.setattr(code_history, "mark_recovery_outcome", stub_mark_outcome)
     monkeypatch.setattr(code_history, "append_mcp_evidence", stub_evidence)
 
@@ -681,12 +685,8 @@ def _round_trip_call_sequence(
     out = recovery_controller.start_recovery(spec=spec, owner="claude-cv-test")
     attempt_id = out["run"]["attempt_id"]
     files = ("src/rt/a.py", "src/rt/b.py")
-    recovery_controller.freeze_run(
-        attempt_id=attempt_id, owner="claude-cv-test", files=files
-    )
-    recovery_controller.thaw_run(
-        attempt_id=attempt_id, owner="claude-cv-test"
-    )
+    recovery_controller.freeze_run(attempt_id=attempt_id, owner="claude-cv-test", files=files)
+    recovery_controller.thaw_run(attempt_id=attempt_id, owner="claude-cv-test")
     return sequence, file_args
 
 
@@ -711,17 +711,13 @@ def test_freeze_thaw_round_trip_identical_across_versions(
 
     expected_sequence = [
         "record_step_failure",  # start_recovery -> v1 ledger row
-        "lock_mcp_files",       # saga step 1
-        "snapshot_file",        # saga step 2 (file 1)
-        "snapshot_file",        # saga step 2 (file 2)
-        "release_mcp_files",    # thaw -> compensation/cleanup
+        "lock_mcp_files",  # saga step 1
+        "snapshot_file",  # saga step 2 (file 1)
+        "snapshot_file",  # saga step 2 (file 2)
+        "release_mcp_files",  # thaw -> compensation/cleanup
     ]
-    assert seq_v013 == expected_sequence, (
-        f"v0.13 saga ordering regression: got {seq_v013}"
-    )
-    assert seq_v012 == expected_sequence, (
-        f"v0.12 saga ordering regression: got {seq_v012}"
-    )
+    assert seq_v013 == expected_sequence, f"v0.13 saga ordering regression: got {seq_v013}"
+    assert seq_v012 == expected_sequence, f"v0.12 saga ordering regression: got {seq_v012}"
     assert seq_v013 == seq_v012, (
         f"P3-4 cross-version regression: saga step ORDER differs.\n"
         f"v0.13={seq_v013}\n"

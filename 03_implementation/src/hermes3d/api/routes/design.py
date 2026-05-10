@@ -80,7 +80,11 @@ def submit_intake(body: DesignIntake) -> dict:
     target_printer_id = body.constraints.get("target_printer_id")
     execute(
         "INSERT INTO jobs (id, name, job_type, status, printer_id, dry_run) VALUES (?, ?, 'design', 'running', ?, 1)",
-        (job_id, _design_title(body.prompt), target_printer_id if isinstance(target_printer_id, str) else None),
+        (
+            job_id,
+            _design_title(body.prompt),
+            target_printer_id if isinstance(target_printer_id, str) else None,
+        ),
     )
     execute(
         """
@@ -102,7 +106,10 @@ def submit_intake(body: DesignIntake) -> dict:
             prompt=body.prompt,
         )
     except Exception as exc:
-        execute("UPDATE jobs SET status = 'failed', updated_at = datetime('now') WHERE id = ?", (job_id,))
+        execute(
+            "UPDATE jobs SET status = 'failed', updated_at = datetime('now') WHERE id = ?",
+            (job_id,),
+        )
         execute(
             """
             INSERT INTO job_steps (id, job_id, step_number, name, status, started_at, ended_at, error)
@@ -121,7 +128,11 @@ def submit_intake(body: DesignIntake) -> dict:
         )
         raise HTTPException(
             status_code=500,
-            detail={"status": "failed", "reason": f"Design executor failed: {exc}", "job_id": job_id},
+            detail={
+                "status": "failed",
+                "reason": f"Design executor failed: {exc}",
+                "job_id": job_id,
+            },
         ) from exc
     return {
         "id": job_id,
@@ -171,11 +182,20 @@ def _toolchain_status() -> dict:
     source_cards = _source_cards(modules)
     local_audit = _local_tooling_audit()
     local_tools = _local_tool_cards(local_audit)
-    proof_rows = rows("SELECT gate_name, status, error, checked_at FROM truth_gate_results ORDER BY checked_at DESC LIMIT 1")
+    proof_rows = rows(
+        "SELECT gate_name, status, error, checked_at FROM truth_gate_results ORDER BY checked_at DESC LIMIT 1"
+    )
     latest_truth = proof_rows[0] if proof_rows else None
     openscad_ready = _tool_ready(local_tools, "openscad_cli")
-    slicer_ready = any(_tool_ready(local_tools, tool_id) for tool_id in ("prusaslicer_cli", "orcaslicer_cli", "flsun_slicer_cli"))
-    source_ready = any(item["status"] == "ready" for item in source_cards if item["id"] in {"cadquery", "openscad", "trimesh", "blender"})
+    slicer_ready = any(
+        _tool_ready(local_tools, tool_id)
+        for tool_id in ("prusaslicer_cli", "orcaslicer_cli", "flsun_slicer_cli")
+    )
+    source_ready = any(
+        item["status"] == "ready"
+        for item in source_cards
+        if item["id"] in {"cadquery", "openscad", "trimesh", "blender"}
+    )
     mesh_ready = importlib.util.find_spec("trimesh") is not None
     executor_ready, executor_detail = _parametric_executor_status()
     blockers = [] if executor_ready else [executor_detail]
@@ -208,7 +228,11 @@ def _toolchain_status() -> dict:
                 "name": "OpenSCAD CAD CLI",
                 "label": "OpenSCAD CAD CLI",
                 "status": "ready" if openscad_ready else "not_installed",
-                "detail": _tool_detail(local_tools, "openscad_cli", "OpenSCAD executable was not detected by the local tooling audit."),
+                "detail": _tool_detail(
+                    local_tools,
+                    "openscad_cli",
+                    "OpenSCAD executable was not detected by the local tooling audit.",
+                ),
                 "source": "local_tooling_audit",
                 "proof_path": str(implementation_path("proof", "LOCAL_TOOLING_AUDIT.json")),
             },
@@ -217,7 +241,9 @@ def _toolchain_status() -> dict:
                 "name": "Mesh validation worker",
                 "label": "Mesh validation worker",
                 "status": "ready" if mesh_ready else "blocked",
-                "detail": "trimesh is importable for geometry validation and proof gates." if mesh_ready else "trimesh is not importable in the backend runtime.",
+                "detail": "trimesh is importable for geometry validation and proof gates."
+                if mesh_ready
+                else "trimesh is not importable in the backend runtime.",
                 "source": "python_runtime",
             },
             {
@@ -250,7 +276,9 @@ def _toolchain_status() -> dict:
         "sources": source_cards,
         "proof_sources": {
             "local_tooling": str(implementation_path("proof", "LOCAL_TOOLING_AUDIT.json")),
-            "source_registry": str(implementation_path("proof", "SOURCE_REGISTRY_TRUTH_AUDIT.json")),
+            "source_registry": str(
+                implementation_path("proof", "SOURCE_REGISTRY_TRUTH_AUDIT.json")
+            ),
             "flsun_profiles": str(implementation_path("proof", "FLSUN_PROFILE_SOURCE_AUDIT.json")),
         },
     }
@@ -290,16 +318,22 @@ def _parametric_executor_status() -> tuple[bool, str]:
         return False, f"Parametric desk organizer executor is unavailable: {exc}"
     if importlib.util.find_spec("trimesh") is None:
         return False, "trimesh is not importable in the backend runtime."
-    return True, "Parametric desk organizer executor is wired through the local trimesh/manifold worker and writes STL plus signed proof envelopes."
+    return (
+        True,
+        "Parametric desk organizer executor is wired through the local trimesh/manifold worker and writes STL plus signed proof envelopes.",
+    )
 
 
 def _resolve_supported_design(prompt: str, constraints: dict[str, Any]) -> tuple[str, Any]:
     from hermes3d.core.design.desk_organizer import OrganizerSpec
 
-    template = str(constraints.get("template") or constraints.get("design_template") or "").strip().lower()
+    template = (
+        str(constraints.get("template") or constraints.get("design_template") or "").strip().lower()
+    )
     text = f"{template} {prompt}".lower()
     supported = template in {"desk_organizer", "parametric_desk_organizer", "organizer"} or any(
-        token in text for token in ("desk organizer", "organizer", "tray", "pen holder", "phone slot")
+        token in text
+        for token in ("desk organizer", "organizer", "tray", "pen holder", "phone slot")
     )
     if not supported:
         raise UnsupportedDesignError(
@@ -348,7 +382,9 @@ def _execute_supported_design(
     )
     proof = json.loads(written_proof.read_text(encoding="utf-8"))
     truth_report = proof.get("truth_gate_report") if isinstance(proof, dict) else {}
-    truth_status = str(truth_report.get("overall_status") if isinstance(truth_report, dict) else "error")
+    truth_status = str(
+        truth_report.get("overall_status") if isinstance(truth_report, dict) else "error"
+    )
     if truth_status != "pass":
         raise RuntimeError(f"Truth gate rejected generated mesh with status {truth_status}")
 
@@ -369,21 +405,37 @@ def _execute_supported_design(
         "sha256": proof_sha,
         "mesh_artifact_id": mesh_artifact_id,
         "truth_gate_status": truth_status,
-        "signature_algorithm": proof.get("signature", {}).get("algorithm") if isinstance(proof, dict) else None,
+        "signature_algorithm": proof.get("signature", {}).get("algorithm")
+        if isinstance(proof, dict)
+        else None,
     }
     execute(
         """
         INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
         VALUES (?, ?, 'mesh', 'design-executor', 'MODELING', 'MODEL_APPROVAL', ?, ?, ?, ?)
         """,
-        (mesh_artifact_id, job_id, mesh_path.name, str(mesh_path), mesh_path.stat().st_size, as_json(mesh_notes)),
+        (
+            mesh_artifact_id,
+            job_id,
+            mesh_path.name,
+            str(mesh_path),
+            mesh_path.stat().st_size,
+            as_json(mesh_notes),
+        ),
     )
     execute(
         """
         INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
         VALUES (?, ?, 'proof_report', 'design-executor', 'MODELING', 'MODEL_APPROVAL', ?, ?, ?, ?)
         """,
-        (proof_artifact_id, job_id, written_proof.name, str(written_proof), written_proof.stat().st_size, as_json(proof_notes)),
+        (
+            proof_artifact_id,
+            job_id,
+            written_proof.name,
+            str(written_proof),
+            written_proof.stat().st_size,
+            as_json(proof_notes),
+        ),
     )
     execute(
         """
@@ -417,7 +469,9 @@ def _execute_supported_design(
         "INSERT INTO job_events (id, job_id, event_type, source_agent, message) VALUES (?, ?, 'design_executor_completed', 'design-executor', ?)",
         (new_id(), job_id, f"Generated {mesh_path.name}; proof_event_id={proof_event_id}"),
     )
-    execute("UPDATE jobs SET status = 'completed', updated_at = datetime('now') WHERE id = ?", (job_id,))
+    execute(
+        "UPDATE jobs SET status = 'completed', updated_at = datetime('now') WHERE id = ?", (job_id,)
+    )
     return {
         "artifact": {
             "id": mesh_artifact_id,
@@ -537,18 +591,20 @@ def _local_tool_cards(audit: dict) -> list[dict]:
     for tool_id, label in LOCAL_TOOL_LABELS.items():
         raw = raw_tools.get(tool_id)
         if not isinstance(raw, dict):
-            cards.append({
-                "id": tool_id,
-                "name": label,
-                "status": "not_installed",
-                "detail": "No local tooling audit record exists for this executable.",
-                "source": "local_tooling_audit",
-                "capabilities": [],
-                "path": None,
-                "detected": False,
-                "executed": False,
-                "return_code": None,
-            })
+            cards.append(
+                {
+                    "id": tool_id,
+                    "name": label,
+                    "status": "not_installed",
+                    "detail": "No local tooling audit record exists for this executable.",
+                    "source": "local_tooling_audit",
+                    "capabilities": [],
+                    "path": None,
+                    "detected": False,
+                    "executed": False,
+                    "return_code": None,
+                }
+            )
             continue
         detected = bool(raw.get("detected"))
         executed = bool(raw.get("executed"))
@@ -565,19 +621,25 @@ def _local_tool_cards(audit: dict) -> list[dict]:
             detail = "Executable detected; execution was skipped by policy."
         else:
             detail = "Executable was not detected."
-        cards.append({
-            "id": tool_id,
-            "name": label,
-            "status": "ready" if detected and (executed or return_code == 0) else "detected" if detected else "not_installed",
-            "detail": detail,
-            "source": "local_tooling_audit",
-            "capabilities": [str(item) for item in capabilities],
-            "path": path or None,
-            "detected": detected,
-            "executed": executed,
-            "return_code": return_code if isinstance(return_code, int) else None,
-            "proof_path": str(implementation_path("proof", "LOCAL_TOOLING_AUDIT.json")),
-        })
+        cards.append(
+            {
+                "id": tool_id,
+                "name": label,
+                "status": "ready"
+                if detected and (executed or return_code == 0)
+                else "detected"
+                if detected
+                else "not_installed",
+                "detail": detail,
+                "source": "local_tooling_audit",
+                "capabilities": [str(item) for item in capabilities],
+                "path": path or None,
+                "detected": detected,
+                "executed": executed,
+                "return_code": return_code if isinstance(return_code, int) else None,
+                "proof_path": str(implementation_path("proof", "LOCAL_TOOLING_AUDIT.json")),
+            }
+        )
     return cards
 
 
@@ -590,21 +652,23 @@ def _source_cards(modules: list[dict]) -> list[dict]:
         install_state = str(module.get("install_state") or "unavailable")
         bridge_tasks = _json_list(module.get("bridge_tasks"))
         ready = install_state in {"installed", "detected", "healthy"}
-        cards.append({
-            "id": module_id,
-            "module_id": module_id,
-            "name": str(module.get("display_name") or module_id),
-            "status": "ready" if ready else "blocked",
-            "detail": f"{install_state}; {module.get('detected_version') or 'version not recorded'}",
-            "source": "source_registry",
-            "capabilities": bridge_tasks,
-            "path": module.get("local_path"),
-            "repo_url": module.get("repo_url"),
-            "priority": module.get("priority"),
-            "license": module.get("license"),
-            "launch_kind": module.get("launch_kind"),
-            "proof_path": str(implementation_path("proof", "SOURCE_REGISTRY_TRUTH_AUDIT.json")),
-        })
+        cards.append(
+            {
+                "id": module_id,
+                "module_id": module_id,
+                "name": str(module.get("display_name") or module_id),
+                "status": "ready" if ready else "blocked",
+                "detail": f"{install_state}; {module.get('detected_version') or 'version not recorded'}",
+                "source": "source_registry",
+                "capabilities": bridge_tasks,
+                "path": module.get("local_path"),
+                "repo_url": module.get("repo_url"),
+                "priority": module.get("priority"),
+                "license": module.get("license"),
+                "launch_kind": module.get("launch_kind"),
+                "proof_path": str(implementation_path("proof", "SOURCE_REGISTRY_TRUTH_AUDIT.json")),
+            }
+        )
     return cards
 
 
@@ -634,17 +698,36 @@ def _tool_detail(tools: list[dict], tool_id: str, fallback: str) -> str:
 
 
 def _slicer_summary(tools: list[dict]) -> str:
-    ready = [tool["name"] for tool in tools if tool.get("id") in {"prusaslicer_cli", "orcaslicer_cli", "flsun_slicer_cli"} and tool.get("status") == "ready"]
+    ready = [
+        tool["name"]
+        for tool in tools
+        if tool.get("id") in {"prusaslicer_cli", "orcaslicer_cli", "flsun_slicer_cli"}
+        and tool.get("status") == "ready"
+    ]
     if ready:
         return "Ready slicer executables: " + ", ".join(ready) + "."
-    detected = [tool["name"] for tool in tools if tool.get("id") in {"prusaslicer_cli", "orcaslicer_cli", "flsun_slicer_cli"} and tool.get("status") == "detected"]
+    detected = [
+        tool["name"]
+        for tool in tools
+        if tool.get("id") in {"prusaslicer_cli", "orcaslicer_cli", "flsun_slicer_cli"}
+        and tool.get("status") == "detected"
+    ]
     if detected:
-        return "Detected slicer executables need a successful CLI proof run: " + ", ".join(detected) + "."
+        return (
+            "Detected slicer executables need a successful CLI proof run: "
+            + ", ".join(detected)
+            + "."
+        )
     return "No local slicer CLI executable is ready."
 
 
 def _source_summary(sources: list[dict]) -> str:
-    ready = [source["name"] for source in sources if source.get("status") == "ready" and source.get("id") in {"cadquery", "openscad", "trimesh", "blender"}]
+    ready = [
+        source["name"]
+        for source in sources
+        if source.get("status") == "ready"
+        and source.get("id") in {"cadquery", "openscad", "trimesh", "blender"}
+    ]
     if ready:
         return "Installed source checkouts: " + ", ".join(ready[:6]) + "."
     return "No installed CAD/modeling source checkout is recorded."
@@ -676,10 +759,15 @@ _TEMPLATE_REGISTRY: list[dict[str, Any]] = [
         "executor_class": "OrganizerSpec",
         "outputs": ["stl", "proof_envelope"],
         "parameters": [
-            "width_mm", "depth_mm", "height_mm",
-            "wall_mm", "floor_mm",
-            "tray_count", "pen_count",
-            "phone_slot", "cable_passthrough",
+            "width_mm",
+            "depth_mm",
+            "height_mm",
+            "wall_mm",
+            "floor_mm",
+            "tray_count",
+            "pen_count",
+            "phone_slot",
+            "cable_passthrough",
         ],
         "requires": ["trimesh", "manifold3d"],
         "preview_available": False,
@@ -717,7 +805,9 @@ def _discover_templates() -> list[dict[str, Any]]:
             entry["executor_detail"] = "No executor module configured."
 
         # Check Python deps
-        missing_deps = [dep for dep in (tmpl.get("requires") or []) if importlib.util.find_spec(dep) is None]
+        missing_deps = [
+            dep for dep in (tmpl.get("requires") or []) if importlib.util.find_spec(dep) is None
+        ]
         entry["missing_deps"] = missing_deps
         entry["deps_ok"] = len(missing_deps) == 0
 
@@ -729,72 +819,90 @@ def _discover_templates() -> list[dict[str, Any]]:
 # Provider health probes — real shutil.which + importlib checks, no stubs
 # ---------------------------------------------------------------------------
 
+
 def _probe_providers() -> list[dict[str, Any]]:
     """Probe all supported CAD/modeling providers and return real health data."""
     providers: list[dict[str, Any]] = []
 
     # --- OpenSCAD CLI ---
-    providers.append(_probe_cli_provider(
-        provider_id="openscad",
-        display_name="OpenSCAD",
-        kind="cad_cli",
-        exe_names=["openscad", "openscad-nightly"],
-        version_args=["--version"],
-        capabilities=["solid_csg", "parametric_scad", "stl_export"],
-        docs_url="https://openscad.org/",
-    ))
+    providers.append(
+        _probe_cli_provider(
+            provider_id="openscad",
+            display_name="OpenSCAD",
+            kind="cad_cli",
+            exe_names=["openscad", "openscad-nightly"],
+            version_args=["--version"],
+            capabilities=["solid_csg", "parametric_scad", "stl_export"],
+            docs_url="https://openscad.org/",
+        )
+    )
 
     # --- Blender ---
-    providers.append(_probe_cli_provider(
-        provider_id="blender",
-        display_name="Blender",
-        kind="modeling_cli",
-        exe_names=["blender"],
-        version_args=["--version"],
-        capabilities=["mesh_modeling", "stl_export", "python_scripting", "mcp_support"],
-        docs_url="https://www.blender.org/",
-    ))
+    providers.append(
+        _probe_cli_provider(
+            provider_id="blender",
+            display_name="Blender",
+            kind="modeling_cli",
+            exe_names=["blender"],
+            version_args=["--version"],
+            capabilities=["mesh_modeling", "stl_export", "python_scripting", "mcp_support"],
+            docs_url="https://www.blender.org/",
+        )
+    )
 
     # --- CadQuery (Python library) ---
-    providers.append(_probe_python_provider(
-        provider_id="cadquery",
-        display_name="CadQuery",
-        kind="python_cad_library",
-        module_name="cadquery",
-        capabilities=["parametric_cad", "brep_modeling", "step_export", "stl_export"],
-        docs_url="https://cadquery.readthedocs.io/",
-    ))
+    providers.append(
+        _probe_python_provider(
+            provider_id="cadquery",
+            display_name="CadQuery",
+            kind="python_cad_library",
+            module_name="cadquery",
+            capabilities=["parametric_cad", "brep_modeling", "step_export", "stl_export"],
+            docs_url="https://cadquery.readthedocs.io/",
+        )
+    )
 
     # --- trimesh (mesh processing — required for desk_organizer) ---
-    providers.append(_probe_python_provider(
-        provider_id="trimesh",
-        display_name="trimesh",
-        kind="python_mesh_library",
-        module_name="trimesh",
-        capabilities=["mesh_validation", "stl_import_export", "watertight_check", "boolean_ops"],
-        docs_url="https://trimsh.org/",
-    ))
+    providers.append(
+        _probe_python_provider(
+            provider_id="trimesh",
+            display_name="trimesh",
+            kind="python_mesh_library",
+            module_name="trimesh",
+            capabilities=[
+                "mesh_validation",
+                "stl_import_export",
+                "watertight_check",
+                "boolean_ops",
+            ],
+            docs_url="https://trimsh.org/",
+        )
+    )
 
     # --- manifold3d (boolean CSG — required for desk_organizer) ---
-    providers.append(_probe_python_provider(
-        provider_id="manifold3d",
-        display_name="manifold3d",
-        kind="python_csg_library",
-        module_name="manifold3d",
-        capabilities=["boolean_csg", "manifold_mesh", "robust_union_difference"],
-        docs_url="https://github.com/elalish/manifold",
-    ))
+    providers.append(
+        _probe_python_provider(
+            provider_id="manifold3d",
+            display_name="manifold3d",
+            kind="python_csg_library",
+            module_name="manifold3d",
+            capabilities=["boolean_csg", "manifold_mesh", "robust_union_difference"],
+            docs_url="https://github.com/elalish/manifold",
+        )
+    )
 
     # --- FreeCAD ---
-    providers.append(_probe_cli_provider(
-        provider_id="freecad",
-        display_name="FreeCAD",
-        kind="cad_cli",
-        exe_names=["freecad", "FreeCAD", "freecadcmd", "FreeCADCmd"],
-        version_args=["--version"],
-        capabilities=["parametric_cad", "step_export", "stl_export", "python_scripting"],
-        docs_url="https://www.freecad.org/",
-    ))
+    providers.append(
+        _probe_cli_provider(
+            provider_id="freecad",
+            display_name="FreeCAD",
+            kind="cad_cli",
+            exe_names=["freecad", "FreeCAD", "freecadcmd", "FreeCADCmd"],
+            version_args=["--version"],
+            capabilities=["parametric_cad", "step_export", "stl_export", "python_scripting"],
+            docs_url="https://www.freecad.org/",
+        )
+    )
 
     return providers
 
@@ -900,13 +1008,17 @@ def _probe_python_provider(
     module_path: str | None = None
     try:
         import importlib.metadata as meta_mod
+
         version_str = meta_mod.version(module_name)
     except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: surface the silent fallback
         try:
             import logging
+
             logging.getLogger(__name__).debug(
                 "design.module_version_lookup: metadata.version(%r) failed: %s: %s",
-                module_name, type(exc).__name__, exc,
+                module_name,
+                type(exc).__name__,
+                exc,
             )
         except Exception:  # noqa: BLE001
             pass

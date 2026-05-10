@@ -12,7 +12,6 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from hermes3d.services import module_runtime
 from hermes3d.services.module_runtime import (
     SERVICE_WEB_HEALTH_MODULE_IDS,
@@ -21,11 +20,10 @@ from hermes3d.services.module_runtime import (
     probe_fluidd,
     probe_mainsail,
     probe_manyfold,
-    probe_octoprint,
     probe_octofarm,
+    probe_octoprint,
     probe_service_web_health,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -87,7 +85,9 @@ def test_each_service_has_builtin_probe_config() -> None:
     for module_id in SERVICE_WEB_HEALTH_MODULE_IDS:
         probe = module_runtime.runtime_probe_config(module_id)
         assert probe is not None, f"Missing probe config for {module_id}"
-        assert probe.get("kind") == "local_http_health", f"{module_id} probe kind is not local_http_health"
+        assert probe.get("kind") == "local_http_health", (
+            f"{module_id} probe kind is not local_http_health"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +200,9 @@ def test_service_probe_ready_on_200_with_matching_token(
     monkeypatch.setattr(module_runtime, "_private_runtime_env", lambda: {})
 
     # Build a body that contains the expected token.
-    body_str = f'{{"status": "ok", "{expected_token}": "1.0"}}' if expected_token else '{"status": "ok"}'
+    body_str = (
+        f'{{"status": "ok", "{expected_token}": "1.0"}}' if expected_token else '{"status": "ok"}'
+    )
     body_bytes = body_str.encode()
 
     mock_response = _mock_http_response(body_bytes, status=200)

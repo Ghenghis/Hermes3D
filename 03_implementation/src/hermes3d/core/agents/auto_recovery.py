@@ -157,7 +157,8 @@ def auto_recover(
         except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log recovery-poll failure
             log.debug(
                 "auto_recovery.printer_state_poll_soft fallback: %s: %s",
-                type(exc).__name__, exc,
+                type(exc).__name__,
+                exc,
             )
 
     # ---- Step 2: firmware restart ----
@@ -200,7 +201,8 @@ def auto_recover(
         except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log firmware-recovery-poll failure
             log.debug(
                 "auto_recovery.firmware_restart fallback: %s: %s",
-                type(exc).__name__, exc,
+                type(exc).__name__,
+                exc,
             )
 
     result.outcome = RecoveryOutcome.GAVE_UP

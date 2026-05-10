@@ -17,10 +17,8 @@ import asyncio
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from hermes3d.api.routes import printer_safety as printer_safety_route
 from hermes3d.services.printer_safety_gate import PrinterSafetyGate
-
 
 # --------------------------------------------------------------------------- #
 # Fixtures — every test gets a brand-new gate so state doesn't leak.
@@ -89,9 +87,7 @@ def test_camera_frame_alone_still_blocked(
 # --------------------------------------------------------------------------- #
 
 
-def test_obstructed_plate_is_blocked(
-    gate: PrinterSafetyGate, fixed_clock: "list[float]"
-) -> None:
+def test_obstructed_plate_is_blocked(gate: PrinterSafetyGate, fixed_clock: "list[float]") -> None:
     async def _go() -> tuple[bool, list[str]]:
         await gate.bind_camera("printer_a", "cam_a")
         await gate.record_camera_frame("cam_a", fixed_clock[0])
@@ -127,9 +123,7 @@ def test_clear_with_low_confidence_is_blocked(
 # --------------------------------------------------------------------------- #
 
 
-def test_clear_high_confidence_allows(
-    gate: PrinterSafetyGate, fixed_clock: "list[float]"
-) -> None:
+def test_clear_high_confidence_allows(gate: PrinterSafetyGate, fixed_clock: "list[float]") -> None:
     async def _go() -> tuple[bool, list[str]]:
         await gate.bind_camera("printer_a", "cam_a")
         await gate.record_camera_frame("cam_a", fixed_clock[0])
@@ -146,9 +140,7 @@ def test_clear_high_confidence_allows(
 # --------------------------------------------------------------------------- #
 
 
-def test_camera_stale_blocks(
-    gate: PrinterSafetyGate, fixed_clock: "list[float]"
-) -> None:
+def test_camera_stale_blocks(gate: PrinterSafetyGate, fixed_clock: "list[float]") -> None:
     async def _go() -> tuple[bool, list[str]]:
         await gate.bind_camera("printer_a", "cam_a")
         await gate.record_camera_frame("cam_a", fixed_clock[0])
@@ -189,9 +181,7 @@ def test_plate_classification_stale_blocks(
 # --------------------------------------------------------------------------- #
 
 
-def test_state_is_isolated_per_printer(
-    gate: PrinterSafetyGate, fixed_clock: "list[float]"
-) -> None:
+def test_state_is_isolated_per_printer(gate: PrinterSafetyGate, fixed_clock: "list[float]") -> None:
     async def _go() -> "tuple[tuple[bool, list[str]], tuple[bool, list[str]]]":
         # printer_a gets full proof on cam_a
         await gate.bind_camera("printer_a", "cam_a")
@@ -284,9 +274,7 @@ def test_routes_403_when_blocked_and_200_when_allowed(
 # --------------------------------------------------------------------------- #
 
 
-def test_concurrent_calls_have_no_race(
-    gate: PrinterSafetyGate, fixed_clock: "list[float]"
-) -> None:
+def test_concurrent_calls_have_no_race(gate: PrinterSafetyGate, fixed_clock: "list[float]") -> None:
     async def _go() -> tuple[list[bool], list[bool]]:
         # phase 1: nothing recorded -> everything blocked
         await gate.bind_camera("printer_a", "cam_a")

@@ -288,8 +288,7 @@ def _summarize(results: list[dict[str, Any]]) -> dict[str, Any]:
 def _head_lines(value: str, *, max_lines: int = 6, max_chars: int = 240) -> list[str]:
     lines = value.splitlines()
     return [
-        line if len(line) <= max_chars else f"{line[:max_chars]}..."
-        for line in lines[:max_lines]
+        line if len(line) <= max_chars else f"{line[:max_chars]}..." for line in lines[:max_lines]
     ]
 
 

@@ -822,24 +822,16 @@ def module_agent_cli_readiness() -> dict[str, Any]:
         record["module_id"] for record in records if record["read_only_runner_available"]
     ]
     executable_path_runners = [
-        record["module_id"]
-        for record in records
-        if record["executable_path_runner_available"]
+        record["module_id"] for record in records if record["executable_path_runner_available"]
     ]
     python_import_repair_runners = [
-        record["module_id"]
-        for record in records
-        if record["python_import_repair_available"]
+        record["module_id"] for record in records if record["python_import_repair_available"]
     ]
     cli_install_config_runners = [
-        record["module_id"]
-        for record in records
-        if record["cli_install_config_available"]
+        record["module_id"] for record in records if record["cli_install_config_available"]
     ]
     npm_package_preflight_runners = [
-        record["module_id"]
-        for record in records
-        if record["npm_package_preflight_available"]
+        record["module_id"] for record in records if record["npm_package_preflight_available"]
     ]
     return {
         "status": "ready",
@@ -913,27 +905,19 @@ def _agent_cli_readiness_record(mod: dict[str, Any]) -> dict[str, Any]:
         "read_only_runner_route": f"/api/modules/{mod['id']}/runtime/read-only-runner"
         if contract.get("read_only_runner_available")
         else None,
-        "executable_path_runner_available": bool(
-            contract.get("executable_path_runner_available")
-        ),
+        "executable_path_runner_available": bool(contract.get("executable_path_runner_available")),
         "executable_path_runner_route": f"/api/modules/{mod['id']}/runtime/executable-path-runner"
         if contract.get("executable_path_runner_available")
         else None,
-        "python_import_repair_available": bool(
-            contract.get("python_import_repair_available")
-        ),
+        "python_import_repair_available": bool(contract.get("python_import_repair_available")),
         "python_import_repair_route": f"/api/modules/{mod['id']}/runtime/python-import-repair-runner"
         if contract.get("python_import_repair_available")
         else None,
-        "cli_install_config_available": bool(
-            contract.get("cli_install_config_available")
-        ),
+        "cli_install_config_available": bool(contract.get("cli_install_config_available")),
         "cli_install_config_route": f"/api/modules/{mod['id']}/runtime/cli-install-config-runner"
         if contract.get("cli_install_config_available")
         else None,
-        "npm_package_preflight_available": bool(
-            contract.get("npm_package_preflight_available")
-        ),
+        "npm_package_preflight_available": bool(contract.get("npm_package_preflight_available")),
         "npm_package_preflight_route": f"/api/modules/{mod['id']}/runtime/npm-package-runner"
         if contract.get("npm_package_preflight_available")
         else None,
@@ -1145,9 +1129,7 @@ def create_module_runtime_cli_install_config_runner(
         for item in contract.get("install_config", {}).get("detected_candidate_executables", [])
         if item.get("sha256")
     ]
-    schema_hash = (
-        contract.get("install_config", {}).get("adapter_schema", {}).get("sha256")
-    )
+    schema_hash = contract.get("install_config", {}).get("adapter_schema", {}).get("sha256")
     config_hashes = [
         item.get("sha256")
         for item in contract.get("install_config", {}).get("config_files", [])

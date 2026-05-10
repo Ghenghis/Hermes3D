@@ -23,7 +23,16 @@ from hermes3d.services.local_state import local_printers
 
 router = APIRouter()
 
-MUTATING_WORK_KINDS = {"build", "download", "install", "merge", "update", "code", "app_update", "printer_action"}
+MUTATING_WORK_KINDS = {
+    "build",
+    "download",
+    "install",
+    "merge",
+    "update",
+    "code",
+    "app_update",
+    "printer_action",
+}
 OPEN_JOB_STATUSES = {"queued", "running", "printing", "waiting_approval", "paused"}
 ACTIVE_PRINTER_STATUSES = {"printing", "active", "paused"}
 SAFE_DECISIONS = {"keep", "remove"}
@@ -120,11 +129,17 @@ def get_config() -> dict:
 @router.put("/api/learning/config")
 def put_config(body: LearningConfigUpdate) -> dict:
     if body.enabled is not None:
-        execute("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('learning.enabled', ?, datetime('now'))", (str(body.enabled).lower(),))
+        execute(
+            "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('learning.enabled', ?, datetime('now'))",
+            (str(body.enabled).lower(),),
+        )
     if body.idle_minutes is not None:
         if body.idle_minutes < 1 or body.idle_minutes > 1440:
             raise HTTPException(status_code=400, detail="idle_minutes must be between 1 and 1440")
-        execute("INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('learning.idle_minutes', ?, datetime('now'))", (str(body.idle_minutes),))
+        execute(
+            "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES ('learning.idle_minutes', ?, datetime('now'))",
+            (str(body.idle_minutes),),
+        )
     return get_config()
 
 
@@ -132,7 +147,10 @@ def put_config(body: LearningConfigUpdate) -> dict:
 def reports() -> list[dict]:
     path = DB_PATH.parent / "learning" / "reports"
     path.mkdir(parents=True, exist_ok=True)
-    return [{"filename": p.name, "path": str(p), "size_bytes": p.stat().st_size} for p in path.glob("*.md")]
+    return [
+        {"filename": p.name, "path": str(p), "size_bytes": p.stat().st_size}
+        for p in path.glob("*.md")
+    ]
 
 
 @router.get("/api/learning/reports/{filename}")
@@ -213,7 +231,13 @@ def create_idle_candidate(body: IdleCandidateCreate) -> dict:
             body.created_by,
         ),
     )
-    _record_idle_event(candidate_id, "created", body.created_by, {"status": status, "blocked_reason": blocked_reason}, proof_event_id)
+    _record_idle_event(
+        candidate_id,
+        "created",
+        body.created_by,
+        {"status": status, "blocked_reason": blocked_reason},
+        proof_event_id,
+    )
     candidate = _candidate(candidate_id)
     return {
         "accepted": status != "blocked",
@@ -240,10 +264,20 @@ def request_idle_review(candidate_id: str, body: IdleCandidateDecision | None = 
             approval_id,
             candidate["title"],
             candidate["agent_id"],
-            as_json({"candidate_id": candidate_id, "target_tab": candidate.get("target_tab"), "branch_ref": candidate.get("branch_ref")}),
+            as_json(
+                {
+                    "candidate_id": candidate_id,
+                    "target_tab": candidate.get("target_tab"),
+                    "branch_ref": candidate.get("branch_ref"),
+                }
+            ),
         ),
     )
-    proof_event_id = _append_proof("learning.idle_candidate.review_requested", actor, {"candidate_id": candidate_id, "approval_id": approval_id})
+    proof_event_id = _append_proof(
+        "learning.idle_candidate.review_requested",
+        actor,
+        {"candidate_id": candidate_id, "approval_id": approval_id},
+    )
     proof_ids = [*_json_list(candidate.get("proof_event_ids")), proof_event_id]
     execute(
         """
@@ -257,8 +291,16 @@ def request_idle_review(candidate_id: str, body: IdleCandidateDecision | None = 
         """,
         (approval_id, json.dumps(proof_ids), candidate_id),
     )
-    _record_idle_event(candidate_id, "review_requested", actor, {"approval_id": approval_id}, proof_event_id)
-    return {"accepted": True, "status": "ready_for_review", "approval_id": approval_id, "proof_event_id": proof_event_id, "candidate": _candidate(candidate_id)}
+    _record_idle_event(
+        candidate_id, "review_requested", actor, {"approval_id": approval_id}, proof_event_id
+    )
+    return {
+        "accepted": True,
+        "status": "ready_for_review",
+        "approval_id": approval_id,
+        "proof_event_id": proof_event_id,
+        "candidate": _candidate(candidate_id),
+    }
 
 
 @router.post("/api/learning/idle-workbench/candidates/{candidate_id}/decision")
@@ -270,9 +312,18 @@ def decide_idle_candidate(candidate_id: str, body: IdleCandidateDecision) -> dic
     if decision == "merge":
         reason = _merge_block_reason(candidate, blockers)
         if reason:
-            proof_event_id = _append_proof("learning.idle_candidate.merge_blocked", actor, {"candidate_id": candidate_id, "reason": reason})
-            _record_idle_event(candidate_id, "merge_blocked", actor, {"reason": reason}, proof_event_id)
-            raise HTTPException(status_code=409, detail={"status": "blocked", "reason": reason, "proof_event_id": proof_event_id})
+            proof_event_id = _append_proof(
+                "learning.idle_candidate.merge_blocked",
+                actor,
+                {"candidate_id": candidate_id, "reason": reason},
+            )
+            _record_idle_event(
+                candidate_id, "merge_blocked", actor, {"reason": reason}, proof_event_id
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={"status": "blocked", "reason": reason, "proof_event_id": proof_event_id},
+            )
         next_status = "completed"
     elif decision in SAFE_DECISIONS:
         next_status = "approved" if decision == "keep" else "rejected"
@@ -281,7 +332,12 @@ def decide_idle_candidate(candidate_id: str, body: IdleCandidateDecision) -> dic
     proof_event_id = _append_proof(
         "learning.idle_candidate.decision",
         actor,
-        {"candidate_id": candidate_id, "decision": decision, "status": next_status, "reason": body.reason},
+        {
+            "candidate_id": candidate_id,
+            "decision": decision,
+            "status": next_status,
+            "reason": body.reason,
+        },
     )
     proof_ids = [*_json_list(candidate.get("proof_event_ids")), proof_event_id]
     execute(
@@ -295,8 +351,20 @@ def decide_idle_candidate(candidate_id: str, body: IdleCandidateDecision) -> dic
         """,
         (next_status, json.dumps(proof_ids), candidate_id),
     )
-    _record_idle_event(candidate_id, f"decision_{decision}", actor, {"status": next_status, "reason": body.reason}, proof_event_id)
-    return {"accepted": True, "status": next_status, "decision": decision, "proof_event_id": proof_event_id, "candidate": _candidate(candidate_id)}
+    _record_idle_event(
+        candidate_id,
+        f"decision_{decision}",
+        actor,
+        {"status": next_status, "reason": body.reason},
+        proof_event_id,
+    )
+    return {
+        "accepted": True,
+        "status": next_status,
+        "decision": decision,
+        "proof_event_id": proof_event_id,
+        "candidate": _candidate(candidate_id),
+    }
 
 
 @router.post("/api/learning/idle-workbench/candidates/{candidate_id}/run")
@@ -329,7 +397,13 @@ def run_idle_candidate(candidate_id: str, body: IdleCandidateRun | None = None) 
             """,
             (reason, json.dumps(proof_ids), candidate_id),
         )
-        _record_idle_event(candidate_id, "run_blocked", actor, {"reason": reason, "missing": missing}, proof_event_id)
+        _record_idle_event(
+            candidate_id,
+            "run_blocked",
+            actor,
+            {"reason": reason, "missing": missing},
+            proof_event_id,
+        )
         return {
             "accepted": False,
             "status": "blocked",
@@ -351,7 +425,13 @@ def run_idle_candidate(candidate_id: str, body: IdleCandidateRun | None = None) 
             {"candidate_id": candidate_id, "kind": candidate.get("kind"), "reason": reason},
         )
         _record_idle_event(candidate_id, "run_failed", actor, {"reason": reason}, proof_event_id)
-        return {"accepted": False, "status": "runtime_error", "reason": reason, "proof_event_id": proof_event_id, "candidate": _candidate(candidate_id)}
+        return {
+            "accepted": False,
+            "status": "runtime_error",
+            "reason": reason,
+            "proof_event_id": proof_event_id,
+            "candidate": _candidate(candidate_id),
+        }
 
     report = _write_run_report(candidate, output)
     artifact_id = new_id()
@@ -366,7 +446,13 @@ def run_idle_candidate(candidate_id: str, body: IdleCandidateRun | None = None) 
             report["filename"],
             report["path"],
             report["size_bytes"],
-            as_json({"source": "idle_workbench_runner", "candidate_id": candidate_id, "sha256": report["sha256"]}),
+            as_json(
+                {
+                    "source": "idle_workbench_runner",
+                    "candidate_id": candidate_id,
+                    "sha256": report["sha256"],
+                }
+            ),
         ),
     )
     proof_event_id = _append_proof(
@@ -401,7 +487,13 @@ def run_idle_candidate(candidate_id: str, body: IdleCandidateRun | None = None) 
         """,
         (json.dumps(gate_status, sort_keys=True), json.dumps(proof_ids), candidate_id),
     )
-    _record_idle_event(candidate_id, "run_completed", actor, {"artifact_id": artifact_id, "report": report}, proof_event_id)
+    _record_idle_event(
+        candidate_id,
+        "run_completed",
+        actor,
+        {"artifact_id": artifact_id, "report": report},
+        proof_event_id,
+    )
     return {
         "accepted": True,
         "status": "ready_for_review",
@@ -415,7 +507,10 @@ def run_idle_candidate(candidate_id: str, body: IdleCandidateRun | None = None) 
 def _runner_ready() -> tuple[bool, str]:
     if env_value("HERMES3D_LEARNING_RUNNER_ENABLED").strip() == "1":
         return True, ""
-    return False, "Idle learning runner is not configured; set HERMES3D_LEARNING_RUNNER_ENABLED=1 after installing the research/report worker."
+    return (
+        False,
+        "Idle learning runner is not configured; set HERMES3D_LEARNING_RUNNER_ENABLED=1 after installing the research/report worker.",
+    )
 
 
 def _agent_runtime_ready() -> tuple[bool, str]:
@@ -425,7 +520,9 @@ def _agent_runtime_ready() -> tuple[bool, str]:
     return False, str(probe["reason"])
 
 
-def _automation_readiness(runner_ready: bool, runner_reason: str, blockers: list[dict[str, Any]]) -> dict[str, Any]:
+def _automation_readiness(
+    runner_ready: bool, runner_reason: str, blockers: list[dict[str, Any]]
+) -> dict[str, Any]:
     agent_ready, agent_reason = _agent_runtime_ready()
     capabilities: list[dict[str, Any]] = []
     blocker_labels = ", ".join(str(item.get("label") or item.get("id")) for item in blockers[:4])
@@ -446,7 +543,9 @@ def _automation_readiness(runner_ready: bool, runner_reason: str, blockers: list
                 "execution_status": "ready" if not missing else "blocked",
                 "missing": missing,
                 "proof_required": True,
-                "safety_scope": "queue-only until runtime, blockers, approvals, and proof gates are green" if missing else "runtime execution allowed after proof gate pass",
+                "safety_scope": "queue-only until runtime, blockers, approvals, and proof gates are green"
+                if missing
+                else "runtime execution allowed after proof gate pass",
             }
         )
     return {
@@ -482,7 +581,9 @@ def _idle_blockers() -> list[dict[str, Any]]:
                     "reason": "S1 stays read-only: no movement, upload, test, or print.",
                 }
             )
-    for job in rows("SELECT id, name, status FROM jobs WHERE status IN ('queued', 'running', 'printing', 'waiting_approval', 'paused') ORDER BY created_at DESC LIMIT 12"):
+    for job in rows(
+        "SELECT id, name, status FROM jobs WHERE status IN ('queued', 'running', 'printing', 'waiting_approval', 'paused') ORDER BY created_at DESC LIMIT 12"
+    ):
         blockers.append(
             {
                 "type": "job",
@@ -492,7 +593,9 @@ def _idle_blockers() -> list[dict[str, Any]]:
                 "reason": "Open job exists; risky idle work waits for a quiet system.",
             }
         )
-    approval_count = (row("SELECT COUNT(*) AS count FROM approvals WHERE status = 'pending'") or {}).get("count", 0)
+    approval_count = (
+        row("SELECT COUNT(*) AS count FROM approvals WHERE status = 'pending'") or {}
+    ).get("count", 0)
     if approval_count:
         blockers.append(
             {
@@ -508,7 +611,9 @@ def _idle_blockers() -> list[dict[str, Any]]:
 
 def _run_missing_reasons(candidate: dict[str, Any], blockers: list[dict[str, Any]]) -> list[str]:
     missing: list[str] = []
-    enabled = (row("SELECT value FROM settings WHERE key = 'learning.enabled'") or {}).get("value", "false") == "true"
+    enabled = (row("SELECT value FROM settings WHERE key = 'learning.enabled'") or {}).get(
+        "value", "false"
+    ) == "true"
     if not enabled:
         missing.append("Idle Learning mode is disabled.")
     runner_ready, runner_reason = _runner_ready()
@@ -527,7 +632,12 @@ def _run_missing_reasons(candidate: dict[str, Any], blockers: list[dict[str, Any
 
 def _blocker_refs(blockers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
-        {"type": item.get("type"), "id": item.get("id"), "label": item.get("label"), "status": item.get("status")}
+        {
+            "type": item.get("type"),
+            "id": item.get("id"),
+            "label": item.get("label"),
+            "status": item.get("status"),
+        }
         for item in blockers
     ]
 
@@ -545,21 +655,23 @@ def _call_agent_runtime(runtime_url: str, candidate: dict[str, Any], notes: str 
         "Return recommended next steps and proof gates that should pass before any mutation."
     )
     request_body = json.dumps(
-        runtime_request_body({
-            "model": agent_id,
-            "stream": False,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a Hermes3D OS idle-workbench agent. Use real local data only when supplied. "
-                        "If information is missing, name the missing setup. S1 at 192.168.0.12 is locked for printer actions. "
-                        "This run may create a report only; it must not perform or imply external mutations."
-                    ),
-                },
-                {"role": "user", "content": user},
-            ],
-        }),
+        runtime_request_body(
+            {
+                "model": agent_id,
+                "stream": False,
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a Hermes3D OS idle-workbench agent. Use real local data only when supplied. "
+                            "If information is missing, name the missing setup. S1 at 192.168.0.12 is locked for printer actions. "
+                            "This run may create a report only; it must not perform or imply external mutations."
+                        ),
+                    },
+                    {"role": "user", "content": user},
+                ],
+            }
+        ),
         separators=(",", ":"),
     ).encode("utf-8")
     request = urllib.request.Request(
@@ -572,12 +684,18 @@ def _call_agent_runtime(runtime_url: str, candidate: dict[str, Any], notes: str 
         with urllib.request.urlopen(request, timeout=120) as response:
             payload = json.loads(response.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
-        raise RuntimeError(f"Hermes Agent runtime rejected idle candidate run: HTTP {exc.code}") from exc
+        raise RuntimeError(
+            f"Hermes Agent runtime rejected idle candidate run: HTTP {exc.code}"
+        ) from exc
     except Exception as exc:
-        raise RuntimeError(f"Hermes Agent runtime is unreachable for idle candidate run: {exc}") from exc
+        raise RuntimeError(
+            f"Hermes Agent runtime is unreachable for idle candidate run: {exc}"
+        ) from exc
     content = _runtime_content(payload)
     if not content.strip():
-        raise RuntimeError("Hermes Agent runtime returned no report content for idle candidate run.")
+        raise RuntimeError(
+            "Hermes Agent runtime returned no report content for idle candidate run."
+        )
     return content.strip()[:20000]
 
 
@@ -637,7 +755,12 @@ def _safe_report_slug(value: str) -> str:
 
 
 def _candidate_rows() -> list[dict[str, Any]]:
-    return [_candidate_from_row(item) for item in rows("SELECT * FROM idle_workbench_candidates ORDER BY updated_at DESC, created_at DESC LIMIT 50")]
+    return [
+        _candidate_from_row(item)
+        for item in rows(
+            "SELECT * FROM idle_workbench_candidates ORDER BY updated_at DESC, created_at DESC LIMIT 50"
+        )
+    ]
 
 
 def _candidate(candidate_id: str) -> dict[str, Any] | None:
@@ -660,7 +783,13 @@ def _candidate_from_row(item: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def _record_idle_event(candidate_id: str, event_type: str, actor: str, payload: dict[str, Any], proof_event_id: str | None = None) -> None:
+def _record_idle_event(
+    candidate_id: str,
+    event_type: str,
+    actor: str,
+    payload: dict[str, Any],
+    proof_event_id: str | None = None,
+) -> None:
     execute(
         """
         INSERT INTO idle_workbench_events
@@ -685,7 +814,13 @@ def _daily_prompt() -> dict[str, Any]:
     return {
         "question": "What should Hermes3D improve while the workstation is idle?",
         "last_candidate_at": latest.get("created_at") if latest else None,
-        "suggested_kinds": ["research", "app_update", "printer_maintenance", "documentation", "workflow"],
+        "suggested_kinds": [
+            "research",
+            "app_update",
+            "printer_maintenance",
+            "documentation",
+            "workflow",
+        ],
     }
 
 

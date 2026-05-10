@@ -51,12 +51,10 @@ References
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 
@@ -84,7 +82,16 @@ HERMES_AGENT_TOP_LEVEL_PACKAGES: tuple[str, ...] = (
     "acp_registry",
 )
 EXPECTED_MCP_TOOL_LINES: tuple[int, ...] = (
-    471, 528, 561, 618, 670, 699, 733, 769, 823, 839,
+    471,
+    528,
+    561,
+    618,
+    670,
+    699,
+    733,
+    769,
+    823,
+    839,
 )
 EXPECTED_MCP_TOOL_COUNT = 10
 
@@ -200,17 +207,14 @@ def test_smoke_2_canary_mcp_tools_decorator_count() -> None:
 
     text = serve.read_text(encoding="utf-8")
     lines = [
-        i
-        for i, line in enumerate(text.splitlines(), start=1)
-        if line.strip() == "@mcp.tool()"
+        i for i, line in enumerate(text.splitlines(), start=1) if line.strip() == "@mcp.tool()"
     ]
     assert len(lines) == EXPECTED_MCP_TOOL_COUNT, (
         f"Smoke 2 regression vs PR #157: expected {EXPECTED_MCP_TOOL_COUNT} "
         f"@mcp.tool() decorators, found {len(lines)} at {lines}."
     )
     assert tuple(lines) == EXPECTED_MCP_TOOL_LINES, (
-        f"Smoke 2 line drift vs PR #157: expected {EXPECTED_MCP_TOOL_LINES}, "
-        f"got {tuple(lines)}."
+        f"Smoke 2 line drift vs PR #157: expected {EXPECTED_MCP_TOOL_LINES}, got {tuple(lines)}."
     )
 
 
@@ -250,9 +254,7 @@ def test_smoke_3_minimax_build_probe_request_redacted_header(
     # but it MUST NOT appear in any other returned string.
     assert "sk-test-DUMMY-DO-NOT-USE" in auth
     for piece in (method, url):
-        assert "sk-test" not in piece, (
-            f"Smoke 3 secret leak: API key value appeared in {piece!r}."
-        )
+        assert "sk-test" not in piece, f"Smoke 3 secret leak: API key value appeared in {piece!r}."
 
 
 # ---------------------------------------------------------------------------
@@ -423,12 +425,14 @@ def test_smoke_7_blk013_bounded_task_endpoint_via_testclient(
     ready_sandbox["workspace_mount"] = str(code_history.PROJECT_ROOT)
 
     monkeypatch.setattr(
-        code_history, "_cli_runner_status",
+        code_history,
+        "_cli_runner_status",
         lambda runner_id: dict(_DETECTED_RUNNER_FIXTURE, id=runner_id),
     )
     monkeypatch.setattr(code_history, "code_sandbox_readiness", lambda: ready_sandbox)
     monkeypatch.setattr(
-        code_history, "_safe_mcp_files",
+        code_history,
+        "_safe_mcp_files",
         lambda files, must_exist: [str(f) for f in files],
     )
     monkeypatch.setattr(code_history, "append_mcp_evidence", fake_evidence)

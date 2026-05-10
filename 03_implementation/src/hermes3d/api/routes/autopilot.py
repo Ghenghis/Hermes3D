@@ -37,25 +37,57 @@ def readiness() -> list[dict]:
     unlocked = [printer for printer in printers if not printer["maintenance_flag"]]
     plugins = rows("SELECT id, state FROM plugins")
     checks = {
-        "Printer Connectivity": (any(p["status"] in {"online", "printing", "paused"} for p in unlocked), "No unlocked printer is marked online in local state."),
-        "Slicer Availability": (any("slicer" in str(p["id"]).lower() and p["state"] == "ACTIVE" for p in plugins), "No slicer plugin is active."),
-        "Agent Health": (True, "Agent API is available; live agent runtime may still be not_configured."),
+        "Printer Connectivity": (
+            any(p["status"] in {"online", "printing", "paused"} for p in unlocked),
+            "No unlocked printer is marked online in local state.",
+        ),
+        "Slicer Availability": (
+            any("slicer" in str(p["id"]).lower() and p["state"] == "ACTIVE" for p in plugins),
+            "No slicer plugin is active.",
+        ),
+        "Agent Health": (
+            True,
+            "Agent API is available; live agent runtime may still be not_configured.",
+        ),
         "Safety Gate Status": (True, "S1 hard lock is enforced by backend policy."),
-        "Proof Gate Status": (bool(row("SELECT id FROM truth_gate_results LIMIT 1")), "No truth gate result has been recorded yet."),
+        "Proof Gate Status": (
+            bool(row("SELECT id FROM truth_gate_results LIMIT 1")),
+            "No truth gate result has been recorded yet.",
+        ),
         "Filament Profile Loaded": (False, "No filament profile source is configured."),
         "Bed Mesh Calibrated": (False, "No Moonraker bed mesh telemetry is configured."),
         "Nozzle Temp Verified": (False, "No live temperature telemetry is configured."),
         "Movement Lock State": (True, "S1 movement/upload/test/capture routes remain locked."),
-        "Dispatch Gate Open": (not bool(row("SELECT id FROM approvals WHERE status = 'pending' LIMIT 1")), "Approval queue has pending items."),
-        "Model LLM Available": (bool(os.environ.get("HERMES3D_MODEL_LLM_URL")), "HERMES3D_MODEL_LLM_URL is not configured."),
-        "ComfyUI Available": (port_reachable(service_url("comfyui")), "ComfyUI URL is not configured or unreachable."),
+        "Dispatch Gate Open": (
+            not bool(row("SELECT id FROM approvals WHERE status = 'pending' LIMIT 1")),
+            "Approval queue has pending items.",
+        ),
+        "Model LLM Available": (
+            bool(os.environ.get("HERMES3D_MODEL_LLM_URL")),
+            "HERMES3D_MODEL_LLM_URL is not configured.",
+        ),
+        "ComfyUI Available": (
+            port_reachable(service_url("comfyui")),
+            "ComfyUI URL is not configured or unreachable.",
+        ),
         "Evidence Ledger Reachable": (True, "SQLite evidence tables are available."),
         "Operator Present": (True, "Local operator is present through this UI session."),
-        "Approval Queue Clear": (not bool(row("SELECT id FROM approvals WHERE status = 'pending' LIMIT 1")), "Approval queue has pending items."),
-        "API Token Set": (bool(os.environ.get("HERMES3D_GUI_TOKEN")), "HERMES3D_GUI_TOKEN is not set."),
+        "Approval Queue Clear": (
+            not bool(row("SELECT id FROM approvals WHERE status = 'pending' LIMIT 1")),
+            "Approval queue has pending items.",
+        ),
+        "API Token Set": (
+            bool(os.environ.get("HERMES3D_GUI_TOKEN")),
+            "HERMES3D_GUI_TOKEN is not set.",
+        ),
     }
     return [
-        {"id": label.lower().replace(" ", "_"), "name": label, "ready": checks[label][0], "message": "" if checks[label][0] else checks[label][1]}
+        {
+            "id": label.lower().replace(" ", "_"),
+            "name": label,
+            "ready": checks[label][0],
+            "message": "" if checks[label][0] else checks[label][1],
+        }
         for label in CHECKS
     ]
 
@@ -93,7 +125,10 @@ def write_report() -> dict:
             "This file was written by the live Hermes3D backend.",
             "",
             "Guardrails:",
-            *[f"- {item['id']}: {item['rule']} ({'enforced' if item['enforced'] else 'not enforced'})" for item in guardrails()],
+            *[
+                f"- {item['id']}: {item['rule']} ({'enforced' if item['enforced'] else 'not enforced'})"
+                for item in guardrails()
+            ],
             "",
             "Readiness summary:",
             *_readiness_lines(),
@@ -104,9 +139,21 @@ def write_report() -> dict:
 @router.get("/api/autopilot/guardrails")
 def guardrails() -> list[dict]:
     return [
-        {"id": "s1_lock", "rule": "FLSUN S1 is locked: no movement, upload, test, or capture.", "enforced": True},
-        {"id": "approval_required", "rule": "Print start requires job_id with approved PRINT_APPROVAL.", "enforced": True},
-        {"id": "truth_gate", "rule": "Print start requires passing truth-gate records for every configured gate.", "enforced": True},
+        {
+            "id": "s1_lock",
+            "rule": "FLSUN S1 is locked: no movement, upload, test, or capture.",
+            "enforced": True,
+        },
+        {
+            "id": "approval_required",
+            "rule": "Print start requires job_id with approved PRINT_APPROVAL.",
+            "enforced": True,
+        },
+        {
+            "id": "truth_gate",
+            "rule": "Print start requires passing truth-gate records for every configured gate.",
+            "enforced": True,
+        },
     ]
 
 

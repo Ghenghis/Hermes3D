@@ -35,13 +35,19 @@ def activate(plugin_id: str) -> dict:
                 "plugin": _honest_plugin(plugin),
             },
         )
-    execute("UPDATE plugins SET state = 'ACTIVE', activated_at = datetime('now') WHERE id = ?", (plugin_id,))
+    execute(
+        "UPDATE plugins SET state = 'ACTIVE', activated_at = datetime('now') WHERE id = ?",
+        (plugin_id,),
+    )
     return _honest_plugin(row("SELECT * FROM plugins WHERE id = ?", (plugin_id,)) or plugin)
 
 
 @router.post("/api/plugins/{plugin_id}/deactivate")
 def deactivate(plugin_id: str) -> dict:
-    execute("UPDATE plugins SET state = 'READY', updated_at = datetime('now') WHERE id = ?", (plugin_id,))
+    execute(
+        "UPDATE plugins SET state = 'READY', updated_at = datetime('now') WHERE id = ?",
+        (plugin_id,),
+    )
     plugin = row("SELECT * FROM plugins WHERE id = ?", (plugin_id,))
     if not plugin:
         raise HTTPException(status_code=404, detail="plugin not found")
@@ -58,13 +64,19 @@ def get_config(plugin_id: str) -> dict:
 
 @router.put("/api/plugins/{plugin_id}/config")
 def put_config(plugin_id: str, body: PluginConfig) -> dict:
-    execute("UPDATE plugins SET config = ?, updated_at = datetime('now') WHERE id = ?", (json.dumps(body.config), plugin_id))
+    execute(
+        "UPDATE plugins SET config = ?, updated_at = datetime('now') WHERE id = ?",
+        (json.dumps(body.config), plugin_id),
+    )
     return {"plugin_id": plugin_id, "config": _redact_config(body.config)}
 
 
 @router.get("/api/plugins/{plugin_id}/logs")
 def logs(plugin_id: str, limit: int = 50) -> dict:
-    return {"plugin_id": plugin_id, "lines": [f"{plugin_id}: no live log source configured"][:limit]}
+    return {
+        "plugin_id": plugin_id,
+        "lines": [f"{plugin_id}: no live log source configured"][:limit],
+    }
 
 
 @router.get("/api/plugins/{plugin_id}/status")
@@ -73,7 +85,12 @@ def status(plugin_id: str) -> dict:
     if not plugin:
         raise HTTPException(status_code=404, detail="plugin not found")
     honest = _honest_plugin(plugin)
-    return {"id": honest["id"], "state": honest["state"], "status": honest["status"], "reason": honest["reason"]}
+    return {
+        "id": honest["id"],
+        "state": honest["state"],
+        "status": honest["status"],
+        "reason": honest["reason"],
+    }
 
 
 def _honest_plugin(plugin: dict) -> dict:
@@ -100,7 +117,14 @@ def _honest_plugin(plugin: dict) -> dict:
 
 def _plugin_configured(plugin_id: str, config_json: str | None) -> tuple[bool, str]:
     config = json.loads(config_json or "{}")
-    if plugin_id in {"moonraker", "camera-observer", "visual-evidence", "maintenance", "evidence-ledger", "autopilot-setup"}:
+    if plugin_id in {
+        "moonraker",
+        "camera-observer",
+        "visual-evidence",
+        "maintenance",
+        "evidence-ledger",
+        "autopilot-setup",
+    }:
         return True, ""
     if plugin_id == "azure-voice":
         ok = bool(os.environ.get("AZURE_SPEECH_KEY") and os.environ.get("AZURE_SPEECH_REGION"))
@@ -124,4 +148,6 @@ def _redact_config(value: object) -> object:
 
 def _secret_key(key: object) -> bool:
     lowered = str(key).lower()
-    return any(token in lowered for token in ("key", "token", "secret", "password", "authorization"))
+    return any(
+        token in lowered for token in ("key", "token", "secret", "password", "authorization")
+    )

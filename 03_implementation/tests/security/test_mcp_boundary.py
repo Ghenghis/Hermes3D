@@ -53,8 +53,8 @@ def test_s1_printer_is_locked_in_local_printers() -> None:
     local_state = importlib.import_module("hermes3d.services.local_state")
     src = inspect.getsource(local_state.local_printers)
     # The locked flag is computed as `locked = printer_id == 'flsun_s1'`.
-    assert 'flsun_s1' in src
-    assert 'locked' in src
+    assert "flsun_s1" in src
+    assert "locked" in src
 
 
 # --------------------------------------------------------------------------- #
@@ -100,9 +100,9 @@ def test_trusted_runtime_url_accepts_loopback() -> None:
 def test_trusted_runtime_url_rejects_self_bridge_ports(port: int) -> None:
     agent_runtime = importlib.import_module("hermes3d.services.agent_runtime")
     url = f"http://127.0.0.1:{port}/v1"
-    assert (
-        agent_runtime.trusted_runtime_url({"HERMES3D_AGENT_RUNTIME_URL": url}) is None
-    ), f"self-bridge port {port} must be rejected to prevent recursion"
+    assert agent_runtime.trusted_runtime_url({"HERMES3D_AGENT_RUNTIME_URL": url}) is None, (
+        f"self-bridge port {port} must be rejected to prevent recursion"
+    )
 
 
 # --------------------------------------------------------------------------- #

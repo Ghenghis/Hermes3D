@@ -68,7 +68,8 @@ def main() -> int:
     installed_git = [
         row
         for row in rows
-        if row["install_state"] in {"installed", "healthy"} and is_git_checkout(row.get("local_path"))
+        if row["install_state"] in {"installed", "healthy"}
+        and is_git_checkout(row.get("local_path"))
     ]
     detected_non_git = [row for row in rows if row["install_state"] == "detected"]
     source_available = [row for row in rows if row["install_state"] == "source_available"]

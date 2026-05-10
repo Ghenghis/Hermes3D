@@ -12,11 +12,7 @@ from pathlib import Path
 
 import pytest
 
-PROOF_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "proof"
-    / "GEN3D_VERIFY_2026-05-06.json"
-)
+PROOF_PATH = Path(__file__).resolve().parents[2] / "proof" / "GEN3D_VERIFY_2026-05-06.json"
 
 EXPECTED_PROVIDERS = {
     "comfyui",

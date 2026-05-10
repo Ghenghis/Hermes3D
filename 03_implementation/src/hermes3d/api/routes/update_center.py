@@ -10,6 +10,7 @@ that the Settings → Update Center subtab consumes. It surfaces:
 - Provider health summary
 - Failsafe / rollback availability per component
 """
+
 from __future__ import annotations
 
 import json
@@ -36,7 +37,11 @@ _BACKEND_PKG = IMPLEMENTATION_ROOT / "pyproject.toml"
 # app-manifest file will exist next to the executable.  We look for the
 # env var the Velopack SDK sets at runtime first.
 _VELOPACK_ENV = "VELOPACK_CURRENT_VERSION"
-_VELOPACK_MANIFEST = Path(os.environ.get("VELOPACK_APP_DIR", "")) / "current" / "RELEASES" if os.environ.get("VELOPACK_APP_DIR") else None
+_VELOPACK_MANIFEST = (
+    Path(os.environ.get("VELOPACK_APP_DIR", "")) / "current" / "RELEASES"
+    if os.environ.get("VELOPACK_APP_DIR")
+    else None
+)
 
 
 def _utc_now() -> str:
@@ -72,9 +77,9 @@ def _backend_version() -> dict[str, Any]:
             for line in path.read_text(encoding="utf-8").splitlines():
                 stripped = line.strip()
                 if stripped.startswith("version") and "=" in stripped:
-                    version = stripped.split("=", 1)[1].strip().strip('"\'')
+                    version = stripped.split("=", 1)[1].strip().strip("\"'")
                 if stripped.startswith("name") and "=" in stripped:
-                    name = stripped.split("=", 1)[1].strip().strip('"\'')
+                    name = stripped.split("=", 1)[1].strip().strip("\"'")
         except OSError:
             pass
     return {
@@ -127,7 +132,9 @@ def _component_backup_available(component: str) -> dict[str, Any]:
             "component": component,
             "backup_available": False,
             "latest_backup": None,
-            "rollback_action": "POST /api/desktop/update/backup" if component == "hermes-desktop" else "POST /api/agents/update/backup",
+            "rollback_action": "POST /api/desktop/update/backup"
+            if component == "hermes-desktop"
+            else "POST /api/agents/update/backup",
         }
     backups = sorted(backup_root.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
     if not backups:
@@ -135,7 +142,9 @@ def _component_backup_available(component: str) -> dict[str, Any]:
             "component": component,
             "backup_available": False,
             "latest_backup": None,
-            "rollback_action": "POST /api/desktop/update/backup" if component == "hermes-desktop" else "POST /api/agents/update/backup",
+            "rollback_action": "POST /api/desktop/update/backup"
+            if component == "hermes-desktop"
+            else "POST /api/agents/update/backup",
         }
     try:
         meta = json.loads(backups[0].read_text(encoding="utf-8"))
@@ -149,7 +158,9 @@ def _component_backup_available(component: str) -> dict[str, Any]:
                 "tag": meta.get("tag"),
                 "commit": meta.get("commit"),
             },
-            "rollback_action": "POST /api/agents/update/rollback" if component == "hermes-agent" else "POST /api/desktop/update/rollback",
+            "rollback_action": "POST /api/agents/update/rollback"
+            if component == "hermes-agent"
+            else "POST /api/desktop/update/rollback",
         }
     except Exception:
         return {
@@ -270,9 +281,11 @@ def update_center() -> dict[str, Any]:
     except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log the proof-event insert fallback
         try:
             import logging
+
             logging.getLogger(__name__).warning(
                 "update_center.read: proof_events insert failed: %s: %s",
-                type(exc).__name__, exc,
+                type(exc).__name__,
+                exc,
             )
         except Exception:  # noqa: BLE001
             pass
@@ -287,10 +300,14 @@ def request_rollback(component: str) -> dict[str, Any]:
     allowed = {"hermes-desktop", "hermes-agent"}
     if component not in allowed:
         from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail=f"Unknown component '{component}'. Allowed: {sorted(allowed)}")
+
+        raise HTTPException(
+            status_code=400, detail=f"Unknown component '{component}'. Allowed: {sorted(allowed)}"
+        )
     meta = _component_backup_available(component)
     if not meta["backup_available"]:
         from fastapi import HTTPException
+
         raise HTTPException(
             status_code=409,
             detail={

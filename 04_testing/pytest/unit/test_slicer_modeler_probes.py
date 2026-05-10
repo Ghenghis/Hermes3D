@@ -19,14 +19,13 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from hermes3d.services import module_runtime
 from hermes3d.services.module_runtime import (
-    probe_slicer_cli,
-    probe_modeler_import,
-    SLICER_MODULE_IDS,
     MODELER_PYTHON_IMPORT_IDS,
     MODELER_SOURCE_INVENTORY_IDS,
+    SLICER_MODULE_IDS,
+    probe_modeler_import,
+    probe_slicer_cli,
 )
 
 # ---------------------------------------------------------------------------
@@ -172,9 +171,7 @@ def test_probe_modeler_import_returns_required_fields(module_id: str) -> None:
 
 
 @pytest.mark.parametrize("module_id", sorted(MODELER_PYTHON_IMPORT_IDS))
-def test_probe_modeler_import_blocked_reason_when_import_fails(
-    monkeypatch, module_id: str
-) -> None:
+def test_probe_modeler_import_blocked_reason_when_import_fails(monkeypatch, module_id: str) -> None:
     """When the import fails, blocked_reason names the Python module."""
     # Force subprocess to return non-zero (import failed)
     mock_proc = MagicMock()
@@ -319,4 +316,7 @@ def test_probe_modeler_import_truck_returns_blocked_with_reason() -> None:
     result = probe_modeler_import("truck")
     assert result["status"] == "blocked"
     assert result["blocked_reason"] is not None
-    assert "source-inventory" in result["blocked_reason"].lower() or "truck" in result["blocked_reason"].lower()
+    assert (
+        "source-inventory" in result["blocked_reason"].lower()
+        or "truck" in result["blocked_reason"].lower()
+    )

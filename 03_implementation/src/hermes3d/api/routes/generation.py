@@ -23,7 +23,9 @@ _LANE04_PROOF_PATH = (
 )
 
 # Adapter registry schemas dir for template discovery
-_SCHEMAS_DIR = Path(__file__).resolve().parents[6] / "03_implementation" / "adapter_registry" / "schemas"
+_SCHEMAS_DIR = (
+    Path(__file__).resolve().parents[6] / "03_implementation" / "adapter_registry" / "schemas"
+)
 
 router = APIRouter()
 
@@ -60,7 +62,9 @@ def services() -> list[dict]:
                 "id": service_id,
                 "name": name,
                 "url": url,
-                "status": "online" if port_reachable(url) else ("unreachable" if url else "not_configured"),
+                "status": "online"
+                if port_reachable(url)
+                else ("unreachable" if url else "not_configured"),
                 "setup": {"settings_key": f"service.{service_id}.url"},
             }
         )
@@ -91,7 +95,7 @@ def gen3d_providers() -> list[dict[str, Any]]:
             lane04_proof = {}
 
     lane04_providers: dict[str, dict[str, Any]] = {}
-    for p in (lane04_proof.get("providers") or []):
+    for p in lane04_proof.get("providers") or []:
         if isinstance(p, dict) and isinstance(p.get("id"), str):
             lane04_providers[p["id"]] = p
 
@@ -129,18 +133,20 @@ def gen3d_providers() -> list[dict[str, Any]]:
         else:
             readiness = "unavailable"
 
-        result.append({
-            "provider_id": provider_id,
-            "label": label,
-            "readiness": readiness,
-            "installed": installed,
-            "pip_version": pip_version,
-            "repo_reachable": repo_reachable,
-            "weights_present": weights_present,
-            "live_reachable": live_reachable,
-            "proof_source": "GEN3D_VERIFY_2026-05-06.json" if lane04 else None,
-            "proof_gate_version": lane04.get("proof_gate_version"),
-        })
+        result.append(
+            {
+                "provider_id": provider_id,
+                "label": label,
+                "readiness": readiness,
+                "installed": installed,
+                "pip_version": pip_version,
+                "repo_reachable": repo_reachable,
+                "weights_present": weights_present,
+                "live_reachable": live_reachable,
+                "proof_source": "GEN3D_VERIFY_2026-05-06.json" if lane04 else None,
+                "proof_gate_version": lane04.get("proof_gate_version"),
+            }
+        )
     return result
 
 
@@ -184,20 +190,22 @@ def gen3d_templates() -> list[dict[str, Any]]:
     for provider_id, (schema_file, provider_label) in provider_schema_map.items():
         schema_path = _SCHEMAS_DIR / schema_file
         schema_valid = schema_path.is_file()
-        local_templates.append({
-            "id": f"{provider_id}_text_to_3d",
-            "name": f"{provider_label} — Text to 3D",
-            "source": "provider_backed",
-            "description": f"Text-to-3D generation via {provider_label}. Requires the provider to be running.",
-            "parameters": [
-                {"name": "prompt", "type": "str", "default": ""},
-                {"name": "seed", "type": "int", "default": 42},
-            ],
-            "outputs": ["glb", "stl", "preview_png"],
-            "requires_provider": provider_id,
-            "schema_file": schema_file if schema_valid else None,
-            "schema_present": schema_valid,
-        })
+        local_templates.append(
+            {
+                "id": f"{provider_id}_text_to_3d",
+                "name": f"{provider_label} — Text to 3D",
+                "source": "provider_backed",
+                "description": f"Text-to-3D generation via {provider_label}. Requires the provider to be running.",
+                "parameters": [
+                    {"name": "prompt", "type": "str", "default": ""},
+                    {"name": "seed", "type": "int", "default": 42},
+                ],
+                "outputs": ["glb", "stl", "preview_png"],
+                "requires_provider": provider_id,
+                "schema_file": schema_file if schema_valid else None,
+                "schema_present": schema_valid,
+            }
+        )
 
     return local_templates
 
@@ -247,14 +255,30 @@ def run_truth_gate(body: TruthGateRun) -> dict:
     for item in results:
         execute(
             "INSERT INTO truth_gate_results (id, job_id, gate_name, status, error, duration_s) VALUES (?, ?, ?, ?, ?, ?)",
-            (new_id(), body.job_id, item["gate_name"], item["status"], item["error"], item["duration_s"]),
+            (
+                new_id(),
+                body.job_id,
+                item["gate_name"],
+                item["status"],
+                item["error"],
+                item["duration_s"],
+            ),
         )
-    return {"job_id": body.job_id, "mesh_path": body.mesh_path, "printer_id": body.printer_id, "duration_s": round(time.monotonic() - started, 4), "gates": results}
+    return {
+        "job_id": body.job_id,
+        "mesh_path": body.mesh_path,
+        "printer_id": body.printer_id,
+        "duration_s": round(time.monotonic() - started, 4),
+        "gates": results,
+    }
 
 
 @router.get("/api/truth-gate/{job_id}/results")
 def truth_gate_results(job_id: str) -> list[dict]:
-    return rows("SELECT * FROM truth_gate_results WHERE job_id = ? ORDER BY checked_at, gate_name", (job_id,))
+    return rows(
+        "SELECT * FROM truth_gate_results WHERE job_id = ? ORDER BY checked_at, gate_name",
+        (job_id,),
+    )
 
 
 def _supported_generation_templates() -> list[dict[str, Any]]:
@@ -306,7 +330,9 @@ def _execute_generation_template(request: GenerationRun, template_id: str) -> di
     mesh.apply_translation((0, 0, size_mm / 2))
     mesh.export(mesh_path, file_type="stl")
     if not mesh_path.exists() or mesh_path.stat().st_size <= 0:
-        raise HTTPException(status_code=500, detail={"status": "failed", "reason": "Generated mesh file is empty."})
+        raise HTTPException(
+            status_code=500, detail={"status": "failed", "reason": "Generated mesh file is empty."}
+        )
     written_proof = write_proof(
         mesh_path=mesh_path,
         output_path=proof_path,
@@ -316,9 +342,17 @@ def _execute_generation_template(request: GenerationRun, template_id: str) -> di
     )
     proof = json.loads(written_proof.read_text(encoding="utf-8"))
     truth_report = proof.get("truth_gate_report") if isinstance(proof, dict) else {}
-    truth_status = str(truth_report.get("overall_status") if isinstance(truth_report, dict) else "error")
+    truth_status = str(
+        truth_report.get("overall_status") if isinstance(truth_report, dict) else "error"
+    )
     if truth_status != "pass":
-        raise HTTPException(status_code=500, detail={"status": "failed", "reason": f"Truth gate rejected generated mesh with status {truth_status}."})
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "failed",
+                "reason": f"Truth gate rejected generated mesh with status {truth_status}.",
+            },
+        )
     preview_path.write_text(_cube_preview_svg(size_mm, signature), encoding="utf-8")
 
     mesh_sha = _file_sha256(mesh_path)
@@ -352,15 +386,17 @@ def _execute_generation_template(request: GenerationRun, template_id: str) -> di
             mesh_path.name,
             str(mesh_path),
             mesh_path.stat().st_size,
-            as_json({
-                "sha256": mesh_sha,
-                "template": template_id,
-                "signature": signature,
-                "size_mm": size_mm,
-                "seed": request.seed,
-                "reference_artifact_id": request.reference_artifact_id,
-                "mesh": _mesh_summary(mesh),
-            }),
+            as_json(
+                {
+                    "sha256": mesh_sha,
+                    "template": template_id,
+                    "signature": signature,
+                    "size_mm": size_mm,
+                    "seed": request.seed,
+                    "reference_artifact_id": request.reference_artifact_id,
+                    "mesh": _mesh_summary(mesh),
+                }
+            ),
         ),
     )
     execute(
@@ -374,7 +410,13 @@ def _execute_generation_template(request: GenerationRun, template_id: str) -> di
             written_proof.name,
             str(written_proof),
             written_proof.stat().st_size,
-            as_json({"sha256": proof_sha, "mesh_artifact_id": mesh_artifact_id, "truth_gate_status": truth_status}),
+            as_json(
+                {
+                    "sha256": proof_sha,
+                    "mesh_artifact_id": mesh_artifact_id,
+                    "truth_gate_status": truth_status,
+                }
+            ),
         ),
     )
     execute(
@@ -388,7 +430,13 @@ def _execute_generation_template(request: GenerationRun, template_id: str) -> di
             preview_path.name,
             str(preview_path),
             preview_path.stat().st_size,
-            as_json({"sha256": preview_sha, "mesh_artifact_id": mesh_artifact_id, "source": "mesh_extents"}),
+            as_json(
+                {
+                    "sha256": preview_sha,
+                    "mesh_artifact_id": mesh_artifact_id,
+                    "source": "mesh_extents",
+                }
+            ),
         ),
     )
     execute(
@@ -457,16 +505,26 @@ def _generation_title(prompt: str) -> str:
     return first[:80] or "3D Generation"
 
 
-def _constraint_float(constraints: dict[str, Any], key: str, default: float, *, minimum: float, maximum: float) -> float:
+def _constraint_float(
+    constraints: dict[str, Any], key: str, default: float, *, minimum: float, maximum: float
+) -> float:
     value = constraints.get(key, default)
     if value is None or value == "":
         return default
     try:
         parsed = float(value)
     except (TypeError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail={"status": "blocked", "reason": f"{key} must be numeric."}) from exc
+        raise HTTPException(
+            status_code=422, detail={"status": "blocked", "reason": f"{key} must be numeric."}
+        ) from exc
     if not (minimum <= parsed <= maximum):
-        raise HTTPException(status_code=422, detail={"status": "blocked", "reason": f"{key} must be between {minimum:g} and {maximum:g} mm."})
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "status": "blocked",
+                "reason": f"{key} must be between {minimum:g} and {maximum:g} mm.",
+            },
+        )
     return parsed
 
 
@@ -478,15 +536,15 @@ def _cube_preview_svg(size_mm: float, signature: str) -> str:
         '<g fill="none" stroke="#20d8ff" stroke-width="3" stroke-linejoin="round">'
         '<path d="M220 130h190l70 70v160H290l-70-70z"/>'
         '<path d="M220 130l70 70h190M290 200v160M410 130v160l70 70"/>'
-        '</g>'
+        "</g>"
         '<g stroke="#1b3658" stroke-width="1">'
         '<path d="M120 360h420"/>'
         '<path d="M160 320h420"/>'
         '<path d="M200 280h420"/>'
-        '</g>'
+        "</g>"
         f'<text x="32" y="48" fill="#dbeafe" font-family="monospace" font-size="24">{label}</text>'
         f'<text x="32" y="82" fill="#7dd3fc" font-family="monospace" font-size="16">proof signature {signature}</text>'
-        '</svg>'
+        "</svg>"
     )
 
 

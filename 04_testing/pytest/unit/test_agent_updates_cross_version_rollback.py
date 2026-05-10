@@ -36,9 +36,7 @@ from typing import Any
 
 import pytest
 from fastapi import HTTPException
-
 from hermes3d.api.routes import agent_updates
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -113,7 +111,9 @@ def test_f1_latest_backup_unfiltered_back_compat(
 ) -> None:
     """When ``checkout_path is None`` legacy behavior is preserved."""
     monkeypatch.setattr(agent_updates, "BACKUP_ROOT", tmp_path)
-    _write_backup(tmp_path, "20260509T000000Z_aaaaaaaa_v2026.5.7_abcdef012345", checkout_path=V013_DEFAULT)
+    _write_backup(
+        tmp_path, "20260509T000000Z_aaaaaaaa_v2026.5.7_abcdef012345", checkout_path=V013_DEFAULT
+    )
     result = agent_updates._latest_backup()
     assert result is not None
     assert result["backup_id"].endswith("_abcdef012345")
@@ -132,9 +132,7 @@ def test_f1_latest_backup_filter_excludes_other_checkout(
     )
     # Active checkout is v0.12 fallback; resolver returns no match.
     result = agent_updates._latest_backup(checkout_path=Path(V012_FALLBACK))
-    assert result is None, (
-        "F1 regression: a v0.13-side backup was selected for a v0.12 rollback"
-    )
+    assert result is None, "F1 regression: a v0.13-side backup was selected for a v0.12 rollback"
 
 
 def test_f1_latest_backup_filter_returns_matching_checkout(
@@ -196,6 +194,7 @@ def test_f1_filter_picks_newer_match_over_older_match(
     # Force older mtime to be older; newer to be newer (some FS may give same).
     import os as _os
     import time as _time
+
     older_ts = _time.time() - 10_000
     newer_ts = _time.time()
     _os.utime(older, (older_ts, older_ts))

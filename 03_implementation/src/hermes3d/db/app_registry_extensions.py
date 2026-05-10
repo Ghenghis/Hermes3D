@@ -92,7 +92,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "MIT",
         "rollback_supported": True,
         "rollback_runbook_url": None,
-        "proof_command": "python -c \"import langchain;print(langchain.__version__)\"",
+        "proof_command": 'python -c "import langchain;print(langchain.__version__)"',
         "update_lane": "stable",
     },
     "langgraph": {
@@ -224,7 +224,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "Apache-2.0",
         "rollback_supported": True,
         "rollback_runbook_url": None,
-        "proof_command": "python -c \"import cadquery;print(cadquery.__version__)\"",
+        "proof_command": 'python -c "import cadquery;print(cadquery.__version__)"',
         "update_lane": "stable",
     },
     "freecad": {
@@ -264,7 +264,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "MIT",
         "rollback_supported": True,
         "rollback_runbook_url": None,
-        "proof_command": "python -c \"import open3d;print(open3d.__version__)\"",
+        "proof_command": 'python -c "import open3d;print(open3d.__version__)"',
         "update_lane": "canary",
     },
     "openscad": {
@@ -297,7 +297,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "MIT",
         "rollback_supported": True,
         "rollback_runbook_url": None,
-        "proof_command": "python -c \"import trimesh;print(trimesh.__version__)\"",
+        "proof_command": 'python -c "import trimesh;print(trimesh.__version__)"',
         "update_lane": "stable",
     },
     "truck": {

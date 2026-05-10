@@ -413,10 +413,7 @@ def main() -> int:
                     cell(row.get("display")),
                     cell(row.get("section")),
                     cell(row.get("path")),
-                    cell(
-                        row.get("executable_path_runner_route")
-                        or row.get("next_action")
-                    ),
+                    cell(row.get("executable_path_runner_route") or row.get("next_action")),
                 ]
             )
             + " |"

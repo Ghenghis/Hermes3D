@@ -31,9 +31,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from hermes3d.services import code_history
-
 
 # ---------------------------------------------------------------------------
 # Test fixtures: redirect ledger to tmp_path; stub MCP I/O so no network.
@@ -210,8 +208,7 @@ def test_mark_recovery_outcome_second_call_raises_idempotency(
     lines = isolated_ledger.read_text(encoding="utf-8").splitlines()
     parsed = [json.loads(line) for line in lines if line.strip()]
     outcomes = [
-        e for e in parsed
-        if e["kind"] == "outcome" and e["attempt_id"] == failure["attempt_id"]
+        e for e in parsed if e["kind"] == "outcome" and e["attempt_id"] == failure["attempt_id"]
     ]
     assert len(outcomes) == 1, (
         f"Expected exactly 1 outcome after duplicate-rejected call, got {len(outcomes)}"
@@ -262,8 +259,10 @@ def test_mark_recovery_outcome_concurrent_finalize_only_one_wins(
 
     t1 = threading.Thread(target=finalizer, args=("A",))
     t2 = threading.Thread(target=finalizer, args=("B",))
-    t1.start(); t2.start()
-    t1.join(timeout=10); t2.join(timeout=10)
+    t1.start()
+    t2.start()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
     assert len(results["ok"]) == 1, (
         f"Exactly one finalizer should succeed under race; got {len(results['ok'])}"
     )

@@ -36,7 +36,14 @@ def _active_session() -> dict | None:
 def status() -> dict:
     session = _active_session()
     if not session:
-        return {"status": "inactive", "session_id": None, "activated_at": None, "actions_taken": 0, "escalations": 0, "cadence_seconds": 60}
+        return {
+            "status": "inactive",
+            "session_id": None,
+            "activated_at": None,
+            "actions_taken": 0,
+            "escalations": 0,
+            "cadence_seconds": 60,
+        }
     return {
         "status": "active",
         "session_id": session["id"],
@@ -57,7 +64,16 @@ def prerequisites() -> list[dict]:
         "No pending PRINT_APPROVALs",
         "Camera coverage acknowledged",
     ]
-    return [{"name": name, "passed": name != "Camera coverage acknowledged", "message": "" if name != "Camera coverage acknowledged" else "No camera acknowledgement recorded."} for name in names]
+    return [
+        {
+            "name": name,
+            "passed": name != "Camera coverage acknowledged",
+            "message": ""
+            if name != "Camera coverage acknowledged"
+            else "No camera acknowledgement recorded.",
+        }
+        for name in names
+    ]
 
 
 @router.post("/api/autonomous/activate")
@@ -91,7 +107,13 @@ async def deactivate() -> dict:
 
 
 @router.get("/api/autonomous/actions")
-def actions(session_id: str | None = None, persona_id: str | None = None, outcome: str | None = None, limit: int = 50, offset: int = 0) -> list[dict]:
+def actions(
+    session_id: str | None = None,
+    persona_id: str | None = None,
+    outcome: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
     return rows(
         """
         SELECT * FROM agent_autonomous_actions
@@ -132,6 +154,11 @@ def veto(body: dict) -> dict:
             (id, session_id, persona_id, action_type, action_payload, safety_agent_status, veto_reason, outcome)
         VALUES (?, ?, 'print-safety-agent', 'explicit_veto', ?, 'vetoed', ?, 'skipped')
         """,
-        (action_id, body.get("session_id", "manual"), as_json(body), body.get("reason", "Explicit safety veto.")),
+        (
+            action_id,
+            body.get("session_id", "manual"),
+            as_json(body),
+            body.get("reason", "Explicit safety veto."),
+        ),
     )
     return {"action_id": action_id, "decision": "vetoed"}

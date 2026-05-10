@@ -37,13 +37,11 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-
 from hermes3d.services import proof_helpers
 from hermes3d.services.agent_checkout import (
     DEFAULT_AGENT_CHECKOUT,
     V012_FALLBACK_CHECKOUT,
 )
-
 
 # ---------------------------------------------------------------------------
 # proof_version_fields() direct tests
@@ -69,7 +67,8 @@ def test_env_v012_path_tags_v012(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_env_unknown_path_tags_unknown_no_crash(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Custom fork / forensic clone: version unknown, but path preserved.
 
@@ -88,7 +87,8 @@ def test_env_unknown_path_tags_unknown_no_crash(
 
 
 def test_unknown_path_does_not_leak_env_other_than_checkout(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """Pin: only the *checkout path* itself is exposed in the unknown
     branch — no other env values leak into the recorded payload."""
@@ -203,7 +203,8 @@ def test_jobs_helper_persists_version_fields_alongside_ts_unix(
 
 
 def test_desktop_updates_helper_persists_version_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
 ) -> None:
     """desktop_updates carries Hermes Agent version too, even though
     its own checkout env is HERMES_DESKTOP_CHECKOUT — the audit chain

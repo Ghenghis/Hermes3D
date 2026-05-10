@@ -115,9 +115,13 @@ def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def _http_get_json(url: str, timeout: float = TIMEOUT_SECONDS) -> tuple[bool, Any | None, str | None]:
+def _http_get_json(
+    url: str, timeout: float = TIMEOUT_SECONDS
+) -> tuple[bool, Any | None, str | None]:
     """GET url with a strict timeout. Returns (ok, json_or_text, error_or_none)."""
-    request = urllib.request.Request(url, method="GET", headers={"User-Agent": "hermes3d-source-printfarm-verify/1.0"})
+    request = urllib.request.Request(
+        url, method="GET", headers={"User-Agent": "hermes3d-source-printfarm-verify/1.0"}
+    )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 — strict GET, http only.
             status = response.status
@@ -227,16 +231,18 @@ def main() -> int:
             "policy": printer["policy"],
         }
         if printer["policy"] == "camera-read-only-skipped":
-            entry.update({
-                "skipped": True,
-                "reachable": None,
-                "version": None,
-                "url": None,
-                "method": None,
-                "error": None,
-                "elapsed_ms": 0,
-                "note": "S1 camera — lane policy: never probe.",
-            })
+            entry.update(
+                {
+                    "skipped": True,
+                    "reachable": None,
+                    "version": None,
+                    "url": None,
+                    "method": None,
+                    "error": None,
+                    "elapsed_ms": 0,
+                    "note": "S1 camera — lane policy: never probe.",
+                }
+            )
         else:
             entry["skipped"] = False
             probe = probe_moonraker(printer["ip"], printer["port"])

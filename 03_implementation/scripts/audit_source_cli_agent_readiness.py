@@ -10,7 +10,14 @@ IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = IMPLEMENTATION_ROOT / "proof" / "SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json"
 
 CLI_PREFERRED_LAUNCH_KINDS = {"cli_worker", "cli_or_python_worker", "desktop_or_cli"}
-CLI_POSSIBLE_LAUNCH_KINDS = {"desktop_app", "python_worker", "gpu_worker", "service", "web_app", "npm_package"}
+CLI_POSSIBLE_LAUNCH_KINDS = {
+    "desktop_app",
+    "python_worker",
+    "gpu_worker",
+    "service",
+    "web_app",
+    "npm_package",
+}
 AGENT_CLI_VERIFIER_KINDS = {"cli", "python_module_cli"}
 
 
@@ -43,7 +50,12 @@ def main() -> int:
     finally:
         conn.close()
 
-    rows = [classify_module(module_runtime_probe(module, live=False), module, module_runner_contract(module)) for module in modules]
+    rows = [
+        classify_module(
+            module_runtime_probe(module, live=False), module, module_runner_contract(module)
+        )
+        for module in modules
+    ]
     counts = Counter(row["agent_execution_tier"] for row in rows)
     contract_counts = Counter(row["runner_contract_status"] for row in rows)
     cli_rows = [row for row in rows if row["agent_execution_tier"] == "verified_agent_cli"]
@@ -78,12 +90,8 @@ def main() -> int:
             "agent_executable_modules": [row["module_id"] for row in executable_rows],
             "read_only_runner_modules": [row["module_id"] for row in read_only_rows],
             "executable_path_runner_modules": [row["module_id"] for row in executable_path_rows],
-            "python_import_repair_modules": [
-                row["module_id"] for row in python_import_repair_rows
-            ],
-            "cli_install_config_modules": [
-                row["module_id"] for row in cli_install_config_rows
-            ],
+            "python_import_repair_modules": [row["module_id"] for row in python_import_repair_rows],
+            "cli_install_config_modules": [row["module_id"] for row in cli_install_config_rows],
             "npm_package_preflight_modules": [
                 row["module_id"] for row in npm_package_preflight_rows
             ],
@@ -110,18 +118,31 @@ def main() -> int:
     return 0
 
 
-def classify_module(runtime: dict[str, Any], module: dict[str, Any], contract: dict[str, Any]) -> dict[str, Any]:
+def classify_module(
+    runtime: dict[str, Any], module: dict[str, Any], contract: dict[str, Any]
+) -> dict[str, Any]:
     runtime_status = str(runtime.get("status") or "blocked")
     kind = str(runtime.get("kind") or module.get("launch_kind") or "unknown")
     proof_gate = str(runtime.get("proof_gate_version") or "")
     verifier = str(runtime.get("verifier") or "")
     launch_kind = str(module.get("launch_kind") or "unknown")
     execution_tier = "runner_gap"
-    if runtime_status == "ready" and kind in AGENT_CLI_VERIFIER_KINDS and bool(runtime.get("executed")):
+    if (
+        runtime_status == "ready"
+        and kind in AGENT_CLI_VERIFIER_KINDS
+        and bool(runtime.get("executed"))
+    ):
         execution_tier = "verified_agent_cli"
-    elif runtime_status == "ready" and (proof_gate == "desktop-launcher-metadata-v1" or (kind == "desktop_app" and not bool(runtime.get("executed")))):
+    elif runtime_status == "ready" and (
+        proof_gate == "desktop-launcher-metadata-v1"
+        or (kind == "desktop_app" and not bool(runtime.get("executed")))
+    ):
         execution_tier = "launcher_metadata_only"
-    elif runtime_status == "ready" and kind in {"python_import", "python_source_import", "node_package"}:
+    elif runtime_status == "ready" and kind in {
+        "python_import",
+        "python_source_import",
+        "node_package",
+    }:
         execution_tier = "package_or_import_ready"
     elif runtime_status == "ready" and kind == "moonraker_fleet":
         execution_tier = "service_api_ready"
@@ -152,27 +173,19 @@ def classify_module(runtime: dict[str, Any], module: dict[str, Any], contract: d
         "read_only_runner_route": f"/api/modules/{module.get('id')}/runtime/read-only-runner"
         if contract.get("read_only_runner_available")
         else None,
-        "executable_path_runner_available": bool(
-            contract.get("executable_path_runner_available")
-        ),
+        "executable_path_runner_available": bool(contract.get("executable_path_runner_available")),
         "executable_path_runner_route": f"/api/modules/{module.get('id')}/runtime/executable-path-runner"
         if contract.get("executable_path_runner_available")
         else None,
-        "python_import_repair_available": bool(
-            contract.get("python_import_repair_available")
-        ),
+        "python_import_repair_available": bool(contract.get("python_import_repair_available")),
         "python_import_repair_route": f"/api/modules/{module.get('id')}/runtime/python-import-repair-runner"
         if contract.get("python_import_repair_available")
         else None,
-        "cli_install_config_available": bool(
-            contract.get("cli_install_config_available")
-        ),
+        "cli_install_config_available": bool(contract.get("cli_install_config_available")),
         "cli_install_config_route": f"/api/modules/{module.get('id')}/runtime/cli-install-config-runner"
         if contract.get("cli_install_config_available")
         else None,
-        "npm_package_preflight_available": bool(
-            contract.get("npm_package_preflight_available")
-        ),
+        "npm_package_preflight_available": bool(contract.get("npm_package_preflight_available")),
         "npm_package_preflight_route": f"/api/modules/{module.get('id')}/runtime/npm-package-runner"
         if contract.get("npm_package_preflight_available")
         else None,

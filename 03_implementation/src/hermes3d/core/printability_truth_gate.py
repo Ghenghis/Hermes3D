@@ -25,8 +25,7 @@ GATE_IDS = [
 ]
 
 GATE_DEFINITIONS: list[dict[str, Any]] = [
-    {"id": gate_id, "order": index + 1, "required": True}
-    for index, gate_id in enumerate(GATE_IDS)
+    {"id": gate_id, "order": index + 1, "required": True} for index, gate_id in enumerate(GATE_IDS)
 ]
 
 

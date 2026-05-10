@@ -15,11 +15,9 @@ ABSOLUTE CONSTRAINTS verified by these tests:
 from __future__ import annotations
 
 import subprocess
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from hermes3d.services.module_runtime import (
     FIRMWARE_RUNNER_CONTRACT_TEMPLATE,
     FIRMWARE_SOURCE_PATHS,
@@ -102,7 +100,10 @@ class TestFirmwareRunnerContractTemplate:
         assert FIRMWARE_RUNNER_CONTRACT_TEMPLATE["mutation_allowed"] is False
 
     def test_proof_gate_version_set(self) -> None:
-        assert FIRMWARE_RUNNER_CONTRACT_TEMPLATE["proof_gate_version"] == "firmware-source-inventory-v1"
+        assert (
+            FIRMWARE_RUNNER_CONTRACT_TEMPLATE["proof_gate_version"]
+            == "firmware-source-inventory-v1"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -118,9 +119,7 @@ class TestGitDescribe:
             patch("os.path.isdir", return_value=True),
             patch("subprocess.run") as mock_run,
         ):
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="v2.0.8-1-gabcdef0\n", stderr=""
-            )
+            mock_run.return_value = MagicMock(returncode=0, stdout="v2.0.8-1-gabcdef0\n", stderr="")
             result = _git_describe(str(tmp_path))
         assert result == "v2.0.8-1-gabcdef0"
         # Verify only git describe was called, not make/cmake/avrdude etc.
@@ -179,7 +178,15 @@ class TestGitDescribe:
         for call in mock_run.call_args_list:
             cmd = call[0][0] if call[0] else call[1].get("args", [])
             cmd_str = " ".join(str(c) for c in cmd).lower()
-            for forbidden in ("avrdude", "dfu-util", "openocd", "esptool", "make", "cmake", "platformio"):
+            for forbidden in (
+                "avrdude",
+                "dfu-util",
+                "openocd",
+                "esptool",
+                "make",
+                "cmake",
+                "platformio",
+            ):
                 assert forbidden not in cmd_str, (
                     f"_git_describe called forbidden tool '{forbidden}'"
                 )
@@ -238,9 +245,7 @@ class TestProbeFirmwareSourceInventory:
         with patch("os.path.isdir", return_value=False):
             for mod_id, expected_path in FIRMWARE_SOURCE_PATHS.items():
                 result = probe_firmware_source_inventory(mod_id)
-                assert result["source_path"] == expected_path, (
-                    f"{mod_id}: source_path mismatch"
-                )
+                assert result["source_path"] == expected_path, f"{mod_id}: source_path mismatch"
 
     def test_version_tag_is_none_when_git_fails(self) -> None:
         with (
@@ -321,8 +326,10 @@ class TestProbeAllFirmwareSources:
     def test_klipper_firmware_source_path_contains_klipper(self) -> None:
         with patch("os.path.isdir", return_value=False):
             results = probe_all_firmware_sources()
-        assert "Klipper" in results["firmware_klipper"]["source_path"] or \
-               "klipper" in results["firmware_klipper"]["source_path"].lower()
+        assert (
+            "Klipper" in results["firmware_klipper"]["source_path"]
+            or "klipper" in results["firmware_klipper"]["source_path"].lower()
+        )
 
     @pytest.mark.parametrize(
         "module_id,expected_fragment",
@@ -335,9 +342,7 @@ class TestProbeAllFirmwareSources:
             ("smoothieware", "Smoothieware"),
         ],
     )
-    def test_source_paths_match_firmware_name(
-        self, module_id: str, expected_fragment: str
-    ) -> None:
+    def test_source_paths_match_firmware_name(self, module_id: str, expected_fragment: str) -> None:
         with patch("os.path.isdir", return_value=False):
             results = probe_all_firmware_sources()
         assert expected_fragment in results[module_id]["source_path"], (
@@ -403,7 +408,15 @@ class TestFirmwareSafetyConstraints:
         for call in mock_run.call_args_list:
             cmd = call[0][0] if call[0] else []
             cmd_str = " ".join(str(c) for c in cmd).lower()
-            for forbidden in ("avrdude", "dfu-util", "openocd", "esptool", "platformio", "make", "cmake"):
+            for forbidden in (
+                "avrdude",
+                "dfu-util",
+                "openocd",
+                "esptool",
+                "platformio",
+                "make",
+                "cmake",
+            ):
                 assert forbidden not in cmd_str, (
                     f"probe_all_firmware_sources called forbidden tool '{forbidden}'"
                 )

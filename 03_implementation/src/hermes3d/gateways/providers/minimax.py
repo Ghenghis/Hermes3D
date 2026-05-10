@@ -79,7 +79,11 @@ def completion_caller(config: ProviderConfig) -> LLMCaller:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json",
         }
-        model = os.environ.get("HERMES3D_MINIMAX_MODEL") or os.environ.get("MINIMAX_MODEL") or "MiniMax-M2.7-highspeed"
+        model = (
+            os.environ.get("HERMES3D_MINIMAX_MODEL")
+            or os.environ.get("MINIMAX_MODEL")
+            or "MiniMax-M2.7-highspeed"
+        )
         body = {
             "model": model,
             "messages": [{"role": "user", "content": request.prompt}],

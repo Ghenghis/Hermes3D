@@ -17,6 +17,7 @@ Exit code:
   1  at least one required combination failed
   2  setup error (missing dependency, etc.)
 """
+
 from __future__ import annotations
 
 import json
@@ -40,19 +41,24 @@ def _emoji(ok: bool) -> str:
 def main() -> int:
     try:
         from hermes3d.core.design.desk_organizer import (
-            OrganizerSpec, acceptance_variants, build_organizer,
+            OrganizerSpec,
+            acceptance_variants,
+            build_organizer,
         )
         from hermes3d.core.printers import (
-            FLEET, fits_bed, get_profile,
+            FLEET,
+            fits_bed,
+            get_profile,
         )
         from hermes3d.core.proof.proof_envelope import write_proof
         from hermes3d.core.validation.truth_gate import (
-            TruthGateConfig, run_truth_gate, CheckStatus,
+            TruthGateConfig,
+            run_truth_gate,
+            CheckStatus,
         )
         from hermes3d.core.visual.render import render_all_views
     except Exception as exc:  # noqa: BLE001
-        print(f"Setup error: cannot import hermes3d modules: {exc}",
-              file=sys.stderr)
+        print(f"Setup error: cannot import hermes3d modules: {exc}", file=sys.stderr)
         return 2
 
     # Proof key resolution is handled centrally by core.proof.proof_envelope:
@@ -75,8 +81,10 @@ def main() -> int:
     grand_pass = grand_fail = grand_xfail = 0
 
     for variant_name, spec in variants:
-        print(f"━━━ Variant: {variant_name} "
-              f"({spec.width_mm:.0f}×{spec.depth_mm:.0f}×{spec.height_mm:.0f} mm)")
+        print(
+            f"━━━ Variant: {variant_name} "
+            f"({spec.width_mm:.0f}×{spec.depth_mm:.0f}×{spec.height_mm:.0f} mm)"
+        )
         # Build mesh once
         mesh = build_organizer(spec)
         variant_dir = out_root / variant_name
@@ -87,17 +95,20 @@ def main() -> int:
         # Generic Truth Gate (no printer)
         generic_report = run_truth_gate(stl_path, TruthGateConfig())
         generic_ok = generic_report.passed
-        print(f"  generic Truth Gate: {_emoji(generic_ok)}  "
-              f"{generic_report.overall_status.value}")
+        print(f"  generic Truth Gate: {_emoji(generic_ok)}  {generic_report.overall_status.value}")
         if not generic_ok:
             grand_fail += 1
             for c in generic_report.checks:
                 if c.status == CheckStatus.FAIL:
                     print(f"    fail: {c.name}: {c.message}")
-            results.append({
-                "variant": variant_name, "printer": "(generic)",
-                "outcome": "fail", "reason": "generic Truth Gate failed",
-            })
+            results.append(
+                {
+                    "variant": variant_name,
+                    "printer": "(generic)",
+                    "outcome": "fail",
+                    "reason": "generic Truth Gate failed",
+                }
+            )
             continue
 
         # Render once per variant — same mesh, same views
@@ -112,12 +123,14 @@ def main() -> int:
             if not fits:
                 # Expected failure — record as xfail and skip
                 grand_xfail += 1
-                results.append({
-                    "variant": variant_name,
-                    "printer": profile.profile_id,
-                    "outcome": "xfail",
-                    "reason": "geometrically too large for bed",
-                })
+                results.append(
+                    {
+                        "variant": variant_name,
+                        "printer": profile.profile_id,
+                        "outcome": "xfail",
+                        "reason": "geometrically too large for bed",
+                    }
+                )
                 print(f"  {profile.profile_id:25s}  xfail (won't fit)")
                 continue
 
@@ -140,21 +153,24 @@ def main() -> int:
                     generator_signature=spec.signature(),
                 )
 
-            results.append({
-                "variant": variant_name,
-                "printer": profile.profile_id,
-                "outcome": outcome,
-                "reason": rep.overall_status.value,
-                "proof_path": str(proof_path) if proof_path else None,
-            })
+            results.append(
+                {
+                    "variant": variant_name,
+                    "printer": profile.profile_id,
+                    "outcome": outcome,
+                    "reason": rep.overall_status.value,
+                    "proof_path": str(proof_path) if proof_path else None,
+                }
+            )
             if ok:
                 grand_pass += 1
-                print(f"  {profile.profile_id:25s}  {_emoji(True)} pass    "
-                      f"-> {proof_path.name if proof_path else ''}")
+                print(
+                    f"  {profile.profile_id:25s}  {_emoji(True)} pass    "
+                    f"-> {proof_path.name if proof_path else ''}"
+                )
             else:
                 grand_fail += 1
-                fail = next((c for c in rep.checks
-                             if c.status == CheckStatus.FAIL), None)
+                fail = next((c for c in rep.checks if c.status == CheckStatus.FAIL), None)
                 why = fail.message if fail else "(unknown)"
                 print(f"  {profile.profile_id:25s}  {_emoji(False)} fail    {why}")
 
@@ -174,7 +190,8 @@ def main() -> int:
         "results": results,
     }
     (out_root / "summary.json").write_text(
-        json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+        json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
+    )
 
     md_lines = [
         "# Acceptance Run Summary\n",
@@ -183,16 +200,13 @@ def main() -> int:
         f"- Variants: {len(variants)}",
         f"- Printers in fleet: {fleet_size}",
         "",
-        f"**Pass:** {grand_pass}  **Fail:** {grand_fail}  "
-        f"**xfail (geometric):** {grand_xfail}",
+        f"**Pass:** {grand_pass}  **Fail:** {grand_fail}  **xfail (geometric):** {grand_xfail}",
         "",
         "| Variant | Printer | Outcome | Reason |",
         "|---|---|---|---|",
     ]
     for r in results:
-        md_lines.append(
-            f"| {r['variant']} | {r['printer']} | {r['outcome']} | {r['reason']} |"
-        )
+        md_lines.append(f"| {r['variant']} | {r['printer']} | {r['outcome']} | {r['reason']} |")
     (out_root / "summary.md").write_text("\n".join(md_lines), encoding="utf-8")
 
     print()

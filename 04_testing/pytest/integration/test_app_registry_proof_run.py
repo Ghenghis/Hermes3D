@@ -131,7 +131,7 @@ def test_run_proof_executes_and_persists(client: TestClient) -> None:
     conn = dbinit.connect()
     conn.execute(
         "UPDATE modules SET proof_command = ? WHERE id = ?",
-        ('python -c "print(\'proof-ok\')"', app_id),
+        ("python -c \"print('proof-ok')\"", app_id),
     )
     conn.commit()
     conn.close()
@@ -166,7 +166,7 @@ def test_run_proof_failing_command(client: TestClient) -> None:
     conn = dbinit.connect()
     conn.execute(
         "UPDATE modules SET proof_command = ? WHERE id = ?",
-        ("python -c \"import sys; sys.exit(7)\"", app_id),
+        ('python -c "import sys; sys.exit(7)"', app_id),
     )
     conn.commit()
     conn.close()
@@ -223,7 +223,7 @@ def test_proof_command_redaction(client: TestClient) -> None:
         "UPDATE modules SET proof_command = ? WHERE id = ?",
         (
             # Print a fake bearer token; redact_text should mask it.
-            'python -c "print(\'Authorization: Bearer abc123def456ghi789jkl\')"',
+            "python -c \"print('Authorization: Bearer abc123def456ghi789jkl')\"",
             app_id,
         ),
     )

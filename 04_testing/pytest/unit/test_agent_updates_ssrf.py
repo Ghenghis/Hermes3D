@@ -28,9 +28,7 @@ from unittest.mock import patch
 
 import pytest
 from fastapi import HTTPException
-
 from hermes3d.api.routes import agent_updates
-
 
 # ---------------------------------------------------------------------------
 # Stubs
@@ -60,23 +58,21 @@ class _FakeResp:
 
 def test_remote_release_tags_success(tmp_path: Path) -> None:
     """200 + valid tag list returns sorted unique tags."""
-    body = json.dumps([
-        {"tag_name": "v2026.5.7"},
-        {"tag_name": "v2026.4.1"},
-        {"tag_name": "garbage-not-a-tag"},
-    ])
-    with patch.object(
-        agent_updates.urllib.request, "urlopen", return_value=_FakeResp(body)
-    ):
+    body = json.dumps(
+        [
+            {"tag_name": "v2026.5.7"},
+            {"tag_name": "v2026.4.1"},
+            {"tag_name": "garbage-not-a-tag"},
+        ]
+    )
+    with patch.object(agent_updates.urllib.request, "urlopen", return_value=_FakeResp(body)):
         tags = agent_updates._remote_release_tags(tmp_path)
     assert tags == ["v2026.4.1", "v2026.5.7"]
 
 
 def test_remote_release_tags_empty_list_returns_empty(tmp_path: Path) -> None:
     """200 + ``[]`` (repo with no releases yet) is NOT an error path."""
-    with patch.object(
-        agent_updates.urllib.request, "urlopen", return_value=_FakeResp("[]")
-    ):
+    with patch.object(agent_updates.urllib.request, "urlopen", return_value=_FakeResp("[]")):
         tags = agent_updates._remote_release_tags(tmp_path)
     assert tags == [], "Genuinely empty release list must NOT raise; only outages do."
 
@@ -111,9 +107,7 @@ def test_remote_release_tags_url_error_raises_502(tmp_path: Path) -> None:
 
 def test_remote_release_tags_5xx_raises_502(tmp_path: Path) -> None:
     """HTTPError(503) (subclass of URLError) must also surface as 502."""
-    err = urllib.error.HTTPError(
-        agent_updates.RELEASES_API, 503, "Service Unavailable", {}, None
-    )
+    err = urllib.error.HTTPError(agent_updates.RELEASES_API, 503, "Service Unavailable", {}, None)
     with patch.object(agent_updates.urllib.request, "urlopen", side_effect=err):
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._remote_release_tags(tmp_path)
@@ -122,9 +116,7 @@ def test_remote_release_tags_5xx_raises_502(tmp_path: Path) -> None:
 
 def test_remote_release_tags_malformed_json_raises_502(tmp_path: Path) -> None:
     """Non-JSON response body → 502 (upstream contract violation)."""
-    with patch.object(
-        agent_updates.urllib.request, "urlopen", return_value=_FakeResp("{not-json")
-    ):
+    with patch.object(agent_updates.urllib.request, "urlopen", return_value=_FakeResp("{not-json")):
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._remote_release_tags(tmp_path)
     assert exc_info.value.status_code == 502
@@ -133,9 +125,7 @@ def test_remote_release_tags_malformed_json_raises_502(tmp_path: Path) -> None:
 def test_remote_release_tags_non_list_payload_raises_502(tmp_path: Path) -> None:
     """200 + {object} (instead of list) → 502 (contract violation)."""
     body = json.dumps({"message": "Not Found", "status": "404"})
-    with patch.object(
-        agent_updates.urllib.request, "urlopen", return_value=_FakeResp(body)
-    ):
+    with patch.object(agent_updates.urllib.request, "urlopen", return_value=_FakeResp(body)):
         with pytest.raises(HTTPException) as exc_info:
             agent_updates._remote_release_tags(tmp_path)
     assert exc_info.value.status_code == 502
@@ -172,9 +162,7 @@ def test_remote_release_tags_redacts_bearer_in_detail(tmp_path: Path) -> None:
 
 def test_latest_release_404_keeps_soft_warning() -> None:
     """HTTP 404 = repo has no /releases/latest yet — preserve soft warning."""
-    err = urllib.error.HTTPError(
-        agent_updates.LATEST_RELEASE_API, 404, "Not Found", {}, None
-    )
+    err = urllib.error.HTTPError(agent_updates.LATEST_RELEASE_API, 404, "Not Found", {}, None)
     with patch.object(agent_updates.urllib.request, "urlopen", side_effect=err):
         out = agent_updates._latest_release(tags=[])
     assert out["tag"] is None
@@ -211,15 +199,15 @@ def test_latest_release_url_error_keeps_soft_warning() -> None:
 
 def test_latest_release_success() -> None:
     """200 + valid latest payload populates the result."""
-    body = json.dumps({
-        "tag_name": "v2026.5.7",
-        "name": "Tenacity Release",
-        "published_at": "2026-05-07T00:00:00Z",
-        "html_url": "https://example.invalid/v2026.5.7",
-    })
-    with patch.object(
-        agent_updates.urllib.request, "urlopen", return_value=_FakeResp(body)
-    ):
+    body = json.dumps(
+        {
+            "tag_name": "v2026.5.7",
+            "name": "Tenacity Release",
+            "published_at": "2026-05-07T00:00:00Z",
+            "html_url": "https://example.invalid/v2026.5.7",
+        }
+    )
+    with patch.object(agent_updates.urllib.request, "urlopen", return_value=_FakeResp(body)):
         out = agent_updates._latest_release(tags=["v2026.5.7"])
     assert out["tag"] == "v2026.5.7"
     assert out["name"] == "Tenacity Release"

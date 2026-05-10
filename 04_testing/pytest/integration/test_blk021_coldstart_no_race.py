@@ -79,7 +79,6 @@ def _coldstart_status_call(pipe: Connection, repo_root: str, src_path: str, db_d
         # BEFORE any router is wired, so the immediate request below
         # cannot race uncreated tables.
         from fastapi.testclient import TestClient  # type: ignore[import-not-found]
-
         from hermes3d.api.app import create_gui_app  # noqa: E402
 
         app = create_gui_app()
@@ -152,17 +151,13 @@ def _coldstart_concurrent_calls(pipe: Connection, src_path: str, db_dir: str) ->
 
     try:
         from fastapi.testclient import TestClient  # type: ignore[import-not-found]
-
         from hermes3d.api.app import create_gui_app  # noqa: E402
 
         app = create_gui_app()
         codes: list[int] = []
         with TestClient(app) as client:
             with ThreadPoolExecutor(max_workers=8) as pool:
-                futures = [
-                    pool.submit(client.get, "/api/roadmap/status")
-                    for _ in range(8)
-                ]
+                futures = [pool.submit(client.get, "/api/roadmap/status") for _ in range(8)]
                 for fut in futures:
                     codes.append(fut.result().status_code)
         pipe.send(("status_codes", codes, ""))

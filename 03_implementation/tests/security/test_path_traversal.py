@@ -84,6 +84,7 @@ def test_resolve_project_path_rejects_traversal(malicious: str) -> None:
     with pytest.raises((ValueError, FileNotFoundError, OSError)):
         CODE_HISTORY._resolve_project_path(malicious, write=False)
 
+
 # --------------------------------------------------------------------------- #
 # Acceptance: a known-safe project-relative path must validate
 # --------------------------------------------------------------------------- #

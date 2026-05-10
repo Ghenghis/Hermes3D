@@ -32,16 +32,18 @@ def test_action_catalog_hides_internal_handlers_and_exposes_code_actions() -> No
     assert "source.cli_install_config.preflight" in by_id
     assert "source.npm_package.preflight" in by_id
     assert all("handler" not in contract for contract in contracts)
-    assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {"files", "task_id"}
+    assert set(by_id["code.mcp_locks.lock_files"]["payload_schema"]["required"]) == {
+        "files",
+        "task_id",
+    }
 
 
 def test_code_patch_apply_declares_high_risk_proof_and_rollback_contract() -> None:
     _reset_action_catalog_cache()
 
-    patch_apply = {
-        contract["id"]: contract
-        for contract in agents.action_catalog()["contracts"]
-    }["code.patch.apply"]
+    patch_apply = {contract["id"]: contract for contract in agents.action_catalog()["contracts"]}[
+        "code.patch.apply"
+    ]
 
     assert patch_apply["kind"] == "mutate"
     assert patch_apply["risk"] == "high"
@@ -55,10 +57,9 @@ def test_code_patch_apply_declares_high_risk_proof_and_rollback_contract() -> No
 def test_code_git_commit_declares_owned_snapshot_contract() -> None:
     _reset_action_catalog_cache()
 
-    git_commit = {
-        contract["id"]: contract
-        for contract in agents.action_catalog()["contracts"]
-    }["code.git.commit_owned"]
+    git_commit = {contract["id"]: contract for contract in agents.action_catalog()["contracts"]}[
+        "code.git.commit_owned"
+    ]
 
     assert git_commit["kind"] == "mutate"
     assert git_commit["risk"] == "high"
@@ -81,7 +82,13 @@ def test_code_team_actions_declare_assignment_and_review_contracts() -> None:
     assert assignment["risk"] == "medium"
     assert assignment["proof_required"] is True
     assert assignment["approval_required"] is False
-    assert set(assignment["payload_schema"]["required"]) == {"team_id", "task_id", "title", "files", "objective"}
+    assert set(assignment["payload_schema"]["required"]) == {
+        "team_id",
+        "task_id",
+        "title",
+        "files",
+        "objective",
+    }
     assert "minimax-builders" in assignment["payload_schema"]["safety"]
 
     assert review["kind"] == "proof"
@@ -91,12 +98,22 @@ def test_code_team_actions_declare_assignment_and_review_contracts() -> None:
 
     assert coding_pass["kind"] == "artifact"
     assert coding_pass["risk"] == "medium"
-    assert set(coding_pass["payload_schema"]["required"]) == {"task_id", "title", "files", "objective"}
+    assert set(coding_pass["payload_schema"]["required"]) == {
+        "task_id",
+        "title",
+        "files",
+        "objective",
+    }
     assert "no source mutation" in coding_pass["payload_schema"]["safety"]
 
     assert review_pass["kind"] == "artifact"
     assert review_pass["risk"] == "medium"
-    assert set(review_pass["payload_schema"]["required"]) == {"task_id", "summary", "files", "proof_ids"}
+    assert set(review_pass["payload_schema"]["required"]) == {
+        "task_id",
+        "summary",
+        "files",
+        "proof_ids",
+    }
     assert "proof ids" in review_pass["payload_schema"]["safety"]
 
 

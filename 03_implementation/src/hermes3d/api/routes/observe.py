@@ -68,17 +68,19 @@ def observe_status() -> dict:
         if health == "reachable" and response_ms is not None and response_ms > 0:
             # A single-frame response time gives a floor estimate for fps
             estimated_fps = round(min(30.0, 1000.0 / response_ms), 1)
-        statuses.append({
-            "printer_id": printer_id,
-            "printer_name": printer.get("name", printer_id),
-            "camera_url": camera_url,
-            "health": health,
-            "http_status": http_status,
-            "response_ms": response_ms,
-            "estimated_fps": estimated_fps,
-            # S1 is camera/read-only; flag it so the UI never offers controls
-            "read_only": is_s1_target(printer_id),
-        })
+        statuses.append(
+            {
+                "printer_id": printer_id,
+                "printer_name": printer.get("name", printer_id),
+                "camera_url": camera_url,
+                "health": health,
+                "http_status": http_status,
+                "response_ms": response_ms,
+                "estimated_fps": estimated_fps,
+                # S1 is camera/read-only; flag it so the UI never offers controls
+                "read_only": is_s1_target(printer_id),
+            }
+        )
     online = sum(1 for s in statuses if s["health"] == "reachable")
     return {
         "cameras": statuses,
@@ -101,20 +103,22 @@ def cameras() -> list[dict]:
             real_health, _http_status, _ms = _probe_camera_timed(printer.get("camera_url"))
         else:
             real_health = configured_state  # "not_configured"
-        result.append({
-            "printer_id": printer["id"],
-            "printer_name": printer["name"],
-            "camera_url": printer["camera_url"],
-            "health": real_health,
-            "is_locked": _camera_is_locked(printer),
-            "printer_locked": is_s1_target(printer["id"]),
-            "camera_kind": _camera_kind(printer),
-            "camera_note": _camera_note(printer),
-            "stream_url": f"/api/observe/cameras/{printer['id']}/stream",
-            "snapshot_url": f"/api/observe/cameras/{printer['id']}/snapshot",
-            "view_settings": camera_view_settings(str(printer["id"])),
-            "plate_clearance": plates.get(str(printer["id"])),
-        })
+        result.append(
+            {
+                "printer_id": printer["id"],
+                "printer_name": printer["name"],
+                "camera_url": printer["camera_url"],
+                "health": real_health,
+                "is_locked": _camera_is_locked(printer),
+                "printer_locked": is_s1_target(printer["id"]),
+                "camera_kind": _camera_kind(printer),
+                "camera_note": _camera_note(printer),
+                "stream_url": f"/api/observe/cameras/{printer['id']}/stream",
+                "snapshot_url": f"/api/observe/cameras/{printer['id']}/snapshot",
+                "view_settings": camera_view_settings(str(printer["id"])),
+                "plate_clearance": plates.get(str(printer["id"])),
+            }
+        )
     return result
 
 
@@ -133,7 +137,11 @@ def clear_build_plate(printer_id: str, body: PlateClearanceUpdate) -> dict:
 
 @router.put("/api/observe/cameras/{printer_id}/view")
 def update_camera_view(printer_id: str, body: CameraViewUpdate) -> dict:
-    payload = body.model_dump(exclude_none=True) if hasattr(body, "model_dump") else body.dict(exclude_none=True)
+    payload = (
+        body.model_dump(exclude_none=True)
+        if hasattr(body, "model_dump")
+        else body.dict(exclude_none=True)
+    )
     updated = set_camera_view_settings(printer_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="printer not found")
@@ -175,11 +183,18 @@ def capture_evidence(printer_id: str) -> dict:
     artifact_dir.mkdir(parents=True, exist_ok=True)
     snapshot_path = artifact_dir / f"{artifact_id}.jpg"
     try:
-        request = urllib.request.Request(_snapshot_url(str(camera_url)), headers={"Accept": "image/*"})
-        with urllib.request.urlopen(request, timeout=5.0) as response, snapshot_path.open("wb") as handle:
+        request = urllib.request.Request(
+            _snapshot_url(str(camera_url)), headers={"Accept": "image/*"}
+        )
+        with (
+            urllib.request.urlopen(request, timeout=5.0) as response,
+            snapshot_path.open("wb") as handle,
+        ):
             handle.write(response.read())
     except (urllib.error.URLError, OSError) as exc:
-        raise HTTPException(status_code=502, detail=f"camera snapshot capture failed: {type(exc).__name__}") from exc
+        raise HTTPException(
+            status_code=502, detail=f"camera snapshot capture failed: {type(exc).__name__}"
+        ) from exc
     execute(
         """
         INSERT INTO artifacts
@@ -194,7 +209,10 @@ def capture_evidence(printer_id: str) -> dict:
             f"Captured from real camera endpoint for {printer['id']}",
         ),
     )
-    return row("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)) or {"artifact_id": artifact_id, "snapshot_path": str(snapshot_path)}
+    return row("SELECT * FROM artifacts WHERE id = ?", (artifact_id,)) or {
+        "artifact_id": artifact_id,
+        "snapshot_path": str(snapshot_path),
+    }
 
 
 @router.get("/api/observe/cameras/{printer_id}/health")

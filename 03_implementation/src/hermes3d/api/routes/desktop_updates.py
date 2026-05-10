@@ -24,11 +24,17 @@ router = APIRouter()
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[4]
 BACKUP_ROOT = IMPLEMENTATION_ROOT / "var" / "hermes_desktop_backups"
 DOWNLOAD_ROOT = IMPLEMENTATION_ROOT / "var" / "hermes_desktop_downloads"
-DEFAULT_CHECKOUT = Path(os.environ.get("HERMES_DESKTOP_CHECKOUT", "G:/Github/apps/hermes-desktop-main"))
-UPSTREAM_URL = os.environ.get("HERMES_DESKTOP_UPSTREAM_URL", "https://github.com/fathah/hermes-desktop.git")
+DEFAULT_CHECKOUT = Path(
+    os.environ.get("HERMES_DESKTOP_CHECKOUT", "G:/Github/apps/hermes-desktop-main")
+)
+UPSTREAM_URL = os.environ.get(
+    "HERMES_DESKTOP_UPSTREAM_URL", "https://github.com/fathah/hermes-desktop.git"
+)
 LATEST_RELEASE_API = "https://api.github.com/repos/fathah/hermes-desktop/releases/latest"
 TAG_RE = re.compile(r"^v(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$")
-SECRET_RE = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+")
+SECRET_RE = re.compile(
+    r"(?i)(bearer\s+)[A-Za-z0-9._~+/=-]+|([?&](?:token|key|api_key|access_token)=)[^&\s]+|([A-Za-z0-9_]*KEY=)[^\s]+"
+)
 
 
 class BackupRequest(BaseModel):
@@ -46,7 +52,11 @@ def desktop_update_status() -> dict[str, Any]:
     latest = _latest_release()
     local_version = source.get("package_version")
     latest_version = _version_from_tag(latest.get("tag"))
-    outdated = bool(local_version and latest_version and _semver_key(local_version) < _semver_key(latest_version))
+    outdated = bool(
+        local_version
+        and latest_version
+        and _semver_key(local_version) < _semver_key(latest_version)
+    )
     payload = {
         "repo_url": UPSTREAM_URL,
         "checkout_path": str(checkout),
@@ -57,7 +67,11 @@ def desktop_update_status() -> dict[str, Any]:
         "outdated": outdated,
         "strategy": "download_windows_installer_record_sha256; source checkout updates remain unsupported until staged update and rollback routes exist",
         "installer_download_supported": bool(latest.get("installer_asset")),
-        "installer_verification_supported": bool((latest.get("installer_asset") or {}).get("digest")) if isinstance(latest.get("installer_asset"), dict) else False,
+        "installer_verification_supported": bool(
+            (latest.get("installer_asset") or {}).get("digest")
+        )
+        if isinstance(latest.get("installer_asset"), dict)
+        else False,
         "source_update_supported": False,
         "backup_available": _latest_backup() is not None,
         "latest_backup": _latest_backup(),
@@ -68,8 +82,13 @@ def desktop_update_status() -> dict[str, Any]:
 
 @router.post("/api/desktop/update/backup", status_code=201)
 def desktop_backup(body: BackupRequest | None = None) -> dict[str, Any]:
-    backup = _create_backup(_checkout_path(), note=(body.note if body else None) or "manual Hermes Desktop pre-update backup")
-    _append_proof_event("hermes_desktop_backup_created", "hermes3d-updater", _proof_summary({"backup": backup}))
+    backup = _create_backup(
+        _checkout_path(),
+        note=(body.note if body else None) or "manual Hermes Desktop pre-update backup",
+    )
+    _append_proof_event(
+        "hermes_desktop_backup_created", "hermes3d-updater", _proof_summary({"backup": backup})
+    )
     return backup
 
 
@@ -78,13 +97,22 @@ def desktop_download(body: DownloadRequest | None = None) -> dict[str, Any]:
     latest = _latest_release()
     assets = latest.get("assets") if isinstance(latest.get("assets"), list) else []
     wanted = body.asset_name if body else None
-    asset = next((item for item in assets if item.get("name") == wanted), None) if wanted else latest.get("installer_asset")
+    asset = (
+        next((item for item in assets if item.get("name") == wanted), None)
+        if wanted
+        else latest.get("installer_asset")
+    )
     if not isinstance(asset, dict):
-        raise HTTPException(status_code=409, detail="No downloadable Hermes Desktop installer asset was discovered in the latest release.")
+        raise HTTPException(
+            status_code=409,
+            detail="No downloadable Hermes Desktop installer asset was discovered in the latest release.",
+        )
     url = asset.get("browser_download_url")
     name = asset.get("name")
     if not isinstance(url, str) or not isinstance(name, str):
-        raise HTTPException(status_code=409, detail="Latest release asset was missing a download URL.")
+        raise HTTPException(
+            status_code=409, detail="Latest release asset was missing a download URL."
+        )
     DOWNLOAD_ROOT.mkdir(parents=True, exist_ok=True)
     target = DOWNLOAD_ROOT / _safe_filename(name)
     request = urllib.request.Request(url, headers={"User-Agent": "Hermes3D-Desktop-Updater/1.0"})
@@ -94,7 +122,11 @@ def desktop_download(body: DownloadRequest | None = None) -> dict[str, Any]:
     expected_digest = _digest_value(asset.get("digest"))
     verification_status = "sha256_recorded_only"
     if expected_digest:
-        verification_status = "sha256_verified_github_release_digest" if hmac_compare_digest(digest, expected_digest) else "sha256_mismatch"
+        verification_status = (
+            "sha256_verified_github_release_digest"
+            if hmac_compare_digest(digest, expected_digest)
+            else "sha256_mismatch"
+        )
         if verification_status == "sha256_mismatch":
             raise HTTPException(
                 status_code=502,
@@ -121,7 +153,9 @@ def desktop_download(body: DownloadRequest | None = None) -> dict[str, Any]:
         "INSERT OR REPLACE INTO agent_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
         ("hermes_desktop.update.latest_download", json.dumps(payload)),
     )
-    _append_proof_event("hermes_desktop_installer_downloaded", "hermes3d-updater", _proof_summary(payload))
+    _append_proof_event(
+        "hermes_desktop_installer_downloaded", "hermes3d-updater", _proof_summary(payload)
+    )
     return payload
 
 
@@ -142,13 +176,23 @@ def _source_state(path: Path) -> dict[str, Any]:
             pass
     git_ready = (path / ".git").exists()
     commit = _run_git_optional(path, ["rev-parse", "--short=12", "HEAD"]) if git_ready else None
-    exact_tag = _run_git_optional(path, ["describe", "--tags", "--exact-match"]) if git_ready else None
-    nearest_tag = _run_git_optional(path, ["describe", "--tags", "--abbrev=0"]) if git_ready else None
-    dirty = bool((_run_git_optional(path, ["status", "--porcelain=v1"]) or "").strip()) if git_ready else None
+    exact_tag = (
+        _run_git_optional(path, ["describe", "--tags", "--exact-match"]) if git_ready else None
+    )
+    nearest_tag = (
+        _run_git_optional(path, ["describe", "--tags", "--abbrev=0"]) if git_ready else None
+    )
+    dirty = (
+        bool((_run_git_optional(path, ["status", "--porcelain=v1"]) or "").strip())
+        if git_ready
+        else None
+    )
     return {
         "source_ready": package.exists(),
         "git_ready": git_ready,
-        "reason": None if package.exists() else f"Hermes Desktop source path does not contain package.json: {path}",
+        "reason": None
+        if package.exists()
+        else f"Hermes Desktop source path does not contain package.json: {path}",
         "package_name": package_name,
         "package_version": package_version,
         "commit": commit,
@@ -160,11 +204,23 @@ def _source_state(path: Path) -> dict[str, Any]:
 
 def _latest_release() -> dict[str, Any]:
     try:
-        request = urllib.request.Request(LATEST_RELEASE_API, headers={"Accept": "application/vnd.github+json", "User-Agent": "Hermes3D-Desktop-Updater"})
+        request = urllib.request.Request(
+            LATEST_RELEASE_API,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "Hermes3D-Desktop-Updater",
+            },
+        )
         with urllib.request.urlopen(request, timeout=12) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as exc:
-        return {"tag": None, "name": None, "source": "github_releases_api", "api_warning": _redact(str(exc)), "assets": []}
+        return {
+            "tag": None,
+            "name": None,
+            "source": "github_releases_api",
+            "api_warning": _redact(str(exc)),
+            "assets": [],
+        }
     assets = [
         {
             "name": asset.get("name"),
@@ -176,7 +232,9 @@ def _latest_release() -> dict[str, Any]:
         for asset in payload.get("assets", [])
         if isinstance(asset, dict)
     ]
-    installer = next((asset for asset in assets if str(asset.get("name") or "").lower().endswith(".exe")), None)
+    installer = next(
+        (asset for asset in assets if str(asset.get("name") or "").lower().endswith(".exe")), None
+    )
     return {
         "tag": payload.get("tag_name"),
         "name": payload.get("name") or payload.get("tag_name"),
@@ -194,7 +252,9 @@ def _create_backup(path: Path, note: str) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail=state["reason"])
     BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    version = str(state.get("exact_tag") or state.get("package_version") or "unknown").replace("/", "_")
+    version = str(state.get("exact_tag") or state.get("package_version") or "unknown").replace(
+        "/", "_"
+    )
     backup_id = f"{stamp}_{version}"
     meta_path = BACKUP_ROOT / f"{backup_id}.json"
     if state["git_ready"]:
@@ -239,7 +299,9 @@ def _zip_source_snapshot(root: Path, target: Path) -> None:
 def _latest_backup() -> dict[str, Any] | None:
     if not BACKUP_ROOT.exists():
         return None
-    backups = sorted(BACKUP_ROOT.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    backups = sorted(
+        BACKUP_ROOT.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True
+    )
     if not backups:
         return None
     try:
@@ -288,14 +350,21 @@ def _semver_key(version: str) -> tuple[int, int, int]:
 
 
 def _run_git(path: Path, args: list[str], timeout: int = 30) -> str:
-    result = subprocess.run(["git", *args], cwd=path, text=True, capture_output=True, timeout=timeout, check=False)
+    result = subprocess.run(
+        ["git", *args], cwd=path, text=True, capture_output=True, timeout=timeout, check=False
+    )
     if result.returncode != 0:
-        raise HTTPException(status_code=502, detail=f"git {' '.join(args)} failed: {_redact((result.stderr or result.stdout).strip())}")
+        raise HTTPException(
+            status_code=502,
+            detail=f"git {' '.join(args)} failed: {_redact((result.stderr or result.stdout).strip())}",
+        )
     return result.stdout
 
 
 def _run_git_optional(path: Path, args: list[str]) -> str | None:
-    result = subprocess.run(["git", *args], cwd=path, text=True, capture_output=True, timeout=30, check=False)
+    result = subprocess.run(
+        ["git", *args], cwd=path, text=True, capture_output=True, timeout=30, check=False
+    )
     if result.returncode != 0:
         return None
     return result.stdout.strip() or None
@@ -326,7 +395,9 @@ def _proof_summary(payload: dict[str, Any]) -> dict[str, Any]:
             "name": latest.get("name"),
             "published_at": latest.get("published_at"),
             "html_url": latest.get("html_url"),
-            "installer_asset": (latest.get("installer_asset") or {}).get("name") if isinstance(latest.get("installer_asset"), dict) else None,
+            "installer_asset": (latest.get("installer_asset") or {}).get("name")
+            if isinstance(latest.get("installer_asset"), dict)
+            else None,
         }
     if "backup" in summary and isinstance(summary["backup"], dict):
         backup = summary["backup"]
@@ -352,4 +423,6 @@ def _proof_summary(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _redact(value: str) -> str:
-    return SECRET_RE.sub(lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value)
+    return SECRET_RE.sub(
+        lambda match: f"{match.group(1) or match.group(2) or match.group(3) or ''}[REDACTED]", value
+    )

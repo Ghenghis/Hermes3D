@@ -140,9 +140,7 @@ class PrinterSafetyGate:
         camera-only gate has no source of truth.
         """
         async with self._lock:
-            state = self._printers.setdefault(
-                printer_id, PrinterGateState(printer_id=printer_id)
-            )
+            state = self._printers.setdefault(printer_id, PrinterGateState(printer_id=printer_id))
             state.camera_id = camera_id
             self._camera_to_printers.setdefault(camera_id, set()).add(printer_id)
 
@@ -161,9 +159,7 @@ class PrinterSafetyGate:
                     printer_id, PrinterGateState(printer_id=printer_id, camera_id=camera_id)
                 )
                 if state.last_frame is None or ts_unix >= state.last_frame.ts_unix:
-                    state.last_frame = CameraFrameRecord(
-                        camera_id=camera_id, ts_unix=ts_unix
-                    )
+                    state.last_frame = CameraFrameRecord(camera_id=camera_id, ts_unix=ts_unix)
 
     async def record_plate_classification(
         self,
@@ -263,9 +259,7 @@ class PrinterSafetyGate:
             state = self._printers.get(printer_id)
             frame = state.last_frame if state else None
             cls = state.last_classification if state else None
-            camera_fresh = bool(
-                frame and (now - frame.ts_unix) <= self._camera_freshness_sec
-            )
+            camera_fresh = bool(frame and (now - frame.ts_unix) <= self._camera_freshness_sec)
 
         # release lock before recomputing allow (which re-acquires).
         allow, reasons = await self.is_safe_to_start(printer_id)

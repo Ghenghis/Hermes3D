@@ -24,7 +24,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from hermes3d.services.agent_checkout import hermes_agent_checkout as _hermes_agent_checkout_at_import
+from hermes3d.services.agent_checkout import (
+    hermes_agent_checkout as _hermes_agent_checkout_at_import,
+)
 
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[3]
 LOCAL_TOOLING_AUDIT_PATH = IMPLEMENTATION_ROOT / "proof" / "LOCAL_TOOLING_AUDIT.json"
@@ -1056,16 +1058,16 @@ def module_read_only_runner_contract(
     verifier_kind = str(runtime.get("kind") or launch_kind)
     ready = _read_only_runner_available(runtime=runtime, verifier_kind=verifier_kind)
     runner_family = _read_only_runner_family(verifier_kind)
-    blocked_reason = None if ready else _read_only_runner_blocked_reason(
-        runtime=runtime,
-        verifier_kind=verifier_kind,
-        launch_kind=launch_kind,
+    blocked_reason = (
+        None
+        if ready
+        else _read_only_runner_blocked_reason(
+            runtime=runtime,
+            verifier_kind=verifier_kind,
+            launch_kind=launch_kind,
+        )
     )
-    runtime_public = {
-        key: value
-        for key, value in runtime.items()
-        if key not in {"output_head"}
-    }
+    runtime_public = {key: value for key, value in runtime.items() if key not in {"output_head"}}
     if runtime.get("output_head"):
         runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
     return {
@@ -1125,16 +1127,16 @@ def module_executable_path_runner_contract(mod: dict[str, Any]) -> dict[str, Any
     metadata = _executable_file_metadata(path) if ready else {}
     if ready and not metadata.get("exists"):
         ready = False
-    blocked_reason = None if ready else _executable_path_runner_blocked_reason(
-        runtime=runtime,
-        verifier_kind=verifier_kind,
-        path_value=path_value,
+    blocked_reason = (
+        None
+        if ready
+        else _executable_path_runner_blocked_reason(
+            runtime=runtime,
+            verifier_kind=verifier_kind,
+            path_value=path_value,
+        )
     )
-    runtime_public = {
-        key: value
-        for key, value in runtime.items()
-        if key not in {"output_head"}
-    }
+    runtime_public = {key: value for key, value in runtime.items() if key not in {"output_head"}}
     if runtime.get("output_head"):
         runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
     return {
@@ -1197,17 +1199,17 @@ def module_python_import_repair_runner_contract(mod: dict[str, Any]) -> dict[str
     repair = _python_import_repair_metadata(probe=probe, mod=mod, runtime=runtime)
     if ready and not repair["source_checkout"]["exists"]:
         ready = False
-    blocked_reason = None if ready else _python_import_repair_blocked_reason(
-        runtime=runtime,
-        verifier_kind=verifier_kind,
-        launch_kind=launch_kind,
-        repair=repair,
+    blocked_reason = (
+        None
+        if ready
+        else _python_import_repair_blocked_reason(
+            runtime=runtime,
+            verifier_kind=verifier_kind,
+            launch_kind=launch_kind,
+            repair=repair,
+        )
     )
-    runtime_public = {
-        key: value
-        for key, value in runtime.items()
-        if key not in {"output_head"}
-    }
+    runtime_public = {key: value for key, value in runtime.items() if key not in {"output_head"}}
     if runtime.get("output_head"):
         runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
     return {
@@ -1275,17 +1277,17 @@ def module_cli_install_config_runner_contract(mod: dict[str, Any]) -> dict[str, 
         )
     ):
         ready = False
-    blocked_reason = None if ready else _cli_install_config_blocked_reason(
-        mod=mod,
-        runtime=runtime,
-        verifier_kind=verifier_kind,
-        metadata=metadata,
+    blocked_reason = (
+        None
+        if ready
+        else _cli_install_config_blocked_reason(
+            mod=mod,
+            runtime=runtime,
+            verifier_kind=verifier_kind,
+            metadata=metadata,
+        )
     )
-    runtime_public = {
-        key: value
-        for key, value in runtime.items()
-        if key not in {"output_head"}
-    }
+    runtime_public = {key: value for key, value in runtime.items() if key not in {"output_head"}}
     if runtime.get("output_head"):
         runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
     return {
@@ -1341,16 +1343,16 @@ def module_npm_package_runner_contract(mod: dict[str, Any]) -> dict[str, Any]:
     ready = _npm_package_preflight_runner_available(mod=mod, runtime=runtime)
     if ready and not metadata.get("package_json", {}).get("exists"):
         ready = False
-    blocked_reason = None if ready else _npm_package_preflight_blocked_reason(
-        mod=mod,
-        runtime=runtime,
-        metadata=metadata,
+    blocked_reason = (
+        None
+        if ready
+        else _npm_package_preflight_blocked_reason(
+            mod=mod,
+            runtime=runtime,
+            metadata=metadata,
+        )
     )
-    runtime_public = {
-        key: value
-        for key, value in runtime.items()
-        if key not in {"output_head"}
-    }
+    runtime_public = {key: value for key, value in runtime.items() if key not in {"output_head"}}
     if runtime.get("output_head"):
         runtime_public["output_head_lines"] = len(runtime.get("output_head") or [])
     return {
@@ -2772,7 +2774,9 @@ def _python_import_repair_blocked_reason(
         return "Python import repair preflight requires a registered proof gate version."
     if not repair.get("source_checkout", {}).get("exists"):
         return "Python import repair preflight requires a local source checkout to inspect."
-    return runtime_reason or "Python import repair preflight is blocked until source metadata exists."
+    return (
+        runtime_reason or "Python import repair preflight is blocked until source metadata exists."
+    )
 
 
 def _cli_install_config_blocked_reason(
@@ -3004,9 +3008,7 @@ def _python_import_repair_metadata(
     }
 
 
-def _cli_install_config_metadata(
-    *, mod: dict[str, Any], runtime: dict[str, Any]
-) -> dict[str, Any]:
+def _cli_install_config_metadata(*, mod: dict[str, Any], runtime: dict[str, Any]) -> dict[str, Any]:
     module_id = str(mod.get("id") or "")
     root_value = str(mod.get("local_path") or "")
     root = Path(root_value) if root_value else None
@@ -3025,7 +3027,9 @@ def _cli_install_config_metadata(
         metadata = (
             _executable_file_metadata(resolved)
             if resolved is not None
-            else _executable_file_metadata(Path(shutil.which(value))) if shutil.which(value) else {
+            else _executable_file_metadata(Path(shutil.which(value)))
+            if shutil.which(value)
+            else {
                 "exists": False,
                 "reason": "not_on_path",
             }
@@ -3069,7 +3073,9 @@ def _cli_install_config_metadata(
             "manifest_count": len(manifests),
         },
         "source_manifests": manifests,
-        "adapter_schema": _source_metadata_file(schema) if schema.exists() else {
+        "adapter_schema": _source_metadata_file(schema)
+        if schema.exists()
+        else {
             "exists": False,
             "path": str(schema),
             "reason": "missing",
@@ -3114,9 +3120,15 @@ def _npm_package_preflight_metadata(
         except json.JSONDecodeError as exc:
             parse_error = f"{type(exc).__name__}: {exc.msg}"
     scripts = package_payload.get("scripts") if isinstance(package_payload, dict) else None
-    dependencies = package_payload.get("dependencies") if isinstance(package_payload, dict) else None
-    dev_dependencies = package_payload.get("devDependencies") if isinstance(package_payload, dict) else None
-    peer_dependencies = package_payload.get("peerDependencies") if isinstance(package_payload, dict) else None
+    dependencies = (
+        package_payload.get("dependencies") if isinstance(package_payload, dict) else None
+    )
+    dev_dependencies = (
+        package_payload.get("devDependencies") if isinstance(package_payload, dict) else None
+    )
+    peer_dependencies = (
+        package_payload.get("peerDependencies") if isinstance(package_payload, dict) else None
+    )
     optional_dependencies = (
         package_payload.get("optionalDependencies") if isinstance(package_payload, dict) else None
     )
@@ -3169,12 +3181,16 @@ def _npm_package_preflight_metadata(
         "package_json": package_file,
         "source_manifests": manifests,
         "lockfiles": lockfiles,
-        "node_candidate": _executable_file_metadata(Path(node_path)) if node_path else {
+        "node_candidate": _executable_file_metadata(Path(node_path))
+        if node_path
+        else {
             "exists": False,
             "value": "node",
             "reason": "not_on_path",
         },
-        "npm_candidate": _executable_file_metadata(Path(npm_path)) if npm_path else {
+        "npm_candidate": _executable_file_metadata(Path(npm_path))
+        if npm_path
+        else {
             "exists": False,
             "value": "npm",
             "reason": "not_on_path",
@@ -3533,17 +3549,14 @@ def probe_slicer_cli(module_id: str) -> dict[str, Any]:
             "return_code": None,
             "capabilities": capabilities,
             "blocked_reason": (
-                f"{label} was detected at {found_path} but failed to run "
-                f"--version: {exc}"
+                f"{label} was detected at {found_path} but failed to run --version: {exc}"
             ),
             "proof_gate_version": "slicer-cli-verifier-v1",
             "output_head": [],
         }
 
     combined_output = _redact_text(
-        (proc.stdout or "")
-        + ("\n" if proc.stdout and proc.stderr else "")
-        + (proc.stderr or "")
+        (proc.stdout or "") + ("\n" if proc.stdout and proc.stderr else "") + (proc.stderr or "")
     )
     output_head = _head_lines(combined_output)
 
@@ -3568,7 +3581,9 @@ def probe_slicer_cli(module_id: str) -> dict[str, Any]:
             f"{label} ran at {found_path} but --version returned rc={proc.returncode} "
             f"with no usable output."
         ),
-        "proof_gate_version": probe_cfg.get("proof_gate_version") if probe_cfg else "slicer-cli-verifier-v1",
+        "proof_gate_version": probe_cfg.get("proof_gate_version")
+        if probe_cfg
+        else "slicer-cli-verifier-v1",
         "output_head": output_head,
     }
 
@@ -3682,6 +3697,8 @@ def probe_modeler_import(module_id: str) -> dict[str, Any]:
         "proof_gate_version": probe_cfg.get("proof_gate_version") or "modeler-import-verifier-v1",
         "output_head": base_result.get("output_head") or [],
     }
+
+
 # Firmware source inventory probe (I7 — read-only, no flash/compile/serial)
 # ---------------------------------------------------------------------------
 

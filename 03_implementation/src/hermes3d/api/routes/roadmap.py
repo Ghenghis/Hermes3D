@@ -51,23 +51,108 @@ def tab_completion() -> dict:
             "Hermes Agents are not complete until every visible app, tab, button, and feature has an agent-callable action contract, safety policy, proof event, and exact ready or blocked state.",
         ],
         "tabs": [
-            {"tab": "dashboard", "label": "Dashboard", "state": "done", "summary": "Live backend data, compact dashboard/simple mode, viewport proof recorded."},
-            {"tab": "simple", "label": "Simple GUI", "state": "done", "summary": "Selectable compact dashboard matching the user's preferred dense style."},
-            {"tab": "observe", "label": "Observe", "state": "done", "summary": "Live camera cards, S1 90-degree default, resize/undock/feed controls, backend plate policy."},
-            {"tab": "printers", "label": "Printers", "state": "done", "summary": "Correct T1/S1/V400 IP policy, S1 locked, guarded T1 print proof recorded."},
-            {"tab": "source_os", "label": "Source OS", "state": "in_progress", "summary": f"Source registry is resolved; Verify All, Setup Queue, selected-app Verify, and selected-app Setup Plan create proof; backup/update/rollback routes are UI-wired, {source_truth['runtime_ready']} verifier-backed rows are ready, {source_truth['verified_agent_cli']} real CLI probes are agent-usable, launch kinds are classified for all 60 rows, and safe setup runners remain for the remaining {source_truth['runner_gaps']} runner gaps."},
-            {"tab": "agents", "label": "Agents rail/chat", "state": "done", "summary": "Mic, voice-note upload, file attachments, quick context prompts, Azure reply voice playback, runtime SSE when configured, and bounded Playwright proof runs. Full OS operator coverage is tracked as a separate P0 gate."},
-            {"tab": "artifacts", "label": "Artifacts", "state": "done", "summary": "Agent attachments and proof files are inspectable through live artifacts API."},
-            {"tab": "settings", "label": "Settings", "state": "in_progress", "summary": "Hermes Agent/Desktop update failsafes exist; Environment shows runtime readiness plus source-app setup queue; app-wide update execution remains next."},
-            {"tab": "plugins", "label": "Plugins", "state": "in_progress", "summary": "Plugin state is live-backed and summarizes source update readiness plus the runtime setup queue; next gap is unified app release watch."},
-            {"tab": "jobs", "label": "Jobs", "state": "done", "summary": "Proof-gated pipeline renders backend transition state; cancel, repair proposal, repair apply/escalation, retry, and rollback routes append proof/job events and are UI-wired."},
-            {"tab": "autopilot", "label": "Autopilot", "state": "in_progress", "summary": "Guardrails/readiness routes exist; idle safe-work queue remains next."},
-            {"tab": "learning", "label": "Learning", "state": "in_progress", "summary": "Idle research config exists; daily review queue remains next."},
-            {"tab": "voice", "label": "Voice", "state": "in_progress", "summary": "Voice catalog/preview, chat mic, Azure STT, and agent reply voice playback are backend-wired; transcript review remains next."},
-            {"tab": "design", "label": "Design", "state": "in_progress", "summary": "P0 parametric desk-organizer executor is live with STL artifact, signed proof envelope, truth-gate row, and proof event; broader OpenSCAD/CadQuery/Blender coverage remains."},
-            {"tab": "gen3d", "label": "3D Generation", "state": "in_progress", "summary": "P0 calibration-cube generator is live with STL artifact, preview SVG, signed proof envelope, truth-gate row, and proof event; broader ComfyUI/TRELLIS.2/Hunyuan3D coverage remains."},
-            {"tab": "approvals", "label": "Approvals", "state": "done", "summary": "Pending/approved/rejected approval actions are live-backed."},
-            {"tab": "roadmap", "label": "Roadmap", "state": "in_progress", "summary": "This ledger is now exposed by live API and markdown."},
+            {
+                "tab": "dashboard",
+                "label": "Dashboard",
+                "state": "done",
+                "summary": "Live backend data, compact dashboard/simple mode, viewport proof recorded.",
+            },
+            {
+                "tab": "simple",
+                "label": "Simple GUI",
+                "state": "done",
+                "summary": "Selectable compact dashboard matching the user's preferred dense style.",
+            },
+            {
+                "tab": "observe",
+                "label": "Observe",
+                "state": "done",
+                "summary": "Live camera cards, S1 90-degree default, resize/undock/feed controls, backend plate policy.",
+            },
+            {
+                "tab": "printers",
+                "label": "Printers",
+                "state": "done",
+                "summary": "Correct T1/S1/V400 IP policy, S1 locked, guarded T1 print proof recorded.",
+            },
+            {
+                "tab": "source_os",
+                "label": "Source OS",
+                "state": "in_progress",
+                "summary": f"Source registry is resolved; Verify All, Setup Queue, selected-app Verify, and selected-app Setup Plan create proof; backup/update/rollback routes are UI-wired, {source_truth['runtime_ready']} verifier-backed rows are ready, {source_truth['verified_agent_cli']} real CLI probes are agent-usable, launch kinds are classified for all 60 rows, and safe setup runners remain for the remaining {source_truth['runner_gaps']} runner gaps.",
+            },
+            {
+                "tab": "agents",
+                "label": "Agents rail/chat",
+                "state": "done",
+                "summary": "Mic, voice-note upload, file attachments, quick context prompts, Azure reply voice playback, runtime SSE when configured, and bounded Playwright proof runs. Full OS operator coverage is tracked as a separate P0 gate.",
+            },
+            {
+                "tab": "artifacts",
+                "label": "Artifacts",
+                "state": "done",
+                "summary": "Agent attachments and proof files are inspectable through live artifacts API.",
+            },
+            {
+                "tab": "settings",
+                "label": "Settings",
+                "state": "in_progress",
+                "summary": "Hermes Agent/Desktop update failsafes exist; Environment shows runtime readiness plus source-app setup queue; app-wide update execution remains next.",
+            },
+            {
+                "tab": "plugins",
+                "label": "Plugins",
+                "state": "in_progress",
+                "summary": "Plugin state is live-backed and summarizes source update readiness plus the runtime setup queue; next gap is unified app release watch.",
+            },
+            {
+                "tab": "jobs",
+                "label": "Jobs",
+                "state": "done",
+                "summary": "Proof-gated pipeline renders backend transition state; cancel, repair proposal, repair apply/escalation, retry, and rollback routes append proof/job events and are UI-wired.",
+            },
+            {
+                "tab": "autopilot",
+                "label": "Autopilot",
+                "state": "in_progress",
+                "summary": "Guardrails/readiness routes exist; idle safe-work queue remains next.",
+            },
+            {
+                "tab": "learning",
+                "label": "Learning",
+                "state": "in_progress",
+                "summary": "Idle research config exists; daily review queue remains next.",
+            },
+            {
+                "tab": "voice",
+                "label": "Voice",
+                "state": "in_progress",
+                "summary": "Voice catalog/preview, chat mic, Azure STT, and agent reply voice playback are backend-wired; transcript review remains next.",
+            },
+            {
+                "tab": "design",
+                "label": "Design",
+                "state": "in_progress",
+                "summary": "P0 parametric desk-organizer executor is live with STL artifact, signed proof envelope, truth-gate row, and proof event; broader OpenSCAD/CadQuery/Blender coverage remains.",
+            },
+            {
+                "tab": "gen3d",
+                "label": "3D Generation",
+                "state": "in_progress",
+                "summary": "P0 calibration-cube generator is live with STL artifact, preview SVG, signed proof envelope, truth-gate row, and proof event; broader ComfyUI/TRELLIS.2/Hunyuan3D coverage remains.",
+            },
+            {
+                "tab": "approvals",
+                "label": "Approvals",
+                "state": "done",
+                "summary": "Pending/approved/rejected approval actions are live-backed.",
+            },
+            {
+                "tab": "roadmap",
+                "label": "Roadmap",
+                "state": "in_progress",
+                "summary": "This ledger is now exposed by live API and markdown.",
+            },
         ],
         "next_packages": [
             {
@@ -223,12 +308,30 @@ def tab_completion() -> dict:
             },
         ],
         "references": [
-            {"label": "Moonraker Web API", "url": "https://moonraker.readthedocs.io/en/stable/web_api/"},
-            {"label": "Moonraker update manager", "url": "https://moonraker.readthedocs.io/en/latest/external_api/update_manager/"},
-            {"label": "Moonraker webcam config", "url": "https://moonraker.readthedocs.io/en/latest/configuration/#webcam"},
-            {"label": "GitHub latest release REST API", "url": "https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#get-the-latest-release"},
-            {"label": "PrusaSlicer CLI", "url": "https://github.com/prusa3d/PrusaSlicer/wiki/Command-Line-Interface"},
-            {"label": "OpenSCAD CLI", "url": "https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Using_OpenSCAD_in_a_command_line_environment"},
+            {
+                "label": "Moonraker Web API",
+                "url": "https://moonraker.readthedocs.io/en/stable/web_api/",
+            },
+            {
+                "label": "Moonraker update manager",
+                "url": "https://moonraker.readthedocs.io/en/latest/external_api/update_manager/",
+            },
+            {
+                "label": "Moonraker webcam config",
+                "url": "https://moonraker.readthedocs.io/en/latest/configuration/#webcam",
+            },
+            {
+                "label": "GitHub latest release REST API",
+                "url": "https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#get-the-latest-release",
+            },
+            {
+                "label": "PrusaSlicer CLI",
+                "url": "https://github.com/prusa3d/PrusaSlicer/wiki/Command-Line-Interface",
+            },
+            {
+                "label": "OpenSCAD CLI",
+                "url": "https://en.wikibooks.org/wiki/OpenSCAD_User_Manual/Using_OpenSCAD_in_a_command_line_environment",
+            },
             {"label": "OrcaSlicer source", "url": "https://github.com/OrcaSlicer/OrcaSlicer"},
         ],
     }
@@ -241,11 +344,19 @@ def _source_runtime_truth() -> dict:
     counts = completion.get("runtime_setup_queue", {}).get("counts", {})
     readiness_summary = cli_readiness.get("summary", {})
     surface_summary = cli_surface.get("summary", {})
-    runner_gaps = int(counts.get("runner_not_registered") or readiness_summary.get("runner_gaps") or 0)
+    runner_gaps = int(
+        counts.get("runner_not_registered") or readiness_summary.get("runner_gaps") or 0
+    )
     runtime_ready = int(counts.get("runtime_ready") or 0)
-    verified_agent_cli = int(readiness_summary.get("verified_agent_cli") or surface_summary.get("agent_enabled_cli") or 0)
+    verified_agent_cli = int(
+        readiness_summary.get("verified_agent_cli") or surface_summary.get("agent_enabled_cli") or 0
+    )
     cli_candidates = int(surface_summary.get("candidate_needs_verifier") or 0)
-    generated_at = completion.get("generated_at_utc") or cli_readiness.get("generated_at_utc") or cli_surface.get("generated_at_utc")
+    generated_at = (
+        completion.get("generated_at_utc")
+        or cli_readiness.get("generated_at_utc")
+        or cli_surface.get("generated_at_utc")
+    )
     return {
         "runtime_ready": runtime_ready,
         "runner_gaps": runner_gaps,

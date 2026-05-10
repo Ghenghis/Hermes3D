@@ -23,13 +23,15 @@ class BlenderMCPAdapter(SkeletonAdapter):
     category = "3d-mcp"
     dangerous = True
 
-    _CAPABILITIES = frozenset({
-        "mcp",
-        "provider_switch",
-        "execute_blender_python_after_validation",
-        "scene_inspection",
-        "dry_run_supported",
-    })
+    _CAPABILITIES = frozenset(
+        {
+            "mcp",
+            "provider_switch",
+            "execute_blender_python_after_validation",
+            "scene_inspection",
+            "dry_run_supported",
+        }
+    )
 
     def detect(self) -> DetectResult:
         active = _active_provider()
@@ -41,7 +43,9 @@ class BlenderMCPAdapter(SkeletonAdapter):
             )
         path = shutil.which("uvx")
         if path:
-            return self._detect_result(True, AdapterState.DETECTED, f"{active} selected; uvx at {path}")
+            return self._detect_result(
+                True, AdapterState.DETECTED, f"{active} selected; uvx at {path}"
+            )
         return self._detect_result(
             False,
             AdapterState.UNINSTALLED,
@@ -59,7 +63,9 @@ class BlenderMCPAdapter(SkeletonAdapter):
 
 
 def _active_provider() -> str:
-    setting = row("SELECT value FROM settings WHERE key = 'source_os.blender_mcp_candidates.active_provider'")
+    setting = row(
+        "SELECT value FROM settings WHERE key = 'source_os.blender_mcp_candidates.active_provider'"
+    )
     if setting:
         return str(setting["value"])
     legacy = row("SELECT value FROM settings WHERE key = 'source_os.blender_mcp.active_provider'")

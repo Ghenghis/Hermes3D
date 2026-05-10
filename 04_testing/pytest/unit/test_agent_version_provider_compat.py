@@ -29,10 +29,8 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 import pytest
-
 from hermes3d.services import agent_version_provider_compat as avpc
 from hermes3d.services.agent_version_registry import V012, V013
-
 
 # Module-relative path to the Hermes3D source tree (used by the FS-only
 # import path check). This file lives at
