@@ -39,10 +39,12 @@ const env = runtimeEnv({
 // shared SQLite file (var/hermes3d.db) doesn't race across processes. The
 // db/init._INIT_LOCK is per-process; with parallel spawn both children
 // concurrently call executescript() and the second one fails with
-// "sqlite3.OperationalError: database is locked" before commit. By waiting
-// for the first server's /health (which fires only after init_db() returns)
-// the second process always finds an already-initialized DB and the
-// IF-NOT-EXISTS / INSERT-OR-IGNORE paths become no-ops.
+// "sqlite3.OperationalError: database is locked" before commit, or one
+// can leave the DB in a half-seeded state, leading to flaky 502 responses
+// on routes that require seeded rows. By waiting for the first server's
+// /health (which fires only after init_db() returns) the second process
+// always finds an already-initialized DB and the IF-NOT-EXISTS /
+// INSERT-OR-IGNORE paths become no-ops.
 const children = [spawnServer(apiPort, "Hermes3D GUI API")];
 await waitForHealth(`http://127.0.0.1:${apiPort}/health`, "Hermes3D GUI API");
 if (desktopPort) {
