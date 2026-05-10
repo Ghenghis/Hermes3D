@@ -34,8 +34,13 @@ import pytest
 from hermes3d.services import agent_checkout as ac
 
 
-PROD = "G:/Github/hermes-agent-fresh"
-CANARY = "G:/Github/hermes-agent-v013-canary"
+# Post Wave 1 promotion (2026-05-09): v0.13 is the default; v0.12 is
+# the opt-in fallback path.
+V012_FALLBACK = "G:/Github/hermes-agent-fresh"
+V013_DEFAULT = "G:/Github/hermes-agent-v013-canary"
+# Aliases for tests authored before promotion.
+PROD = V013_DEFAULT
+CANARY = V013_DEFAULT
 
 
 # ---------------------------------------------------------------------------
@@ -43,22 +48,30 @@ CANARY = "G:/Github/hermes-agent-v013-canary"
 # ---------------------------------------------------------------------------
 
 
-def test_default_is_production(monkeypatch: pytest.MonkeyPatch) -> None:
-    """With env unset, resolver returns the production v0.12 path."""
+def test_default_is_v013_post_promotion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Post Wave 1 promotion: with env unset, resolver returns v0.13.
+
+    Wave 1 (2026-05-09) cleared 6/7 hard gates: live MiniMax + DeepSeek
+    probes both ``accepted=true``; canary runtime smoke 8/8 imports +
+    10 MCP tools; production-untouched re-verify; per-call env resolver
+    mid-process flip 4/4; zero secret leak. BLK-013 tracked separately.
+    """
     monkeypatch.delenv("HERMES_AGENT_CHECKOUT", raising=False)
-    assert ac.hermes_agent_checkout() == Path(PROD)
+    assert ac.hermes_agent_checkout() == Path(V013_DEFAULT)
 
 
-def test_canary_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Setting HERMES_AGENT_CHECKOUT flips to the canary path."""
-    monkeypatch.setenv("HERMES_AGENT_CHECKOUT", CANARY)
-    assert ac.hermes_agent_checkout() == Path(CANARY)
+def test_v012_fallback_via_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Operators can revert to v0.12 mid-process by setting the env."""
+    monkeypatch.setenv("HERMES_AGENT_CHECKOUT", V012_FALLBACK)
+    assert ac.hermes_agent_checkout() == Path(V012_FALLBACK)
 
 
 def test_resolver_constants_are_correct() -> None:
-    """The two named constants are the canonical production + canary paths."""
-    assert ac.DEFAULT_AGENT_CHECKOUT == Path(PROD)
-    assert ac.CANARY_AGENT_CHECKOUT == Path(CANARY)
+    """Post-promotion: DEFAULT and CANARY both point to v0.13;
+    V012_FALLBACK is the explicit v0.12 path."""
+    assert ac.DEFAULT_AGENT_CHECKOUT == Path(V013_DEFAULT)
+    assert ac.CANARY_AGENT_CHECKOUT == Path(V013_DEFAULT)
+    assert ac.V012_FALLBACK_CHECKOUT == Path(V012_FALLBACK)
 
 
 # ---------------------------------------------------------------------------
@@ -71,25 +84,25 @@ def test_a5_per_call_env_flip_within_same_process(
 ) -> None:
     """Wave A5 critical: flip env between calls; resolver MUST read live env.
 
-    Pre-fix the resolver would have captured the value at import. This
-    test calls hermes_agent_checkout() multiple times across env flips
-    in the same process and asserts each call reflects the current env.
+    Post-promotion: default = v0.13. Operator flips to v0.12 fallback
+    via the env var, then unsets to return to v0.13 default. Per-call
+    read makes mid-process rollback work without process restart.
     """
-    # Start production
+    # Start at default (v0.13)
     monkeypatch.delenv("HERMES_AGENT_CHECKOUT", raising=False)
-    assert ac.hermes_agent_checkout() == Path(PROD)
+    assert ac.hermes_agent_checkout() == Path(V013_DEFAULT)
 
-    # Flip to canary
-    monkeypatch.setenv("HERMES_AGENT_CHECKOUT", CANARY)
-    assert ac.hermes_agent_checkout() == Path(CANARY), (
+    # Flip to v0.12 fallback
+    monkeypatch.setenv("HERMES_AGENT_CHECKOUT", V012_FALLBACK)
+    assert ac.hermes_agent_checkout() == Path(V012_FALLBACK), (
         "Wave A5 regression: env flip mid-process did NOT propagate; "
         "resolver may be caching at import time again."
     )
 
-    # Flip back to production
+    # Flip back to default (unset = v0.13)
     monkeypatch.delenv("HERMES_AGENT_CHECKOUT")
-    assert ac.hermes_agent_checkout() == Path(PROD), (
-        "Wave A5 regression: rollback to production failed mid-process."
+    assert ac.hermes_agent_checkout() == Path(V013_DEFAULT), (
+        "Wave A5 regression: rollback to default v0.13 failed mid-process."
     )
 
 
@@ -110,19 +123,22 @@ def test_a4_agent_updates_repo_path_per_call(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """agent_updates._repo_path must reflect current env, not the
-    module-level DEFAULT_CHECKOUT constant captured at import."""
+    module-level DEFAULT_CHECKOUT constant captured at import.
+
+    Post-promotion: default unset = v0.13; explicit env = v0.12 fallback.
+    """
     from hermes3d.api.routes import agent_updates
 
     monkeypatch.delenv("HERMES_AGENT_CHECKOUT", raising=False)
-    assert agent_updates._repo_path() == Path(PROD)
+    assert agent_updates._repo_path() == Path(V013_DEFAULT)
 
-    monkeypatch.setenv("HERMES_AGENT_CHECKOUT", CANARY)
-    assert agent_updates._repo_path() == Path(CANARY), (
+    monkeypatch.setenv("HERMES_AGENT_CHECKOUT", V012_FALLBACK)
+    assert agent_updates._repo_path() == Path(V012_FALLBACK), (
         "Wave A4/A5 regression: _repo_path no longer reads env per-call."
     )
 
     monkeypatch.delenv("HERMES_AGENT_CHECKOUT")
-    assert agent_updates._repo_path() == Path(PROD)
+    assert agent_updates._repo_path() == Path(V013_DEFAULT)
 
 
 def test_agent_updates_imports_resolver() -> None:
@@ -183,17 +199,18 @@ def test_load_modules_imports_resolver() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_production_path_unchanged_when_env_unset(
+def test_v013_default_when_env_unset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The production v0.12 path must be the byte-identical default.
+    """Post-promotion: env unset resolves to v0.13 production default.
 
-    Operators relying on the existing path see zero behavior change.
+    Operators wanting v0.12 must explicitly set
+    ``HERMES_AGENT_CHECKOUT=G:/Github/hermes-agent-fresh``.
     """
     monkeypatch.delenv("HERMES_AGENT_CHECKOUT", raising=False)
     from hermes3d.api.routes import agent_updates
 
     # Test the live route helper.
-    assert str(agent_updates._repo_path()) == str(Path(PROD))
+    assert str(agent_updates._repo_path()) == str(Path(V013_DEFAULT))
     # Test the resolver directly.
-    assert str(ac.hermes_agent_checkout()) == str(Path(PROD))
+    assert str(ac.hermes_agent_checkout()) == str(Path(V013_DEFAULT))
