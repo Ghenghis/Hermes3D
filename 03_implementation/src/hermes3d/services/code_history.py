@@ -24,6 +24,7 @@ from hermes3d.db.init import DB_PATH
 from hermes3d.services.agent_runtime import env_value, private_env
 from hermes3d.services.agent_checkout import hermes_agent_checkout
 from hermes3d.gateways.redaction import redact_text
+from hermes3d.services.canary_dirt_filter import compute_dirty as _compute_canary_dirty
 
 # Hermes Agent v0.13 canary switch (Wave A4 finding): captured at import
 # so SOURCE_REPOS can be a module-level tuple (consumers iterate it
@@ -1296,13 +1297,25 @@ def repo_status() -> dict[str, Any]:
     head = _git_value(["rev-parse", "--short", "HEAD"])
     status = _git_value(["status", "--short"], allow_multiline=True) or ""
     diff_summary = _git_value(["diff", "--stat"], allow_multiline=True) or ""
+    # Wave 1 canary noise filter (W6-1, 2026-05-09): pip / pytest / venv
+    # artifacts left by ``pip install -e .`` against the v0.13 canary
+    # checkout (``.venv-canary/``, ``_pip_install.log``, ``__pycache__``,
+    # ``.pytest_cache``, ``.coverage*``, ``*.egg-info``) used to flip
+    # ``dirty=True`` for a tree that was otherwise byte-identical to the
+    # tagged release. ``compute_dirty`` re-evaluates the porcelain output
+    # against :data:`canary_dirt_filter.NOISE_PATTERNS` so we report the
+    # dirty signal that operators actually care about (real edits to
+    # tracked files), while still surfacing the raw porcelain in
+    # ``status_short`` for diagnostics.
+    real_dirty, real_dirty_entries = _compute_canary_dirty(status)
     return {
         "status": "ready",
         "workspace_root": str(PROJECT_ROOT),
         "branch": branch or "detached_or_unknown",
         "head": head,
-        "dirty": bool(status.strip()),
+        "dirty": real_dirty,
         "status_short": status.splitlines()[:300],
+        "dirty_filtered_entries": real_dirty_entries[:300],
         "diff_stat": diff_summary.splitlines()[:120],
     }
 
