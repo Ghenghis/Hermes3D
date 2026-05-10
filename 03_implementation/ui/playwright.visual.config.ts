@@ -64,7 +64,16 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://localhost:5173",
-    viewport: { width: 1920, height: 1080 },
+    // W8-15: viewport must MATCH reference PNG dimensions in Images-GUI/.
+    // 9 of 11 live targets are 1536x1024; toHaveScreenshot is not
+    // resolution-tolerant, so a 1920x1080 capture against a 1536x1024
+    // reference produces a uniform ~0.29 diff ratio regardless of pixel
+    // content (W8-14 diagnosis). The reference pack is the single source of
+    // truth (PR #128); the harness conforms. Two outlier references
+    // (1672x941, 1586x992) are owned by their producing lanes and are
+    // expected to remain DIFF until those references are normalized.
+    // Source: https://playwright.dev/docs/api/class-testoptions#test-options-viewport
+    viewport: { width: 1536, height: 1024 },
     deviceScaleFactor: 1,
     headless: true,
     screenshot: "only-on-failure",
@@ -72,10 +81,10 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "visual-chromium-1920x1080",
+      name: "visual-chromium-1536x1024",
       use: {
         ...devices["Desktop Chrome"],
-        viewport: { width: 1920, height: 1080 },
+        viewport: { width: 1536, height: 1024 },
         deviceScaleFactor: 1,
       },
     },
