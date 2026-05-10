@@ -124,7 +124,12 @@ type SourceOSView = "matrix" | "registry";
 const VIEW_STORAGE_KEY = "h3d.sourceOs.view";
 
 function readInitialView(): SourceOSView {
-  if (typeof window === "undefined") return "matrix";
+  // Default to the legacy "registry" view so the existing live-gui E2E
+  // contract (which expects the source-backed-modules subtitle and the
+  // runtime readiness bar on first open) keeps passing. Operators who
+  // prefer the 60-app matrix can switch via the ViewSwitch and the
+  // selection is persisted in localStorage below.
+  if (typeof window === "undefined") return "registry";
   try {
     const raw = window.localStorage.getItem(VIEW_STORAGE_KEY);
     if (raw === "registry") return "registry";
@@ -132,7 +137,7 @@ function readInitialView(): SourceOSView {
   } catch {
     // localStorage unavailable (private mode / SSR snapshot) — fall through.
   }
-  return "matrix";
+  return "registry";
 }
 
 function navigateToAppDetail(id: string) {
