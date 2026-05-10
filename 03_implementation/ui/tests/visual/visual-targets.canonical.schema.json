@@ -1,0 +1,203 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghenghis.github.io/Hermes3D/schemas/visual-targets.canonical.schema.json",
+  "title": "Hermes3D Canonical Visual Target Registry",
+  "description": "Canonical schema for the W15-A8 visual target registry. Every PNG in Images-GUI/ maps to one or more tracked targets. Single-image PNGs produce one target. Collage PNGs produce one parent target with class='collage' plus N region children (one per logical sub-region the collage shows). Theme palette references additionally generate one target per palette listed in the parent's themes[] array. Schema follows JSON Schema 2020-12 and is modelled after Storybook stories.json + Chromatic baselines.json conventions.",
+  "type": "object",
+  "required": ["$schema", "version", "owner", "created", "reference_viewport", "viewport", "themes", "targets"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "owner": { "type": "string" },
+    "created": { "type": "string", "format": "date" },
+    "tolerance_default": { "type": "number", "minimum": 0, "maximum": 1 },
+    "reference_viewport": { "type": "string", "pattern": "^[0-9]+x[0-9]+$" },
+    "viewport": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "themes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/themeName" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "description": { "type": "string" },
+    "targets": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/target" },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "themeName": {
+      "type": "string",
+      "enum": [
+        "default",
+        "dark",
+        "light",
+        "cyberpunk",
+        "matrix",
+        "tron",
+        "industrial_forge",
+        "aurora_operator"
+      ]
+    },
+    "uiState": {
+      "type": "string",
+      "enum": ["default", "loading", "empty", "blocked", "recovering", "error", "success"]
+    },
+    "passFail": {
+      "type": "string",
+      "enum": ["not-yet-run", "pass", "fail", "skipped", "degraded"]
+    },
+    "finalVerdict": {
+      "type": "string",
+      "enum": ["pending", "match", "mismatch", "deferred", "skipped"]
+    },
+    "liveOrFuture": {
+      "type": "string",
+      "enum": ["live", "future", "deferred"]
+    },
+    "targetClass": {
+      "type": "string",
+      "enum": ["single", "collage", "theme_variant", "region", "user_direction"]
+    },
+    "dimensions": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "viewport": { "$ref": "#/$defs/dimensions" },
+    "cropRegion": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "integer", "minimum": 0 },
+            "y": { "type": "integer", "minimum": 0 },
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "region": {
+      "type": "object",
+      "required": [
+        "region_id",
+        "name",
+        "route",
+        "clip",
+        "theme",
+        "ui_state",
+        "backend_truth_source",
+        "playwright_proof_screenshot",
+        "pass_fail_status",
+        "owning_pr",
+        "final_verdict",
+        "live_or_future"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "region_id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "name": { "type": "string" },
+        "route": { "type": "string", "pattern": "^/" },
+        "clip": {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "integer", "minimum": 0 },
+            "y": { "type": "integer", "minimum": 0 },
+            "width": { "type": "integer", "minimum": 1 },
+            "height": { "type": "integer", "minimum": 1 }
+          },
+          "additionalProperties": false
+        },
+        "theme": { "$ref": "#/$defs/themeName" },
+        "ui_state": { "$ref": "#/$defs/uiState" },
+        "backend_truth_source": { "type": ["string", "null"] },
+        "playwright_proof_screenshot": { "type": "string" },
+        "pass_fail_status": { "$ref": "#/$defs/passFail" },
+        "owning_pr": { "type": ["string", "null"] },
+        "final_verdict": { "$ref": "#/$defs/finalVerdict" },
+        "live_or_future": { "$ref": "#/$defs/liveOrFuture" },
+        "notes": { "type": "string" }
+      }
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "target_id",
+        "image_path",
+        "dimensions",
+        "route",
+        "viewport",
+        "theme",
+        "ui_state",
+        "crop_region",
+        "backend_truth_source",
+        "playwright_proof_screenshot",
+        "pass_fail_status",
+        "owning_pr",
+        "final_verdict",
+        "class",
+        "live_or_future"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "target_id": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "image_path": { "type": "string", "pattern": "^Images-GUI/" },
+        "dimensions": { "$ref": "#/$defs/dimensions" },
+        "route": { "type": "string", "pattern": "^/" },
+        "viewport": { "$ref": "#/$defs/viewport" },
+        "theme": { "$ref": "#/$defs/themeName" },
+        "ui_state": { "$ref": "#/$defs/uiState" },
+        "crop_region": { "$ref": "#/$defs/cropRegion" },
+        "backend_truth_source": { "type": ["string", "null"] },
+        "playwright_proof_screenshot": { "type": "string" },
+        "pass_fail_status": { "$ref": "#/$defs/passFail" },
+        "owning_pr": { "type": ["string", "null"] },
+        "final_verdict": { "$ref": "#/$defs/finalVerdict" },
+        "class": { "$ref": "#/$defs/targetClass" },
+        "live_or_future": { "$ref": "#/$defs/liveOrFuture" },
+        "tolerance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wait_test_id": { "type": "string" },
+        "themes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/themeName" },
+          "uniqueItems": true
+        },
+        "regions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/region" }
+        },
+        "parent_target_id": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "class": { "const": "collage" } }, "required": ["class"] },
+          "then": { "required": ["regions"], "properties": { "regions": { "minItems": 1 } } }
+        },
+        {
+          "if": { "properties": { "class": { "const": "region" } }, "required": ["class"] },
+          "then": { "required": ["parent_target_id"] }
+        }
+      ]
+    }
+  }
+}
