@@ -386,7 +386,7 @@ export function ObserveTab() {
         )}
       </div>
 
-      {cameraMessage && <div className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{cameraMessage}</div>}
+      {cameraMessage && <div data-testid="observe-status-banner" className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{cameraMessage}</div>}
 
       {undockedCamera && (
         <div className="fixed inset-0 z-50 grid bg-bg/85 p-4 backdrop-blur-sm">

@@ -1058,7 +1058,7 @@ test("Observe renders live camera feed cards and exposes V400 USB webcam endpoin
   }
   await root.getByRole("button", { name: "Refresh", exact: true }).click();
   await expect(root.getByRole("button", { name: "Refreshing", exact: true })).toBeVisible();
-  await expect(root.getByText("Camera feeds refreshed: 4/4 configured feeds.", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(root.getByTestId("observe-status-banner")).toHaveText("Camera feeds refreshed: 4/4 configured feeds.", { timeout: 30_000 });
   expect(new URL(page.url()).hash).toBe("#observe");
 
   const s1Card = root.locator("section").filter({ hasText: "FLSUN S1" });
