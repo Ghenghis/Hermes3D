@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id
 from hermes3d.services.agent_checkout import hermes_agent_checkout
+from hermes3d.services.proof_helpers import attach_version_fields
 
 router = APIRouter()
 
@@ -639,9 +640,16 @@ def _auto_repair_to_backup(repo: Path, backup: dict[str, Any] | None, actor: str
 
 
 def _append_proof_event(event_type: str, source_agent: str, payload: dict[str, Any]) -> None:
+    # Wave 2 P2-6 (2026-05-09): every persisted proof event carries the
+    # active Hermes Agent version + upstream tag so post-promotion
+    # forensic queries can attribute behavior to v0.12 (v2026.4.30) vs
+    # v0.13 (v2026.5.7). Provenance basis: NIST SP 800-92 §4 (log
+    # generation/storage) + OpenTelemetry resource attribute
+    # ``service.version``. See services/proof_helpers.py for the merge.
+    enriched = attach_version_fields(payload)
     execute(
         "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
-        (new_id(), event_type, source_agent, as_json(payload)),
+        (new_id(), event_type, source_agent, as_json(enriched)),
     )
 
 
