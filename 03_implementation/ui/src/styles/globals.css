@@ -8,16 +8,26 @@
  * provider mounts. The provider overwrites these per active theme via
  * `themeBootstrap.ts`. Safe to remove if bootstrap is guaranteed to run
  * before first paint.
+ *
+ * W15-A11 token deltas applied (aligned with `theme/tokens.ts`):
+ *   - --h3d-color-surface  : #0f1626 -> #01101a (W14-A4 rank 4)
+ *   - --h3d-color-surface-2: #141d33 -> #001420 (W14-A4 rank 3)
+ *   - --h3d-color-primary  : #22d3ee -> #3b80f4 (W14-A4 rank 1, brand shift)
+ *
+ * `--h3d-color-primary-cyan-legacy` preserves the prior cyan value so a
+ * brand revert or theme variant can restore the original primary with a
+ * single CSS override (no recompile / no token edit).
  */
 :root,
 :root.dark {
   --h3d-color-background: #0a0e1a;
-  --h3d-color-surface: #0f1626;
-  --h3d-color-surface-2: #141d33;
+  --h3d-color-surface: #01101a;
+  --h3d-color-surface-2: #001420;
   --h3d-color-border: #1f2a44;
   --h3d-color-text-primary: #e6edf7;
   --h3d-color-text-secondary: #7c8aa8;
-  --h3d-color-primary: #22d3ee;
+  --h3d-color-primary: #3b80f4;
+  --h3d-color-primary-cyan-legacy: #22d3ee;
   --h3d-color-secondary: #3b82f6;
   --h3d-color-accent: #a78bfa;
   --h3d-color-error: #ef4444;
@@ -33,7 +43,8 @@
   --h3d-color-border: #d4dbe7;
   --h3d-color-text-primary: #0a0e1a;
   --h3d-color-text-secondary: #475569;
-  --h3d-color-primary: #0e7490;
+  --h3d-color-primary: #1d4ed8;
+  --h3d-color-primary-cyan-legacy: #0e7490;
   --h3d-color-secondary: #1d4ed8;
   --h3d-color-accent: #6d28d9;
   --h3d-color-error: #b91c1c;

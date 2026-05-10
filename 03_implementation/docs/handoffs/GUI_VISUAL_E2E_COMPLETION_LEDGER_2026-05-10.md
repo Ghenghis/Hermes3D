@@ -31,7 +31,7 @@
 ## Phase 3 — Implementation Squads (Agents 11-20)
 | # | Squad | Status |
 |---|---|---|
-| 11 | Shell/Design Tokens | _pending_ |
+| 11 | Shell/Design Tokens | PR opened (W15-A11) — top 5 W14-A4 deltas applied: primary cyan->blue (`#3b80f4`, legacy fallback preserved), sidebar default 260->220 px, surface `#0f1626`->`#01101a`, surface2 `#141d33`->`#001420`, card radius 8->6 px. `npm run build` + `tsc --noEmit` + 4/4 Playwright smoke @ 1536/1672/1920 PASS. |
 | 12 | Dashboard Modes | _pending_ |
 | 13 | Source OS + 60 Apps | _pending_ |
 | 14 | Primary Tabs A (Autopilot/Design/Gen3D/Jobs) | _pending_ |
@@ -58,3 +58,4 @@
 ## Loop log
 - 2026-05-10: Wave 15 launched; Phase 0 complete.
 - 2026-05-10: W15-CLEANUP (PR 3 of 8 sequence per W15-A6 §6) — delete 9 unrouted UNACCEPTABLE_FAKE tabs + 11 orphan mock data files + 1 stale 14-tab `app/routes.tsx` manifest. Branch `claude/w15-cleanup-fake-tabs` from `origin/develop@8dccb7b`. Pre-deletion grep audit: 0 of 21 files had any production import (all consumer references were inside the deleted-tab set). Verification: `tsc --noEmit` PASS, `npm run build` PASS, `vitest run` 118 passed / 4 skipped / 0 failed. Diff: 21 deletions only, 2148 net lines removed. Cites W15-A4 §3, §6 + W15-A3 (stale routes.tsx). Sources: ESLint `no-unused-modules` + TypeScript dead-code-elimination patterns.
+- 2026-05-10: Agent 11 (Shell/Design Tokens) opened PR `claude/w15-a11-shell-tokens`. Cites W14-A4 audit. Brand decision: primary shifted cyan->blue with `--h3d-color-primary-cyan-legacy` (`#22d3ee`) preserved for one-step revert; Tailwind `accent.cyan` alias kept verbatim so 88+ existing component refs are not visually moved. Self-audit: build PASS, tsc PASS, 4 smoke specs PASS @ 1536x1024 + 1672x941 + 1920x1080, theme toggle still works, no boot console errors.
