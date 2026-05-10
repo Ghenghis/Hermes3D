@@ -2,15 +2,12 @@ import { useEffect, useState } from "react";
 import { adapters } from "../api/adapters";
 import { TABS } from "../app/routes";
 import { useStore } from "../app/store";
+import { RoadmapBoard } from "../components/roadmap/RoadmapBoard";
+import type { LinkableRoadmapItem } from "../components/roadmap/RoadmapItem";
 import type { RoadmapItem, RoadmapTabCompletion } from "../types/roadmap";
 import type { SourceModuleRuntimeSetupQueue } from "../types/source-os";
 
-type RoadmapRow = RoadmapItem & {
-  id?: number;
-  status?: string;
-  linkTab?: string | null;
-  link_tab?: string | null;
-};
+type RoadmapRow = LinkableRoadmapItem;
 
 export function RoadmapTab() {
   const setActiveTabId = useStore((state) => state.setActiveTabId);
@@ -197,39 +194,23 @@ export function RoadmapTab() {
 
       <section className="rounded border border-border bg-surface p-3">
         <h3 className="text-sm font-semibold text-fg">Legacy Roadmap Rows</h3>
-        <div className="mt-3 grid gap-2">
-        {items.map((item) => {
-          const state = item.state ?? (item.complete ? "done" : "not_started");
-          const row = item as RoadmapRow;
-          const target = row.linkTab ?? row.link_tab ?? null;
-          const validTarget = safeTabId(target);
-          return (
-            <div key={item.number} className="grid grid-cols-[3rem_1fr_auto_auto] items-center gap-3 rounded border border-border bg-bg/40 p-3 text-sm">
-              <span className="font-mono text-muted">{item.number}</span>
-              <span className="text-fg">{item.description}</span>
-              <span className={`rounded px-2 py-1 text-xs ${state === "done" ? "bg-green-900/50 text-green-300" : state === "in_progress" ? "bg-amber-900/50 text-amber-200" : "bg-surface2 text-muted"}`}>{state.replaceAll("_", " ").toUpperCase()}</span>
-              <button
-                type="button"
-                disabled={!validTarget}
-                title={validTarget ? `Open ${validTarget}` : "Roadmap API did not return a valid target tab."}
-                onClick={() => {
-                  if (!validTarget) {
-                    setMessage(`Blocked: roadmap target ${target ?? "(none)"} is not a registered Hermes3D tab.`);
-                    return;
-                  }
-                  setMessage(null);
-                  setActiveTabId(validTarget);
-                }}
-                className="rounded border border-border px-2 py-1 text-xs text-fg disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Open
-              </button>
-            </div>
-          );
-        })}
-        {message && <div className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{message}</div>}
-        {items.length === 0 && <div className="rounded border border-border bg-bg/40 p-3 text-sm text-muted">No roadmap items returned by the live roadmap API.</div>}
-      </div>
+        <RoadmapBoard
+          items={items as RoadmapRow[]}
+          resolveTarget={safeTabId}
+          onOpen={(validTarget, rawTarget) => {
+            if (!validTarget) {
+              setMessage(`Blocked: roadmap target ${rawTarget ?? "(none)"} is not a registered Hermes3D tab.`);
+              return;
+            }
+            setMessage(null);
+            setActiveTabId(validTarget);
+          }}
+          footer={
+            message ? (
+              <div className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{message}</div>
+            ) : null
+          }
+        />
       </section>
     </div>
   );

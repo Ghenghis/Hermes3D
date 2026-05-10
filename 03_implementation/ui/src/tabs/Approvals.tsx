@@ -25,17 +25,15 @@
 import { useEffect, useState } from "react";
 import { adapters } from "../api/adapters";
 import { useStore } from "../app/store";
+import { ApprovalQueue } from "../components/approvals/ApprovalQueue";
+import type { ApprovalActionKind, ApprovalFormState } from "../components/approvals/ApprovalRow";
 import type { Approval } from "../types/approval";
 
 const DEFAULT_POLL_MS = 5_000;
 
-type ActionKind = "approve" | "reject" | "defer";
+type ActionKind = ApprovalActionKind;
 
-interface PendingFormState {
-  id: string;
-  kind: ActionKind;
-  value: string;
-}
+type PendingFormState = ApprovalFormState;
 
 declare global {
   interface Window {
@@ -136,146 +134,17 @@ export function ApprovalsTab() {
             {actionMessage}
           </div>
         )}
-        <div
-          role="feed"
-          aria-busy="false"
-          aria-label="Pending approvals feed"
-          className="mt-3 grid min-h-0 flex-1 content-start gap-2 overflow-auto md:grid-cols-2"
-        >
-          {pending.map((approval) => {
-            const formOpen = openForm?.id === approval.id;
-            const fileScope = approval.fileScope ?? [];
-            return (
-              <article
-                key={approval.id}
-                data-testid={`approvals-pending-${approval.id}`}
-                className="rounded border border-border bg-bg/40 p-3"
-                aria-labelledby={`approval-${approval.id}-title`}
-              >
-                <span className="rounded bg-amber-900/50 px-2 py-1 text-xs text-amber-200">
-                  {approval.approvalType}
-                </span>
-                <h3
-                  id={`approval-${approval.id}-title`}
-                  className="mt-2 font-medium text-fg"
-                >
-                  {approval.jobTitle}
-                </h3>
-                <dl className="mt-1 grid grid-cols-1 gap-0.5 text-[11px] text-muted">
-                  <div className="flex gap-1">
-                    <dt className="text-[10px] uppercase">Requester</dt>
-                    <dd className="font-mono text-fg/90">{approval.requester ?? "—"}</dd>
-                  </div>
-                  <div className="flex gap-1">
-                    <dt className="text-[10px] uppercase">Requested</dt>
-                    <dd>{new Date(approval.createdAt).toLocaleString()}</dd>
-                  </div>
-                </dl>
-                {fileScope.length > 0 && (
-                  <details className="mt-2 text-[11px]" data-testid={`approvals-file-scope-${approval.id}`}>
-                    <summary className="cursor-pointer text-muted">
-                      File scope · {fileScope.length} {fileScope.length === 1 ? "file" : "files"}
-                    </summary>
-                    <ul className="mt-1 max-h-28 overflow-auto rounded bg-bg/40 p-1 font-mono text-[10px] text-fg/90">
-                      {fileScope.map((path) => (
-                        <li key={path} className="truncate" title={path}>
-                          {path}
-                        </li>
-                      ))}
-                    </ul>
-                  </details>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setActiveTabId("artifacts")}
-                  className="mt-2 text-xs text-accent-cyan"
-                >
-                  Evidence summary
-                </button>
-                {!formOpen && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setOpenForm({ id: approval.id, kind: "approve", value: "" })}
-                      data-testid={`approvals-action-approve-${approval.id}`}
-                      className="rounded bg-green-800 px-3 py-1 text-sm text-green-100 hover:bg-green-700"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOpenForm({ id: approval.id, kind: "reject", value: "" })}
-                      data-testid={`approvals-action-deny-${approval.id}`}
-                      className="rounded bg-red-900 px-3 py-1 text-sm text-red-100 hover:bg-red-800"
-                    >
-                      Deny
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOpenForm({ id: approval.id, kind: "defer", value: "" })}
-                      data-testid={`approvals-action-defer-${approval.id}`}
-                      className="rounded bg-amber-900 px-3 py-1 text-sm text-amber-100 hover:bg-amber-800"
-                    >
-                      Defer
-                    </button>
-                  </div>
-                )}
-                {formOpen && openForm && (
-                  <form
-                    className="mt-3 flex flex-col gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void submit(approval, openForm.kind, openForm.value);
-                    }}
-                  >
-                    <label className="text-[11px] text-muted" htmlFor={`approvals-input-${approval.id}`}>
-                      {openForm.kind === "approve"
-                        ? "Optional notes:"
-                        : openForm.kind === "defer"
-                          ? "Reason for deferral:"
-                          : "Reason for denial:"}
-                    </label>
-                    <input
-                      id={`approvals-input-${approval.id}`}
-                      data-testid={`approvals-input-${approval.id}`}
-                      type="text"
-                      value={openForm.value}
-                      onChange={(e) =>
-                        setOpenForm({ ...openForm, value: e.target.value })
-                      }
-                      autoFocus
-                      className="rounded border border-border bg-bg px-2 py-1 text-xs text-fg"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        data-testid={`approvals-submit-${approval.id}`}
-                        className="rounded bg-surface2 px-3 py-1 text-xs text-fg hover:bg-surface2/80"
-                      >
-                        Confirm {openForm.kind}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setOpenForm(null)}
-                        className="rounded border border-border px-3 py-1 text-xs text-muted hover:text-fg"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </article>
-            );
-          })}
-          {pending.length === 0 && (
-            <div
-              data-testid="approvals-pending-empty"
-              className="rounded border border-border bg-bg/40 p-3 text-sm text-muted md:col-span-2"
-            >
-              No pending approvals returned by the live approvals API.
-            </div>
-          )}
-        </div>
+        <ApprovalQueue
+          pending={pending}
+          openForm={openForm}
+          onOpenForm={setOpenForm}
+          onCloseForm={() => setOpenForm(null)}
+          onFormValueChange={(value) =>
+            setOpenForm(openForm ? { ...openForm, value } : null)
+          }
+          onSubmit={(approval, kind, value) => submit(approval, kind, value)}
+          onEvidenceSummary={() => setActiveTabId("artifacts")}
+        />
       </section>
       <section
         id="approvals.history"
