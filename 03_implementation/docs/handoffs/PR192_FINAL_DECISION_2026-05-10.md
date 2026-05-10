@@ -120,13 +120,18 @@ Path 1 picks option (1). Production semantics stay frozen. Future test
 authors are no longer required to know which endpoint the client picks
 first.
 
-### Outcome (after force-push)
+### Outcome (after push)
 
-Pending. Single state check after the next UI-Final run.
+Fix pushed to `claude/w8-2-gui-settings-approvals-apps` as commit
+`0c94af11`. Single state check immediately after push:
+`Layer D2 — UI-Final (React @ 1920×1080)` was `IN_PROGRESS`. No polling
+per W9-2n constraints; result will be observed by the supervisor /
+next agent picking up the PR.
 
-## Final state field (filled after run)
+## Final state field
 
-- `#192 final state`: **OPEN-FIXED-PENDING** (pushed; awaiting Layer D2 — UI-Final)
+- `#192 final state`: **OPEN-FIXED-PENDING** (commit `0c94af11` pushed;
+  Layer D2 — UI-Final IN_PROGRESS at handoff time)
 
 ## Lock release
 
