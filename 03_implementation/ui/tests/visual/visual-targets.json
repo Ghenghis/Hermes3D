@@ -110,10 +110,11 @@
       "target": "04_source_os_60_app_coverage_matrix",
       "reference": "Images-GUI/04-source-os/source-os-60-app-coverage-matrix.png",
       "route": "/#sources",
+      "viewport": { "width": 1672, "height": 941 },
       "status": "live",
       "tolerance": 0.12,
       "wait_test_id": "source-os-root",
-      "notes": "Source OS 60-app coverage matrix view."
+      "notes": "Source OS 60-app coverage matrix view. Viewport override matches reference PNG dimensions (W15-A21 follow-up)."
     },
     {
       "target": "04_source_os_core_categories",
@@ -128,10 +129,11 @@
       "target": "04_source_os_remaining_categories",
       "reference": "Images-GUI/04-source-os/source-os-remaining-categories.png",
       "route": "/#sources",
+      "viewport": { "width": 1586, "height": 992 },
       "status": "live",
       "tolerance": 0.12,
       "wait_test_id": "source-os-root",
-      "notes": "Source OS remaining categories. Same root, different sub-section reference."
+      "notes": "Source OS remaining categories. Viewport override matches reference PNG dimensions (W15-A21 follow-up)."
     },
     {
       "target": "05_action_window_core_apps",
