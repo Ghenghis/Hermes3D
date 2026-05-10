@@ -15,3 +15,7 @@ vite.config.d.ts
 artifacts/
 test-results/
 playwright-report/
+
+# Source component folder named "artifacts" is part of the codebase, not a build output.
+!src/components/artifacts/
+!src/components/artifacts/**

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { adapters } from "../api/adapters";
+import { ArtifactList } from "../components/artifacts/ArtifactList";
 import type { Agent } from "../types/agent";
 import type { Artifact, ArtifactGate, ArtifactStage, ArtifactType, EvidenceForm } from "../types/artifact";
 import type { Job } from "../types/job";
@@ -49,7 +50,6 @@ export function ArtifactsTab() {
   });
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const ready = form.jobId !== "" && form.agent !== "" && form.label !== "" && form.file != null;
-  const grouped = useMemo(() => groupArtifacts(artifacts), [artifacts]);
 
   useEffect(() => {
     void adapters.getJobs().then((next) => {
@@ -129,22 +129,7 @@ export function ArtifactsTab() {
         <h2 className="text-base font-semibold text-fg">Artifacts List</h2>
         <p className="text-sm text-muted">Models, evidence, G-code, and logs</p>
         <div className="mt-4 grid min-h-0 flex-1 content-start gap-3 overflow-auto">
-          {Array.from(grouped.entries()).map(([jobTitle, rows]) => (
-            <div key={jobTitle} className="rounded border border-border bg-bg/40 p-3">
-              <h3 className="font-medium text-fg">{jobTitle}</h3>
-              {rows.map((artifact) => (
-                <div key={artifact.id} className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2 text-sm">
-                  <span className="rounded bg-surface2 px-2 py-1 text-xs text-muted">{artifact.type}</span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-fg">{artifact.name}</span>
-                    <span className="block truncate text-xs text-muted">{artifact.path} · {(artifact.sizeBytes / 1024).toFixed(1)} KB</span>
-                  </span>
-                  <button type="button" onClick={() => void viewArtifact(artifact, setActionMessage)} className="rounded border border-border px-2 py-1 text-xs text-fg">View</button>
-                </div>
-              ))}
-            </div>
-          ))}
-          {artifacts.length === 0 && <div className="rounded border border-border bg-bg/40 p-3 text-sm text-muted">No artifacts returned by the live artifacts API.</div>}
+          <ArtifactList artifacts={artifacts} onView={(artifact) => void viewArtifact(artifact, setActionMessage)} />
         </div>
       </section>
       </div>
@@ -275,13 +260,6 @@ function normalizeArtifact(value: unknown): Artifact | null {
     createdAt: stringValue(value.createdAt ?? value.created_at),
     downloadUrl: stringValue(value.downloadUrl) || `${LIVE_BASE_URL}/api/artifacts/${encodeURIComponent(id)}/download`,
   };
-}
-
-function groupArtifacts(artifacts: Artifact[]) {
-  return artifacts.reduce((groups, artifact) => {
-    groups.set(artifact.jobTitle, [...(groups.get(artifact.jobTitle) ?? []), artifact]);
-    return groups;
-  }, new Map<string, Artifact[]>());
 }
 
 function artifactSummary(value: unknown, fallback: string): string {
