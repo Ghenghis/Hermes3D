@@ -154,8 +154,12 @@ def auto_recover(
                 result.duration_seconds = time.time() - started
                 log.info("Recovered %s via soft restart", printer_id)
                 return result
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log recovery-poll failure
+            log.debug(
+                "auto_recovery.printer_state_poll_soft fallback: %s: %s",
+                type(exc).__name__,
+                exc,
+            )
 
     # ---- Step 2: firmware restart ----
     time.sleep(min(firmware_restart_wait_s, max(0.0, max_total_s - (time.time() - started))))
@@ -194,8 +198,12 @@ def auto_recover(
                 result.duration_seconds = time.time() - started
                 log.info("Recovered %s via firmware restart", printer_id)
                 return result
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 -- Wave Agent 7: log firmware-recovery-poll failure
+            log.debug(
+                "auto_recovery.firmware_restart fallback: %s: %s",
+                type(exc).__name__,
+                exc,
+            )
 
     result.outcome = RecoveryOutcome.GAVE_UP
     result.final_state = state if "state" in locals() else {}

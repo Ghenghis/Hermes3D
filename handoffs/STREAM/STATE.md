@@ -59,7 +59,10 @@ None at this snapshot. v0.5.0 + v0.6 hardening shipped (PRs #18, #19 merged).
 
 - Codex 3-strike circuit: 0/3 (clean)
 - Claude agent collisions tonight: 1 (recovered into PR #34/#35/#36/#37)
-- MCP disconnect events tonight: 1 (mid-session, recovered via gh+git fallback)
+- MCP disconnect events tonight: 1 (mid-session). Current control rule:
+  `gh`/`git` fallback is read-only status only; writes, commits, pushes,
+  merges, installs, updates, and printer actions stay blocked until MCP
+  reconnects with exact-worktree locks.
 - Last user touchpoint: ~04:25Z — explicit YOLO authorization for overnight loop
 
 ---

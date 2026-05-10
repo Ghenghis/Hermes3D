@@ -1,0 +1,3 @@
+# Keep this directory in git so globalSetup can populate it on first run.
+# Contents are mirrored from `Images-GUI/` by tests/visual/global-setup.ts.
+# Do not commit PNGs here — see .gitignore one level up.

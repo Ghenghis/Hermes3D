@@ -1,9 +1,10 @@
 # PERPETUAL MASTER INDEX — total completion plan, both projects
 
 > **Status:** ACTIVE until total completion of both Hermes3D-OS and HermesProof.
-> **Authorized by user:** 2026-05-03. No exit until both projects are
-> release-ready for daily use. No skipping, no bypass, no AI slop. All
-> tasks complete or explicitly DEFERRED with documented reason.
+> **Authorized by user:** 2026-05-03. Continue until both projects are
+> release-ready for daily use, but the hard-stop rules below override any
+> "perpetual" language. No skipping, no bypass, no AI slop. All tasks complete,
+> explicitly BLOCKED with proof, or explicitly DEFERRED with documented reason.
 >
 > **Audience:** Both Claude (architect+builder) and Codex (builder+critic),
 > plus any other client (KiloCode, Cursor, Windsurf, VSCode+Copilot) that
@@ -18,7 +19,33 @@
 3. Pick the **highest-priority unclaimed item** from § Remaining work and start.
 4. Post `TASK_CLAIMED` to `handoffs/STREAM/CODEX_INBOX.md` (or `CLAUDE_INBOX.md` if you want the other side to see).
 5. When done, post `FIX_PUSHED` or `GATE_LANDED` and pick the next.
-6. **There is no exit condition.** When the queue is empty, idle-poll continues. The user wakes up and says "stop" or merges everything.
+6. Idle polling may continue read-only when the queue is empty. Mutation,
+   merge, install, update, printer, provider, or release work stops immediately
+   when any hard-stop condition below is true.
+
+## Hard-stop conditions — override every older loop instruction
+
+Stop the active lane and write `BLOCKED` evidence instead of continuing when any
+of these conditions is true:
+
+- `hermes3d-locks` MCP is disconnected, unhealthy, or points at a different
+  workspace than the worktree being edited.
+- Same-owner MCP task and file locks cannot be acquired before a write.
+- A required provider smoke fails, including MiniMax builder or DeepSeek
+  reviewer auth for Hermes Agent coding work.
+- The folder index, roadmap, or PR base is stale and the lane depends on it.
+- A required gate fails: tests, no-fake scan, visual proof, security scan,
+  provider smoke, lock/evidence verification, or printer policy gate.
+- A critic, reviewer, or audit agent reports an unresolved `NEEDS-FIX` or
+  `BLOCKED` finding.
+- A task needs secrets, private env values, destructive git, release tags,
+  direct `main` pushes, printer writes, or hardware/network action outside its
+  approved policy.
+- More than three cycles happen on the same task without a new proof artifact,
+  changed file, passing gate, or explicit blocker.
+
+Read-only triage may continue during a hard stop. Writes, staging, commits,
+pushes, merges, installs, updates, and printer actions may not.
 
 ---
 
@@ -156,7 +183,11 @@ HermesProof repo (G:\Github\hermes3d-mcp-lock-orchestrator\handoffs\):
 
 1. Pick a queue item that's `unclaimed`.
 2. Post in the OTHER side's inbox: `TASK_CLAIMED` with the queue ID as `correlation`.
-3. Lock files via `hermes_lock_files` (HermesProof MCP). If MCP is offline, fall back to manual: write a short `claim:` line into the queue file marking your owner-string.
+3. Lock files via `hermes_lock_files` (HermesProof MCP). If MCP is offline,
+   unhealthy, or scoped to the wrong workspace, do not write, stage, commit,
+   push, merge, install, update, or run printer actions. STREAM messages may
+   record read-only status only; manual filesystem "claim" lines are not a
+   substitute for MCP locks.
 4. Build in a fresh git worktree (`git worktree add ../my-task origin/<base>`).
 5. Open a PR. Body MUST include `Task ID: <ID>`, `Hermes evidence chain: PASS`, and a literal `hermes_run_gate` reference.
 6. Await CI green; do NOT auto-merge.
@@ -191,16 +222,19 @@ HermesProof repo (G:\Github\hermes3d-mcp-lock-orchestrator\handoffs\):
 
 ## When the queue empties
 
-There is no "queue empty → done" condition. When everything visible is claimed:
+Queue empty is not permission to invent risky work. When everything visible is
+claimed:
 
-1. Re-poll STREAM/ + GATE_GAP_QUEUE.md + ENHANCEMENT_QUEUE.md every 3-5 min
-2. Audit any green PR you haven't audited yet (post AUDIT_VERDICT)
-3. Pick a P2 item
-4. Pick a DEFERRED item and document the missing precondition
-5. Improve test coverage on shipped code
-6. Improve docs
+1. Re-poll STREAM/ + GATE_GAP_QUEUE.md + ENHANCEMENT_QUEUE.md every 3-5 min.
+2. Audit any green PR you have not audited yet and post `AUDIT_VERDICT`.
+3. Pick a P2 item only if it has a clear owner, lock scope, and gate plan.
+4. Pick a DEFERRED item only to document the missing precondition.
+5. Improve test coverage or docs only after acquiring MCP locks.
+6. Stop mutation and report `BLOCKED` if a hard-stop condition is present.
 
-The user wakes up and decides what's done. Until then, you keep going.
+The user decides what is done. Agents keep read-only awareness alive, but no
+agent may convert "keep going" into bypassing locks, gates, provider proof, or
+merge safety.
 
 ---
 

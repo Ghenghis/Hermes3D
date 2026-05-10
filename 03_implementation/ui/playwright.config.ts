@@ -1,19 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
-/**
- * Playwright config for the Phase 2 visual screenshot gate.
- *
- * The test boots a fresh `vite` dev server, navigates to the Dashboard at
- * 1920×1080, disables animations, takes a screenshot, and (if a baseline is
- * present) diffs it against the committed baseline with `maxDiffPixelRatio:
- * 0.03`. The artifact is also exported to `artifacts/` for human review.
- *
- * Pixel-perfect comparison only works when the same browser, viewport,
- * deviceScaleFactor, fonts, and deterministic data are used — see
- * Dashboard.tsx + TopBar.tsx for our deterministic mock-data sources.
- */
+/** Playwright config for live local GUI verification. */
 export default defineConfig({
-  testDir: "./tests/visual",
+  testDir: "./tests/e2e",
   fullyParallel: false,
   retries: 0,
   workers: 1,
@@ -44,8 +33,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev",
-    url: "http://localhost:5173",
+    command: "node scripts/start-e2e-stack.mjs",
+    url: "http://127.0.0.1:5173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

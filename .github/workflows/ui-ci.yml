@@ -37,7 +37,7 @@ on:
       - "04_testing/pytest/integration/test_fleet_poll_roundtrip.py"
       - ".github/workflows/ui-ci.yml"
   pull_request:
-    branches: [main, develop]
+    branches: [main, develop, "feat/**"]
     paths:
       - "03_implementation/ui/**"
       - "03_implementation/src/hermes3d/orchestration/**"
@@ -67,8 +67,21 @@ jobs:
           cache: "npm"
           cache-dependency-path: 03_implementation/ui/package-lock.json
 
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install dependencies (npm ci, deterministic from lockfile)
         run: npm ci
+
+      - name: Install Python API dependencies
+        working-directory: ${{ github.workspace }}
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip install -e .
 
       - name: Lint (tsc --noEmit, strict mode)
         run: npm run lint
@@ -169,7 +182,7 @@ jobs:
 
       - name: Run Playwright live-mode smoke
         working-directory: 03_implementation/ui
-        run: npx playwright test tests/visual/fleet.live.spec.ts
+        run: npx playwright test tests/e2e/live-gui.spec.ts --grep "all left-rail primary tabs route"
 
       - name: Upload live smoke artifacts on failure
         if: failure()

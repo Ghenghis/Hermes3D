@@ -23,12 +23,16 @@ manufacturer = "FLSUN"
 model        = "T1"
 moonraker_url = "http://flsun-t1-a.local"
 api_key       = ""
+official_wiki_url = "https://wiki.flsun3d.com/en/FlsunT1"
+official_config_topics = ["Network Connection Guidelines", "Orca import T1 configurationfile", "First Printing with Local Test Models"]
 
 [printers.flsun_t1_b]
 manufacturer = "FLSUN"
 model        = "T1"
 moonraker_url = "http://flsun-t1-b.local"
 api_key       = ""
+official_wiki_url = "https://wiki.flsun3d.com/en/FlsunT1"
+official_config_topics = ["Network Connection Guidelines", "Orca import T1 configurationfile", "First Printing with Local Test Models"]
 
 [printers.flsun_super_racer]
 manufacturer = "FLSUN"
@@ -41,12 +45,17 @@ manufacturer = "FLSUN"
 model        = "S1"
 moonraker_url = "http://flsun-s1.local"
 api_key       = ""
+official_wiki_url = "https://wiki.flsun3d.com/en/S1"
+official_config_topics = ["Network Connection Guidelines", "Orca import S1 configuration file", "calibration precautions"]
+safety_policy = "offline_locked_no_test_move_upload_until_user_clears"
 
 [printers.flsun_v400]
 manufacturer = "FLSUN"
 model        = "V400"
 moonraker_url = "http://flsun-v400.local"
 api_key       = ""
+official_wiki_url = "https://wiki.flsun3d.com/en/V400"
+official_config_topics = ["Start printing from WEB page", "Automatic leveling", "Replace the printer configuration file"]
 
 # --- Cartesian bed-slingers (4) -------------------------------------------
 

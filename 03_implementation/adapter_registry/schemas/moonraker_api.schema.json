@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "hermes3d://adapter_registry/schemas/moonraker_api/v1",
+  "title": "MoonrakerApiSchema",
+  "description": "Read-only Moonraker HTTP API adapter schema for Hermes3D (H3D-CLAUDE-SOURCE-PRINTFARM). All operations are HTTP GET only. No POST, no G-code upload, no print commands.",
+  "type": "object",
+  "properties": {
+    "adapter": {
+      "type": "string",
+      "const": "moonraker_api",
+      "description": "Adapter identifier"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "policy": {
+      "type": "object",
+      "properties": {
+        "read_only": { "type": "boolean", "const": true },
+        "allowed_methods": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["GET"] },
+          "minItems": 1
+        },
+        "forbidden_endpoints": {
+          "type": "array",
+          "description": "Endpoint patterns that must never be called",
+          "items": { "type": "string" },
+          "examples": [
+            "/printer/gcode/script",
+            "/printer/print/start",
+            "/printer/print/cancel",
+            "/server/files/upload"
+          ]
+        }
+      },
+      "required": ["read_only", "allowed_methods"],
+      "additionalProperties": false
+    },
+    "connection": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "IP address or hostname of the Moonraker instance",
+          "examples": ["192.168.0.10", "192.168.0.11", "192.168.0.34"]
+        },
+        "port": {
+          "type": "integer",
+          "default": 7125,
+          "description": "Moonraker HTTP port (default 7125)"
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "default": 2.0,
+          "maximum": 10.0,
+          "description": "HTTP request timeout"
+        }
+      },
+      "required": ["host"],
+      "additionalProperties": false
+    },
+    "read_endpoints": {
+      "type": "array",
+      "description": "Read-only GET endpoints supported by this adapter",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "description": { "type": "string" },
+          "response_root": {
+            "type": "string",
+            "description": "Top-level JSON key in Moonraker response containing the data (usually 'result')"
+          }
+        },
+        "required": ["path", "description"],
+        "additionalProperties": false
+      },
+      "examples": [
+        [
+          { "path": "/server/info", "description": "Server version and component state", "response_root": "result" },
+          { "path": "/printer/info", "description": "Klipper printer MCU + config info", "response_root": "result" },
+          { "path": "/printer/objects/list", "description": "List of subscribable printer objects", "response_root": "result" },
+          { "path": "/server/config", "description": "Moonraker configuration (read-only snapshot)", "response_root": "result" },
+          { "path": "/api/version", "description": "OctoPrint-compatible version endpoint (Moonraker compatibility shim)", "response_root": null }
+        ]
+      ]
+    }
+  },
+  "required": ["adapter", "version", "policy", "connection"],
+  "additionalProperties": false
+}

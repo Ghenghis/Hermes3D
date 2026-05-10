@@ -1,8 +1,15 @@
-"""Blender MCP provider-manager skeleton (Phase 1 — detect/version/capabilities only)."""
+"""Blender MCP provider manager.
+
+Provider choice is backend-configured. Detection is deliberately conservative:
+we report launcher availability and do not claim a provider is connected until
+a real Blender/MCP session validates it.
+"""
 
 from __future__ import annotations
 
 import shutil
+
+from hermes3d.api.routes._common import row
 
 from .base import SkeletonAdapter
 from .registry import register
@@ -16,18 +23,33 @@ class BlenderMCPAdapter(SkeletonAdapter):
     category = "3d-mcp"
     dangerous = True
 
-    _CAPABILITIES = frozenset({"mcp", "dry_run_supported"})
+    _CAPABILITIES = frozenset(
+        {
+            "mcp",
+            "provider_switch",
+            "execute_blender_python_after_validation",
+            "scene_inspection",
+            "dry_run_supported",
+        }
+    )
 
     def detect(self) -> DetectResult:
-        # `uvx` is the MCP provider launcher; presence of uvx implies we *could*
-        # reach the provider. Phase 3 will run `claude mcp list` to confirm.
+        active = _active_provider()
+        if active == "official_blender":
+            return self._detect_result(
+                True,
+                AdapterState.CONFIGURED,
+                "Official Blender connector selected; requires live Blender add-on validation before use.",
+            )
         path = shutil.which("uvx")
         if path:
-            return self._detect_result(True, AdapterState.DETECTED, f"uvx at {path}")
+            return self._detect_result(
+                True, AdapterState.DETECTED, f"{active} selected; uvx at {path}"
+            )
         return self._detect_result(
             False,
             AdapterState.UNINSTALLED,
-            "uvx not on PATH — install uv then `uvx blender-mcp`",
+            f"{active} selected; uvx not on PATH and no validated Blender MCP session is connected.",
         )
 
     def version(self) -> str | None:
@@ -38,3 +60,13 @@ class BlenderMCPAdapter(SkeletonAdapter):
 
     def capabilities(self) -> frozenset[str]:
         return self._CAPABILITIES
+
+
+def _active_provider() -> str:
+    setting = row(
+        "SELECT value FROM settings WHERE key = 'source_os.blender_mcp_candidates.active_provider'"
+    )
+    if setting:
+        return str(setting["value"])
+    legacy = row("SELECT value FROM settings WHERE key = 'source_os.blender_mcp.active_provider'")
+    return str(legacy["value"]) if legacy else "official_blender"

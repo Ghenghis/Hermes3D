@@ -193,9 +193,27 @@ def test_moonraker_upload_rejects_non_gcode_extension(tmp_path):
         c.upload_gcode(f)
 
 
-def test_probe_fleet_returns_one_entry_per_printer():
+def test_probe_fleet_returns_one_entry_per_printer(monkeypatch):
     """probe_fleet must NEVER raise — it returns a structured list even when
-    every printer is offline (which is the normal case in CI / sandbox)."""
+    every printer is offline (which is the normal case in CI / sandbox).
+
+    The unit test must not wait on real LAN routing/ARP timeouts, so the
+    Moonraker client is replaced with a deterministic unreachable transport.
+    """
+
+    class OfflineMoonrakerClient:
+        def __init__(self, base_url: str, *, timeout_s: float = 5.0, **_kwargs) -> None:
+            self.base_url = base_url
+            self.timeout_s = timeout_s
+
+        def server_info(self):
+            raise MoonrakerError("offline test transport", url=self.base_url)
+
+    monkeypatch.setattr(
+        "hermes3d.core.printers.moonraker_client.MoonrakerClient",
+        OfflineMoonrakerClient,
+    )
+
     entries = probe_fleet(timeout_s=0.2)
     assert len(entries) == len(FLEET)
     expected_keys = {

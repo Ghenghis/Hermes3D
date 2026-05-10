@@ -42,7 +42,7 @@ export function ResourceGauge({
             />
           </RadialBarChart>
         </ResponsiveContainer>
-        <div className="absolute inset-0 flex items-center justify-center text-fg font-semibold text-lg">
+        <div className="absolute inset-0 flex items-center justify-center text-sm font-semibold text-fg">
           {Math.round(value)}%
         </div>
       </div>

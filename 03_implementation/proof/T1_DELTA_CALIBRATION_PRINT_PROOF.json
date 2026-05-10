@@ -1,0 +1,83 @@
+{
+  "generated_by": "codex-master",
+  "generated_at_local": "2026-05-04T18:33:00-07:00",
+  "policy": {
+    "s1": "untouched; offline/locked/no test/no move/no upload",
+    "write_path": "POST /api/printers/{printer_id}/upload-gcode",
+    "required_state_before_start": "Klipper ready and print_stats.state in standby/complete/ready"
+  },
+  "source_models": [
+    "C:/Users/Admin/Downloads/delta Calibration Test Model V2.stl",
+    "C:/Users/Admin/Downloads/delta-calibration-test-model.stl"
+  ],
+  "scaled_artifacts": [
+    "G:/Github/h3d-gui-wiring-codex/03_implementation/var/print-tests/2026-05-05-t1-delta-calibration/delta Calibration Test Model V2-50pct.stl",
+    "G:/Github/h3d-gui-wiring-codex/03_implementation/var/print-tests/2026-05-05-t1-delta-calibration/delta-calibration-test-model-50pct.stl"
+  ],
+  "gcode": {
+    "path": "G:/Github/h3d-gui-wiring-codex/03_implementation/var/print-tests/2026-05-05-t1-delta-calibration/delta-calibration-test-model-50pct-T1.gcode",
+    "sha256": "85f82e0ee342e2fa39a342c6bcf72eac73cc30ec9d3e8d61a1a63ee0851ade19",
+    "bytes": 141334,
+    "bounds_passed": true,
+    "used_fallback_bounds": false,
+    "remote_path": "hermes3d/delta-calibration-test-model-50pct-T1.gcode"
+  },
+  "dispatch_results": [
+    {
+      "printer_id": "flsun_t1_a",
+      "ip": "192.168.0.10",
+      "accepted": true,
+      "uploaded": true,
+      "started": true,
+      "moonraker_start_result": "ok",
+      "post_start_state": "printing",
+      "final_observed_state": "complete",
+      "final_virtual_sdcard_progress": 1.0,
+      "final_filament_used_mm": 101.43206000000008
+    },
+    {
+      "printer_id": "flsun_t1_b",
+      "ip": "192.168.0.11",
+      "accepted": true,
+      "uploaded": true,
+      "started": true,
+      "moonraker_start_result": "ok",
+      "post_start_state": "printing",
+      "final_observed_state": "complete",
+      "final_virtual_sdcard_progress": 1.0,
+      "final_filament_used_mm": 101.43206000000008
+    }
+  ],
+  "post_start_observation": {
+    "flsun_t1_a": {
+      "print_stats.filename": "hermes3d/delta-calibration-test-model-50pct-T1.gcode",
+      "virtual_sdcard.is_active": true,
+      "heater_bed.target": 60.0,
+      "extruder.target": 230.0
+    },
+    "flsun_t1_b": {
+      "print_stats.filename": "hermes3d/delta-calibration-test-model-50pct-T1.gcode",
+      "virtual_sdcard.is_active": true,
+      "heater_bed.target": 60.0,
+      "extruder.target": 230.0
+    }
+  },
+  "final_observation": {
+    "flsun_t1_a": {
+      "print_stats.state": "complete",
+      "print_stats.print_duration": 40.49121731099876,
+      "virtual_sdcard.progress": 1.0,
+      "virtual_sdcard.file_position": 141334,
+      "virtual_sdcard.file_size": 141334,
+      "extruder.target": 0.0
+    },
+    "flsun_t1_b": {
+      "print_stats.state": "complete",
+      "print_stats.print_duration": 40.554297935999784,
+      "virtual_sdcard.progress": 1.0,
+      "virtual_sdcard.file_position": 141334,
+      "virtual_sdcard.file_size": 141334,
+      "extruder.target": 0.0
+    }
+  }
+}

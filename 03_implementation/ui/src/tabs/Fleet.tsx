@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   online: "green",
+  active: "green",
   printing: "cyan",
   paused: "amber",
   maintenance: "amber",
@@ -222,9 +223,11 @@ function PrinterRow({ printer: p, index }: { printer: Printer; index: number }) 
 
 function DataSourceChip({ source }: { source: PrinterDataSource }) {
   const tone = {
-    mock: "border-border text-muted",
     live: "border-accent-green/50 text-accent-green",
+    degraded: "border-accent-amber/50 text-accent-amber",
     error: "border-accent-red/50 text-accent-red",
+    policy: "border-amber-500/50 text-amber-300",
+    config: "border-border text-muted",
   }[source];
   return (
     <span

@@ -81,17 +81,21 @@ def collect_files() -> list[dict]:
                 continue
             rel = full.relative_to(REPO_ROOT).as_posix()
             # Skip the manifest itself + the generator
-            if rel in {"00_overview/contract/KIT_MANIFEST.json",
-                       "00_overview/contract/_generate_manifest.py"}:
+            if rel in {
+                "00_overview/contract/KIT_MANIFEST.json",
+                "00_overview/contract/_generate_manifest.py",
+            }:
                 continue
             tier, role = classify(rel)
-            files.append({
-                "path": rel,
-                "size_bytes": full.stat().st_size,
-                "sha256": sha256(full),
-                "tier": tier,
-                "role": role,
-            })
+            files.append(
+                {
+                    "path": rel,
+                    "size_bytes": full.stat().st_size,
+                    "sha256": sha256(full),
+                    "tier": tier,
+                    "role": role,
+                }
+            )
     files.sort(key=lambda f: f["path"])
     return files
 
@@ -124,8 +128,9 @@ def main() -> None:
     out = REPO_ROOT / "00_overview/contract" / "KIT_MANIFEST.json"
     out.write_text(json.dumps(manifest, indent=2, sort_keys=False), encoding="utf-8")
     print(f"Wrote {out}")
-    print(f"Files: {manifest['summary']['total_files']}, "
-          f"bytes: {manifest['summary']['total_bytes']}")
+    print(
+        f"Files: {manifest['summary']['total_files']}, bytes: {manifest['summary']['total_bytes']}"
+    )
     print(f"By tier: {manifest['summary']['by_tier']}")
     print(f"By role: {manifest['summary']['by_role']}")
 

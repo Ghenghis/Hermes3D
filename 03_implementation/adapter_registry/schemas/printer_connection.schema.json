@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/printer_connection.schema.json",
+  "title": "printer connection config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "ip",
+    "port",
+    "lock_state"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ip": {
+      "type": "string",
+      "minLength": 1
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "default": 7125
+    },
+    "moonraker_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null
+    },
+    "lock_state": {
+      "type": "string",
+      "enum": [
+        "locked",
+        "unlocked",
+        "unknown"
+      ],
+      "default": "unknown"
+    }
+  }
+}

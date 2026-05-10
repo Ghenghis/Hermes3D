@@ -259,6 +259,18 @@ the directory across repos (lock manager doesn't span repos).
 3. **Never** post fictional state — STATE.md must reflect real PR/CI/queue state, verified by `gh` + `hermes_get_state`.
 4. **Never** ignore a CORRECTION_REQUEST silently. ACK or BLOCK within 15min.
 5. **Always** archive resolved messages to LEDGER.md within 6h (keeps the inbox readable for the next polling cycle).
+6. **Never** treat STREAM as authorization for writes, merges, provider actions,
+   installs, updates, release actions, or printer/network automation. STREAM
+   routes work; authority comes from current user/session scope, exact-worktree
+   MCP locks, gates, and evidence.
+7. **Never** continue mutation when `hermes3d-locks` is offline, unhealthy, or
+   scoped to a different workspace. During MCP trouble, only read-only triage
+   and status reporting are allowed.
+8. **Never** mark agent work `DONE` without task id, exact worktree, same-owner
+   task/file locks, pre/post snapshots for touched files, required provider
+   build/review artifacts, gate results, visual proof for visible UI changes,
+   security scan for auth/provider/process/filesystem/printer changes, rollback
+   proof, branch/commit/PR evidence, and released locks.
 
 ---
 

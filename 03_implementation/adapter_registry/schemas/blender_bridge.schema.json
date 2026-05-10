@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/blender_bridge.schema.json",
+  "title": "blender bridge config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "endpoint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional local or service endpoint URL."
+    },
+    "executable_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional absolute executable path."
+    },
+    "config_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional config or profile path."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "default": 5000
+    },
+    "verify": {
+      "type": "object",
+      "description": "Real probe metadata consumed by scripts/verify_modelers.py. No fake or simulated checks.",
+      "additionalProperties": false,
+      "required": ["modeler_id", "kind", "version_probe", "install_check", "runtime_check"],
+      "properties": {
+        "modeler_id": {"type": "string", "const": "blender"},
+        "kind": {"type": "string", "enum": ["cli", "python_import"], "default": "cli"},
+        "version_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "args"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["cli_args", "python_import"]},
+            "args": {"type": "array", "items": {"type": "string"}, "default": ["--version"]},
+            "executable_candidates": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": [
+                "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe",
+                "C:/Program Files/Blender Foundation/Blender 4.4/blender.exe",
+                "blender"
+              ]
+            },
+            "version_regex": {"type": "string", "default": "Blender\\s+(\\d+\\.[0-9]+\\.?[0-9]*)"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 12}
+          }
+        },
+        "install_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executable_must_exist": {"type": "boolean", "default": true},
+            "required_capabilities": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["headless_blender_cli", "python_scene_worker"]
+            }
+          }
+        },
+        "runtime_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "help_args": {"type": "array", "items": {"type": "string"}, "default": ["--help"]},
+            "expected_help_substring": {"type": "string", "default": "Blender"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 15}
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,49 @@
+{
+  "schema": "w6-1-rollback-proof.v1",
+  "task": "W6-1 canary dirt filter + rollback proof",
+  "generated_utc": "2026-05-10T03:09:02Z",
+  "harness": {
+    "filter_module": "hermes3d.services.canary_dirt_filter",
+    "filter_callsite": "hermes3d.services.code_history::repo_status"
+  },
+  "step_1_env_unset_resolves_v013": {
+    "env_HERMES_AGENT_CHECKOUT": null,
+    "resolver_returned": "G:/Github/hermes-agent-v013-canary",
+    "verdict": "PASS"
+  },
+  "step_2_v013_canary_dirty_false": {
+    "checkout_root": "G:/Github/hermes-agent-v013-canary",
+    "head_commit": "498bfc7bc12a",
+    "head_tag": "v2026.5.7",
+    "porcelain_line_count": 2,
+    "porcelain_path_summary": [
+      {
+        "code": "??",
+        "path_basename": ".venv-canary"
+      },
+      {
+        "code": "??",
+        "path_basename": "_pip_install.log"
+      }
+    ],
+    "compute_dirty_result": false,
+    "surviving_real_edit_lines": 0,
+    "verdict": "PASS"
+  },
+  "step_3_env_fresh_resolves_v012": {
+    "env_HERMES_AGENT_CHECKOUT": "G:/Github/hermes-agent-fresh",
+    "resolver_returned": "G:/Github/hermes-agent-fresh",
+    "verdict": "PASS"
+  },
+  "step_4_v012_fresh_dirty_false": {
+    "checkout_root": "G:/Github/hermes-agent-fresh",
+    "head_commit": "73bf3ab1b223",
+    "head_tag": "v2026.4.30",
+    "porcelain_line_count": 0,
+    "porcelain_path_summary": [],
+    "compute_dirty_result": false,
+    "surviving_real_edit_lines": 0,
+    "verdict": "PASS"
+  },
+  "overall_verdict": "PASS"
+}

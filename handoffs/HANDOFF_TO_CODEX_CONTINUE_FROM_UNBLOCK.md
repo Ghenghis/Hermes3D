@@ -7,6 +7,12 @@
 > keep appearing as Claude's merge-master agents land conflict fixes;
 > Codex audits them as they arrive.
 
+> **Control update 2026-05-08:** This handoff is historical operating context,
+> not a blanket authorization. Newer Hermes Agent truth/proof and control-gate
+> docs override any instruction here that says to merge all green PRs, loop
+> forever, use provider bridges before live smoke proof, or work without exact
+> MCP locks.
+
 ---
 
 ## Paste-ready Codex prompt
@@ -67,14 +73,16 @@ Your continuing role this cycle:
        + Windsurf + VSCode adapter examples, VHS terminal demo, theme-aware
        SVGs, Lighthouse a11y CI, fencing tokens in lock-manager).
 
-3. Once all HP merged, the user's standing rule (saved in Claude's
-   memory at memory/feedback_merge_authorization.md) is: merge all
-   green ASAP without per-merge confirmation. You can use the same
-   merge command as Claude:
-     gh pr merge <N> -R Ghenghis/HermesProof --squash --delete-branch
-   for any PR you author OR audit-LGTM that's CI-green.
+3. Merge only after the current merge gate passes. A PR is not merge-ready
+   from "green CI" alone; it also needs the latest base, correct dependency
+   order, critic/reviewer LGTM, no unresolved audit findings, proof bundle,
+   security/no-fake/visual gates where applicable, and no active same-file
+   conflicts. If any gate is missing, write the blocker and do not merge.
 
-4. Hermes Agent USER bridge will be available the moment PR #20 lands.
+4. Hermes Agent USER bridge is available only after it is enabled, scoped,
+   session-authorized, and provider chat-completions smoke passes for the
+   required provider lane. PR landing, env-var presence, or a `/models` response
+   is not enough.
    That gives YOU access to:
      - hermes_anonymous_claim / release / state
      - hermes_user_grant_session / revoke_session / check_authorization
@@ -83,7 +91,9 @@ Your continuing role this cycle:
      - hermes_agent_request_user_session / resolve_blocked / revoke_session
    Once enabled (HERMES_AGENT_ENABLED=1 + HERMES_AGENT_PROJECT_GOALS=...),
    you can call hermes_agent_resolve_blocked on STREAM BLOCKED
-   escalations to close them without waking the user.
+   escalations only when the action scope matches the granted session and the
+   evidence ledger records the rationale. Provider-auth failure means BLOCKED,
+   not fallback approval.
 
 5. MCP supervisor (PR #33) gives you auto-reconnect when the
    hermes3d-locks server crashes. Once merged, the user's MCP client
@@ -109,7 +119,11 @@ Heartbeat: post TASK_CLAIMED in STREAM/CODEX_INBOX.md when starting
 work; post FIX_PUSHED / AUDIT_VERDICT / GATE_LANDED when done. If a
 correlation goes >20 min with no progress, post HEARTBEAT or BLOCKED.
 
-There is no exit condition. Loop forever until the user says stop.
+There is no silent idle condition. Polling can continue read-only, but mutation
+stops immediately on any hard-stop condition: MCP disconnect/workspace mismatch,
+missing locks, failed provider smoke, failed gate, stale base/index, unresolved
+critic finding, secret/private-env need, hardware ambiguity, or no proof
+progress after three cycles.
 
 Specific items I'd love you to pick up first:
 

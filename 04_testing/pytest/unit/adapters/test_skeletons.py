@@ -81,7 +81,7 @@ def test_skeleton_detect_does_not_raise_or_invoke_subprocess(key):
     with patch("hermes3d.adapters.base._safe_version_command") as mocked:
         r = cls().detect()
     assert isinstance(r, DetectResult)
-    assert r.state in {AdapterState.UNINSTALLED, AdapterState.DETECTED}
+    assert r.state in {AdapterState.UNINSTALLED, AdapterState.DETECTED, AdapterState.CONFIGURED}
     mocked.assert_not_called()
 
 
@@ -106,7 +106,7 @@ def test_skeleton_capabilities_returns_nonempty_frozenset(key):
 def test_skeleton_phase3_methods_raise_not_implemented_yet(key):
     cls = _registered_by_key()[key]
     instance = cls()
-    for method_name in (
+    methods = [
         "validate",
         "healthcheck",
         "status",
@@ -114,7 +114,12 @@ def test_skeleton_phase3_methods_raise_not_implemented_yet(key):
         "open_undocked",
         "open_external",
         "detach_ui",
-    ):
+    ]
+    if key == "printrun":
+        # Printrun now exposes a real, no-serial-command GUI launcher path.
+        # The remaining printer-control methods must still stay Phase-3 gated.
+        methods.remove("open_external")
+    for method_name in methods:
         with pytest.raises(NotImplementedYet, match="Phase 3"):
             getattr(instance, method_name)()
 

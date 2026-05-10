@@ -2,6 +2,7 @@
 
 export type PrinterStatus =
   | "online"
+  | "active"
   | "printing"
   | "paused"
   | "maintenance"
@@ -9,7 +10,18 @@ export type PrinterStatus =
   | "error";
 
 export type PrinterAdapter = "moonraker" | "octoprint" | "printrun" | "manual";
-export type PrinterDataSource = "mock" | "live" | "error";
+export type PrinterDataSource = "live" | "degraded" | "error" | "policy" | "config";
+
+export interface PrinterSourceRefs {
+  official_wiki_url?: string;
+  official_setup_topics?: string[];
+  flsun_slicer_install?: string;
+  source_profile_ini?: string;
+  source_profile_ini_detected?: boolean;
+  profiles_detected?: Record<string, boolean>;
+  installed_profiles?: Record<string, string>;
+  safety?: string;
+}
 
 export interface Printer {
   id: string;
@@ -28,4 +40,50 @@ export interface Printer {
   current_job: string | null;
   maintenance_flag: boolean;
   camera_url: string | null;
+  moonraker_url?: string | null;
+  safety_policy?: "locked" | "read_only" | "write_enabled" | string;
+  write_enabled?: boolean;
+  onboarded?: boolean;
+  status_source?: string;
+  source_refs: PrinterSourceRefs;
+}
+
+export interface PrinterOnboardRequest {
+  id?: string;
+  name: string;
+  model: Printer["model"];
+  moonraker_url: string;
+  camera_url?: string;
+  actor?: string;
+  write_enabled?: boolean;
+}
+
+export interface PrinterOnboardProbe {
+  name: string;
+  ok: boolean;
+  required?: boolean;
+  http_status?: number | null;
+  reason?: string;
+  klippy_connected?: boolean;
+  klippy_state?: string;
+  moonraker_version?: string;
+  api_version?: string;
+  print_state?: string;
+  filename?: string | null;
+  progress?: number;
+}
+
+export interface PrinterOnboardResult {
+  created: boolean;
+  printer: Printer | null;
+  probe_summary: {
+    ok?: boolean;
+    required_probes?: string[];
+    probes?: PrinterOnboardProbe[];
+  } | null;
+  proof_event_id?: string | null;
+  status?: string;
+  reason?: string;
+  failed_probe?: string | null;
+  detail?: unknown;
 }

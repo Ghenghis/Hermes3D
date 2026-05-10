@@ -17,6 +17,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Home, Lock, Octagon } from "
 
 const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   online: "green",
+  active: "green",
   printing: "cyan",
   paused: "amber",
   maintenance: "amber",
