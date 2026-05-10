@@ -1,7 +1,11 @@
-/// <reference types="vitest" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Compute __dirname in an ESM-safe way without requiring @types/node `__dirname`
+// or `node:path.resolve(__dirname, ...)`. Vite 8 / Node 20+ support this idiom
+// and it keeps tsconfig.node.json from needing `@types/node`.
+const here = fileURLToPath(new URL(".", import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
@@ -10,23 +14,9 @@ export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, "index.html"),
-        actionWindow: resolve(__dirname, "action-window.html"),
+        main: `${here}index.html`,
+        actionWindow: `${here}action-window.html`,
       },
     },
-  },
-  test: {
-    environment: "jsdom",
-    globals: false,
-    setupFiles: ["./src/test-setup-w6-4.ts"],
-    // W6-4 ships its own targeted suite — full repo unit run is owned by W6-3.
-    // Restricting `include` to ActionWindow + TaskMonitor means new authors
-    // can run `npx vitest run` from the ui/ dir without picking up unrelated
-    // tests from other lanes.
-    include: [
-      "src/components/ActionWindow/**/*.test.{ts,tsx}",
-      "src/components/TaskMonitor/**/*.test.{ts,tsx}",
-    ],
-    css: false,
   },
 });

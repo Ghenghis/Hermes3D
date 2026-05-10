@@ -6,7 +6,11 @@
  *   - localStorage persistence round-trip.
  *   - Render of the panel, tabs, resize handles, and pop-out button.
  *
- * Run with: npx vitest run src/components/ActionWindow
+ * Run with: npx vitest run tests/unit/ActionWindow.test.tsx
+ *
+ * NOTE: This file lives in tests/unit/ (NOT under src/) so that tsc, which is
+ * scoped to `include: ["src"]` in tsconfig.json, will not type-check it as part
+ * of `npm run build`. Vitest is configured separately via vitest.config.ts.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,8 +23,8 @@ import {
   loadPersistedSize,
   persistSize,
   ACTION_WINDOW_STORAGE_KEY,
-} from "./useResizable";
-import { ActionWindow } from "./ActionWindow";
+} from "../../src/components/ActionWindow/useResizable";
+import { ActionWindow } from "../../src/components/ActionWindow/ActionWindow";
 
 afterEach(() => {
   cleanup();

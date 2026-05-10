@@ -7,7 +7,11 @@
  *   - Polling-mocked expansion of a run row to its event timeline.
  *   - Clear-completed local filter behaviour.
  *
- * Run with: npx vitest run src/components/TaskMonitor
+ * Run with: npx vitest run tests/unit/TaskMonitorDrawer.test.tsx
+ *
+ * NOTE: This file lives in tests/unit/ (NOT under src/) so that tsc, which is
+ * scoped to `include: ["src"]` in tsconfig.json, will not type-check it as part
+ * of `npm run build`. Vitest is configured separately via vitest.config.ts.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -17,13 +21,13 @@ import {
   classifyError,
   nextBackoffMs,
   useRecoveryRunsPoll,
-} from "./useRecoveryRunsPoll";
+} from "../../src/components/TaskMonitor/useRecoveryRunsPoll";
 import {
   RecoveryRunsFetchError,
   type RecoveryRun,
   type RecoveryRunsResponse,
-} from "../../api/recoveryRuns";
-import { TaskMonitorDrawer } from "./TaskMonitorDrawer";
+} from "../../src/api/recoveryRuns";
+import { TaskMonitorDrawer } from "../../src/components/TaskMonitor/TaskMonitorDrawer";
 
 afterEach(cleanup);
 
@@ -207,7 +211,7 @@ describe("<TaskMonitorDrawer /> with mocked polling", () => {
 
 describe("useRecoveryRunsPoll backoff smoke", () => {
   /** Minimal harness so we can introspect backoffStep without mounting the drawer. */
-  function HookHarness({ fetcher }: { fetcher: typeof import("../../api/recoveryRuns").fetchRecoveryRuns }) {
+  function HookHarness({ fetcher }: { fetcher: typeof import("../../src/api/recoveryRuns").fetchRecoveryRuns }) {
     const result = useRecoveryRunsPoll({ enabled: true, intervalMs: 60_000, fetchRunsImpl: fetcher });
     return <div data-testid="harness" data-backoff-step={result.backoffStep} data-error={result.error ?? ""} data-success={result.successCount} />;
   }
