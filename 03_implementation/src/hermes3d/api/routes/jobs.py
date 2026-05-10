@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.services.local_state import local_printer as _local_printer
+from hermes3d.services.proof_helpers import attach_version_fields
 
 router = APIRouter()
 
@@ -372,8 +373,18 @@ def _append_job_event(job_id: str, event_type: str, source_agent: str, message: 
 
 
 def _append_proof_event(event_type: str, source_agent: str, payload: dict[str, Any]) -> str:
+    # Wave 2 P2-6 (2026-05-09): version-tag every persisted proof
+    # event with the active Hermes Agent version + upstream tag at
+    # write time. Provenance basis: NIST SP 800-92 §4 (log generation
+    # / storage) + OpenTelemetry ``service.version`` resource
+    # attribute. See services/proof_helpers.py. This jobs.py helper
+    # adds ``ts_unix`` BEFORE merging version fields so a caller who
+    # explicitly stamps a ``version_label`` in their payload still
+    # wins (attach_version_fields preserves caller keys on collision).
     event_id = new_id()
-    proof_payload = {"ts_unix": round(time.time(), 3), **payload}
+    proof_payload = attach_version_fields(
+        {"ts_unix": round(time.time(), 3), **payload},
+    )
     execute(
         "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
         (event_id, event_type, source_agent, as_json(proof_payload)),

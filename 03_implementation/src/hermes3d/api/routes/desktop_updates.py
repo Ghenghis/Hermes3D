@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id
+from hermes3d.services.proof_helpers import attach_version_fields
 
 router = APIRouter()
 
@@ -301,9 +302,18 @@ def _run_git_optional(path: Path, args: list[str]) -> str | None:
 
 
 def _append_proof_event(event_type: str, source_agent: str, payload: dict[str, Any]) -> None:
+    # Wave 2 P2-6 (2026-05-09): version-tag every persisted proof
+    # event. Mirrors agent_updates.py / jobs.py call sites; see
+    # services/proof_helpers.py for the merge contract and the
+    # NIST SP 800-92 §4 + OpenTelemetry ``service.version`` provenance
+    # basis. The desktop updater records its own checkout via
+    # HERMES_DESKTOP_CHECKOUT, but the active *Hermes Agent* version
+    # is what the audit chain attributes — this row tracks BOTH because
+    # desktop releases coordinate with the agent runtime.
+    enriched = attach_version_fields(payload)
     execute(
         "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
-        (new_id(), event_type, source_agent, as_json(payload)),
+        (new_id(), event_type, source_agent, as_json(enriched)),
     )
 
 
