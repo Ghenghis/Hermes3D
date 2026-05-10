@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { adapters } from "../api/adapters";
 import { TABS } from "../app/routes";
 import { useStore } from "../app/store";
+import { AgentActivityFeed } from "../components/autopilot/AgentActivityFeed";
+import { FreezeThawControls } from "../components/autopilot/FreezeThawControls";
+import { PlannerQueue } from "../components/autopilot/PlannerQueue";
 import type { AutopilotCheck, GuardrailPolicy } from "../types/autopilot";
 
 type HermesImportMeta = ImportMeta & {
@@ -76,7 +79,8 @@ export function AutopilotTab() {
   };
 
   return (
-    <div data-testid="autopilot-root" className="grid min-h-[calc(100vh-6.5rem)] grid-rows-[minmax(0,1.35fr)_auto_minmax(0,1fr)] gap-3">
+    <div data-testid="autopilot-root" className="grid min-h-[calc(100vh-6.5rem)] gap-3 lg:grid-cols-12">
+      <div className="grid min-h-0 gap-3 lg:col-span-7 lg:grid-rows-[minmax(0,1.35fr)_auto_minmax(0,1fr)]">
       <section id="autopilot.readiness" className="flex min-h-0 flex-col rounded border border-border bg-surface p-4">
         <div className="flex items-center justify-between">
           <h2 className="text-base font-semibold text-fg">READINESS CHECKS</h2>
@@ -134,6 +138,12 @@ export function AutopilotTab() {
           ))}
         </div>
       </section>
+      </div>
+      <div className="grid min-h-0 gap-3 lg:col-span-5 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)_minmax(140px,auto)]">
+        <PlannerQueue />
+        <AgentActivityFeed />
+        <FreezeThawControls />
+      </div>
     </div>
   );
 }
