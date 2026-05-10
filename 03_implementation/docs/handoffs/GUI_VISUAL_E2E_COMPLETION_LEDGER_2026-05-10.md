@@ -57,3 +57,4 @@
 
 ## Loop log
 - 2026-05-10: Wave 15 launched; Phase 0 complete.
+- 2026-05-10: W15-CLEANUP (PR 3 of 8 sequence per W15-A6 §6) — delete 9 unrouted UNACCEPTABLE_FAKE tabs + 11 orphan mock data files + 1 stale 14-tab `app/routes.tsx` manifest. Branch `claude/w15-cleanup-fake-tabs` from `origin/develop@8dccb7b`. Pre-deletion grep audit: 0 of 21 files had any production import (all consumer references were inside the deleted-tab set). Verification: `tsc --noEmit` PASS, `npm run build` PASS, `vitest run` 118 passed / 4 skipped / 0 failed. Diff: 21 deletions only, 2148 net lines removed. Cites W15-A4 §3, §6 + W15-A3 (stale routes.tsx). Sources: ESLint `no-unused-modules` + TypeScript dead-code-elimination patterns.
