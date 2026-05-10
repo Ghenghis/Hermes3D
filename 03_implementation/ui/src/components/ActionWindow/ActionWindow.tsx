@@ -21,10 +21,11 @@ import {
   GitMerge,
   Maximize2,
   Minimize2,
+  Square,
   Terminal,
   X as CloseIcon,
 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ACTION_WINDOW_STORAGE_KEY,
   useResizable,
@@ -32,6 +33,58 @@ import {
 } from "./useResizable";
 
 export type ActionWindowTab = "code" | "output" | "diff";
+
+/**
+ * Three display modes per W15-A19 spec:
+ *  - "normal":     embedded panel at the persisted (useResizable) size — inline
+ *                  in the AppShell. This is the default.
+ *  - "expanded":   ~50% of viewport (50vw × 50vh), centered as a non-modal
+ *                  overlay. Useful when the user wants to focus but keep the
+ *                  underlying tab visible behind the panel.
+ *  - "fullscreen": 100% viewport modal — pinned to `fixed inset-0` and rendered
+ *                  on top of the AppShell. The previous code's `maximized`
+ *                  state corresponded to this mode.
+ *
+ * The mode is persisted to `localStorage` so the user's last choice survives a
+ * page reload. The detached browser-tab form (rendered when the route is
+ * `/action-window?detached=1`) ignores the persisted mode and always fills its
+ * tab's viewport, because there is no surrounding chrome to expand against.
+ */
+export const ACTION_WINDOW_MODES = ["normal", "expanded", "fullscreen"] as const;
+export type ActionWindowMode = (typeof ACTION_WINDOW_MODES)[number];
+
+const MODE_STORAGE_KEY = "hermes3d.actionWindow.mode";
+
+function isActionWindowMode(value: unknown): value is ActionWindowMode {
+  return typeof value === "string" && (ACTION_WINDOW_MODES as readonly string[]).includes(value);
+}
+
+function readPersistedMode(): ActionWindowMode {
+  if (typeof window === "undefined") {
+    return "normal";
+  }
+  try {
+    const raw = window.localStorage.getItem(MODE_STORAGE_KEY);
+    return isActionWindowMode(raw) ? raw : "normal";
+  } catch {
+    return "normal";
+  }
+}
+
+function writePersistedMode(mode: ActionWindowMode): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(MODE_STORAGE_KEY, mode);
+  } catch {
+    /* ignore — quota or private-mode failures are not fatal here */
+  }
+}
+
+/** Cycle order: normal -> expanded -> fullscreen -> normal. */
+export function nextActionWindowMode(mode: ActionWindowMode): ActionWindowMode {
+  const idx = ACTION_WINDOW_MODES.indexOf(mode);
+  return ACTION_WINDOW_MODES[(idx + 1) % ACTION_WINDOW_MODES.length];
+}
 
 export interface ActionWindowOutputEntry {
   ts: string; // ISO timestamp
@@ -63,6 +116,14 @@ export interface ActionWindowProps {
   diff?: ActionWindowDiff | null;
   /** Default tab on mount. */
   defaultTab?: ActionWindowTab;
+  /**
+   * Optional initial display mode override. When omitted, the persisted value
+   * from `localStorage` is used (falling back to "normal"). Pass an explicit
+   * mode to bypass persistence — useful in tests.
+   */
+  initialMode?: ActionWindowMode;
+  /** Called whenever the user cycles the mode toggle. */
+  onModeChange?: (mode: ActionWindowMode) => void;
 }
 
 const TAB_DEFS: Array<{ id: ActionWindowTab; label: string; icon: JSX.Element }> = [
@@ -80,31 +141,98 @@ export function ActionWindow({
   output = [],
   diff = null,
   defaultTab = "code",
+  initialMode,
+  onModeChange,
 }: ActionWindowProps) {
   const storageKey = detached ? null : ACTION_WINDOW_STORAGE_KEY;
   const { size, rightHandleProps, bottomHandleProps, cornerHandleProps, isResizing } =
     useResizable({ storageKey, initialSize });
   const [activeTab, setActiveTab] = useState<ActionWindowTab>(defaultTab);
-  const [maximized, setMaximized] = useState(false);
+  // Detached browser-tab form is always fullscreen-equivalent and ignores the
+  // persisted mode. For the embedded form we initialise from the explicit prop
+  // first, then `localStorage`, falling back to "normal".
+  const [mode, setMode] = useState<ActionWindowMode>(() => {
+    if (detached) return "fullscreen";
+    if (initialMode) return initialMode;
+    return readPersistedMode();
+  });
+
+  // Persist only when the embedded form changes mode (detached form is
+  // ephemeral — its mode is implicit in the pop-out).
+  useEffect(() => {
+    if (detached) return;
+    writePersistedMode(mode);
+  }, [detached, mode]);
+
+  const cycleMode = useCallback(() => {
+    setMode((prev) => {
+      const next = nextActionWindowMode(prev);
+      onModeChange?.(next);
+      return next;
+    });
+  }, [onModeChange]);
+
+  const setExplicitMode = useCallback(
+    (next: ActionWindowMode) => {
+      setMode((prev) => {
+        if (prev === next) return prev;
+        onModeChange?.(next);
+        return next;
+      });
+    },
+    [onModeChange],
+  );
 
   const containerStyle = useMemo<React.CSSProperties>(() => {
-    if (detached || maximized) {
+    if (detached || mode === "fullscreen") {
       return { width: "100%", height: "100%" };
     }
+    if (mode === "expanded") {
+      // ~50% of the viewport, centered. Using vw/vh keeps the math honest
+      // across the breakpoints the AppShell supports.
+      return { width: "50vw", height: "50vh" };
+    }
     return { width: `${size.width}px`, height: `${size.height}px` };
-  }, [detached, maximized, size.height, size.width]);
+  }, [detached, mode, size.height, size.width]);
+
+  const sizeLabel = useMemo(() => {
+    if (detached || mode === "fullscreen") return "viewport";
+    if (mode === "expanded") return "50vw × 50vh";
+    return `${size.width}×${size.height}`;
+  }, [detached, mode, size.height, size.width]);
+
+  const containerClassName = useMemo(() => {
+    const base =
+      "relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface text-fg shadow-lg";
+    if (detached) return base;
+    if (mode === "fullscreen") return `${base} fixed inset-0 z-50`;
+    if (mode === "expanded") return `${base} fixed left-1/2 top-1/2 z-40 -translate-x-1/2 -translate-y-1/2`;
+    return base;
+  }, [detached, mode]);
 
   const onPopOut = useCallback(() => {
     if (typeof window === "undefined") return;
     window.open(detachUrl, "hermes3d-action-window", "noopener,noreferrer");
   }, [detachUrl]);
 
+  const modeButtonLabel: Record<ActionWindowMode, string> = {
+    normal: "Expand Action Window to half-viewport",
+    expanded: "Maximize Action Window to fullscreen",
+    fullscreen: "Restore Action Window to normal",
+  };
+  const modeButtonIcon: Record<ActionWindowMode, JSX.Element> = {
+    normal: <Maximize2 size={14} />,
+    expanded: <Square size={14} />,
+    fullscreen: <Minimize2 size={14} />,
+  };
+
   return (
     <section
       data-testid="action-window-root"
       data-detached={detached ? "true" : "false"}
       data-resizing={isResizing ? "true" : "false"}
-      className="relative flex flex-col overflow-hidden rounded-lg border border-border bg-surface text-fg shadow-lg"
+      data-mode={mode}
+      className={containerClassName}
       style={containerStyle}
       aria-label="Action Window"
     >
@@ -113,18 +241,50 @@ export function ActionWindow({
           <span className="text-xs uppercase tracking-wide text-muted">Action Window</span>
           <span className="hidden text-xs text-muted sm:inline">·</span>
           <span className="hidden truncate text-xs text-fg sm:inline" data-testid="action-window-size-label">
-            {detached || maximized ? "viewport" : `${size.width}×${size.height}`}
+            {sizeLabel}
           </span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {!detached && (
+            <div
+              role="group"
+              aria-label="Action Window mode"
+              data-testid="action-window-mode-group"
+              className="hidden items-center gap-0.5 rounded-md border border-border bg-bg/40 p-0.5 md:flex"
+            >
+              {ACTION_WINDOW_MODES.map((m) => {
+                const active = mode === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setExplicitMode(m)}
+                    aria-label={`Set Action Window to ${m}`}
+                    aria-pressed={active}
+                    data-testid={`action-window-mode-${m}`}
+                    className={[
+                      "rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors",
+                      active
+                        ? "bg-accent-blue/15 text-accent-blue"
+                        : "text-muted hover:bg-surface hover:text-fg",
+                    ].join(" ")}
+                  >
+                    {m === "normal" ? "Norm" : m === "expanded" ? "Exp" : "Full"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {!detached && (
             <button
               type="button"
-              onClick={() => setMaximized((v) => !v)}
-              aria-label={maximized ? "Restore Action Window" : "Maximize Action Window"}
+              onClick={cycleMode}
+              aria-label={modeButtonLabel[mode]}
+              data-testid="action-window-mode-toggle"
+              data-mode={mode}
               className="rounded-md p-1 text-muted hover:bg-surface hover:text-fg"
             >
-              {maximized ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+              {modeButtonIcon[mode]}
             </button>
           )}
           <button
@@ -183,7 +343,7 @@ export function ActionWindow({
         {activeTab === "diff" && <DiffPanel diff={diff} />}
       </div>
 
-      {!detached && !maximized && (
+      {!detached && mode === "normal" && (
         <>
           <div
             {...rightHandleProps}

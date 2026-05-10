@@ -24,7 +24,13 @@ import {
   persistSize,
   ACTION_WINDOW_STORAGE_KEY,
 } from "../../src/components/ActionWindow/useResizable";
-import { ActionWindow } from "../../src/components/ActionWindow/ActionWindow";
+import {
+  ActionWindow,
+  ACTION_WINDOW_MODES,
+  nextActionWindowMode,
+} from "../../src/components/ActionWindow/ActionWindow";
+
+const MODE_STORAGE_KEY = "hermes3d.actionWindow.mode";
 
 afterEach(() => {
   cleanup();
@@ -176,5 +182,94 @@ describe("<ActionWindow />", () => {
   it("renders the size label when embedded", () => {
     render(<ActionWindow initialSize={{ width: 720, height: 480 }} />);
     expect(screen.getByTestId("action-window-size-label")).toHaveTextContent("720×480");
+  });
+});
+
+describe("ActionWindow mode (normal/expanded/fullscreen)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("nextActionWindowMode cycles normal -> expanded -> fullscreen -> normal", () => {
+    expect(ACTION_WINDOW_MODES).toEqual(["normal", "expanded", "fullscreen"]);
+    expect(nextActionWindowMode("normal")).toBe("expanded");
+    expect(nextActionWindowMode("expanded")).toBe("fullscreen");
+    expect(nextActionWindowMode("fullscreen")).toBe("normal");
+  });
+
+  it("defaults to normal when no persisted value exists", () => {
+    render(<ActionWindow initialSize={{ width: 800, height: 500 }} />);
+    expect(screen.getByTestId("action-window-root")).toHaveAttribute("data-mode", "normal");
+    expect(screen.getByTestId("action-window-handle-right")).toBeInTheDocument();
+  });
+
+  it("explicit setExplicitMode buttons set the mode", () => {
+    render(<ActionWindow initialSize={{ width: 800, height: 500 }} />);
+    const root = screen.getByTestId("action-window-root");
+    fireEvent.click(screen.getByTestId("action-window-mode-expanded"));
+    expect(root).toHaveAttribute("data-mode", "expanded");
+    fireEvent.click(screen.getByTestId("action-window-mode-fullscreen"));
+    expect(root).toHaveAttribute("data-mode", "fullscreen");
+    // Resize handles should be hidden in non-normal modes.
+    expect(screen.queryByTestId("action-window-handle-right")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("action-window-mode-normal"));
+    expect(root).toHaveAttribute("data-mode", "normal");
+    expect(screen.getByTestId("action-window-handle-right")).toBeInTheDocument();
+  });
+
+  it("toggle button cycles modes in order", () => {
+    render(<ActionWindow initialSize={{ width: 800, height: 500 }} />);
+    const toggle = screen.getByTestId("action-window-mode-toggle");
+    const root = screen.getByTestId("action-window-root");
+    expect(root).toHaveAttribute("data-mode", "normal");
+    fireEvent.click(toggle);
+    expect(root).toHaveAttribute("data-mode", "expanded");
+    fireEvent.click(toggle);
+    expect(root).toHaveAttribute("data-mode", "fullscreen");
+    fireEvent.click(toggle);
+    expect(root).toHaveAttribute("data-mode", "normal");
+  });
+
+  it("persists mode to localStorage and restores on mount", () => {
+    window.localStorage.setItem(MODE_STORAGE_KEY, "expanded");
+    render(<ActionWindow initialSize={{ width: 800, height: 500 }} />);
+    expect(screen.getByTestId("action-window-root")).toHaveAttribute("data-mode", "expanded");
+    cleanup();
+    // Switch to fullscreen via the toggle and confirm the write.
+    render(<ActionWindow initialSize={{ width: 800, height: 500 }} />);
+    fireEvent.click(screen.getByTestId("action-window-mode-fullscreen"));
+    expect(window.localStorage.getItem(MODE_STORAGE_KEY)).toBe("fullscreen");
+  });
+
+  it("ignores invalid persisted mode and falls back to normal", () => {
+    window.localStorage.setItem(MODE_STORAGE_KEY, "not-a-mode");
+    render(<ActionWindow initialSize={{ width: 800, height: 500 }} />);
+    expect(screen.getByTestId("action-window-root")).toHaveAttribute("data-mode", "normal");
+  });
+
+  it("detached form always reports fullscreen-equivalent and hides mode controls", () => {
+    render(<ActionWindow detached />);
+    const root = screen.getByTestId("action-window-root");
+    expect(root).toHaveAttribute("data-mode", "fullscreen");
+    expect(screen.queryByTestId("action-window-mode-toggle")).not.toBeInTheDocument();
+  });
+
+  it("notifies onModeChange when toggled", () => {
+    const onModeChange = vi.fn();
+    render(
+      <ActionWindow initialSize={{ width: 800, height: 500 }} onModeChange={onModeChange} />,
+    );
+    fireEvent.click(screen.getByTestId("action-window-mode-toggle"));
+    expect(onModeChange).toHaveBeenCalledWith("expanded");
+  });
+
+  it("size label reflects mode", () => {
+    render(<ActionWindow initialSize={{ width: 720, height: 480 }} />);
+    const label = screen.getByTestId("action-window-size-label");
+    expect(label).toHaveTextContent("720×480");
+    fireEvent.click(screen.getByTestId("action-window-mode-expanded"));
+    expect(label).toHaveTextContent("50vw × 50vh");
+    fireEvent.click(screen.getByTestId("action-window-mode-fullscreen"));
+    expect(label).toHaveTextContent("viewport");
   });
 });
