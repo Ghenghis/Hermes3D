@@ -1,20 +1,28 @@
 /**
  * Settings landing page backed by the local GUI API.
  *
- * Hosts the four canonical subtabs:
+ * Hosts the eight canonical subtabs:
+ *   - General       · theme, language, defaults
  *   - Providers     · LLM endpoint config (read-only `llm_policy.yaml` view)
+ *   - Agents        · agent policy preview
+ *   - MCP           · active MCP file locks
  *   - Printers      · 12-printer fleet from `printers.toml` + optional health
  *   - Environment   · env-var presence with values redacted to [set]/[not set]
+ *   - Updates       · update center, version + rollback
  *   - About         · version, license, links to GitHub + docs
  *
+ * Subtab routing (W15-A17): the URL hash is authoritative — visiting
+ * `#settings/<sub>` selects the matching subtab; clicking a subtab
+ * replaces the hash with `#settings/<sub>`. We use `replaceState` (not
+ * `pushState`) so navigating subtabs doesn't pollute browser history.
  * The provider chain itself and the service-health endpoint are owned by
  * other tracks; this page only consumes their public shapes (and gracefully
  * degrades when they're not yet shipped).
  *
- * Subtab routing is internal `useState` — we MUST NOT introduce
- * react-router; the universal shell uses the TABS pattern only.
+ * Subtab routing follows the same `#<tab>/<sub>` pattern AppRegistry uses
+ * (`#apps/<id>`). No react-router; the universal shell uses TABS only.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   Cog,
@@ -29,7 +37,12 @@ import {
 } from "lucide-react";
 import { Panel } from "../layout/Panel";
 import { ResizablePane } from "../layout/ResizablePane";
-import { useStore } from "../../app/store";
+import {
+  SETTINGS_SUBTAB_KEYS,
+  settingsSubtabFromHash,
+  useStore,
+  type SettingsSubtabKey,
+} from "../../app/store";
 import { GeneralSubtab } from "./GeneralSubtab";
 import { ProvidersSubtab } from "./ProvidersSubtab";
 import { PrintersSubtab } from "./PrintersSubtab";
@@ -39,15 +52,10 @@ import { AgentConfigSection } from "./AgentConfigSection";
 import { UpdateCenterSubtab } from "./UpdateCenterSubtab";
 import { McpSubtab } from "./McpSubtab";
 
-type SubtabKey =
-  | "general"
-  | "providers"
-  | "agents"
-  | "mcp"
-  | "printers"
-  | "environment"
-  | "about"
-  | "updates";
+type SubtabKey = SettingsSubtabKey;
+
+const SETTINGS_HASH_PREFIX = "settings";
+const DEFAULT_SUBTAB: SubtabKey = "general";
 
 const SUBTABS: { key: SubtabKey; label: string; Icon: typeof Cpu; description: string }[] = [
   { key: "general",     label: "General",       Icon: MonitorCog,  description: "Theme, language, defaults" },
@@ -60,9 +68,82 @@ const SUBTABS: { key: SubtabKey; label: string; Icon: typeof Cpu; description: s
   { key: "about",       label: "About",         Icon: Info,        description: "Version + links" },
 ];
 
+// Defensive: enforce SUBTABS and SETTINGS_SUBTAB_KEYS stay in sync at
+// load time so reorderings here trip a console warning in dev instead of
+// silently breaking the URL contract. `import.meta.env.DEV` is the Vite
+// compile-time flag; we guard the access so non-Vite consumers (Jest)
+// don't choke on the missing import.meta.
+const __isDev: boolean =
+  typeof import.meta !== "undefined" &&
+  (import.meta as { env?: { DEV?: boolean } }).env?.DEV === true;
+if (__isDev && SUBTABS.length !== SETTINGS_SUBTAB_KEYS.length) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[SettingsPage] SUBTABS (${SUBTABS.length}) and SETTINGS_SUBTAB_KEYS (${SETTINGS_SUBTAB_KEYS.length}) length mismatch`,
+  );
+}
+
+function readInitialSubtab(): SubtabKey {
+  if (typeof window === "undefined") return DEFAULT_SUBTAB;
+  return settingsSubtabFromHash(window.location.hash) ?? DEFAULT_SUBTAB;
+}
+
 export function SettingsPage() {
   const setActiveTabId = useStore((state) => state.setActiveTabId);
-  const [active, setActive] = useState<SubtabKey>("general");
+  const [active, setActive] = useState<SubtabKey>(readInitialSubtab);
+
+  // Sync the subtab selection FROM the URL hash so deep links and the
+  // back/forward buttons select the correct subtab. The interval is a
+  // safety-net for environments that swallow hashchange (Playwright on
+  // some Firefox builds); 500ms matches App.tsx's tab-level cadence.
+  useEffect(() => {
+    const sync = () => {
+      const next = settingsSubtabFromHash(window.location.hash);
+      if (next && next !== active) setActive(next);
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    const timer = window.setInterval(sync, 500);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+      window.clearInterval(timer);
+    };
+  }, [active]);
+
+  // Sync the URL hash TO the subtab selection. We use replaceState so
+  // navigating subtabs doesn't bloat browser history — mirrors the
+  // tab-level logic in App.tsx.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const desired = `#${SETTINGS_HASH_PREFIX}/${active}`;
+    if (window.location.hash === desired) return;
+    // Only rewrite when the head segment is "settings" — never clobber
+    // a hash that points at a different tab (the user may have just
+    // clicked the sidebar).
+    const head = window.location.hash.replace(/^#/, "").split(/[/:.]/, 1)[0];
+    if (head && head !== SETTINGS_HASH_PREFIX) return;
+    window.history.replaceState(null, "", desired);
+  }, [active]);
+
+  const handleSelect = (key: SubtabKey) => {
+    setActive(key);
+    if (typeof window !== "undefined") {
+      const next = `#${SETTINGS_HASH_PREFIX}/${key}`;
+      if (window.location.hash !== next) {
+        window.history.replaceState(null, "", next);
+        // Fire hashchange so AgentChatMirror and any other listeners
+        // see the navigation; replaceState alone does not emit it.
+        try {
+          window.dispatchEvent(new HashChangeEvent("hashchange"));
+        } catch {
+          /* JSDOM occasionally fails to construct HashChangeEvent */
+        }
+      }
+    }
+  };
+
   const meta = SUBTABS.find((s) => s.key === active) ?? SUBTABS[0];
 
   return (
@@ -105,7 +186,7 @@ export function SettingsPage() {
                     aria-controls={`settings-panel-${s.key}`}
                     id={`settings-tab-${s.key}`}
                     data-testid={`settings-subtab-${s.key}`}
-                    onClick={() => setActive(s.key)}
+                    onClick={() => handleSelect(s.key)}
                     className={[
                       "w-full flex items-center gap-2 px-2 py-1.5 rounded border-l-2 text-left",
                       selected

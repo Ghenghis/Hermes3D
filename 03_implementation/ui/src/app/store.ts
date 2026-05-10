@@ -87,6 +87,59 @@ export function tabIdFromHash(hash: string): string | null {
   return TAB_IDS.includes(tabId as (typeof TAB_IDS)[number]) ? tabId : null;
 }
 
+/**
+ * Settings subtab URL-hash routing (W15-A17).
+ *
+ * Tabs with nested subtabs encode the selection in the trailing path
+ * segment, e.g. `#settings/general`, `#settings/mcp`. The first segment
+ * is owned by `tabIdFromHash`; the second segment is owned by the tab
+ * itself. This keeps deep links stable across reloads without coupling
+ * the subtab list to the global hash table.
+ *
+ * Note: the helper is intentionally generic over both the tab head and
+ * the allowed subtab keys so adjacent tabs (Voice / A18) can adopt the
+ * same routing shape without conflicting on `store.ts`. The Voice agent
+ * lane is expected to add `voiceSubtabFromHash` next to this helper.
+ */
+export function subtabFromHash<K extends string>(
+  hash: string,
+  expectedHead: string,
+  allowed: readonly K[],
+): K | null {
+  const raw = hash.replace(/^#/, "").trim();
+  if (!raw) {
+    return null;
+  }
+  // Accept both `settings/general` and the legacy `settings.general` form;
+  // colon is reserved for dashboard mode routing.
+  const [head, sub] = raw.split(/[/.]/, 2);
+  if (head !== expectedHead || !sub) {
+    return null;
+  }
+  const decoded = decodeURIComponent(sub.toLowerCase());
+  return (allowed as readonly string[]).includes(decoded) ? (decoded as K) : null;
+}
+
+/**
+ * Convenience wrapper for the Settings tab. Keeps the rest of the app from
+ * having to import the generic helper and the subtab list separately.
+ */
+export const SETTINGS_SUBTAB_KEYS = [
+  "general",
+  "providers",
+  "agents",
+  "mcp",
+  "printers",
+  "environment",
+  "updates",
+  "about",
+] as const;
+export type SettingsSubtabKey = (typeof SETTINGS_SUBTAB_KEYS)[number];
+
+export function settingsSubtabFromHash(hash: string): SettingsSubtabKey | null {
+  return subtabFromHash<SettingsSubtabKey>(hash, "settings", SETTINGS_SUBTAB_KEYS);
+}
+
 function initialActiveTabId(): string {
   if (typeof window === "undefined") {
     return "dashboard";

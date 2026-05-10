@@ -35,6 +35,7 @@ import {
   type ResolvedThemeMode,
   type ThemeMode,
 } from "./tokens";
+import { applyPalette, readStoredPaletteId } from "./palettes";
 
 const STORAGE_KEY = "h3d.theme";
 const VALID_MODES: readonly ThemeMode[] = ["light", "dark", "system"] as const;
@@ -91,6 +92,11 @@ function resolveTheme(theme: ThemeMode): ResolvedThemeMode {
 /**
  * Apply the resolved theme to the document. Called both on mount and on
  * every change so that hot-reloads stay consistent.
+ *
+ * W15-A17 — after the base light/dark variables land, the persisted named
+ * palette (`h3d.theme.palette`) is layered on top so its `--h3d-color-*`
+ * overrides shadow the defaults. `applyPalette` is a no-op when the
+ * stored id is `default`, so this is free for users on the baseline.
  */
 function applyTheme(resolved: ResolvedThemeMode): void {
   if (typeof document === "undefined") return;
@@ -103,6 +109,9 @@ function applyTheme(resolved: ResolvedThemeMode): void {
   for (const [name, value] of Object.entries(vars)) {
     root.style.setProperty(name, value);
   }
+
+  // Layer the named palette over the base CSS variables.
+  applyPalette(readStoredPaletteId());
 }
 
 export function ThemeProvider({
