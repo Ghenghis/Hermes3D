@@ -1,0 +1,152 @@
+# Hermes Agent multi-version regression CI (Wave 2 P3-3, 2026-05-09).
+#
+# Mission
+# -------
+# Lock down the post Wave 1 promotion (PR #160 squash 3158a4e) v0.13
+# production-default contract by running BOTH regression-pin suites
+# (v0.12 fallback PR #163 + v0.13 default PR #165) plus the per-call
+# resolver suite (PR #155) on every push to main / develop / the
+# promotion branch when any of the gated source paths change.
+#
+# Surfaces gated by this workflow
+#   1. agent_checkout.py            — single resolver (12-Factor III)
+#   2. agent_updates.py             — _repo_path() per-call read
+#   3. agent_version_registry.py    — PR #162 registry (v0.12 + v0.13 + auto)
+#   4. code_history.py              — SOURCE_REPOS module-level capture
+#   5. module_runtime.py            — BUILTIN_RUNTIME_PROBES capture
+#   6. db/load_modules.py           — SOURCE_OVERRIDES capture
+#   + the three pytest files that pin them.
+#
+# Why a multi-OS matrix?
+# ---------------------
+# v0.13 (Tenacity Release) ships a Windows TUI guard the v0.12 line
+# does not have. Production hosts run on Windows (operator desktops);
+# CI hosts run on Ubuntu. The matrix proves both regression suites
+# behave identically across host families so an operator-side rollback
+# (HERMES_AGENT_CHECKOUT=G:/Github/hermes-agent-fresh) cannot be
+# silently broken by a server-side commit, and vice versa. fail-fast
+# is disabled so one OS's red bar does not mask the other's status.
+#
+# Why no `pip install -e .`?
+# --------------------------
+# The regression suites are env-mocked (monkeypatch.setenv) and
+# path-mocked (Path("G:/Github/...") is parsed but never stat'd —
+# verified in P3-3 brief by reading both pin files end to end). They
+# import hermes3d.* via PYTHONPATH=03_implementation/src and only
+# touch the resolver + 3 sister sites + a handful of subprocess
+# stubs. Skipping editable install keeps the matrix run under one
+# minute per OS.
+#
+# What this workflow does NOT test
+# --------------------------------
+# - Live HTTP probes against MiniMax / DeepSeek (those are manual
+#   operator drills with real API keys; CI must never carry them).
+# - Real subprocess execution of git/npm/pytest gates inside the
+#   v0.12 / v0.13 checkouts (the runners cannot host those repos).
+# - Filesystem existence of G:/Github/hermes-agent-fresh or
+#   G:/Github/hermes-agent-v013-canary — both regression suites
+#   only assert Path equality, never .exists().
+#
+# Sources cited (read for this PR)
+# --------------------------------
+# - GitHub Actions matrix strategy:
+#   https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
+# - pytest skip / xfail (multi-OS guidance):
+#   https://docs.pytest.org/en/stable/how-to/skipping.html
+# - 12-Factor App config rule III (env-driven config):
+#   https://12factor.net/config
+
+name: hermes-agent-versions
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "claude/v013-promotion-flip"
+    paths:
+      - "03_implementation/src/hermes3d/services/agent_checkout.py"
+      - "03_implementation/src/hermes3d/services/agent_version_registry.py"
+      - "03_implementation/src/hermes3d/api/routes/agent_updates.py"
+      - "03_implementation/src/hermes3d/services/code_history.py"
+      - "03_implementation/src/hermes3d/services/module_runtime.py"
+      - "03_implementation/src/hermes3d/db/load_modules.py"
+      - "04_testing/pytest/unit/test_agent_checkout_resolver.py"
+      - "04_testing/pytest/unit/test_v012_fallback_regression_pin.py"
+      - "04_testing/pytest/unit/test_v013_default_regression_pin.py"
+      - ".github/workflows/hermes-agent-versions.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel stale runs on the same ref so a rapid push burst does not
+# queue four redundant matrix runs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pin-tests:
+    name: pin-tests (${{ matrix.os }} / py${{ matrix.python }})
+    strategy:
+      # fail-fast=false — one OS's red bar must NOT mask the other.
+      # See:
+      #   docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        python: ["3.11"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+
+      - name: Install minimal test dependencies
+        # Hermes3D itself is tested as source via PYTHONPATH; we do
+        # NOT pip install -e . because the pin tests only need pytest
+        # plus what hermes3d.services / hermes3d.api / hermes3d.db
+        # transitively import. If a future commit pulls in a heavier
+        # transitive dep, surface 5/6 will tell us by failing.
+        # shell: bash is set explicitly so backslash line continuation
+        # works on both Ubuntu and Windows (Git Bash on the win runner).
+        shell: bash
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest fastapi httpx pydantic
+
+      - name: Run resolver + v0.12 + v0.13 regression pins
+        env:
+          # CRITICAL: do NOT set HERMES_AGENT_CHECKOUT here — let the
+          # resolver default to v0.13 (Wave 1 promotion). The v0.12
+          # regression suite uses monkeypatch.setenv internally to
+          # exercise the rollback path. Confirmed by reading
+          # test_v012_fallback_regression_pin.py before authoring this
+          # workflow (paths are mocked, never stat'd).
+          PYTHONPATH: 03_implementation/src
+          # Force-disable the heavy pytest gate inside _run_update_checks.
+          # Reference: test_v013_default_regression_pin.py surface 5.
+          HERMES_AGENT_RUN_PYTEST: ""
+        # Reference: pytest skip / xfail across OSes —
+        # https://docs.pytest.org/en/stable/how-to/skipping.html
+        shell: bash
+        run: |
+          python -m pytest -v --tb=short --color=yes \
+            04_testing/pytest/unit/test_agent_checkout_resolver.py \
+            04_testing/pytest/unit/test_v012_fallback_regression_pin.py \
+            04_testing/pytest/unit/test_v013_default_regression_pin.py
+
+      - name: Capture host + interpreter summary
+        if: always()
+        shell: bash
+        run: |
+          python -c "import platform, sys; \
+            print('OS:', platform.platform()); \
+            print('Python:', sys.version); \
+            print('Executable:', sys.executable)"
