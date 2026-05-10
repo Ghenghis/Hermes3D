@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-10T03:38:37.795Z",
-  "started_at": "2026-05-10T03:35:31.315Z",
+  "generated_at": "2026-05-10T04:01:09.572Z",
+  "started_at": "2026-05-10T03:57:45.102Z",
   "run_status": "failed",
   "owner": "claude-w6-6-visual-proof",
   "lane": "W6-6 Playwright visual proof against Images-GUI/",
@@ -20,8 +20,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 1 — direction PNG, not a 1:1 page snapshot. Skipped from strict comparison; tracked for visual direction only.",
-      "started_at": "2026-05-10T03:38:37.422Z",
-      "finished_at": "2026-05-10T03:38:37.422Z"
+      "started_at": "2026-05-10T04:01:08.883Z",
+      "finished_at": "2026-05-10T04:01:08.883Z"
     },
     {
       "target": "00_user_generated_2",
@@ -32,8 +32,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 2.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_3",
@@ -44,8 +44,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 3.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_4",
@@ -56,8 +56,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 4.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_5",
@@ -68,8 +68,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 5.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_6",
@@ -80,8 +80,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 6.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_7",
@@ -92,8 +92,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 7.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_8",
@@ -104,8 +104,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 8.",
-      "started_at": "2026-05-10T03:38:37.423Z",
-      "finished_at": "2026-05-10T03:38:37.423Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_generated_9",
@@ -116,8 +116,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 9.",
-      "started_at": "2026-05-10T03:38:37.424Z",
-      "finished_at": "2026-05-10T03:38:37.424Z"
+      "started_at": "2026-05-10T04:01:08.884Z",
+      "finished_at": "2026-05-10T04:01:08.884Z"
     },
     {
       "target": "00_user_hermes3d",
@@ -127,9 +127,9 @@
       "tolerance": 0.15,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 00_user_hermes3d wait_test_id dashboard-root mounts ",
-      "started_at": "2026-05-10T03:38:21.475Z",
-      "finished_at": "2026-05-10T03:38:37.074Z"
+      "error": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+      "started_at": "2026-05-10T04:00:37.997Z",
+      "finished_at": "2026-05-10T04:01:08.317Z"
     },
     {
       "target": "01_dashboard_advanced_a",
@@ -139,9 +139,9 @@
       "tolerance": 0.1,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 01_dashboard_advanced_a wait_test_id dashboard-root mounts ",
-      "started_at": "2026-05-10T03:35:32.545Z",
-      "finished_at": "2026-05-10T03:35:48.185Z"
+      "error": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+      "started_at": "2026-05-10T03:57:48.808Z",
+      "finished_at": "2026-05-10T03:58:19.004Z"
     },
     {
       "target": "01_dashboard_advanced_b",
@@ -152,8 +152,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Advanced dashboard alt view B. Future target — owned by Wave 6 lane 3.",
-      "started_at": "2026-05-10T03:35:49.504Z",
-      "finished_at": "2026-05-10T03:35:49.504Z"
+      "started_at": "2026-05-10T03:58:20.114Z",
+      "finished_at": "2026-05-10T03:58:20.114Z"
     },
     {
       "target": "01_dashboard_custom_a",
@@ -164,8 +164,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Custom dashboard with draggable widgets — not implemented yet. Future target — owned by Wave 6 lane 3 / 4.",
-      "started_at": "2026-05-10T03:35:49.506Z",
-      "finished_at": "2026-05-10T03:35:49.506Z"
+      "started_at": "2026-05-10T03:58:20.116Z",
+      "finished_at": "2026-05-10T03:58:20.116Z"
     },
     {
       "target": "01_dashboard_custom_b",
@@ -176,8 +176,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Custom dashboard alt B. Future target.",
-      "started_at": "2026-05-10T03:35:49.506Z",
-      "finished_at": "2026-05-10T03:35:49.506Z"
+      "started_at": "2026-05-10T03:58:20.116Z",
+      "finished_at": "2026-05-10T03:58:20.116Z"
     },
     {
       "target": "01_dashboard_simple_a",
@@ -188,8 +188,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Simple dashboard mode A. Mode switcher is being added by W6-3.",
-      "started_at": "2026-05-10T03:35:49.506Z",
-      "finished_at": "2026-05-10T03:35:49.506Z"
+      "started_at": "2026-05-10T03:58:20.116Z",
+      "finished_at": "2026-05-10T03:58:20.116Z"
     },
     {
       "target": "01_dashboard_simple_b",
@@ -200,8 +200,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Simple dashboard mode B. Future target — owned by Wave 6 lane 3.",
-      "started_at": "2026-05-10T03:35:49.506Z",
-      "finished_at": "2026-05-10T03:35:49.506Z"
+      "started_at": "2026-05-10T03:58:20.116Z",
+      "finished_at": "2026-05-10T03:58:20.116Z"
     },
     {
       "target": "02_primary_artifacts_approvals_plugins_roadmap",
@@ -211,9 +211,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 02_primary_artifacts_approvals_plugins_roadmap wait_test_id artifacts-root mounts ",
-      "started_at": "2026-05-10T03:36:23.208Z",
-      "finished_at": "2026-05-10T03:36:38.808Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:58:32.741Z",
+      "finished_at": "2026-05-10T03:58:36.442Z"
     },
     {
       "target": "02_primary_autopilot_design_gen3d_jobs",
@@ -223,9 +223,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 02_primary_autopilot_design_gen3d_jobs wait_test_id autopilot-root mounts ",
-      "started_at": "2026-05-10T03:35:49.506Z",
-      "finished_at": "2026-05-10T03:36:05.117Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:58:20.117Z",
+      "finished_at": "2026-05-10T03:58:23.264Z"
     },
     {
       "target": "02_primary_printers_observe_agents_learning",
@@ -235,9 +235,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 02_primary_printers_observe_agents_learning wait_test_id printers-root mounts ",
-      "started_at": "2026-05-10T03:36:06.302Z",
-      "finished_at": "2026-05-10T03:36:21.886Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:58:25.700Z",
+      "finished_at": "2026-05-10T03:58:30.977Z"
     },
     {
       "target": "03_settings_subtabs_all",
@@ -247,9 +247,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 03_settings_subtabs_all wait_test_id settings-root mounts ",
-      "started_at": "2026-05-10T03:36:39.880Z",
-      "finished_at": "2026-05-10T03:36:55.473Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:58:37.612Z",
+      "finished_at": "2026-05-10T03:58:40.517Z"
     },
     {
       "target": "03_voice_communication_subtabs",
@@ -259,9 +259,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 03_voice_communication_subtabs wait_test_id voice-root mounts ",
-      "started_at": "2026-05-10T03:36:56.963Z",
-      "finished_at": "2026-05-10T03:37:12.580Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:58:42.090Z",
+      "finished_at": "2026-05-10T03:58:45.658Z"
     },
     {
       "target": "04_source_os_60_app_coverage_matrix",
@@ -271,9 +271,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 04_source_os_60_app_coverage_matrix wait_test_id source-os-root mounts ",
-      "started_at": "2026-05-10T03:37:13.753Z",
-      "finished_at": "2026-05-10T03:37:29.344Z"
+      "error": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+      "started_at": "2026-05-10T03:58:48.199Z",
+      "finished_at": "2026-05-10T03:59:18.353Z"
     },
     {
       "target": "04_source_os_core_categories",
@@ -283,9 +283,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 04_source_os_core_categories wait_test_id source-os-root mounts ",
-      "started_at": "2026-05-10T03:37:30.564Z",
-      "finished_at": "2026-05-10T03:37:46.152Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:59:20.008Z",
+      "finished_at": "2026-05-10T03:59:43.751Z"
     },
     {
       "target": "04_source_os_remaining_categories",
@@ -295,9 +295,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 04_source_os_remaining_categories wait_test_id source-os-root mounts ",
-      "started_at": "2026-05-10T03:37:47.522Z",
-      "finished_at": "2026-05-10T03:38:03.176Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T03:59:44.900Z",
+      "finished_at": "2026-05-10T04:00:11.717Z"
     },
     {
       "target": "05_action_window_advanced_tools",
@@ -308,8 +308,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Action Window advanced-tools template. Future target — owned by W6-4.",
-      "started_at": "2026-05-10T03:38:04.436Z",
-      "finished_at": "2026-05-10T03:38:04.436Z"
+      "started_at": "2026-05-10T04:00:12.961Z",
+      "finished_at": "2026-05-10T04:00:12.961Z"
     },
     {
       "target": "05_action_window_core_apps",
@@ -320,8 +320,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Action Window core-apps template. Action Window is being added by W6-4.",
-      "started_at": "2026-05-10T03:38:04.435Z",
-      "finished_at": "2026-05-10T03:38:04.435Z"
+      "started_at": "2026-05-10T04:00:12.960Z",
+      "finished_at": "2026-05-10T04:00:12.960Z"
     },
     {
       "target": "06_states_responsive_reference",
@@ -332,8 +332,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Loading/empty/blocked/recovering responsive states reference. Per-state specs are out of scope for this lane.",
-      "started_at": "2026-05-10T03:38:04.436Z",
-      "finished_at": "2026-05-10T03:38:04.436Z"
+      "started_at": "2026-05-10T04:00:12.962Z",
+      "finished_at": "2026-05-10T04:00:12.962Z"
     },
     {
       "target": "07_plugins_skills_mcp_app_connectors",
@@ -343,9 +343,9 @@
       "tolerance": 0.12,
       "evidence_path": null,
       "diff_path": null,
-      "error": "Error: 07_plugins_skills_mcp_app_connectors wait_test_id plugins-root mounts ",
-      "started_at": "2026-05-10T03:38:04.436Z",
-      "finished_at": "2026-05-10T03:38:20.077Z"
+      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
+      "started_at": "2026-05-10T04:00:12.962Z",
+      "finished_at": "2026-05-10T04:00:36.574Z"
     },
     {
       "target": "08_proof_health_notifications_safety",
@@ -356,8 +356,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Composite of proof + health + notifications + safety. Anchored to Observe. Future target.",
-      "started_at": "2026-05-10T03:38:21.474Z",
-      "finished_at": "2026-05-10T03:38:21.474Z"
+      "started_at": "2026-05-10T04:00:37.996Z",
+      "finished_at": "2026-05-10T04:00:37.996Z"
     },
     {
       "target": "08_workflow_printqueue_files_logs",
@@ -368,8 +368,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Composite of workflow + print queue + files + logs. No single route maps yet; uses Jobs as anchor. Future target — split by lane 3/4.",
-      "started_at": "2026-05-10T03:38:21.473Z",
-      "finished_at": "2026-05-10T03:38:21.473Z"
+      "started_at": "2026-05-10T04:00:37.994Z",
+      "finished_at": "2026-05-10T04:00:37.994Z"
     },
     {
       "target": "09_theme_variants_reference",
@@ -380,8 +380,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Theme palette reference (default/cyberpunk/matrix/tron/forge/aurora). Theme switcher not implemented; future target.",
-      "started_at": "2026-05-10T03:38:21.475Z",
-      "finished_at": "2026-05-10T03:38:21.475Z"
+      "started_at": "2026-05-10T04:00:37.996Z",
+      "finished_at": "2026-05-10T04:00:37.996Z"
     }
   ]
 }
