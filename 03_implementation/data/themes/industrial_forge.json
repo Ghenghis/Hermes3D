@@ -1,0 +1,23 @@
+{
+  "id": "industrial_forge",
+  "display_name": "Industrial Forge",
+  "description": "Cast iron and molten steel. Warm amber accents on graphite for the shop floor.",
+  "kind": "dark",
+  "tokens": {
+    "bg_root": "#16110D",
+    "bg_panel": "#1F1812",
+    "bg_elevated": "#2A2018",
+    "fg_primary": "#F5E6D3",
+    "fg_secondary": "#C9A87C",
+    "fg_muted": "#8B6F4E",
+    "accent_primary": "#FF8C1A",
+    "accent_secondary": "#D4530E",
+    "border_subtle": "#3A2B1F",
+    "border_strong": "#5C4530",
+    "status_success": "#7CB342",
+    "status_warning": "#FFB300",
+    "status_danger": "#D32F2F",
+    "status_info": "#FF8C1A",
+    "highlight": "#3F2A18"
+  }
+}

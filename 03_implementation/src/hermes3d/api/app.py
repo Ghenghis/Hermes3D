@@ -18,6 +18,8 @@ from hermes3d.api.routes import (
     autonomous,
     autopilot,
     code_operator,
+    connectors,
+    dashboard_layouts,
     design,
     desktop_compat,
     desktop_updates,
@@ -34,6 +36,8 @@ from hermes3d.api.routes import (
     printers,
     roadmap,
     settings,
+    settings_themes,
+    skills,
     source_os,
     system,
     update_center,
@@ -129,6 +133,12 @@ def create_gui_app() -> FastAPI:
         notifications,
         observe,
         source_os,
+        # W15 A20 backend gaps: skill registry, connector registry,
+        # theme palette catalog, per-user dashboard layout persistence.
+        skills,
+        connectors,
+        settings_themes,
+        dashboard_layouts,
     ]:
         app.include_router(route_module.router)
 

@@ -1,0 +1,23 @@
+{
+  "id": "tron",
+  "display_name": "Tron Grid",
+  "description": "The Grid. Cool cyan circuits on absolute black. High-contrast operator overlay.",
+  "kind": "dark",
+  "tokens": {
+    "bg_root": "#000000",
+    "bg_panel": "#020812",
+    "bg_elevated": "#031224",
+    "fg_primary": "#DDF6FF",
+    "fg_secondary": "#7DD3FC",
+    "fg_muted": "#0EA5E9",
+    "accent_primary": "#00E5FF",
+    "accent_secondary": "#00B7D1",
+    "border_subtle": "#04324A",
+    "border_strong": "#0891B2",
+    "status_success": "#00E5A8",
+    "status_warning": "#FFB300",
+    "status_danger": "#FF3D6B",
+    "status_info": "#00E5FF",
+    "highlight": "#06243A"
+  }
+}

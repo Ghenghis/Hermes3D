@@ -1,0 +1,23 @@
+{
+  "id": "cyberpunk",
+  "display_name": "Cyberpunk Neon",
+  "description": "Neo-Tokyo night drive. Magenta and cyan over deep navy.",
+  "kind": "dark",
+  "tokens": {
+    "bg_root": "#0A0414",
+    "bg_panel": "#140926",
+    "bg_elevated": "#1B0E33",
+    "fg_primary": "#F2E6FF",
+    "fg_secondary": "#C6A8FF",
+    "fg_muted": "#7A5C9E",
+    "accent_primary": "#FF2EC4",
+    "accent_secondary": "#00E5FF",
+    "border_subtle": "#2A1547",
+    "border_strong": "#5A2EA0",
+    "status_success": "#39FF14",
+    "status_warning": "#FFE100",
+    "status_danger": "#FF2D55",
+    "status_info": "#00E5FF",
+    "highlight": "#3D1A6E"
+  }
+}

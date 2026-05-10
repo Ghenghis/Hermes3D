@@ -1,0 +1,23 @@
+{
+  "id": "aurora_operator",
+  "display_name": "Aurora Operator",
+  "description": "Aurora borealis at the print farm. Teal-violet gradient base for long focused sessions.",
+  "kind": "dark",
+  "tokens": {
+    "bg_root": "#0B1226",
+    "bg_panel": "#121A33",
+    "bg_elevated": "#1A2342",
+    "fg_primary": "#E9EEFF",
+    "fg_secondary": "#A6B4E5",
+    "fg_muted": "#6677A8",
+    "accent_primary": "#7B68EE",
+    "accent_secondary": "#26D9C5",
+    "border_subtle": "#1F2A4C",
+    "border_strong": "#3D4E7E",
+    "status_success": "#26D9C5",
+    "status_warning": "#F2C94C",
+    "status_danger": "#EB5757",
+    "status_info": "#7B68EE",
+    "highlight": "#1D2A55"
+  }
+}
