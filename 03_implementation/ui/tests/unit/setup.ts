@@ -1,55 +1,64 @@
 /**
- * Vitest setup for the W6-4 lane (ActionWindow + TaskMonitor).
+ * Vitest setup — W6-3 lane.
  *
- * Loads `@testing-library/jest-dom` matcher extensions so test files can use
- * `toBeInTheDocument`, `toHaveAttribute`, etc.
- *
- * Also patches `window.localStorage` with a working in-memory implementation
- * because Node 25 ships a native localStorage stub (under the experimental
- * `--localstorage-file` flag) that exposes `setItem`/`getItem` but is missing
- * `clear`/`removeItem`. The native stub shadows jsdom's full implementation
- * inside the vitest worker, breaking real test code. The shim below is
- * jsdom-compatible and only installed when the global is broken.
- *
- * Kept lane-scoped (`-w6-4` suffix) so it does not collide with whatever
- * global setup W6-3's dashboard suite ends up using when those land.
+ * Provides:
+ *   - `@testing-library/jest-dom` matchers
+ *   - Auto-cleanup of mounted DOM nodes between tests
+ *   - A working `localStorage` polyfill. jsdom 25 under Node 25 leaves
+ *     `localStorage` as an empty object without the standard methods, so
+ *     we install a minimal Storage shim.
  */
-
 import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, beforeEach } from "vitest";
 
-if (typeof window !== "undefined") {
-  const ls = window.localStorage as unknown as { clear?: () => void } | undefined;
-  if (!ls || typeof ls.clear !== "function") {
-    const store = new Map<string, string>();
-    const fullShim = {
-      get length() {
-        return store.size;
-      },
-      clear() {
-        store.clear();
-      },
-      getItem(key: string) {
-        return store.has(key) ? store.get(key)! : null;
-      },
-      key(index: number) {
-        return Array.from(store.keys())[index] ?? null;
-      },
-      removeItem(key: string) {
-        store.delete(key);
-      },
-      setItem(key: string, value: string) {
-        store.set(key, String(value));
-      },
-    };
-    Object.defineProperty(window, "localStorage", {
+class InMemoryStorage implements Storage {
+  private store = new Map<string, string>();
+  get length(): number {
+    return this.store.size;
+  }
+  clear(): void {
+    this.store.clear();
+  }
+  getItem(key: string): string | null {
+    return this.store.has(key) ? this.store.get(key)! : null;
+  }
+  key(index: number): string | null {
+    return Array.from(this.store.keys())[index] ?? null;
+  }
+  removeItem(key: string): void {
+    this.store.delete(key);
+  }
+  setItem(key: string, value: string): void {
+    this.store.set(key, String(value));
+  }
+}
+
+function ensureStorage(): void {
+  const w = globalThis as unknown as { window?: Window & { localStorage: Storage; sessionStorage: Storage } };
+  if (typeof w.window === "undefined") return;
+  const probe = w.window.localStorage as Partial<Storage> | undefined;
+  if (!probe || typeof probe.setItem !== "function") {
+    Object.defineProperty(w.window, "localStorage", {
+      value: new InMemoryStorage(),
       configurable: true,
-      writable: true,
-      value: fullShim,
     });
-    Object.defineProperty(globalThis, "localStorage", {
+  }
+  const sprobe = w.window.sessionStorage as Partial<Storage> | undefined;
+  if (!sprobe || typeof sprobe.setItem !== "function") {
+    Object.defineProperty(w.window, "sessionStorage", {
+      value: new InMemoryStorage(),
       configurable: true,
-      writable: true,
-      value: fullShim,
     });
   }
 }
+
+ensureStorage();
+
+beforeEach(() => {
+  ensureStorage();
+});
+
+afterEach(() => {
+  cleanup();
+});

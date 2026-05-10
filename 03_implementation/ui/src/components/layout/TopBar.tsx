@@ -1,6 +1,7 @@
 import { Bell, CircleDot, Clock, Cpu, Settings as SettingsIcon, ShieldCheck } from "lucide-react";
 import { EditionBadge } from "../badges/EditionBadge";
 import { ProofChip } from "../badges/ProofChip";
+import { DashboardModeSwitcher } from "../dashboard/DashboardModeSwitcher";
 import { adapters } from "../../api/adapters";
 import type { Notification } from "../../types/notification";
 import type { ProofBundle } from "../../types/proof";
@@ -19,11 +20,13 @@ import { useStore } from "../../app/store";
 export function TopBar({ activeLabel }: { activeLabel: string }) {
   const setUiMode = useStore((s) => s.setUiMode);
   const setActiveTabId = useStore((s) => s.setActiveTabId);
+  const activeTabId = useStore((s) => s.activeTabId);
   const [sys, setSys] = useState<SystemSnapshot | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [latestProof, setLatestProof] = useState<ProofBundle | null>(null);
   const unread = notifications.filter((n) => !n.read).length;
   const time = sys ? formatClock(sys.ts_utc) : "--:--";
+  const showDashboardModes = activeTabId === "dashboard";
 
   useEffect(() => {
     let mounted = true;
@@ -75,11 +78,12 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
           <StatusPill icon={<CircleDot size={13} />} label="Backend" value="unavailable" tone="amber" />
         )}
         <span className="h-6 w-px bg-border mx-1.5" aria-hidden />
+        {showDashboardModes && <DashboardModeSwitcher />}
         <button
           type="button"
           onClick={() => setUiMode("simple")}
           className="rounded-md border border-accent-blue/50 bg-accent-blue/10 px-2 py-1 text-xs font-semibold text-accent-blue hover:bg-accent-blue/20"
-          title="Switch to the live Simple Version"
+          title="Switch to the live Simple Version (legacy)"
         >
           Simple
         </button>
