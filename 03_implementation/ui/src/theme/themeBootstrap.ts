@@ -5,8 +5,13 @@
  * theme system, BEFORE `ReactDOM.createRoot`.
  *
  * Safe to call multiple times; mutations are idempotent.
+ *
+ * W15-A17 extension: after the base light/dark variables land, the
+ * persisted named palette (`h3d.theme.palette`) is applied so its
+ * `--h3d-color-*` overrides shadow the defaults on first paint.
  */
 import { themeCssVars, type ThemeMode } from "./tokens";
+import { applyPalette, readStoredPaletteId } from "./palettes";
 
 const STORAGE_KEY = "h3d.theme";
 
@@ -45,4 +50,9 @@ export function bootstrapTheme(storageKey: string = STORAGE_KEY): void {
   for (const [k, v] of Object.entries(vars)) {
     root.style.setProperty(k, v);
   }
+
+  // Layer the named palette on top of the base variables so deep links
+  // and reloads keep the user's chosen palette before React renders.
+  // `applyPalette` is a no-op when the stored id is the default.
+  applyPalette(readStoredPaletteId());
 }

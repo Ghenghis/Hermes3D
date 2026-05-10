@@ -23,3 +23,15 @@ export {
   type Tokens,
 } from "./tokens";
 export { bootstrapTheme } from "./themeBootstrap";
+export {
+  applyPalette,
+  isNamedPaletteId,
+  NAMED_PALETTES,
+  NAMED_PALETTE_BY_ID,
+  DEFAULT_PALETTE_ID,
+  PALETTE_STORAGE_KEY,
+  readStoredPaletteId,
+  writeStoredPaletteId,
+  type NamedPalette,
+  type NamedPaletteId,
+} from "./palettes";

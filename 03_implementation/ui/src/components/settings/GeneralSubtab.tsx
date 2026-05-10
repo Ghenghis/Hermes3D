@@ -30,9 +30,19 @@
  *     is internal state).
  */
 import { useEffect, useState } from "react";
-import { Languages, Moon, MonitorCog, Save } from "lucide-react";
+import { Languages, Moon, MonitorCog, Palette, Save } from "lucide-react";
 import { adapters } from "../../api/adapters";
 import type { AppSettings, ThemeName } from "../../types/settings";
+import {
+  applyPalette,
+  DEFAULT_PALETTE_ID,
+  isNamedPaletteId,
+  NAMED_PALETTES,
+  PALETTE_STORAGE_KEY,
+  readStoredPaletteId,
+  writeStoredPaletteId,
+  type NamedPaletteId,
+} from "../../theme/palettes";
 
 type DashboardModePref = "simple" | "advanced" | "custom";
 type UIModePref = "full" | "simple";
@@ -96,6 +106,12 @@ export function GeneralSubtab() {
   const [dashboardMode, setDashboardMode] = useState<DashboardModePref>(() =>
     readLocal(LS_DASHBOARD_MODE, ["simple", "advanced", "custom"] as const, "advanced"),
   );
+  // Named palette is persisted to localStorage under the dedicated
+  // `h3d.theme.palette` key (W15-A17). Backend persistence is owned by
+  // A20 (`/api/settings/themes`); until that endpoint exists, the
+  // palette is preview-only and survives reload via local storage.
+  const [palette, setPalette] = useState<NamedPaletteId>(() => readStoredPaletteId());
+  const [savedPalette, setSavedPalette] = useState<NamedPaletteId>(palette);
 
   const [savedLanguage, setSavedLanguage] = useState<LanguagePref>(language);
   const [savedUiMode, setSavedUiMode] = useState<UIModePref>(uiMode);
@@ -125,11 +141,20 @@ export function GeneralSubtab() {
     };
   }, []);
 
+  // Live preview: every palette change re-applies the CSS variables.
+  // We intentionally do this BEFORE save — clicking a swatch should
+  // preview immediately, like VS Code's theme picker, with the persist
+  // step happening on Save (so revert == reload, or pick "default").
+  useEffect(() => {
+    applyPalette(palette);
+  }, [palette]);
+
   const dirty =
     (serverTheme !== null && theme !== serverTheme) ||
     language !== savedLanguage ||
     uiMode !== savedUiMode ||
-    dashboardMode !== savedDashboardMode;
+    dashboardMode !== savedDashboardMode ||
+    palette !== savedPalette;
 
   const handleSave = async () => {
     if (!dirty || busy) return;
@@ -145,14 +170,20 @@ export function GeneralSubtab() {
       writeLocal(LS_LANGUAGE, language);
       writeLocal(LS_UI_MODE, uiMode);
       writeLocal(LS_DASHBOARD_MODE, dashboardMode);
+      // The named palette has its own dedicated key (PALETTE_STORAGE_KEY)
+      // because the W8-3 ThemeProvider already owns `h3d.theme` for
+      // light/dark mode — keeping these orthogonal is the contract.
+      writeStoredPaletteId(palette);
       setSavedLanguage(language);
       setSavedUiMode(uiMode);
       setSavedDashboardMode(dashboardMode);
+      setSavedPalette(palette);
       await adapters.emitProofEvent("settings.general.saved", {
         theme,
         language,
         uiMode,
         dashboardMode,
+        palette,
       });
       setStatus({ tone: "ok", text: "Preferences saved." });
     } catch (error) {
@@ -209,6 +240,79 @@ export function GeneralSubtab() {
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset
+        className="flex flex-col gap-2 rounded border border-border bg-surface2/30 p-3"
+        data-testid="settings-general-palettes"
+      >
+        <legend className="px-1 text-[10px] uppercase tracking-wide text-muted">
+          <Palette size={11} className="mr-1 inline" /> Theme Palette
+        </legend>
+        <p className="text-[10px] text-muted">
+          Switches the live CSS variables. Saved to your browser
+          (<code className="font-mono">{PALETTE_STORAGE_KEY}</code>); preview-only until the
+          backend <code className="font-mono">/api/settings/themes</code> endpoint ships.
+        </p>
+        <div
+          role="radiogroup"
+          aria-label="Theme palette"
+          className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
+        >
+          {NAMED_PALETTES.map((opt) => {
+            const selected = palette === opt.id;
+            return (
+              <label
+                key={opt.id}
+                data-testid={`settings-general-palette-${opt.id}`}
+                className={[
+                  "flex cursor-pointer flex-col gap-1 rounded border px-2 py-1.5 text-[11px]",
+                  selected
+                    ? "border-accent-cyan bg-surface2 text-fg"
+                    : "border-border text-muted hover:bg-surface2/60 hover:text-fg",
+                ].join(" ")}
+              >
+                <input
+                  type="radio"
+                  name="general-palette"
+                  value={opt.id}
+                  checked={selected}
+                  onChange={() => {
+                    if (isNamedPaletteId(opt.id)) setPalette(opt.id);
+                  }}
+                  className="sr-only"
+                />
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium text-fg">{opt.label}</span>
+                  <span className="flex items-center gap-1">
+                    <span
+                      aria-hidden="true"
+                      data-testid={`settings-general-palette-${opt.id}-swatch-bg`}
+                      className="inline-block h-3 w-3 rounded-sm border border-border"
+                      style={{ backgroundColor: opt.swatches.background }}
+                    />
+                    <span
+                      aria-hidden="true"
+                      data-testid={`settings-general-palette-${opt.id}-swatch-primary`}
+                      className="inline-block h-3 w-3 rounded-sm border border-border"
+                      style={{ backgroundColor: opt.swatches.primary }}
+                    />
+                  </span>
+                </div>
+                <span className="text-[10px] text-muted">{opt.blurb}</span>
+                <span className="font-mono text-[10px] text-muted">{opt.id}</span>
+              </label>
+            );
+          })}
+        </div>
+        {palette !== DEFAULT_PALETTE_ID && (
+          <p
+            className="text-[10px] text-muted"
+            data-testid="settings-general-palette-reset-hint"
+          >
+            Pick <strong>{NAMED_PALETTES[0].label}</strong> to revert to the shipped baseline.
+          </p>
+        )}
       </fieldset>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
