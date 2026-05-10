@@ -106,28 +106,34 @@ The webServer block in `playwright.visual.config.ts` reuses
 separate dev-server orchestration is needed. The first run will boot the
 stack on `127.0.0.1:5173`.
 
-### First-run results (2026-05-09)
+### First-run results (2026-05-10 03:38 UTC)
 
-The first execution against `feat/hermes3d-7-complete-gui-repo-wiring` was
-blocked by an unrelated Vite dev-server compile error: `App.tsx` imports
-`./components/dashboard/DashboardSimple` which does not yet exist on the
-base branch. That work is owned by W6-3 (dashboard mode switcher). The
-harness correctly reported the failure as runtime errors rather than
-silently passing or fabricating results.
+Run on `claude/w6-6-playwright-visual-proof` branch off
+`feat/hermes3d-7-complete-gui-repo-wiring`, in a clean worktree at
+`G:/Github/_claude_worktrees/h3d-claude-w6-6-visual` with `node_modules/`
+junctioned to the parent codex repo.
 
 | Status | Count | Notes |
 |---|---:|---|
-| match | 0 | Live targets could not run because the dev server failed to compile. |
+| match | 0 | Live targets could not produce a pixel diff because the SPA never mounted. |
 | diff | 0 | |
-| missing-baseline | 0 | |
-| skipped-future | 19 | Future targets skipped as expected. |
-| skipped-missing-reference | 0 | All 31 reference PNGs were present on disk. |
-| error | 1 | First live target reported wait_test_id timeout because the SPA never mounted (root cause: missing imports in App.tsx). |
-| (did not run) | 11 | Subsequent live targets were skipped by Playwright after the first crash blew up the worker. |
+| missing-baseline | 0 | All 31 reference PNGs are present on disk. |
+| skipped-future | 20 | Future targets skipped as expected. |
+| skipped-missing-reference | 0 | |
+| error | 11 | All 11 live targets timed out waiting for their `wait_test_id` to mount. Root cause is a pre-existing Vite HMR error in `src/app/routes.tsx`: `ReferenceError: $RefreshReg$ is not defined`, blocking React from rendering. This pre-dates this lane and reproduces with the existing E2E config too. |
+| **total** | **31** | All 31 reference PNGs catalogued. |
 
-The lane is unblocked once W6-3 lands and the dev server compiles. At that
-point a re-run will yield real `match` / `diff` rows. The harness itself
-does NOT need a fix; the failure mode is doing what it should.
+The lane is unblocked once the Vite HMR / Fast Refresh issue on
+`feat/hermes3d-7-complete-gui-repo-wiring` is fixed (likely a missing
+`@vitejs/plugin-react` preamble or a stale Vite 8 / React-plugin
+incompatibility). At that point a re-run will yield real `match` / `diff`
+rows. The harness itself does NOT need a fix; the current failure mode is
+doing what it should: reporting concrete error data per target and
+emitting the JSON summary.
+
+The 20 `skipped-future` rows are the expected design: those references
+are owned by W6-3 (dashboard modes / theme switcher / custom dashboards),
+W6-4 (Action Window), or future state-screen lanes.
 
 ## How to update reference PNGs (intentional UI changes)
 
