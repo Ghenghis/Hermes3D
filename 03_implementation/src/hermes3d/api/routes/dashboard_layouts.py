@@ -70,8 +70,7 @@ def _row_to_layout(row: dict[str, Any]) -> DashboardLayout:
 def list_dashboard_layouts() -> DashboardLayoutsResponse:
     """Return all saved per-user dashboard layouts."""
     records = rows(
-        "SELECT key, value, updated_at FROM agent_config "
-        "WHERE key LIKE ? ORDER BY key",
+        "SELECT key, value, updated_at FROM agent_config WHERE key LIKE ? ORDER BY key",
         (f"{_KEY_PREFIX}%",),
     )
     items = [_row_to_layout(record) for record in records]

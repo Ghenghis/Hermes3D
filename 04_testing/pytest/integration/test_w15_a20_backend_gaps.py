@@ -115,8 +115,7 @@ def test_themes_route_returns_six_named_palettes(client: TestClient) -> None:
     assert body["total"] == 6
     ids = {item["id"] for item in body["items"]}
     assert ids == EXPECTED_THEME_IDS, (
-        f"missing palettes: {EXPECTED_THEME_IDS - ids} | "
-        f"unexpected: {ids - EXPECTED_THEME_IDS}"
+        f"missing palettes: {EXPECTED_THEME_IDS - ids} | unexpected: {ids - EXPECTED_THEME_IDS}"
     )
 
 
@@ -142,14 +141,11 @@ def test_themes_palettes_have_full_token_set(client: TestClient) -> None:
     for item in body["items"]:
         token_keys = set(item["tokens"].keys())
         missing = required_tokens - token_keys
-        assert not missing, (
-            f"theme {item['id']!r} missing tokens: {missing}"
-        )
+        assert not missing, f"theme {item['id']!r} missing tokens: {missing}"
         # Hex sanity: every token starts with '#' and is 7 chars.
         for token_name, token_value in item["tokens"].items():
             assert token_value.startswith("#"), (
-                f"theme {item['id']!r} token {token_name!r} = "
-                f"{token_value!r} is not a hex color"
+                f"theme {item['id']!r} token {token_name!r} = {token_value!r} is not a hex color"
             )
             assert len(token_value) == 7, (
                 f"theme {item['id']!r} token {token_name!r} = "
@@ -223,8 +219,7 @@ def test_dashboard_layouts_post_is_idempotent_upsert(client: TestClient) -> None
     listed = client.get("/api/dashboard/layouts").json()
     matches = [item for item in listed["items"] if item["user_id"] == user_id]
     assert len(matches) == 1, (
-        f"upsert must keep a single row for user_id={user_id!r}; "
-        f"got {len(matches)}"
+        f"upsert must keep a single row for user_id={user_id!r}; got {len(matches)}"
     )
     assert matches[0]["layout"]["version"] == 2
 
@@ -238,9 +233,7 @@ def test_dashboard_layouts_post_rejects_empty_user_id(client: TestClient) -> Non
     assert resp.status_code == 400
 
 
-def test_dashboard_layouts_uses_agent_config_table(
-    client: TestClient, tmp_path: Path
-) -> None:
+def test_dashboard_layouts_uses_agent_config_table(client: TestClient, tmp_path: Path) -> None:
     """The W15 A20 contract says we persist in ``agent_config`` (no new
     migration). Confirm the row lands there with the documented key
     prefix so future refactors know what to migrate."""
@@ -260,8 +253,7 @@ def test_dashboard_layouts_uses_agent_config_table(
     finally:
         conn.close()
     assert match is not None, (
-        "dashboard layout must be persisted at agent_config key "
-        "dashboard.layouts.<user_id>"
+        "dashboard layout must be persisted at agent_config key dashboard.layouts.<user_id>"
     )
 
 
