@@ -882,3 +882,74 @@ def test_recovery_state_route_returns_attempts() -> None:
     assert "attempts" in payload
     assert payload["count"] >= 1
     assert any(item.get("attempt_id") == attempt_id for item in payload["attempts"])
+
+
+# W8-7 unit pin (2026-05-09): pins the workspace-equivalence helper that
+# fixes the worktree mismatch reported by W7-3's truth-check. The helper
+# accepts:
+#   1. Identical resolved paths (canonical workspace -- existing behaviour)
+#   2. Two paths that share the same git-common-dir (linked worktrees of
+#      the same repo) -- the new behaviour added in this PR.
+# It must NOT accept arbitrary directories, the parent of the workspace,
+# or unrelated git repos. See ``code_history._workspace_paths_equivalent``.
+def test_workspace_check_accepts_worktrees(tmp_path: Path) -> None:
+    helper = code_history._workspace_paths_equivalent
+
+    # Identical paths -> True (the historical canonical case).
+    assert helper(str(tmp_path), tmp_path) is True
+
+    # Set up two linked worktrees of the same repo.
+    main_repo = tmp_path / "main"
+    main_repo.mkdir()
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main", str(main_repo)],
+        check=True,
+        capture_output=True,
+    )
+    # git requires user.email/name + a commit before worktree-add.
+    subprocess.run(
+        ["git", "-C", str(main_repo), "config", "user.email", "w87@test.local"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(main_repo), "config", "user.name", "w87"],
+        check=True,
+        capture_output=True,
+    )
+    (main_repo / "README").write_text("seed\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(main_repo), "add", "README"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(main_repo), "commit", "-q", "-m", "seed"],
+        check=True,
+        capture_output=True,
+    )
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(main_repo), "worktree", "add", "-q", "-b", "branch-w87", str(linked)],
+        check=True,
+        capture_output=True,
+    )
+
+    # Two linked worktrees of the same repo -> True (the W8-7 fix).
+    assert helper(str(main_repo), linked) is True
+    assert helper(str(linked), main_repo) is True
+
+    # An unrelated directory (no git repo) -> False.
+    unrelated = tmp_path / "unrelated"
+    unrelated.mkdir()
+    assert helper(str(unrelated), main_repo) is False
+
+    # An unrelated repo -> False (different git-common-dir).
+    other_repo = tmp_path / "other"
+    other_repo.mkdir()
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main", str(other_repo)],
+        check=True,
+        capture_output=True,
+    )
+    assert helper(str(other_repo), main_repo) is False
