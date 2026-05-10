@@ -105,7 +105,9 @@ export function DashboardSimple() {
         />
       </section>
 
-      {/* Hero status card */}
+      {/* Hero status card — mirrors Images-GUI/01-dashboard-modes/simple-dashboard-a.png:
+          a single large System Status panel with a SIMPLE MODE badge top-right and a
+          live 4-col mini-stat strip (RAM/Disk/GPU detect/GPU util) along the bottom. */}
       <section
         className="col-span-12 flex flex-col items-stretch justify-between gap-3 rounded-card border border-border bg-surface p-5 lg:col-span-8"
         data-testid="dashboard-simple-hero"
@@ -121,15 +123,24 @@ export function DashboardSimple() {
               full panel layout, or Custom to design your own.
             </p>
           </div>
-          <div className="rounded-md border border-border bg-surface2 px-3 py-2 text-xs">
-            <div className="text-muted">CPU</div>
-            <div className="font-mono text-fg">{snapshot.system ? `${snapshot.system.cpu_pct}%` : "—"}</div>
+          <div className="flex flex-col items-end gap-1">
+            <span
+              data-testid="dashboard-simple-mode-badge"
+              className="rounded border border-accent-blue/40 bg-accent-blue/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-blue"
+            >
+              Simple Mode
+            </span>
+            <div className="rounded-md border border-border bg-surface2 px-3 py-2 text-xs">
+              <div className="text-muted">CPU</div>
+              <div className="font-mono text-fg">{snapshot.system ? `${snapshot.system.cpu_pct}%` : "—"}</div>
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-4 gap-2.5">
           <MiniStat label="RAM" value={snapshot.system ? `${snapshot.system.ram_pct}%` : "—"} />
           <MiniStat label="Disk" value={snapshot.system ? `${snapshot.system.disk_pct}%` : "—"} />
           <MiniStat label="GPU detect" value={snapshot.system ? `${snapshot.system.gpu_detected_pct}%` : "—"} />
+          <MiniStat label="GPU util" value={snapshot.system ? `${snapshot.system.gpu_util_pct}%` : "—"} />
         </div>
       </section>
 

@@ -15,7 +15,7 @@
  * Drag-and-drop uses native HTML5 events so we do not need to add a new
  * dependency (the project already keeps node_modules lean).
  */
-import { GripVertical, Plus, Settings as SettingsIcon, Trash2, X } from "lucide-react";
+import { Cloud, CloudOff, GripVertical, Plus, Settings as SettingsIcon, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { adapters } from "../../api/adapters";
 import { ResourceGauge } from "../charts/ResourceGauge";
@@ -29,6 +29,7 @@ import type { Notification } from "../../types/notification";
 import type { ProofBundle } from "../../types/proof";
 import type { SystemSnapshot } from "../../types/system";
 import type { Workflow } from "../../types/workflow";
+import { useDashboardLayouts } from "../../hooks/useDashboardLayouts";
 import {
   ALL_CUSTOM_WIDGETS,
   DEFAULT_CUSTOM_LAYOUT,
@@ -92,10 +93,35 @@ export function DashboardCustom() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [draggingId, setDraggingId] = useState<CustomWidgetId | null>(null);
 
+  // Optional server-side persistence (W15-A12 / A20 wiring). The hook is a
+  // no-op when the VITE_FEATURE_DASHBOARD_LAYOUTS flag is not set; localStorage
+  // remains the primary cache in all cases.
+  const layoutsSync = useDashboardLayouts();
+
   // Persist on every layout change so refresh is faithful.
+  // localStorage is always written (primary cache). When server sync is
+  // enabled, also push to the backend; saveLayout swallows network errors.
   useEffect(() => {
-    writePersistedCustomLayout(layout);
-  }, [layout]);
+    if (layoutsSync.enabled) {
+      void layoutsSync.saveLayout(layout);
+    } else {
+      writePersistedCustomLayout(layout);
+    }
+  }, [layout, layoutsSync]);
+
+  // When server sync is enabled and a server layout arrives that differs
+  // from the locally-held one AND the user has not edited yet this session,
+  // adopt the server copy. The localStorage-vs-server reconciliation rule
+  // lives in useDashboardLayouts; this effect just plumbs the result.
+  useEffect(() => {
+    if (!layoutsSync.enabled) return;
+    const server = layoutsSync.serverLayout;
+    if (!server || server.length === 0) return;
+    // Only adopt if local was empty/default at load time.
+    const local = readPersistedCustomLayout();
+    if (local && local.length > 0) return;
+    setLayout(server);
+  }, [layoutsSync.enabled, layoutsSync.serverLayout]);
 
   useEffect(() => {
     let mounted = true;
@@ -184,6 +210,29 @@ export function DashboardCustom() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {layoutsSync.enabled && (
+            <span
+              data-testid="dashboard-custom-sync-indicator"
+              title={
+                layoutsSync.lastError
+                  ? `Layout sync offline: ${layoutsSync.lastError}`
+                  : layoutsSync.lastSyncedUtc
+                    ? `Last synced ${layoutsSync.lastSyncedUtc}`
+                    : layoutsSync.isSaving
+                      ? "Syncing layout…"
+                      : "Server layout sync enabled"
+              }
+              className={[
+                "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide",
+                layoutsSync.lastError
+                  ? "border-accent-amber/40 bg-accent-amber/10 text-accent-amber"
+                  : "border-accent-green/40 bg-accent-green/10 text-accent-green",
+              ].join(" ")}
+            >
+              {layoutsSync.lastError ? <CloudOff size={11} /> : <Cloud size={11} />}
+              {layoutsSync.isSaving ? "Sync…" : layoutsSync.lastError ? "Local" : "Sync"}
+            </span>
+          )}
           <button
             type="button"
             data-testid="dashboard-custom-reset-btn"
@@ -208,8 +257,11 @@ export function DashboardCustom() {
       <div className="grid min-h-0 flex-1 grid-cols-12 gap-3">
         <div
           data-testid="dashboard-custom-grid"
+          data-widget-count={layout.length}
           className={[
-            "col-span-12 grid auto-rows-min grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3",
+            // Matches Images-GUI/01-dashboard-modes/custom-dashboard-a/b density:
+            // 1-col mobile, 2-col tablet, 3-col laptop, 4-col xl (≥1280px).
+            "col-span-12 grid auto-rows-min grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4",
             drawerOpen ? "lg:col-span-9" : "lg:col-span-12",
           ].join(" ")}
         >

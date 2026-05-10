@@ -185,10 +185,24 @@ export const ALL_CUSTOM_WIDGETS: ReadonlyArray<CustomWidgetId> = [
   "notifications",
 ];
 
+/**
+ * The default Custom layout. Six widgets — chosen to match the reference at
+ * `Images-GUI/01-dashboard-modes/custom-dashboard-a.png` which shows a
+ * camera/slicer header, KPI + fleet + pipeline + resources + recent jobs
+ * cards. Six is the minimum-density spec from the W15-A12 brief
+ * ("6-12 placeable widget slots"); users can add the remaining three widgets
+ * (proof, logs, notifications) from the palette.
+ *
+ * Layout reordering follows the React drag-and-drop reference pattern
+ * documented at https://docs.dndkit.com/ ; the multi-section dashboard
+ * pattern follows Grafana
+ * (https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/).
+ */
 export const DEFAULT_CUSTOM_LAYOUT: ReadonlyArray<CustomWidgetId> = [
   "kpi",
   "fleet",
   "pipeline",
+  "agents",
   "resources",
   "jobs",
 ];
