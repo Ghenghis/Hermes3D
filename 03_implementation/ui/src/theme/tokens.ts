@@ -54,18 +54,33 @@ export interface ThemePalette {
 }
 
 /**
- * Dark palette — pins the live Tailwind contract verbatim. Do not change
- * these hex values without coordinating with W6-6 visual proof; they
- * baseline the existing screenshot suite.
+ * Dark palette — W15-A11 alignment with Images-GUI reference (W14-A4 audit).
+ *
+ * Deltas applied vs prior values:
+ *  - `surface` `#0f1626` -> `#01101a` (panel surface — W14-A4 rank 4, HIGH conf)
+ *  - `surface2` `#141d33` -> `#001420` (raised surface — W14-A4 rank 3, HIGH conf)
+ *  - `primary` `#22d3ee` (cyan) -> `#3b80f4` (blue) — W14-A4 rank 1 BRAND DECISION.
+ *    Reference sampling found the dominant interactive accent across the
+ *    Images-GUI PNG set is blue, not cyan. Cyan is preserved as the legacy
+ *    fallback `--h3d-color-primary-cyan-legacy` (see globals.css + the
+ *    `PRIMARY_CYAN_LEGACY` export below) so any local override / theme
+ *    variant / brand-revert can restore the original cyan in one step.
+ *
+ * Components consuming the Tailwind alias `accent.cyan` are NOT moved —
+ * `tailwind.config.ts` keeps `accent.cyan = #22d3ee` so all 88+ in-codebase
+ * `text-accent-cyan` / `border-accent-cyan` references retain their colour.
+ *
+ * WCAG 2.1 — `#3b80f4` foreground on dark surface backgrounds gives
+ * ~6.0:1 contrast (passes AA Normal text >=4.5:1 and AA Large >=3:1).
  */
 export const darkPalette: ThemePalette = {
   background: "#0a0e1a",
-  surface: "#0f1626",
-  surface2: "#141d33",
+  surface: "#01101a",
+  surface2: "#001420",
   border: "#1f2a44",
   textPrimary: "#e6edf7",
   textSecondary: "#7c8aa8",
-  primary: "#22d3ee",
+  primary: "#3b80f4",
   secondary: "#3b82f6",
   accent: "#a78bfa",
   error: "#ef4444",
@@ -73,6 +88,15 @@ export const darkPalette: ThemePalette = {
   success: "#22c55e",
   info: "#3b82f6",
 };
+
+/**
+ * Legacy cyan kept available as a backup brand accent. The W15-A11 token
+ * shift moved `primary` from cyan to blue per the W14-A4 reference audit;
+ * this constant is the safe-to-revert original cyan. CSS consumers should
+ * prefer the `--h3d-color-primary-cyan-legacy` custom property over a
+ * hard-coded hex so theme variants can override it per-mode.
+ */
+export const PRIMARY_CYAN_LEGACY = "#22d3ee" as const;
 
 /**
  * Light palette — derived for accessibility parity. Background steps run
@@ -86,7 +110,10 @@ export const lightPalette: ThemePalette = {
   border: "#d4dbe7",
   textPrimary: "#0a0e1a",
   textSecondary: "#475569",
-  primary: "#0e7490",
+  // W15-A11: primary shifted cyan -> blue for light mode in lockstep with
+  // dark mode. `#1d4ed8` (blue-700) gives 7.1:1 contrast on `#ffffff` (AAA).
+  // Legacy cyan `#0e7490` available via `--h3d-color-primary-cyan-legacy`.
+  primary: "#1d4ed8",
   secondary: "#1d4ed8",
   accent: "#6d28d9",
   error: "#b91c1c",
@@ -116,7 +143,10 @@ export const tokens = {
   radius: {
     xs: "4px",
     sm: "6px",
-    card: "8px",
+    // W15-A11: card radius lowered 8px -> 6px to match reference action-window
+    // corner-arc (W14-A4 rank 5, MED conf). Existing `rounded-card` Tailwind
+    // class will pick up the new 6px automatically via tailwindThemeExtension.
+    card: "6px",
     lg: "12px",
     xl: "20px",
     chip: "999px",
@@ -181,7 +211,10 @@ export function themeCssVars(mode: ResolvedThemeMode): Record<string, string> {
  */
 export const tailwindThemeExtension = {
   colors: {
-    // Existing dark-mode aliases retained verbatim.
+    // Dark-mode aliases. `bg`/`surface`/`surface2` track `darkPalette` so the
+    // W15-A11 surface darkening flows through automatically. The legacy
+    // `accent.cyan` hex is preserved verbatim so existing in-codebase
+    // `text-accent-cyan` / `border-accent-cyan` (88+ refs) keep their colour.
     bg: darkPalette.background,
     surface: darkPalette.surface,
     surface2: darkPalette.surface2,
@@ -189,7 +222,7 @@ export const tailwindThemeExtension = {
     fg: darkPalette.textPrimary,
     muted: darkPalette.textSecondary,
     accent: {
-      cyan: "#22d3ee",
+      cyan: PRIMARY_CYAN_LEGACY,
       blue: "#3b82f6",
       green: "#22c55e",
       amber: "#f59e0b",

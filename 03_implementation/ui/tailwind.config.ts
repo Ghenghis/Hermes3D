@@ -21,6 +21,15 @@ import type { Config } from "tailwindcss";
  * runtime without re-rendering. The original `bg`, `surface`, `fg`
  * aliases are preserved verbatim for visual-contract back-compat.
  */
+// W15-A11 token deltas applied (aligned with `src/theme/tokens.ts` +
+// `src/styles/globals.css`):
+//   - colors.surface  : #0f1626 -> #01101a (W14-A4 rank 4)
+//   - colors.surface2 : #141d33 -> #001420 (W14-A4 rank 3)
+//   - borderRadius.card : 8px -> 6px (W14-A4 rank 5)
+//   - accent.cyan kept verbatim (#22d3ee) — 88+ existing in-codebase refs
+//     to `text-accent-cyan` / `border-accent-cyan` retain their colour. The
+//     brand primary shift (cyan -> blue) lives on the `--h3d-color-primary`
+//     CSS variable and the `h3d.primary` Tailwind alias only.
 const config: Config = {
   darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
@@ -28,8 +37,8 @@ const config: Config = {
     extend: {
       colors: {
         bg: "#0a0e1a",
-        surface: "#0f1626",
-        surface2: "#141d33",
+        surface: "#01101a",
+        surface2: "#001420",
         border: "#1f2a44",
         fg: "#e6edf7",
         muted: "#7c8aa8",
@@ -48,6 +57,7 @@ const config: Config = {
           "text-primary": "var(--h3d-color-text-primary)",
           "text-secondary": "var(--h3d-color-text-secondary)",
           primary: "var(--h3d-color-primary)",
+          "primary-cyan-legacy": "var(--h3d-color-primary-cyan-legacy)",
           secondary: "var(--h3d-color-secondary)",
           accent: "var(--h3d-color-accent)",
           error: "var(--h3d-color-error)",
@@ -57,7 +67,7 @@ const config: Config = {
         },
       },
       borderRadius: {
-        card: "8px",
+        card: "6px",
         chip: "999px",
       },
       fontFamily: {
@@ -65,6 +75,9 @@ const config: Config = {
         mono: ["JetBrains Mono", "ui-monospace", "monospace"],
       },
       boxShadow: {
+        // Glow shadow keeps cyan rgba — active-state sidebar row pairs this
+        // shadow with `border-accent-cyan` (still `#22d3ee` via `accent.cyan`).
+        // Both stay cyan together for visual consistency.
         glow: "0 0 0 1px rgba(34,211,238,0.18)",
       },
     },

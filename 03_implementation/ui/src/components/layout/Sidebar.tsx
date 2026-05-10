@@ -4,13 +4,18 @@ import { AgentChatMirror } from "../agents/AgentChatMirror";
 import { HermesAgentBanner } from "../agents/HermesAgentBanner";
 import { ResizablePane } from "./ResizablePane";
 
+// W15-A11: Sidebar defaultWidth lowered 260 -> 220 to match the Images-GUI
+// reference sidebar (~12% of viewport — 152px at 1280, 220 at 1536, 228 at
+// 1920). Per W14-A4 rank 2 HIGH-confidence finding. Persisted user-resize
+// widths in `h3d.mainSidebar.width` localStorage continue to override this
+// default — only fresh sessions pick up the new value.
 export function Sidebar() {
   const { activeTabId, setActiveTabId } = useStore();
 
   return (
     <ResizablePane
       storageKey="h3d.mainSidebar.width"
-      defaultWidth={260}
+      defaultWidth={220}
       minWidth={200}
       maxWidth={560}
       label="left panel"
