@@ -167,3 +167,111 @@ test_concurrent_calls_have_no_race                      PASSED
 ```
 
 10/10 pass. No skipped or xfail tests.
+
+## 9. STATUS UPDATE — wired-in 2026-05-09 (W8-10)
+
+**Owner agent:** `claude-w8-10-app-wire-in`
+**Branch:** `claude/w8-10-printer-safety-app-wire-in` (from
+`feat/hermes3d-7-complete-gui-repo-wiring` HEAD `d1334ed`)
+**Predecessor lock release:** W6-7 released `app.py` after PR #179 opened, so the
+two-line wire-in deferred at the bottom of section 3 is now safe to land.
+
+### Patch applied to `03_implementation/src/hermes3d/api/app.py`
+
+Two lines added — alphabetised in the `from hermes3d.api.routes import (...)`
+block, and inserted adjacent to `printers` in the `route_module` list inside
+`create_gui_app()`:
+
+```diff
+ from hermes3d.api.routes import (
+     ...,
+     ports,
++    printer_safety,
+     printers,
+     roadmap,
+     ...
+ )
+
+ # ... inside create_gui_app() ...
+ for route_module in [
+     ...,
+     generation,
+     printers,
++    printer_safety,
+     settings,
+     ...,
+ ]:
+     app.include_router(route_module.router)
+```
+
+No other route or service in `app.py` was touched. Diff is 2 added lines and
+0 deleted.
+
+### Verification (run on 2026-05-09 against the patched app)
+
+```text
+$ PYTHONPATH=src python -c "from hermes3d.api.app import app; \
+    print(sorted([r.path for r in app.routes if 'safety' in r.path \
+    or r.path.endswith('/start-print') \
+    or r.path.endswith('/heat-extruder') \
+    or r.path.endswith('/heat-bed')]))"
+[
+  '/api/printers/{printer_id}/heat-bed',
+  '/api/printers/{printer_id}/heat-extruder',
+  '/api/printers/{printer_id}/safety-events/bind-camera',
+  '/api/printers/{printer_id}/safety-events/camera-frame',
+  '/api/printers/{printer_id}/safety-events/plate-classification',
+  '/api/printers/{printer_id}/safety-state',
+  '/api/printers/{printer_id}/start-print',
+]
+```
+
+All 7 W6-9 routes are now mounted on the canonical `app` (244 total app routes).
+
+### Smoke tests (run on 2026-05-09 against the patched app)
+
+```text
+$ python -m pytest 04_testing/pytest/integration/test_printer_safety_gate.py -v
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-8.4.2
+collected 10 items
+
+test_default_state_is_blocked_with_full_reasons         PASSED
+test_camera_frame_alone_still_blocked                   PASSED
+test_obstructed_plate_is_blocked                        PASSED
+test_clear_with_low_confidence_is_blocked               PASSED
+test_clear_high_confidence_allows                       PASSED
+test_camera_stale_blocks                                PASSED
+test_plate_classification_stale_blocks                  PASSED
+test_state_is_isolated_per_printer                      PASSED
+test_routes_403_when_blocked_and_200_when_allowed       PASSED
+test_concurrent_calls_have_no_race                      PASSED
+
+============================= 10 passed in 2.22s ==============================
+```
+
+10/10 still pass post-wire-in. (Suite uses a freshly-constructed `FastAPI()`
+plus `include_router` so it does not exercise `app.py` directly — the
+verification command above confirms `app.py` itself now mounts the router.)
+
+`04_testing/pytest/unit/test_app_factory.py` and `test_app_routes.py` were
+checked via Glob and do **not** exist in this repo, so no other unit harness
+needs to run for this wire-in.
+
+### Sources
+
+1. **FastAPI `include_router` reference** —
+   <https://fastapi.tiangolo.com/tutorial/bigger-applications/#include-the-apirouter>
+   confirms the `app.include_router(module.router)` pattern this repo uses.
+2. **Existing route wiring in `03_implementation/src/hermes3d/api/app.py`
+   (HEAD `d1334ed`)** — the alphabetised import block plus iterative
+   `for route_module in [...]: app.include_router(route_module.router)` loop
+   is the team's canonical pattern; this patch follows it without exception.
+
+### Lock release
+
+`hermes_release_files` called for `claude-w8-10-app-wire-in` on:
+- `03_implementation/src/hermes3d/api/app.py`
+- `03_implementation/docs/handoffs/HERMES_PRINTER_SAFETY_GATE_2026-05-09.md`
+
+after PR was opened.
