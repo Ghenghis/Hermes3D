@@ -791,7 +791,24 @@ def _recovery_task_id(suffix: str) -> str:
     return f"H3D-TEST-RECOVERY-{_recovery_uuid4().hex[:12]}-{suffix}"
 
 
-def test_recovery_records_gate_fail() -> None:
+@pytest.fixture()
+def recovery_mcp_ready(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep recovery unit tests independent of the local MCP checkout."""
+
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(
+        code_history,
+        "append_mcp_evidence",
+        lambda **_kwargs: {
+            "status": "recorded",
+            "workspace": str(code_history.PROJECT_ROOT),
+            "evidence_id": "ev_recovery_test",
+            "result": {"ok": True},
+        },
+    )
+
+
+def test_recovery_records_gate_fail(recovery_mcp_ready: None) -> None:
     client = TestClient(create_gui_app())
     task_id = _recovery_task_id("gate")
 
@@ -825,7 +842,7 @@ def test_recovery_records_gate_fail() -> None:
     assert len(record["failure_fingerprint"]) == 16
 
 
-def test_recovery_records_patch_rejected() -> None:
+def test_recovery_records_patch_rejected(recovery_mcp_ready: None) -> None:
     client = TestClient(create_gui_app())
     task_id = _recovery_task_id("patch")
 
@@ -849,7 +866,7 @@ def test_recovery_records_patch_rejected() -> None:
     assert record["recommended_next_action"] == "refresh_context"
 
 
-def test_recovery_records_merge_git_fail() -> None:
+def test_recovery_records_merge_git_fail(recovery_mcp_ready: None) -> None:
     client = TestClient(create_gui_app())
     task_id = _recovery_task_id("merge")
 
@@ -888,7 +905,7 @@ def test_recovery_rejects_unknown_failure_class() -> None:
     assert response.status_code == 422
 
 
-def test_recovery_redacts_secret_like_values() -> None:
+def test_recovery_redacts_secret_like_values(recovery_mcp_ready: None) -> None:
     client = TestClient(create_gui_app())
     task_id = _recovery_task_id("secret")
     bearer_value = "Bearer abcdefghijklmnop1234567890ABCDEFGH"
@@ -911,7 +928,7 @@ def test_recovery_redacts_secret_like_values() -> None:
     assert "abcdefghijklmnop1234567890" not in summary
 
 
-def test_recovery_mark_outcome_recovered() -> None:
+def test_recovery_mark_outcome_recovered(recovery_mcp_ready: None) -> None:
     client = TestClient(create_gui_app())
     task_id = _recovery_task_id("outcome")
 
@@ -946,7 +963,7 @@ def test_recovery_mark_outcome_recovered() -> None:
     assert outcome["attempt_id"] == attempt_id
 
 
-def test_recovery_state_route_returns_attempts() -> None:
+def test_recovery_state_route_returns_attempts(recovery_mcp_ready: None) -> None:
     client = TestClient(create_gui_app())
     task_id = _recovery_task_id("state")
 
