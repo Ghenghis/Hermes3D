@@ -326,9 +326,38 @@ export function LearningTab() {
         </div>
       </section>
 
-      <section id="learning.reports" className="flex min-h-[360px] flex-col rounded border border-border bg-surface p-4 lg:col-span-12">
+      <section id="learning.resources" className="flex flex-col gap-3 rounded border border-border bg-surface p-4 lg:col-span-6" data-testid="learning-resources">
+        <div>
+          <h2 className="text-base font-semibold text-fg">LEARNING RESOURCES</h2>
+          <p className="text-xs text-muted">
+            Static reference links pinned to upstream truth. No backend fetch — links are honest URLs the operator can verify offline.
+          </p>
+        </div>
+        <ul className="grid gap-2 text-sm">
+          {LEARNING_RESOURCES.map((resource) => (
+            <li key={resource.url}>
+              <a
+                href={resource.url}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="grid gap-1 rounded border border-border bg-bg/40 p-3 hover:border-accent-cyan/60"
+                data-testid={`learning-resource-${resource.id}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-fg">{resource.title}</span>
+                  <span className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase text-muted">{resource.kind}</span>
+                </div>
+                <span className="text-xs text-muted">{resource.summary}</span>
+                <span className="truncate font-mono text-[10px] text-accent-cyan">{resource.url}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section id="learning.reports" className="flex min-h-[360px] flex-col rounded border border-border bg-surface p-4 lg:col-span-6">
         <h2 className="text-base font-semibold text-fg">RESEARCH REPORTS</h2>
-        <div className="mt-4 grid content-start gap-2 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-4 grid content-start gap-2">
           {reports.map((report) => (
             <div key={report.id} className="grid grid-cols-[1fr_auto_auto] items-center gap-3 rounded border border-border bg-bg/40 p-3 text-sm">
               <span className="truncate text-fg">{report.filename}</span>
@@ -343,6 +372,43 @@ export function LearningTab() {
     </div>
   );
 }
+
+/**
+ * Curated static learning resources — these are NOT fetched from any backend.
+ * They are honest reference URLs to upstream truth (Hermes Agent repo + project docs).
+ * When backend reports are unreachable, this section still gives the operator
+ * verifiable starting points instead of a blank tab.
+ */
+const LEARNING_RESOURCES: { id: string; title: string; summary: string; url: string; kind: string }[] = [
+  {
+    id: "hermes-agent",
+    title: "NousResearch / hermes-agent",
+    summary: "Upstream Hermes Agent runtime. Source of v0.13 'Tenacity Release' + supervisor patterns.",
+    url: "https://github.com/NousResearch/hermes-agent",
+    kind: "repo",
+  },
+  {
+    id: "hermes3d",
+    title: "Ghenghis / Hermes3D",
+    summary: "This workbench. Includes printer safety policies, observe routes, and Hermes Agent integration.",
+    url: "https://github.com/Ghenghis/Hermes3D",
+    kind: "repo",
+  },
+  {
+    id: "hermesproof",
+    title: "Ghenghis / HermesProof",
+    summary: "Proof-gated supervision and truth-gate library used by Hermes Agent Workbench evidence chain.",
+    url: "https://github.com/Ghenghis/HermesProof",
+    kind: "repo",
+  },
+  {
+    id: "a2a-protocol",
+    title: "Agent-to-Agent (A2A) Protocol",
+    summary: "Specification for handoff/task transfer between agents — what hermes_a2a_* MCP tools implement.",
+    url: "https://github.com/google/A2A",
+    kind: "spec",
+  },
+];
 
 async function refreshWorkbench(
   setWorkbench: (state: IdleWorkbenchState) => void,
