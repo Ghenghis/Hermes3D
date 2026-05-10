@@ -815,9 +815,8 @@ def recovery_runs_active(task_id: str | None = None) -> dict[str, Any]:
     ``/recovery/state`` only returns the JSONL ledger shape.
 
     This endpoint is **read-only** — it lists active runs from the
-    transient ``_RUNS`` registry. Confirm-by-default policy preserved:
-    no mutation routes added in this PR. Mutation routes (start, freeze,
-    cancel) land with RC v2 commits 3-5.
+    transient ``_RUNS`` registry. Confirm-by-default policy preserved.
+    Mutation routes (propose / review / apply / resume) live below.
 
     See ``recovery_controller.list_active_runs`` for the payload shape.
     """
@@ -825,3 +824,260 @@ def recovery_runs_active(task_id: str | None = None) -> dict[str, Any]:
         return recovery_controller.list_active_runs(task_id=task_id)
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+# ---------------------------------------------------------------------------
+# W6-2: Recovery Controller v2 active-loop routes (commits 3-5).
+#
+# Sequence: failure (existing /recovery/record-failure) -> freeze (existing
+# saga step in services) -> propose -> review -> apply -> resume.
+#
+# Each route is a thin wrapper over the corresponding service method
+# (``recovery_controller.propose_fix`` / ``review_proposal`` /
+# ``apply_proposal`` / ``resume_run``). Validation, redaction, proof
+# event emission, and saga compensation all live in the service layer;
+# the route's only jobs are body validation, HTTP status mapping, and
+# 503-ifying ``ProviderNotConfigured``.
+#
+# Sources:
+#   1. Saga pattern (Garcia-Molina + Salem 1987) -- compensation rule for
+#      apply_proposal failure: rollback to RETRY_FAILED, release locks via
+#      thaw_run; proposal stays addressable for forensic review.
+#      https://temporal.io/blog/saga-pattern-made-easy
+#   2. FastAPI router pattern (bigger-applications) -- this file is one
+#      APIRouter; the per-feature add is a route block, not a new module.
+#      https://fastapi.tiangolo.com/tutorial/bigger-applications/
+# ---------------------------------------------------------------------------
+
+
+# 503 message: intentionally generic so a leaked response body does not
+# tell an attacker which env var the operator is missing. The real setup
+# guidance lives in HERMES_RC_V2_ACTIVE_LOOP_2026-05-09.md.
+_PROVIDER_503_MESSAGE = (
+    "Recovery provider is not configured on this server. "
+    "An operator must wire a proposal/review provider before this route "
+    "can be used. See docs/handoffs/HERMES_RC_V2_ACTIVE_LOOP_2026-05-09.md."
+)
+
+
+class RecoveryProposeRequest(StrictBody):
+    """POST /api/code-operator/recovery/propose body."""
+
+    run_id: str = Field(min_length=32, max_length=32)
+    failure_summary: str = Field(default="", max_length=400)
+
+
+class RecoveryReviewRequest(StrictBody):
+    """POST /api/code-operator/recovery/review body."""
+
+    run_id: str = Field(min_length=32, max_length=32)
+    proposal_id: str = Field(min_length=1, max_length=120)
+
+
+class RecoveryApplyRequest(StrictBody):
+    """POST /api/code-operator/recovery/apply body."""
+
+    run_id: str = Field(min_length=32, max_length=32)
+    proposal_id: str = Field(min_length=1, max_length=120)
+    confirm: bool = False
+
+
+class RecoveryResumeRequest(StrictBody):
+    """POST /api/code-operator/recovery/resume body."""
+
+    run_id: str = Field(min_length=32, max_length=32)
+    gate_id: str | None = Field(default=None, max_length=80)
+
+
+@router.post("/recovery/propose")
+def recovery_propose(body: RecoveryProposeRequest) -> dict[str, Any]:
+    """Phase 4 of the active loop: dispatch a fix proposal to the configured provider.
+
+    Returns 200 + ProposalRecord on success, 503 if no provider is wired,
+    409 if the run is not in PROPOSING (or not addressable), 422 on shape
+    issues. Confirm-by-default policy: this route does NOT auto-apply; a
+    follow-up call to /apply with confirm=true is required.
+    """
+    try:
+        result = recovery_controller.propose_fix(
+            attempt_id=body.run_id,
+            owner=CODE_OPERATOR_ACTOR,
+            failure_summary=body.failure_summary,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+    status = result.get("status")
+    if status == "provider_not_configured":
+        raise HTTPException(status_code=503, detail={"reason": _PROVIDER_503_MESSAGE})
+    if status == "unknown_attempt":
+        raise HTTPException(status_code=404, detail={"reason": "Recovery run not found."})
+    if status == "not_in_proposing":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": (
+                    "Run is not in 'proposing' state; freeze the run first "
+                    "via the saga step before requesting a proposal."
+                ),
+                "current_state": result.get("current_state"),
+            },
+        )
+    return result
+
+
+@router.post("/recovery/review")
+def recovery_review(body: RecoveryReviewRequest) -> dict[str, Any]:
+    """Phase 5: adversarial review of the proposal.
+
+    Returns 200 + ReviewRecord(verdict in {"approved","rejected","needs-revision"}).
+    A verdict of "approved" transitions the run to AWAITING_HUMAN_CONFIRM.
+    """
+    try:
+        result = recovery_controller.review_proposal(
+            attempt_id=body.run_id,
+            owner=CODE_OPERATOR_ACTOR,
+            proposal_id=body.proposal_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+    status = result.get("status")
+    if status == "provider_not_configured":
+        raise HTTPException(status_code=503, detail={"reason": _PROVIDER_503_MESSAGE})
+    if status == "unknown_attempt":
+        raise HTTPException(status_code=404, detail={"reason": "Recovery run not found."})
+    if status == "not_in_reviewing":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Run is not in 'reviewing' state; propose a fix first.",
+                "current_state": result.get("current_state"),
+            },
+        )
+    if status == "proposal_mismatch":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "proposal_id does not match the run's current proposal.",
+                "expected": result.get("expected"),
+                "got": result.get("got"),
+            },
+        )
+    return result
+
+
+@router.post("/recovery/apply")
+def recovery_apply(body: RecoveryApplyRequest) -> dict[str, Any]:
+    """Phase 6: apply the reviewed proposal.
+
+    Requires verdict='approved' and confirm=true (confirm-by-default
+    policy). Returns 409 if the review is rejected or pending, 422 if
+    confirm is missing, 200 + ApplyRecord on success.
+    """
+    try:
+        result = recovery_controller.apply_proposal(
+            attempt_id=body.run_id,
+            owner=CODE_OPERATOR_ACTOR,
+            proposal_id=body.proposal_id,
+            confirm=body.confirm,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+    status = result.get("status")
+    if status == "unknown_attempt":
+        raise HTTPException(status_code=404, detail={"reason": "Recovery run not found."})
+    if status == "not_ready_to_apply":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": (
+                    "Run is not in 'awaiting_human_confirm' state; review the "
+                    "proposal first."
+                ),
+                "current_state": result.get("current_state"),
+            },
+        )
+    if status == "proposal_mismatch":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "proposal_id does not match the run's current proposal.",
+                "expected": result.get("expected"),
+                "got": result.get("got"),
+            },
+        )
+    if status == "review_not_approved":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "Review verdict is not 'approved'; cannot apply.",
+                "verdict": result.get("verdict"),
+            },
+        )
+    if status == "confirm_required":
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "reason": (
+                    "Confirm-by-default: explicit confirm=true is required to "
+                    "apply a reviewed patch."
+                ),
+            },
+        )
+    if status == "apply_failed":
+        # Saga compensation already ran (see service); surface as 502 so
+        # the caller can distinguish "we tried and the apply failed" from
+        # "we never started the apply".
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "reason": "Patch apply failed; run transitioned to retry_failed.",
+                "error_class": result.get("error_class"),
+                "run": result.get("run"),
+            },
+        )
+    return result
+
+
+@router.post("/recovery/resume")
+def recovery_resume(body: RecoveryResumeRequest) -> dict[str, Any]:
+    """Phase 7: re-run the original failing gate.
+
+    Gate passes -> RECOVERED + thaw_run; gate fails -> ESCALATED + thaw_run.
+    Both terminal states release the file locks acquired in freeze_run.
+    """
+    try:
+        result = recovery_controller.resume_run(
+            attempt_id=body.run_id,
+            owner=CODE_OPERATOR_ACTOR,
+            gate_id=body.gate_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+    status = result.get("status")
+    if status == "unknown_attempt":
+        raise HTTPException(status_code=404, detail={"reason": "Recovery run not found."})
+    if status == "not_in_re_running_gate":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": (
+                    "Run is not in 're_running_gate' state; apply a reviewed "
+                    "proposal first."
+                ),
+                "current_state": result.get("current_state"),
+            },
+        )
+    if status == "gate_error":
+        raise HTTPException(
+            status_code=502,
+            detail={
+                "reason": "Gate runner raised an exception during resume.",
+                "gate_id": result.get("gate_id"),
+                "error_class": result.get("error_class"),
+            },
+        )
+    return result
