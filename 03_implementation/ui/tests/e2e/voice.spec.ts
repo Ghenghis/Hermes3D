@@ -20,3 +20,34 @@ test("Voice tab mounts and respects STT runtime gating", async ({ page }) => {
   await assertNoFakeVisibleText(page, TAB_FIXTURES.voice.rootTestId);
   await assertNoErrors(page);
 });
+
+test("Voice tab exposes URL-addressable subtabs (#voice/browser, /transcript-history, /proof-review)", async ({
+  page,
+}) => {
+  await page.goto("/#voice/browser");
+  await expect(page.getByTestId("voice-root")).toHaveAttribute("data-active-subtab", "browser");
+  // Either the Web Speech API surface or the honest-unsupported banner must
+  // render — we never accept a blank state.
+  const browserSurfaces = page
+    .getByTestId("voice-browser-subtab")
+    .or(page.getByTestId("voice-browser-unsupported"));
+  await expect(browserSurfaces.first()).toBeVisible();
+
+  await page.goto("/#voice/transcript-history");
+  await expect(page.getByTestId("voice-root")).toHaveAttribute(
+    "data-active-subtab",
+    "transcript-history",
+  );
+  await expect(page.getByTestId("voice-transcript-history-subtab")).toBeVisible();
+
+  await page.goto("/#voice/proof-review");
+  await expect(page.getByTestId("voice-root")).toHaveAttribute(
+    "data-active-subtab",
+    "proof-review",
+  );
+  await expect(page.getByTestId("voice-proof-review-subtab")).toBeVisible();
+
+  // Clicking the subtab nav button must also update the URL hash.
+  await page.getByTestId("voice-subtab-browser").click();
+  await expect(page).toHaveURL(/#voice\/browser$/);
+});

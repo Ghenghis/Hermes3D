@@ -88,18 +88,23 @@ export function tabIdFromHash(hash: string): string | null {
 }
 
 /**
- * Settings subtab URL-hash routing (W15-A17).
+ * Generic subtab URL-hash routing helper (W15-A17 / W15-A18).
  *
  * Tabs with nested subtabs encode the selection in the trailing path
- * segment, e.g. `#settings/general`, `#settings/mcp`. The first segment
+ * segment, e.g. `#settings/general`, `#voice/browser`. The first segment
  * is owned by `tabIdFromHash`; the second segment is owned by the tab
  * itself. This keeps deep links stable across reloads without coupling
  * the subtab list to the global hash table.
  *
- * Note: the helper is intentionally generic over both the tab head and
- * the allowed subtab keys so adjacent tabs (Voice / A18) can adopt the
- * same routing shape without conflicting on `store.ts`. The Voice agent
- * lane is expected to add `voiceSubtabFromHash` next to this helper.
+ * The helper is intentionally generic over both the tab head and the
+ * allowed subtab keys so adjacent tabs (Settings / Voice) share the same
+ * routing shape without conflicting on `store.ts`.
+ *
+ * Examples:
+ *   subtabFromHash("#voice/browser",          "voice",    VOICE_SUBTAB_KEYS)    -> "browser"
+ *   subtabFromHash("#voice/transcript-history","voice",   VOICE_SUBTAB_KEYS)    -> "transcript-history"
+ *   subtabFromHash("#voice",                  "voice",    VOICE_SUBTAB_KEYS)    -> null
+ *   subtabFromHash("#settings/providers",     "voice",    VOICE_SUBTAB_KEYS)    -> null
  */
 export function subtabFromHash<K extends string>(
   hash: string,
@@ -138,6 +143,22 @@ export type SettingsSubtabKey = (typeof SETTINGS_SUBTAB_KEYS)[number];
 
 export function settingsSubtabFromHash(hash: string): SettingsSubtabKey | null {
   return subtabFromHash<SettingsSubtabKey>(hash, "settings", SETTINGS_SUBTAB_KEYS);
+}
+
+/**
+ * Convenience wrapper for the Voice tab (W15-A18). Mirrors the Settings
+ * helper so `#voice/<sub>` deep links survive reloads and the subtab list
+ * is the single source of truth.
+ */
+export const VOICE_SUBTAB_KEYS = [
+  "browser",
+  "transcript-history",
+  "proof-review",
+] as const;
+export type VoiceSubtabKey = (typeof VOICE_SUBTAB_KEYS)[number];
+
+export function voiceSubtabFromHash(hash: string): VoiceSubtabKey | null {
+  return subtabFromHash<VoiceSubtabKey>(hash, "voice", VOICE_SUBTAB_KEYS);
 }
 
 function initialActiveTabId(): string {
