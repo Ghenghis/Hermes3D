@@ -1068,7 +1068,7 @@ def review_proposal(
     owner: str,
     proposal_id: str,
 ) -> dict[str, Any]:
-    """Phase 5: adversarial review of the proposal via DeepSeek (or stub).
+    """Phase 5: adversarial review of the proposal via DeepSeek or local fallback.
 
     State requirement: run must be in REVIEWING with a matching proposal_id.
     Returns dict with ``status`` in {"reviewed", "provider_not_configured",

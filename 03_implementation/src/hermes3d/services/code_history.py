@@ -755,7 +755,7 @@ def run_bounded_code_cli_task(
     Hard contract:
       - Exactly one file in ``files`` (must be project-relative and exist).
       - The prompt is the ``BOUNDED_TASK_PROMPT`` constant above; callers
-        cannot inject. The ``{rel}`` placeholder is replaced server-side
+        cannot inject. The ``{rel}`` template token is replaced server-side
         with the (validated) project-relative path of the single file.
       - Docker invocation pins ``--network=none``, ``--read-only``,
         a 64 MiB ``/tmp`` tmpfs, ``--memory=512m``, ``--cpus=1``,
