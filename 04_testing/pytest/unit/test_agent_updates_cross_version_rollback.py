@@ -72,7 +72,11 @@ def _write_backup(
         "dirty_zip_path": None,
     }
     if checkout_path is not None:
-        payload["checkout_path"] = checkout_path
+        # Production ``_create_backup`` writes ``str(repo)`` where ``repo``
+        # is a ``Path``; on Windows that means OS-native backslashes.
+        # Mirror that exact normalization so the F1 filter (which also
+        # uses ``str(Path(...))``) matches in tests.
+        payload["checkout_path"] = str(Path(checkout_path))
     meta_path = backup_root / f"{backup_id}.json"
     meta_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return meta_path
@@ -146,7 +150,10 @@ def test_f1_latest_backup_filter_returns_matching_checkout(
     )
     result = agent_updates._latest_backup(checkout_path=Path(V012_FALLBACK))
     assert result is not None
-    assert result["checkout_path"] == V012_FALLBACK
+    # Persisted ``checkout_path`` is normalized via ``str(Path(...))``
+    # so the OS-native form (backslashes on Windows) is what is stored
+    # — matching what ``_create_backup`` writes in production.
+    assert result["checkout_path"] == str(Path(V012_FALLBACK))
     assert result["tag"] == "v2026.4.30"
 
 

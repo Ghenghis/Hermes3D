@@ -18,10 +18,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id
-from hermes3d.services.agent_checkout import (
-    DEFAULT_AGENT_CHECKOUT,
-    hermes_agent_checkout,
-)
+from hermes3d.services.agent_checkout import DEFAULT_AGENT_CHECKOUT
+from hermes3d.services.agent_checkout import hermes_agent_checkout
 from hermes3d.services.proof_helpers import attach_version_fields
 
 router = APIRouter()
