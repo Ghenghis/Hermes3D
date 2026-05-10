@@ -613,16 +613,29 @@ export function PrintersTab() {
             : printer.status === "offline" || printer.status === "maintenance"
               ? "Printer must be online before running a Moonraker test."
               : null;
+          const safety = printerSafetyState(printer);
           return (
-            <section key={printer.id} className="flex min-h-0 flex-col rounded border border-border bg-surface p-4">
+            <section key={printer.id} className="flex min-h-0 flex-col rounded border border-border bg-surface p-4" data-testid={`printer-card-${printerId}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h3 className="text-base font-semibold text-fg">{printer.name}</h3>
                   <p className="font-mono text-xs text-muted">{printer.ip ?? OPERATOR_IPS[printerId] ?? "no ip"}</p>
                 </div>
-                <span className={`rounded px-2 py-1 text-xs font-semibold ${locked ? "bg-red-900/50 text-red-300" : result?.ok ? "bg-green-900/40 text-green-300" : "bg-surface2 text-muted"}`}>
-                  {locked ? `${printer.status.toUpperCase()} / LOCKED` : result ? (result.ok ? "MOONRAKER READY" : "MOONRAKER FAIL") : "CONFIGURED"}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`rounded px-2 py-1 text-xs font-semibold ${locked ? "bg-red-900/50 text-red-300" : result?.ok ? "bg-green-900/40 text-green-300" : "bg-surface2 text-muted"}`}>
+                    {locked ? `${printer.status.toUpperCase()} / LOCKED` : result ? (result.ok ? "MOONRAKER READY" : "MOONRAKER FAIL") : "CONFIGURED"}
+                  </span>
+                  {/* W6-9 safety-state badge — distinct from connection status; always shown so operators see write/lock posture. */}
+                  <span
+                    data-testid={`printer-safety-state-${printerId}`}
+                    data-safety-state={safety.kind}
+                    aria-label={`Safety state: ${safety.label}`}
+                    title={safety.title}
+                    className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${safety.className}`}
+                  >
+                    {safety.label}
+                  </span>
+                </div>
               </div>
               <div className="mt-3 grid gap-1 text-sm text-muted">
                 <label className="flex items-center gap-2">
@@ -770,6 +783,67 @@ function canonicalPrinterId(printer: Printer): string {
 
 function isS1(printer: Printer): boolean {
   return canonicalPrinterId(printer) === "s1";
+}
+
+/**
+ * Distill backend printer state into a single safety badge.
+ *
+ * Order of precedence (matches backend gating):
+ *   1. S1 / maintenance flag      -> SAFETY LOCKED (red)
+ *   2. Onboarded read-only        -> READ-ONLY (amber)
+ *   3. Onboarded write-enabled    -> WRITE ENABLED (green)
+ *   4. Anything else              -> POLICY UNKNOWN (muted)
+ *
+ * The badge is rendered alongside the connection-status badge so operators
+ * see lock posture even when the printer is offline (W6-9 requirement).
+ */
+type PrinterSafetyState = {
+  kind: "locked" | "read_only" | "write_enabled" | "policy_unknown";
+  label: string;
+  title: string;
+  className: string;
+};
+
+function printerSafetyState(printer: Printer): PrinterSafetyState {
+  if (isS1(printer) || printer.maintenance_flag) {
+    return {
+      kind: "locked",
+      label: "Safety locked",
+      title: "Maintenance / camera-only safety lock enforced by backend.",
+      className: "bg-red-900/60 text-red-200 border border-red-700/60",
+    };
+  }
+  const policy = printer.safety_policy;
+  if (printer.write_enabled === true || policy === "write_enabled") {
+    return {
+      kind: "write_enabled",
+      label: "Write enabled",
+      title: "Backend allows guarded upload/start after idle + bounds + approval gates.",
+      className: "bg-green-900/40 text-green-300 border border-green-700/60",
+    };
+  }
+  if (policy === "locked") {
+    return {
+      kind: "locked",
+      label: "Safety locked",
+      title: "Backend lock policy: control disabled.",
+      className: "bg-red-900/60 text-red-200 border border-red-700/60",
+    };
+  }
+  if (policy === "read_only" || printer.onboarded === true || printer.write_enabled === false) {
+    return {
+      kind: "read_only",
+      label: "Read-only",
+      title: "Onboarded read-only — writes blocked until policy approves them.",
+      className: "bg-amber-900/40 text-amber-200 border border-amber-700/60",
+    };
+  }
+  return {
+    kind: "policy_unknown",
+    label: "Policy unknown",
+    title: "No safety_policy returned by backend; treating as read-only by default.",
+    className: "bg-surface2 text-muted border border-border",
+  };
 }
 
 function normalizeOperatorPrinter(printer: Printer): Printer {

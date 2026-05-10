@@ -8,8 +8,10 @@ import { useEffect, useState } from "react";
 import { Panel } from "../components/layout/Panel";
 import { StatusBadge, type StatusTone } from "../components/badges/StatusBadge";
 import { AgentCommandCenter } from "../components/agents/AgentCommandCenter";
+import { HermesAgentBanner } from "../components/agents/HermesAgentBanner";
 import { NotificationCenter } from "../components/notifications/NotificationCenter";
 import { adapters } from "../api/adapters";
+import { useAgentUpdateStatus } from "../hooks/useAgents";
 import type { Agent } from "../types/agent";
 import type {
   AgentActionCatalog,
@@ -237,6 +239,9 @@ export function AgentsTab() {
 
   return (
     <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="agents-root">
+      <div className="col-span-12" data-testid="agents-tab-hermes-version">
+        <HermesAgentVersionRibbon />
+      </div>
       <div className="col-span-12">
         <AgentCommandCenter agents={agents} />
       </div>
@@ -845,6 +850,83 @@ export function AgentsTab() {
         <NotificationCenter notifications={notifications} />
       </div>
     </div>
+  );
+}
+
+/**
+ * Hermes Agent version ribbon — surfaces v0.13 / current install tag, outdated state,
+ * and the latest release for the Agents primary tab (W6-5 HermesAgentBanner reuse + W15 A15 brief).
+ * Renders deterministic copy when the backend is unreachable so we never fake a tag.
+ */
+function HermesAgentVersionRibbon() {
+  const { data, error, isLoading } = useAgentUpdateStatus();
+  const currentTag = data?.current?.exact_tag ?? data?.current?.nearest_tag ?? null;
+  const latestTag = data?.latest_release?.tag ?? null;
+  const outdated = data?.outdated ?? false;
+  const outdatedBy = data?.outdated_by ?? 0;
+  const ribbonState = error
+    ? "offline"
+    : isLoading && !data
+      ? "loading"
+      : outdated
+        ? "update-available"
+        : "current";
+  const ribbonTone =
+    ribbonState === "update-available" || ribbonState === "offline"
+      ? "amber"
+      : ribbonState === "current"
+        ? "green"
+        : "muted";
+  const ribbonHeadline =
+    ribbonState === "offline"
+      ? "Hermes Agent status unreachable"
+      : ribbonState === "loading"
+        ? "Loading Hermes Agent version"
+        : outdated
+          ? `Hermes Agent update available (${outdatedBy} release${outdatedBy === 1 ? "" : "s"} behind)`
+          : "Hermes Agent current";
+  const ribbonDetail =
+    ribbonState === "offline"
+      ? error?.message ?? "/api/agents/update/status did not respond."
+      : ribbonState === "loading"
+        ? "Polling /api/agents/update/status (5 s)."
+        : `Installed ${currentTag ?? "unknown"}${latestTag ? `, latest ${latestTag}` : ""}.`;
+
+  return (
+    <Panel
+      id="agents.hermes-version"
+      title="HERMES AGENT VERSION"
+      dense
+      status={{ tone: ribbonTone, label: ribbonState.replace("-", " ") }}
+      className="min-h-[88px]"
+    >
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex flex-wrap items-center gap-3 text-xs text-fg"
+      >
+        <HermesAgentBanner />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate font-semibold">{ribbonHeadline}</span>
+          <span className="truncate text-[11px] text-muted">{ribbonDetail}</span>
+        </div>
+        <div className="flex flex-wrap gap-1.5 text-[11px]">
+          <span className="rounded border border-border bg-bg/40 px-2 py-0.5 text-muted">
+            installed <span className="font-mono text-fg">{currentTag ?? "unknown"}</span>
+          </span>
+          {latestTag && (
+            <span className="rounded border border-border bg-bg/40 px-2 py-0.5 text-muted">
+              latest <span className="font-mono text-fg">{latestTag}</span>
+            </span>
+          )}
+          {outdated && (
+            <span className="rounded border border-accent-amber/40 bg-accent-amber/10 px-2 py-0.5 font-semibold uppercase text-accent-amber">
+              update lane pending
+            </span>
+          )}
+        </div>
+      </div>
+    </Panel>
   );
 }
 

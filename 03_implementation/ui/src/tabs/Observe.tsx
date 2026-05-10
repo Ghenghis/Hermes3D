@@ -256,8 +256,34 @@ export function ObserveTab() {
   const onlineCount = Object.values(cameraStatus).filter((s) => s.health === "reachable").length;
   const totalStatusCount = Object.keys(cameraStatus).length;
 
+  /**
+   * ARIA live announcement for camera state transitions.
+   *
+   * Built from the most recently changed fields the operator should hear about:
+   * online/total count, refresh state, plate clearance changes, and any backend
+   * error stored in cameraMessage. The wrapping div uses role="status" with
+   * aria-live="polite" so screen readers get the update without interrupting
+   * the user (W3C WAI-ARIA Live Regions guidance + WCAG 2.1 SC 4.1.3).
+   */
+  const ariaAnnouncement = (() => {
+    if (cameraMessage) return cameraMessage;
+    if (isRefreshing) return "Refreshing live camera feeds.";
+    if (totalStatusCount === 0) return "Camera fleet status loading.";
+    return `${onlineCount} of ${totalStatusCount} camera feeds online.`;
+  })();
+
   return (
     <div data-testid="observe-root" className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] gap-2.5 rounded-card border border-border bg-surface p-3 text-fg">
+      {/* ARIA live region — politely announces camera count / refresh / error changes. */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+        data-testid="observe-aria-live"
+      >
+        {ariaAnnouncement}
+      </div>
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[13px] font-semibold">Camera Observer</h2>
@@ -360,7 +386,7 @@ export function ObserveTab() {
         )}
       </div>
 
-      {cameraMessage && <div className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{cameraMessage}</div>}
+      {cameraMessage && <div data-testid="observe-status-banner" className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{cameraMessage}</div>}
 
       {undockedCamera && (
         <div className="fixed inset-0 z-50 grid bg-bg/85 p-4 backdrop-blur-sm">
