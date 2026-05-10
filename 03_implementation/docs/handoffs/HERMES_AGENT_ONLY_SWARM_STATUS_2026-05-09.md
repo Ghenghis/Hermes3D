@@ -10,6 +10,8 @@
 
 **v0.13 deferral status:** **PARTIALLY LIFTED.** Hermes3D OS can now consume v0.13 in canary mode via env switch. Production stays v0.12 by default (operator opt-in via `HERMES_AGENT_CHECKOUT`).
 
+> **STATUS UPDATE 2026-05-10 (W5-8b doc-fix):** **subsequently FULLY LIFTED.** PR #160 (merged 2026-05-10T00:19Z) flipped the default to v0.13; v0.12 remains opt-in fallback via `HERMES_AGENT_CHECKOUT=G:/Github/hermes-agent-fresh`. Hermes3D-side workaround for the upstream guard non-blocker: PR #155 (canary resolver) + PR #160 (default flip). Upstream PR #22567 (closed-not-merged) is no longer on our critical path.
+
 **Major Wave 1 + Wave 2 prior verdict (KEEP DEFERRED) was based on a query artifact:** Wave 1's `gh api .../actions/runs?branch=main` grouped 0 successful runs by combining unrelated workflow names. **Wave A1 re-grouped by `workflow_id=242054771` and found 39/100 main `Tests` runs green** across 7 distinct main SHAs since v2026.5.7.
 
 **Wave A2 confirmed `pip install -e .` SUCCEEDS on Windows at v2026.5.7.**

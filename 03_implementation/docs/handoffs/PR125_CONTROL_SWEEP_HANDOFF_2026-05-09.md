@@ -1,6 +1,11 @@
 # PR #125 Control Sweep Handoff
+
+> **POST-MERGE 2026-05-09T07:09Z (W5-8b doc-fix):** PR #125 was MERGED on 2026-05-09T07:09:15Z. The body of this doc is the **pre-merge sweep record** authored before that merge landed; it is preserved verbatim for the audit trail. Treat every "OPEN, CLEAN" / "not merged yet" reference below as historical state, not current state.
+>
+> **Provider rescue update (W5-8b doc-fix):** the §"MiniMax BLOCKED HTTP 429" / "DeepSeek BLOCKED HTTP 401" rows in the audit table below are **superseded** by `PROVIDER_RESCUE_BLOCKER_PROOF_2026-05-09.md:L1-9` ("SUPERSEDED — Providers Now PASS", `accepted:true` HTTP 200, evidence `ev_4a52d9b1336ca9f2` MiniMax + `ev_e708071cb269f170` DeepSeek). The original BLOCKED state was an out-of-repo `.env` issue, not a code bug.
+
 Date: 2026-05-09  
-Contract: PR #125 `docs(agent): tighten control gates` — OPEN, CLEAN  
+Contract: PR #125 `docs(agent): tighten control gates` — OPEN, CLEAN  *(see banner above; merged 2026-05-09T07:09:15Z)*  
 Executed by: claude-sweep-docs (task H3D-PR125-SWEEP-DOCS)  
 Workspace: G:\Github\h3d-gui-wiring-codex  
 Branch: codex/claude-hermes-runtime-finish-contract-2026-05-08  

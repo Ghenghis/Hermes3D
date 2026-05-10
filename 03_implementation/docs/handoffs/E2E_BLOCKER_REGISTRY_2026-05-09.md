@@ -11,6 +11,22 @@
 
 ---
 
+## STATUS UPDATE 2026-05-10 (post Wave 5; W5-8b doc-fix)
+
+The Wave 5 swarm executed PRs #155–#174 between 2026-05-09T23:23Z and 2026-05-10T01:44Z. Several rows below are now superseded. The supersessions in this STATUS UPDATE are authoritative; the table further down is the historical pre-Wave-5 verdict.
+
+| Row | Pre-Wave-5 status | Post-Wave-5 status | Source of truth |
+|---|---|---|---|
+| **DoD #3** "Hermes Agent proof lane passing OR formally deferred" | `deferred` | **`superseded-by-PR-#160`** — v0.13 promoted to production default 2026-05-10T00:19Z (squash `3158a4e`); v0.12 remains opt-in fallback via `HERMES_AGENT_CHECKOUT=G:/Github/hermes-agent-fresh`. Re-grouped main `Tests` runs by `workflow_id=242054771`: **39/100 green** (correcting the earlier "0 succeeded" query artifact); cf. `HERMES_AGENT_ONLY_SWARM_STATUS_2026-05-09.md:L13`. | PR #160 metadata; `services/agent_checkout.py:L31` (`DEFAULT_AGENT_CHECKOUT = Path("G:/Github/hermes-agent-v013-canary")`). |
+| **DoD #1** MiniMax smoke | `open` | `open` (live re-smoke pending; provider env confirmed by `PROVIDER_RESCUE_BLOCKER_PROOF_2026-05-09.md`: HTTP 200 `accepted:true` `ev_4a52d9b1336ca9f2`). | PROVIDER_RESCUE_BLOCKER_PROOF |
+| **DoD #2** DeepSeek smoke | `open` | `open` (live re-smoke pending; provider env confirmed: HTTP 200 `accepted:true` `ev_e708071cb269f170`). | PROVIDER_RESCUE_BLOCKER_PROOF |
+| **BLK-011** "v0.13.0 upstream tests.yml continuously red \| last 100 main runs: 0 succeeded" | `upstream-blocked` | **`superseded-by-PR-#160`** — corrected to 39/100 green when re-grouped by canonical workflow_id; PR #160 then promoted v0.13 to default. | gh api workflows/242054771/runs (re-grouped); PR #160 |
+| **BLK-021** Hermes Agent v0.13 cold-start race (DB schema not yet migrated when GUI loads) | (not yet in registry) | **new — P2** | `HERMES_AGENT_V013_GUI_E2E_2026-05-09.md:L137-138` (lives on the W5-3 branch) — cold-start UX race; git-tracked schema confirmed at `03_implementation/src/hermes3d/db/schema.sql`. Tracked here so it is not lost when that branch lands. |
+
+**v0.13 deferral verdict (was at table row "BLK-011 stays deferred; v0.13.0 stays deferred until clean proof lane"):** **superseded.** v0.13 is now the production default. The "stays deferred" sentence below is retained for historical fidelity but **must not be acted on as a current decision**.
+
+---
+
 ## E2E Definition of Done
 
 Hermes3D OS is **not E2E-ready** until every row below is `verified` or has explicit user approval to defer:
@@ -58,6 +74,7 @@ Hermes3D OS is **not E2E-ready** until every row below is `verified` or has expl
 | BLK-018 | secrets.scan | P2 | Continuous secret-leak guard not in CI | only manual grep done so far; Bonus 14 NO_LEAKS at 2026-05-09 | squad-G | `.github/workflows/` | TruffleHog / Gitleaks | n/a | n/a | n/a | **open** |
 | BLK-019 | ci.lanes | P1 | No Hermes Agent proof workflow on free GHA runner | Agent 13 swarm provided drop-in YAML | squad-H | `.github/workflows/hermes-agent-proof.yml` (proposed) | Agent 13 receipts | n/a | n/a | n/a | **open** |
 | BLK-020 | desktop-updates | P2 | Same un-summarized agent_config write pattern as BLK-002 | `desktop_updates.py:120-122` | swarm | `desktop_updates.py` | Agent 7 swarm cross-table audit | n/a | n/a | n/a | **open** |
+| BLK-021 | hermes-agent.gui-e2e | P2 | Hermes Agent v0.13 cold-start race — DB schema not yet migrated when GUI loads on first run | git-tracked file confirmed at `03_implementation/src/hermes3d/db/schema.sql`; race observed during W5-3 GUI E2E drill | squad-E | `03_implementation/src/hermes3d/db/load_modules.py`, `schema.sql` | `HERMES_AGENT_V013_GUI_E2E_2026-05-09.md:L137-138` (W5-3 branch) | n/a | n/a | n/a | **open** (cold-start UX) |
 
 ---
 
@@ -117,4 +134,4 @@ The discovery audit is delegated to swarm agents below. Each agent returns a cla
 
 - Audit doc: `60-apps-batch2/bonus12-bug-finder.md` (PR #135 / commit 5ecd8ff)
 - Pre-existing 20-agent swarm output banks: Agents 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15 (all returned)
-- Standing user constraints honored: free/OSS only; no paid services; secrets at `G:/private/`; v0.13.0 stays deferred until clean proof lane
+- Standing user constraints honored: free/OSS only; no paid services; secrets at `G:/private/`. ~~v0.13.0 stays deferred until clean proof lane~~ **[SUPERSEDED 2026-05-10 by PR #160 — v0.13 is production default; v0.12 remains opt-in fallback via `HERMES_AGENT_CHECKOUT`.]**
