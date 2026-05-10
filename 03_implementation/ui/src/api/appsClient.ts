@@ -149,6 +149,7 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
     id: (typeof record.id === "string" ? record.id : "") || "(unknown)",
     name:
       (typeof record.name === "string" ? record.name : null) ??
+      (typeof record.display === "string" ? record.display : null) ??
       (typeof record.id === "string" ? record.id : "(unknown)"),
     current_version: readString(record, "current_version") ?? readString(record, "version"),
     tested_versions: readArray(record, "tested_versions").filter(
