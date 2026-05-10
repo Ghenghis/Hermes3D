@@ -1,28 +1,31 @@
 /**
- * W6-6 Custom Playwright reporter for visual-proof.spec.ts.
+ * W6-6 / W15-A9 Playwright reporter for visual-proof.spec.ts.
  *
- * Reads the test annotations emitted by visual-proof.spec.ts and produces a
- * single JSON summary at:
+ * Reads test annotations emitted by visual-proof.spec.ts and produces a JSON
+ * summary at:
  *   03_implementation/docs/evidence/visual_proof_2026-05-09/summary.json
  *
- * Each row records:
- *   { target, status, route, reference, tolerance,
- *     diff_pixels?, total_pixels?, ratio?,
- *     evidence_path, diff_path?, error?, started_at, finished_at }
+ * W15-A9 extensions over W14:
+ *   - region-level rows (one per region in target.regions[]) so the
+ *     collage references in Images-GUI/02-primary-pages/ get per-region
+ *     diff classification rather than a single composite verdict.
+ *   - same-origin 404 events on each row (count + summary) for cap 4.
+ *   - console-error events on each row (count + first 5 messages) for cap 3.
+ *   - no-fake hits (count + summary) for cap 5.
  *
- * Status values:
- *   - "match"               : visual diff <= tolerance
- *   - "diff"                : visual diff > tolerance (FAIL)
- *   - "missing-baseline"    : no reference PNG found at the expected path
- *   - "skipped-future"      : status="future" target owned by another lane
- *   - "skipped-missing-reference": reference path was not on disk
- *   - "error"               : runtime error (timeout, navigation crash, etc.)
+ * The schema is additive: rows still carry every W14 field, so downstream
+ * consumers (W15-A10's expected-red report, the truth-gate parser) continue
+ * to work unmodified.
  *
  * Sources:
- *  - Playwright reporter API:
- *      https://playwright.dev/docs/api/class-reporter
- *  - Playwright snapshot/visual-comparison docs:
- *      https://playwright.dev/docs/test-snapshots
+ *  1. Playwright reporter API:
+ *     https://playwright.dev/docs/api/class-reporter
+ *  2. Chromatic / Percy visual-test recipe — region + console + 404 fields:
+ *     https://www.chromatic.com/docs/visual-tests/
+ *
+ * No-fake / no-paid contract:
+ *  - Reporter writes one JSON file locally; no telemetry, no remote sink.
+ *  - All fields are derived from in-process annotations; nothing is invented.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -46,6 +49,7 @@ interface ManifestTarget {
   status: "live" | "future";
   tolerance: number;
   notes?: string;
+  regions?: { name: string; clip?: unknown; reference?: string; tolerance?: number }[];
 }
 
 interface ManifestFile {
@@ -59,6 +63,7 @@ try {
 } catch {
   MANIFEST = {};
 }
+
 const SUMMARY_DIR = path.join(
   REPO_ROOT,
   "03_implementation",
@@ -67,6 +72,15 @@ const SUMMARY_DIR = path.join(
   "visual_proof_2026-05-09",
 );
 const SUMMARY_PATH = path.join(SUMMARY_DIR, "summary.json");
+
+interface RegionRow {
+  region: string;
+  status: "match" | "diff" | "missing-baseline" | "error" | "not-run";
+  tolerance: number | null;
+  diff_pixels?: number;
+  ratio?: number;
+  reference: string | null;
+}
 
 interface VisualRow {
   target: string;
@@ -80,11 +94,24 @@ interface VisualRow {
   route: string | null;
   reference: string | null;
   tolerance: number | null;
+  viewport: { width: number; height: number } | null;
+  theme: string | null;
+  clock_time: string | null;
   diff_pixels?: number;
   total_pixels?: number;
   ratio?: number;
   evidence_path: string | null;
   diff_path: string | null;
+  // W15-A9 — new event counts. Always present so consumers can filter.
+  console_errors: number;
+  console_summary: string;
+  network_same_origin_errors: number;
+  network_total_errors: number;
+  network_summary: string;
+  no_fake_hits: number;
+  no_fake_summary: string;
+  // W15-A9 — region-level rollups. Empty when target has no regions[].
+  regions: RegionRow[];
   error: string | null;
   started_at: string | null;
   finished_at: string | null;
@@ -107,23 +134,27 @@ class VisualProofReporter implements Reporter {
   }
 
   onTestEnd(test: TestCase, result: TestResult): void {
-    // Each visual-proof.spec.ts test pushes contract annotations:
-    //   visual-proof-target  -> sent immediately on test start
-    //   visual-proof-result  -> sent only on a successful match
-    //   visual-proof         -> single annotation when skipped (only fires
-    //                          when the wrapped fn is invoked; for
-    //                          test.skip(reason, fn) it does NOT fire, so we
-    //                          fall back to title-based lookup below)
     const annotations = test.annotations.concat(result.annotations ?? []);
     let target: string | null = null;
     let route: string | null = null;
     let reference: string | null = null;
     let tolerance: number | null = null;
+    let viewport: { width: number; height: number } | null = null;
+    let theme: string | null = null;
+    let clockTime: string | null = null;
     let matched = false;
+    let regionsRollup: Map<string, RegionRow> = new Map();
+    let consoleErrors = 0;
+    let consoleSummary = "";
+    let networkSameOrigin = 0;
+    let networkTotal = 0;
+    let networkSummary = "";
+    let noFakeHits = 0;
+    let noFakeSummary = "";
     let skippedReason: string | null = null;
     let skippedKind: "future" | "missing-reference" | null = null;
 
-    // Extract target name from the describe title which is "visual: <target>".
+    // Extract the target name from the describe title: "visual: <target>".
     // This is the only reliable way to identify a skipped test since the
     // wrapped fn body never runs and our annotations never fire.
     for (const titleSeg of test.titlePath()) {
@@ -142,12 +173,20 @@ class VisualProofReporter implements Reporter {
         skippedKind = "future";
         skippedReason = manifest.notes ?? "future";
       } else {
-        // status === "live"; if the test was skipped we infer the reason
-        // is the reference PNG was not on disk.
         const refAbs = path.resolve(REPO_ROOT, manifest.reference);
         if (!fs.existsSync(refAbs)) {
           skippedKind = "missing-reference";
         }
+      }
+      // Pre-populate region rollups so the row records all expected regions
+      // even if the test threw before hitting the loop.
+      for (const region of manifest.regions ?? []) {
+        regionsRollup.set(region.name, {
+          region: region.name,
+          status: "not-run",
+          tolerance: region.tolerance ?? manifest.tolerance ?? null,
+          reference: region.reference ?? manifest.reference,
+        });
       }
     }
 
@@ -161,9 +200,59 @@ class VisualProofReporter implements Reporter {
       if (typeof parsed.reference === "string") reference = parsed.reference;
       if (typeof parsed.tolerance === "number") tolerance = parsed.tolerance;
 
+      if (ann.type === "visual-proof-target") {
+        if (
+          parsed.viewport &&
+          typeof parsed.viewport === "object" &&
+          parsed.viewport !== null
+        ) {
+          const v = parsed.viewport as { width?: unknown; height?: unknown };
+          if (typeof v.width === "number" && typeof v.height === "number") {
+            viewport = { width: v.width, height: v.height };
+          }
+        }
+        if (typeof parsed.theme === "string") theme = parsed.theme;
+        if (typeof parsed.clock_time === "string") clockTime = parsed.clock_time;
+      }
+
       if (ann.type === "visual-proof-result" && parsed.status === "match") {
         matched = true;
       }
+
+      if (ann.type === "visual-proof-region-result") {
+        const regionName = typeof parsed.region === "string" ? parsed.region : null;
+        if (regionName) {
+          const existing = regionsRollup.get(regionName) ?? {
+            region: regionName,
+            status: "not-run" as RegionRow["status"],
+            tolerance:
+              typeof parsed.tolerance === "number" ? parsed.tolerance : null,
+            reference: null,
+          };
+          existing.status = parsed.status === "match" ? "match" : "diff";
+          if (typeof parsed.tolerance === "number") existing.tolerance = parsed.tolerance;
+          regionsRollup.set(regionName, existing);
+        }
+      }
+
+      if (ann.type === "visual-proof-console") {
+        if (typeof parsed.errors === "number") consoleErrors = parsed.errors;
+        if (typeof parsed.summary === "string") consoleSummary = parsed.summary;
+      }
+
+      if (ann.type === "visual-proof-network") {
+        if (typeof parsed.same_origin_errors === "number")
+          networkSameOrigin = parsed.same_origin_errors;
+        if (typeof parsed.total_errors === "number")
+          networkTotal = parsed.total_errors;
+        if (typeof parsed.summary === "string") networkSummary = parsed.summary;
+      }
+
+      if (ann.type === "visual-proof-no-fake") {
+        if (typeof parsed.hits === "number") noFakeHits = parsed.hits;
+        if (typeof parsed.summary === "string") noFakeSummary = parsed.summary;
+      }
+
       if (ann.type === "visual-proof") {
         if (parsed.status === "skipped-future") {
           skippedKind = "future";
@@ -190,13 +279,10 @@ class VisualProofReporter implements Reporter {
     let totalPixels: number | undefined;
     let ratio: number | undefined;
 
-    // Look for the diff/actual attachments Playwright emits when the screenshot
-    // assertion fails. These give us diff_pixels and the diff PNG path.
     for (const att of result.attachments ?? []) {
       if (!att.name) continue;
       if (/expected/.test(att.name) && att.path) {
-        // The expected image is the reference PNG itself; record its path so
-        // reviewers can hop directly to Images-GUI/.
+        // The expected image is the reference PNG itself.
       } else if (/actual/.test(att.name) && att.path) {
         evidencePath = path.relative(REPO_ROOT, att.path).replace(/\\/g, "/");
       } else if (/diff/.test(att.name) && att.path) {
@@ -204,21 +290,14 @@ class VisualProofReporter implements Reporter {
       }
     }
 
-    // Inspect the test error for diff_pixels / ratio info that Playwright
-    // emits on toHaveScreenshot failure.
     if (result.status === "failed" || result.status === "timedOut") {
       const msg = result.error?.message ?? "";
       errorMessage = msg.split("\n").slice(0, 2).join(" ").slice(0, 600);
-      // Playwright failure messages contain phrases like:
-      //   "12345 pixels (ratio 0.06 of all image pixels) are different."
       const pixMatch = msg.match(/(\d+)\s+pixels?\s+\(ratio\s+([0-9.]+)/i);
       if (pixMatch) {
         diffPixels = Number(pixMatch[1]);
         ratio = Number(pixMatch[2]);
       }
-      // Missing baseline messages:
-      //   "A snapshot doesn't exist at ..., writing actual."
-      //   "Error: A snapshot doesn't exist at ..."
       if (/snapshot doesn't exist|does not exist/i.test(msg)) {
         status = "missing-baseline";
       } else if (diffPixels !== undefined) {
@@ -237,7 +316,6 @@ class VisualProofReporter implements Reporter {
             : "skipped-future";
       if (skippedReason) errorMessage = skippedReason;
     } else if (result.status === "passed") {
-      // Passed without a match annotation — defensive fallback.
       status = "match";
     } else {
       status = "error";
@@ -249,11 +327,24 @@ class VisualProofReporter implements Reporter {
       route,
       reference,
       tolerance,
+      viewport,
+      theme,
+      clock_time: clockTime,
       diff_pixels: diffPixels,
       total_pixels: totalPixels,
       ratio,
       evidence_path: evidencePath,
       diff_path: diffPath,
+      console_errors: consoleErrors,
+      console_summary: consoleSummary,
+      network_same_origin_errors: networkSameOrigin,
+      network_total_errors: networkTotal,
+      network_summary: networkSummary,
+      no_fake_hits: noFakeHits,
+      no_fake_summary: noFakeSummary,
+      regions: Array.from(regionsRollup.values()).sort((a, b) =>
+        a.region.localeCompare(b.region),
+      ),
       error: errorMessage,
       started_at: startedAt,
       finished_at: finishedAt,
@@ -272,19 +363,37 @@ class VisualProofReporter implements Reporter {
       { total: 0 } as Record<string, number>,
     );
 
+    // W15-A9 — additional rollups so the summary is actionable without
+    // post-processing.
+    const gateCounts = this.rows.reduce(
+      (acc, row) => {
+        acc.console_error_targets += row.console_errors > 0 ? 1 : 0;
+        acc.network_4xx_targets += row.network_same_origin_errors > 0 ? 1 : 0;
+        acc.no_fake_targets += row.no_fake_hits > 0 ? 1 : 0;
+        acc.targets_with_regions += row.regions.length > 0 ? 1 : 0;
+        return acc;
+      },
+      {
+        console_error_targets: 0,
+        network_4xx_targets: 0,
+        no_fake_targets: 0,
+        targets_with_regions: 0,
+      },
+    );
+
     const summary = {
-      schema_version: 1,
+      schema_version: 2,
       generated_at: new Date().toISOString(),
       started_at: this.startedAt,
       run_status: result.status,
-      owner: "claude-w6-6-visual-proof",
-      lane: "W6-6 Playwright visual proof against Images-GUI/",
+      owner: "claude-w15-a9-oracle",
+      lane: "W15-A9 Playwright Oracle Builder (9 capabilities)",
       counts,
+      gate_counts: gateCounts,
       rows: this.rows.sort((a, b) => a.target.localeCompare(b.target)),
     };
 
     fs.writeFileSync(SUMMARY_PATH, JSON.stringify(summary, null, 2) + "\n");
-    // Also write a brief stdout summary so CI logs surface the totals.
     const summaryLine =
       `[visual-proof] total=${counts.total} ` +
       Object.entries(counts)
@@ -292,6 +401,10 @@ class VisualProofReporter implements Reporter {
         .map(([k, v]) => `${k}=${v}`)
         .join(" ");
     process.stdout.write(`${summaryLine}\n`);
+    process.stdout.write(
+      `[visual-proof] gate-fails: console=${gateCounts.console_error_targets} ` +
+        `network=${gateCounts.network_4xx_targets} no-fake=${gateCounts.no_fake_targets}\n`,
+    );
     process.stdout.write(`[visual-proof] summary written to ${SUMMARY_PATH}\n`);
   }
 }

@@ -1,77 +1,74 @@
 /**
- * W6-6 Playwright visual-proof harness against the Images-GUI/ reference pack.
- * W8-14 patch:
- *   - reference PNGs are now read from tests/visual/__refs__/ (mirrored from
- *     Images-GUI/ by global-setup.ts). Playwright rejects snapshot paths that
- *     escape the test root with "outputPath is not allowed outside of the
- *     parent directory" — keeping references inside the test root sidesteps
- *     that safety check while preserving Images-GUI/ as the source of truth.
- *   - waitForStable() drops `waitForLoadState("networkidle")` (the SPA's
- *     long-poll and SSE channels keep the network busy beyond 30s), in favor
- *     of `domcontentloaded` + a 500ms quiet timeout. Per the Playwright docs
- *     (https://playwright.dev/docs/api/class-page#page-wait-for-load-state)
- *     `networkidle` is "DISCOURAGED" precisely for SPAs of this shape.
+ * W6-6 / W8-14 / W15-A9 Playwright visual-oracle spec.
  *
- * For each entry in visual-targets.json with status === "live":
- *   1. Navigate to target.route on the live dev server (via webServer)
- *   2. Wait for wait_test_id (15s timeout), domcontentloaded, and a 500ms
- *      quiet period for the SPA to settle.
- *   3. Call expect(page).toHaveScreenshot([...path]) with the target's
- *      tolerance as maxDiffPixelRatio. Playwright uses its bundled
- *      pixelmatch implementation; diff PNGs land under test-results/ when a
- *      target exceeds tolerance.
+ * W15-A9 implements 9 capabilities identified by W15-A5's gap analysis of
+ * the W14 harness. Versus W14, every live target now runs through:
+ *   1. Region crops — `target.regions[]` produces one screenshot per region.
+ *   2. Per-target viewport — `target.viewport` selects a project; tests
+ *      `test.use({ viewport })` so the assertion baseline matches.
+ *   3. Console-error mandatory fail — strict, no allow-list.
+ *   4. Network 404 fail — same-origin 4xx/5xx fail the test.
+ *   5. No-fake DOM scan — innerText / data-* markers fail the test.
+ *   6. Deterministic clock — `page.clock.install({ time })` + `pauseAt`.
+ *   7. Theme determinism — `localStorage[h3d.theme]` stubbed via initScript.
+ *   8. fonts.ready — awaited before every screenshot (full-page + regions).
+ *   9. Region screenshots — `page.screenshot({ clip })` for collage refs.
  *
- * Targets with status === "future" call test.skip() with a reason; the JSON
- * reporter still records a "skipped" row so reviewers see all 31 references.
+ * Test shape per live target:
+ *   describe `visual: <target>`
+ *     beforeEach:
+ *       - addInitScript theme stub
+ *       - install deterministic clock + pause at clock_time
+ *       - attach console + 404 trackers
+ *     test `matches reference within tolerance N`:
+ *       - goto(route), wait for wait_test_id
+ *       - waitForFontsReady, scanForFakeMarkers, drain console + 404
+ *       - assert no fake markers, no console errors, no same-origin 4xx/5xx
+ *       - if target.regions: loop screenshot({clip}) per region with its
+ *         own toHaveScreenshot reference + tolerance
+ *       - else: full-page toHaveScreenshot
+ *
+ * The reporter (visual-proof-reporter.ts) collects annotations emitted at
+ * key milestones so the JSON summary contains region-level, network, and
+ * console-error rows without needing extra Playwright wiring.
  *
  * Sources cited:
- *  - Playwright snapshot/visual-comparison docs:
- *      https://playwright.dev/docs/test-snapshots
- *  - Playwright toHaveScreenshot API:
- *      https://playwright.dev/docs/api/class-pageassertions#page-assertions-to-have-screenshot
- *  - Playwright page.waitForLoadState reference (W8-14 networkidle fix):
- *      https://playwright.dev/docs/api/class-page#page-wait-for-load-state
+ *  1. Playwright clock.install / pauseAt:
+ *     https://playwright.dev/docs/clock
+ *  2. Chromatic / Percy visual-test harness recipe (regions + per-viewport
+ *     projects + console-error + 404 gate + fonts.ready):
+ *     https://www.chromatic.com/docs/visual-tests/
  *
  * No-fake / no-paid contract:
- *  - This spec NEVER auto-updates reference PNGs. The visual config sets
- *    updateSnapshots: "none". Refresh requires an explicit operator action
- *    (run with --update-snapshots, then review diff in the PR).
- *  - The __refs__/ mirror is one-way: Images-GUI/ -> __refs__/. Never the
- *    reverse. globalSetup verifies size+mtime parity on every run.
- *  - This spec only reports diff data; component fixes are out of scope and
- *    are owned by W6-3 / W6-4.
- *  - No paid services are used; everything runs against the local dev server
- *    started by scripts/start-e2e-stack.mjs.
- *
- * Snapshot path resolution: snapshotPathTemplate is "{arg}{ext}" so the array
- * passed to toHaveScreenshot is path.join'd and resolved relative to the
- * playwright config dir (UI_ROOT). After W8-14 we pass a forward-only chain
- * into tests/visual/__refs__/<category>/<file>.png — fully inside the test
- * root, so Playwright accepts it.
+ *  - updateSnapshots is "none" at the config level; this spec never writes
+ *    or auto-updates reference PNGs.
+ *  - All gates are STRICT-by-default. There is no allow-list flag.
+ *  - All network is local; no telemetry; no paid services.
  */
 import { test, expect, type Page } from "@playwright/test";
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-interface VisualTarget {
-  target: string;
-  reference: string;
-  route: string;
-  status: "live" | "future";
-  tolerance: number;
-  wait_test_id?: string;
-  notes?: string;
-}
-
-interface VisualTargetsFile {
-  description: string;
-  owner: string;
-  created: string;
-  tolerance_default: number;
-  viewport: { width: number; height: number };
-  targets: VisualTarget[];
-}
+import {
+  DEFAULT_THEME,
+  DETERMINISTIC_TIME,
+  attachConsoleErrorSink,
+  installDeterministicClock,
+  pauseClock,
+  setLiveTheme,
+  stubTheme,
+  waitForFontsReady,
+  type ConsoleErrorSink,
+  type VisualRegion,
+  type VisualTargetsFile,
+} from "./_visual-helpers";
+import { scanForFakeMarkers, summarizeFakeHits } from "./no-fake-scanner";
+import {
+  attachNetworkErrorTracker,
+  summarizeNetworkErrors,
+  type NetworkErrorTracker,
+} from "./network-404-tracker";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TARGETS_PATH = path.join(HERE, "visual-targets.json");
@@ -79,20 +76,15 @@ const UI_ROOT = path.resolve(HERE, "..", "..");
 const REPO_ROOT = path.resolve(UI_ROOT, "..", "..");
 // W8-14: refs are mirrored INSIDE the test root so snapshotPathTemplate
 // "{arg}{ext}" resolves forward-only and Playwright accepts the path.
-// global-setup.ts populates this directory before any tests run.
 const REFS_LOCAL_ROOT = path.join(HERE, "__refs__");
 const targetsFile = JSON.parse(fs.readFileSync(TARGETS_PATH, "utf-8")) as VisualTargetsFile;
+const BASE_URL = "http://localhost:5173";
 
 /**
- * Wait for the SPA to settle: domcontentloaded plus quietMs of no nav.
- *
- * W8-14: networkidle was removed because the Hermes3D SPA opens long-poll
- * and SSE channels (recovery_controller, agent updates, A2A) that never go
- * idle within Playwright's 30s default. Playwright's docs flag networkidle
- * as DISCOURAGED for SPAs of this shape:
- *   https://playwright.dev/docs/api/class-page#page-wait-for-load-state
- * The wait_test_id assertion in each test (toBeVisible, 15s) plus a 500ms
- * quiet period is sufficient to prove the route mounted and rendered.
+ * Wait for SPA settle: domcontentloaded plus a quiet timeout. networkidle is
+ * intentionally skipped — long-poll + SSE channels in the Hermes3D SPA never
+ * idle within Playwright's 30s default. The wait_test_id assertion plus a
+ * 500ms quiet period proves the route mounted (see W8-14 diagnosis).
  */
 async function waitForStable(page: Page, quietMs = 500): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
@@ -100,48 +92,69 @@ async function waitForStable(page: Page, quietMs = 500): Promise<void> {
 }
 
 /**
- * Build the snapshot-name array for toHaveScreenshot from a reference path.
- *
- * Reference paths in visual-targets.json are repo-relative (e.g.
- * "Images-GUI/01-dashboard-modes/advanced-dashboard-a.png"). W8-14 changes
- * the resolution to point at the LOCAL mirror under tests/visual/__refs__/
- * (populated by global-setup.ts). The returned chain is relative to UI_ROOT
- * (the playwright config dir) and stays entirely INSIDE the test root, which
- * sidesteps Playwright's "outputPath is not allowed outside of the parent
- * directory" check on snapshotPathTemplate "{arg}{ext}".
+ * Build the snapshot-name array from a repo-relative reference path.
+ * Returns segments relative to UI_ROOT so toHaveScreenshot resolves
+ * forward-only into tests/visual/__refs__/.
  */
 function snapshotPathSegments(referenceRepoRel: string): string[] {
-  // Strip the leading "Images-GUI/" segment so the rest maps 1:1 into __refs__/.
   const subPath = referenceRepoRel.replace(/^Images-GUI[\\/]+/i, "");
   const referenceAbs = path.join(REFS_LOCAL_ROOT, subPath);
   const fromUiRoot = path.relative(UI_ROOT, referenceAbs);
-  // Keep the .png on the last segment so toHaveScreenshot infers the ext;
-  // splitting by both separators tolerates Windows backslashes.
   return fromUiRoot.split(/[\\/]+/);
+}
+
+/**
+ * Build region snapshot segments: parent-directory + filename derived from
+ * the original reference (stem) plus a `.<regionName>.png` suffix. The
+ * resulting path lives next to the full-page reference inside __refs__/.
+ */
+function regionSnapshotSegments(referenceRepoRel: string, regionName: string): string[] {
+  const subPath = referenceRepoRel.replace(/^Images-GUI[\\/]+/i, "");
+  const dir = path.dirname(subPath);
+  const base = path.basename(subPath, path.extname(subPath));
+  const fileName = `${base}.${regionName}.png`;
+  const referenceAbs = path.join(REFS_LOCAL_ROOT, dir, fileName);
+  const fromUiRoot = path.relative(UI_ROOT, referenceAbs);
+  return fromUiRoot.split(/[\\/]+/);
+}
+
+/**
+ * Annotation helper — JSON-stringifies once and pushes onto the active test.
+ * Keeping this in one place means the reporter always parses the same shape.
+ */
+function annotate(type: string, payload: Record<string, unknown>): void {
+  test.info().annotations.push({
+    type,
+    description: JSON.stringify(payload),
+  });
 }
 
 for (const target of targetsFile.targets) {
   const referenceAbs = path.resolve(REPO_ROOT, target.reference);
 
   test.describe(`visual: ${target.target}`, () => {
+    // W15-A9 cap 2 — per-target viewport override. test.use propagates
+    // viewport to the underlying browser context so the screenshot
+    // assertion baseline matches the per-target reference shape. Tests
+    // without an override inherit the project's default viewport.
+    if (target.viewport && Number.isFinite(target.viewport.width) && Number.isFinite(target.viewport.height)) {
+      test.use({ viewport: { width: target.viewport.width, height: target.viewport.height } });
+    }
+
     if (target.status === "future") {
-      // Future targets are owned by other Wave 6 lanes (W6-3 dashboard mode
-      // switcher, W6-4 Action Window, theme switcher, custom dashboards).
-      // We register them as skipped tests so the reporter row exists.
+      // Future targets are skipped at runtime; the reporter still records a
+      // row via the title-based lookup.
       // eslint-disable-next-line playwright/no-skipped-test
       test.skip(
-        `${target.target} future-target — owned by Wave 6 lane 3/4 (${target.notes ?? "future"})`,
+        `${target.target} future-target — owned by another W15 lane (${target.notes ?? "future"})`,
         async () => {
-          test.info().annotations.push({
-            type: "visual-proof",
-            description: JSON.stringify({
-              target: target.target,
-              reference: target.reference,
-              route: target.route,
-              tolerance: target.tolerance,
-              status: "skipped-future",
-              reason: target.notes ?? "future",
-            }),
+          annotate("visual-proof", {
+            target: target.target,
+            reference: target.reference,
+            route: target.route,
+            tolerance: target.tolerance,
+            status: "skipped-future",
+            reason: target.notes ?? "future",
           });
         },
       );
@@ -153,35 +166,52 @@ for (const target of targetsFile.targets) {
       test.skip(
         `${target.target} missing-reference at ${target.reference}`,
         async () => {
-          test.info().annotations.push({
-            type: "visual-proof",
-            description: JSON.stringify({
-              target: target.target,
-              reference: target.reference,
-              route: target.route,
-              tolerance: target.tolerance,
-              status: "skipped-missing-reference",
-            }),
+          annotate("visual-proof", {
+            target: target.target,
+            reference: target.reference,
+            route: target.route,
+            tolerance: target.tolerance,
+            status: "skipped-missing-reference",
           });
         },
       );
       return;
     }
 
+    // Per-test state — kept outside the test body so beforeEach can populate
+    // it and the assertion block can drain it.
+    let consoleSink: ConsoleErrorSink;
+    let networkTracker: NetworkErrorTracker;
+
+    test.beforeEach(async ({ page }) => {
+      // W15-A9 cap 7 — theme determinism via initScript BEFORE first paint.
+      await stubTheme(page, target.theme ?? DEFAULT_THEME);
+      // W15-A9 cap 6 — deterministic clock pinned at target.clock_time or
+      // DETERMINISTIC_TIME. Installed BEFORE navigation so Date(), timers,
+      // and requestAnimationFrame are already frozen on first paint.
+      await installDeterministicClock(page, target.clock_time ?? DETERMINISTIC_TIME);
+      // W15-A9 cap 3 + 4 — strict console + same-origin 4xx/5xx trackers.
+      consoleSink = attachConsoleErrorSink(page);
+      networkTracker = attachNetworkErrorTracker(page, { baseURL: BASE_URL });
+    });
+
     test(`matches reference within tolerance ${target.tolerance}`, async ({ page }) => {
-      // Annotate up-front so the reporter has the contract row even if the
-      // test fails mid-flight.
-      test.info().annotations.push({
-        type: "visual-proof-target",
-        description: JSON.stringify({
-          target: target.target,
-          reference: target.reference,
-          route: target.route,
-          tolerance: target.tolerance,
-        }),
+      annotate("visual-proof-target", {
+        target: target.target,
+        reference: target.reference,
+        route: target.route,
+        tolerance: target.tolerance,
+        viewport: target.viewport ?? targetsFile.viewport,
+        theme: target.theme ?? DEFAULT_THEME,
+        clock_time: target.clock_time ?? DETERMINISTIC_TIME,
+        regions: (target.regions ?? []).map((r: VisualRegion) => r.name),
       });
 
       await page.goto(target.route);
+      // Re-assert theme post-navigation in case the SPA cleared LS during
+      // boot. Cheap and idempotent — see _visual-helpers.setLiveTheme.
+      await setLiveTheme(page, target.theme ?? DEFAULT_THEME);
+
       if (target.wait_test_id) {
         await expect(
           page.getByTestId(target.wait_test_id),
@@ -189,25 +219,92 @@ for (const target of targetsFile.targets) {
         ).toBeVisible({ timeout: 15_000 });
       }
       await waitForStable(page, 500);
+      // W15-A9 cap 8 — wait for fonts.ready + a single rAF tick to flush.
+      await waitForFontsReady(page);
 
-      const segments = snapshotPathSegments(target.reference);
-
-      await expect(page).toHaveScreenshot(segments, {
-        fullPage: true,
-        animations: "disabled",
-        maxDiffPixelRatio: target.tolerance,
+      // W15-A9 cap 5 — DOM no-fake scan. Drain hits and annotate; the
+      // assertion below fails the test if any landed.
+      const fakeHits = await scanForFakeMarkers(page);
+      annotate("visual-proof-no-fake", {
+        target: target.target,
+        hits: fakeHits.length,
+        summary: summarizeFakeHits(fakeHits),
       });
+      expect(
+        fakeHits,
+        `${target.target} must not contain fake/mock DOM markers. Hits: ${summarizeFakeHits(fakeHits)}`,
+      ).toHaveLength(0);
 
-      // After a successful match, append a final "match" annotation. If the
-      // assertion above failed, control never reaches here and the reporter
-      // records the row as a "diff" failure.
-      test.info().annotations.push({
-        type: "visual-proof-result",
-        description: JSON.stringify({
-          target: target.target,
-          status: "match",
-          tolerance: target.tolerance,
-        }),
+      // W15-A9 cap 4 — same-origin 4xx/5xx fail. We drain BEFORE the
+      // screenshot so the actual screenshot does not itself trigger a 4xx
+      // (e.g. a missing icon) AFTER our gate.
+      const sameOriginErrors = networkTracker.sameOriginErrors();
+      annotate("visual-proof-network", {
+        target: target.target,
+        same_origin_errors: sameOriginErrors.length,
+        total_errors: networkTracker.errors.length,
+        summary: summarizeNetworkErrors(sameOriginErrors),
+      });
+      expect(
+        sameOriginErrors,
+        `${target.target} must not produce same-origin 4xx/5xx. Errors: ${summarizeNetworkErrors(sameOriginErrors)}`,
+      ).toHaveLength(0);
+
+      // W15-A9 cap 3 — strict console-error gate. STRICT: no allow-list.
+      annotate("visual-proof-console", {
+        target: target.target,
+        errors: consoleSink.errors.length,
+        summary: consoleSink.errors.map((e) => e.text).slice(0, 5).join(" | "),
+      });
+      expect(
+        consoleSink.errors,
+        `${target.target} must not log console.errors or unhandled page errors. Errors: ${consoleSink.errors.map((e) => e.text).join(" | ")}`,
+      ).toHaveLength(0);
+
+      // W15-A9 cap 6 (phase 2) — pause the clock RIGHT before screenshot.
+      // Installing in beforeEach pinned Date.now() for the page boot; pausing
+      // here freezes timer-driven animations for the actual frame capture.
+      await pauseClock(page, target.clock_time ?? DETERMINISTIC_TIME);
+
+      // W15-A9 caps 1 + 9 — region screenshots. If the manifest lists
+      // regions, each one produces its own toHaveScreenshot diff against
+      // a per-region reference. Otherwise we fall back to full-page.
+      const regions = target.regions ?? [];
+      if (regions.length > 0) {
+        for (const region of regions) {
+          const regionReference = region.reference ?? target.reference;
+          const regionTolerance = region.tolerance ?? target.tolerance;
+          const segments = regionSnapshotSegments(regionReference, region.name);
+          await expect(page).toHaveScreenshot(segments, {
+            animations: "disabled",
+            maxDiffPixelRatio: regionTolerance,
+            clip: region.clip,
+          });
+          annotate("visual-proof-region-result", {
+            target: target.target,
+            region: region.name,
+            status: "match",
+            tolerance: regionTolerance,
+            clip: region.clip,
+          });
+        }
+      } else {
+        const segments = snapshotPathSegments(target.reference);
+        await expect(page).toHaveScreenshot(segments, {
+          fullPage: true,
+          animations: "disabled",
+          maxDiffPixelRatio: target.tolerance,
+        });
+      }
+
+      // Final success annotation. The reporter uses this to classify the
+      // row as "match"; absence (i.e. an assertion threw earlier) yields
+      // "diff" / "missing-baseline" / "error".
+      annotate("visual-proof-result", {
+        target: target.target,
+        status: "match",
+        tolerance: target.tolerance,
+        regions: regions.length,
       });
     });
   });
