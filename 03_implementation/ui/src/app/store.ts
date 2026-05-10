@@ -75,7 +75,12 @@ export function tabIdFromHash(hash: string): string | null {
   if (!raw) {
     return null;
   }
-  const tabId = HASH_TO_TAB[raw] ?? raw;
+  // Strip an optional `:mode` suffix used by the dashboard mode router
+  // (e.g. `#dashboard:simple`, `#dashboard/custom`, `#dashboard.advanced`).
+  // The mode portion is consumed by `dashboardModeStore.modeFromHash`; this
+  // helper only resolves the tab.
+  const head = raw.split(/[:/.]/, 1)[0] ?? raw;
+  const tabId = HASH_TO_TAB[head] ?? head;
   return TAB_IDS.includes(tabId as (typeof TAB_IDS)[number]) ? tabId : null;
 }
 

@@ -2,6 +2,14 @@ import { AppShell } from "./app/AppShell";
 import { TABS } from "./app/routes";
 import { TAB_TO_HASH, tabIdFromHash, useStore } from "./app/store";
 import { SimpleHermesDashboard } from "./components/simple/SimpleHermesDashboard";
+import { DashboardSimple } from "./components/dashboard/DashboardSimple";
+import { DashboardAdvanced } from "./components/dashboard/DashboardAdvanced";
+import { DashboardCustom } from "./components/dashboard/DashboardCustom";
+import {
+  modeFromHash as dashboardModeFromHash,
+  modeFromQueryString,
+  useDashboardModeStore,
+} from "./components/dashboard/dashboardModeStore";
 import { SourceOSTab } from "./tabs/SourceOS";
 import { Dashboard } from "./tabs/Dashboard";
 import { AutopilotTab } from "./tabs/Autopilot";
@@ -43,36 +51,58 @@ export default function App() {
   const activeTabId = useStore((s) => s.activeTabId);
   const setActiveTabId = useStore((s) => s.setActiveTabId);
   const uiMode = useStore((s) => s.uiMode);
+  const dashboardMode = useDashboardModeStore((s) => s.mode);
+  const setDashboardMode = useDashboardModeStore((s) => s.setMode);
   const tab = TABS.find((t) => t.id === activeTabId) ?? TABS[0];
-  const Component = TAB_COMPONENTS[tab.id] ?? UnavailableTab;
+  const baseComponent = TAB_COMPONENTS[tab.id] ?? UnavailableTab;
+  const Component =
+    tab.id === "dashboard" && uiMode === "full"
+      ? dashboardComponentFor(dashboardMode)
+      : baseComponent;
 
   useEffect(() => {
-    const syncFromHash = () => {
+    const syncFromUrl = () => {
       const nextTabId = tabIdFromHash(window.location.hash);
       if (nextTabId && nextTabId !== useStore.getState().activeTabId) {
         setActiveTabId(nextTabId);
       }
+      // Dashboard mode can be controlled by either the hash (`#dashboard:custom`)
+      // or the `?mode=` query string. The hash takes precedence so the mode
+      // stays sticky across refresh of a deep link.
+      const hashMode = dashboardModeFromHash(window.location.hash);
+      const queryMode = modeFromQueryString(window.location.search);
+      const nextMode = hashMode ?? queryMode;
+      if (nextMode && nextMode !== useDashboardModeStore.getState().mode) {
+        setDashboardMode(nextMode);
+      }
     };
-    syncFromHash();
-    window.addEventListener("hashchange", syncFromHash);
-    window.addEventListener("popstate", syncFromHash);
-    const syncTimer = window.setInterval(syncFromHash, 500);
+    syncFromUrl();
+    window.addEventListener("hashchange", syncFromUrl);
+    window.addEventListener("popstate", syncFromUrl);
+    const syncTimer = window.setInterval(syncFromUrl, 500);
     return () => {
-      window.removeEventListener("hashchange", syncFromHash);
-      window.removeEventListener("popstate", syncFromHash);
+      window.removeEventListener("hashchange", syncFromUrl);
+      window.removeEventListener("popstate", syncFromUrl);
       window.clearInterval(syncTimer);
     };
-  }, [setActiveTabId]);
+  }, [setActiveTabId, setDashboardMode]);
 
   useEffect(() => {
-    const nextHash = `#${TAB_TO_HASH[activeTabId] ?? activeTabId}`;
+    // Keep the URL hash authoritative for the active tab and the dashboard
+    // mode. We use replaceState (not pushState) so navigating tabs does not
+    // pollute browser history with every click.
+    const baseHash = TAB_TO_HASH[activeTabId] ?? activeTabId;
+    const nextHash =
+      activeTabId === "dashboard" && uiMode === "full"
+        ? `#${baseHash}:${dashboardMode}`
+        : `#${baseHash}`;
     if (window.location.hash !== nextHash) {
       window.history.replaceState(null, "", nextHash);
     }
-  }, [activeTabId]);
+  }, [activeTabId, dashboardMode, uiMode]);
 
   if (uiMode === "simple") {
-    return <SimpleHermesDashboard activeTabId={tab.id} activeLabel={tab.label} Content={Component} />;
+    return <SimpleHermesDashboard activeTabId={tab.id} activeLabel={tab.label} Content={baseComponent} />;
   }
 
   return (
@@ -80,6 +110,18 @@ export default function App() {
       <Component />
     </AppShell>
   );
+}
+
+function dashboardComponentFor(mode: "simple" | "advanced" | "custom"): () => JSX.Element {
+  switch (mode) {
+    case "simple":
+      return DashboardSimple;
+    case "custom":
+      return DashboardCustom;
+    case "advanced":
+    default:
+      return DashboardAdvanced;
+  }
 }
 
 function UnavailableTab() {
