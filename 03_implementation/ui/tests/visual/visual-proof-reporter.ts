@@ -37,6 +37,28 @@ import type {
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..", "..", "..");
+const TARGETS_PATH = path.join(HERE, "visual-targets.json");
+
+interface ManifestTarget {
+  target: string;
+  reference: string;
+  route: string;
+  status: "live" | "future";
+  tolerance: number;
+  notes?: string;
+}
+
+interface ManifestFile {
+  targets: ManifestTarget[];
+}
+
+let MANIFEST: Record<string, ManifestTarget> = {};
+try {
+  const raw = JSON.parse(fs.readFileSync(TARGETS_PATH, "utf-8")) as ManifestFile;
+  MANIFEST = Object.fromEntries(raw.targets.map((t) => [t.target, t]));
+} catch {
+  MANIFEST = {};
+}
 const SUMMARY_DIR = path.join(
   REPO_ROOT,
   "03_implementation",
@@ -88,7 +110,10 @@ class VisualProofReporter implements Reporter {
     // Each visual-proof.spec.ts test pushes contract annotations:
     //   visual-proof-target  -> sent immediately on test start
     //   visual-proof-result  -> sent only on a successful match
-    //   visual-proof         -> single annotation when skipped
+    //   visual-proof         -> single annotation when skipped (only fires
+    //                          when the wrapped fn is invoked; for
+    //                          test.skip(reason, fn) it does NOT fire, so we
+    //                          fall back to title-based lookup below)
     const annotations = test.annotations.concat(result.annotations ?? []);
     let target: string | null = null;
     let route: string | null = null;
@@ -97,6 +122,34 @@ class VisualProofReporter implements Reporter {
     let matched = false;
     let skippedReason: string | null = null;
     let skippedKind: "future" | "missing-reference" | null = null;
+
+    // Extract target name from the describe title which is "visual: <target>".
+    // This is the only reliable way to identify a skipped test since the
+    // wrapped fn body never runs and our annotations never fire.
+    for (const titleSeg of test.titlePath()) {
+      const m = /^visual:\s+([\w_-]+)$/.exec(titleSeg.trim());
+      if (m) {
+        target = m[1];
+        break;
+      }
+    }
+    if (target && MANIFEST[target]) {
+      const manifest = MANIFEST[target];
+      route = route ?? manifest.route;
+      reference = reference ?? manifest.reference;
+      tolerance = tolerance ?? manifest.tolerance;
+      if (manifest.status === "future") {
+        skippedKind = "future";
+        skippedReason = manifest.notes ?? "future";
+      } else {
+        // status === "live"; if the test was skipped we infer the reason
+        // is the reference PNG was not on disk.
+        const refAbs = path.resolve(REPO_ROOT, manifest.reference);
+        if (!fs.existsSync(refAbs)) {
+          skippedKind = "missing-reference";
+        }
+      }
+    }
 
     for (const ann of annotations) {
       const desc = ann.description ?? "";
