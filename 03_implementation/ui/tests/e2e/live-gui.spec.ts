@@ -594,7 +594,10 @@ test("hash route sync mounts the requested tab after direct navigation", async (
   await page.goto("/#dashboard");
   await expect(page.getByTestId("dashboard-root")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("observe-root")).toHaveCount(0);
-  expect(new URL(page.url()).hash).toBe("#dashboard");
+  // W6-3 dashboard 3-modes feature appends a :<mode> suffix (e.g.
+  // #dashboard:advanced) when the user has a saved mode. Accept either
+  // the bare `#dashboard` or `#dashboard:<mode>` forms.
+  expect(new URL(page.url()).hash).toMatch(/^#dashboard(?::[a-z0-9-]+)?$/);
 });
 
 test("printer panel reflects operator IPs and keeps S1 test locked", async ({ page }) => {
