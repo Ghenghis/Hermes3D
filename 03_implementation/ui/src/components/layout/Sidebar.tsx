@@ -1,6 +1,7 @@
 import { PRIMARY_TABS, type TabDef } from "../../app/routes";
 import { useStore } from "../../app/store";
 import { AgentChatMirror } from "../agents/AgentChatMirror";
+import { HermesAgentBanner } from "../agents/HermesAgentBanner";
 import { ResizablePane } from "./ResizablePane";
 
 export function Sidebar() {
@@ -20,7 +21,11 @@ export function Sidebar() {
     >
       <div className="shrink-0 border-b border-border px-4 py-4">
         <div className="text-fg font-semibold tracking-tight">HERMES3D OS</div>
-        <div className="text-muted text-xs mt-0.5">v5.3</div>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-muted text-xs">v5.3</span>
+          {/* W6-5: live Hermes Agent banner. Polls /api/agents/update/status. */}
+          <HermesAgentBanner compact />
+        </div>
       </div>
       <nav className="min-h-0 flex-1 overflow-y-auto py-2">
         {PRIMARY_TABS.map((tab) => (
