@@ -1,0 +1,23 @@
+{
+  "id": "default",
+  "display_name": "Default Midnight",
+  "description": "Neutral dark operator theme. The Hermes3D out-of-box palette.",
+  "kind": "dark",
+  "tokens": {
+    "bg_root": "#0F1115",
+    "bg_panel": "#161A21",
+    "bg_elevated": "#1E232C",
+    "fg_primary": "#E6E8EC",
+    "fg_secondary": "#A4ABB8",
+    "fg_muted": "#6B7280",
+    "accent_primary": "#5B8DEF",
+    "accent_secondary": "#7CC4FF",
+    "border_subtle": "#262B34",
+    "border_strong": "#3A414C",
+    "status_success": "#3FB37F",
+    "status_warning": "#E6A23C",
+    "status_danger": "#E5484D",
+    "status_info": "#5B8DEF",
+    "highlight": "#243049"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "matrix",
+  "display_name": "Matrix Terminal",
+  "description": "Phosphor-green CRT. Pure terminal mode for the operator who reads everything.",
+  "kind": "dark",
+  "tokens": {
+    "bg_root": "#000000",
+    "bg_panel": "#020A02",
+    "bg_elevated": "#031203",
+    "fg_primary": "#00FF41",
+    "fg_secondary": "#22C55E",
+    "fg_muted": "#15803D",
+    "accent_primary": "#00FF41",
+    "accent_secondary": "#80FF80",
+    "border_subtle": "#063C12",
+    "border_strong": "#0D6024",
+    "status_success": "#00FF41",
+    "status_warning": "#FFFF00",
+    "status_danger": "#FF1744",
+    "status_info": "#00E5A8",
+    "highlight": "#0A2E14"
+  }
+}
