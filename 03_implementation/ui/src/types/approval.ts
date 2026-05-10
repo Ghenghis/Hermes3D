@@ -1,6 +1,6 @@
 export type ApprovalType = "MODEL_APPROVAL" | "PRINT_APPROVAL" | "REPAIR_APPROVAL";
-export type ApprovalStatus = "pending" | "approved" | "rejected";
-export type ApprovalDecision = "approved" | "rejected";
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "deferred";
+export type ApprovalDecision = "approved" | "rejected" | "deferred";
 
 export interface Approval {
   id: string;
@@ -15,4 +15,15 @@ export interface Approval {
     gateResultsUrl: string | null;
     artifactUrls: string[];
   };
+  /**
+   * Optional list of repository-relative file paths affected by the request.
+   * Surfaced from `hermes_request_handoff` payloads. Empty when the
+   * approval covers a non-file action (e.g. job repair).
+   */
+  fileScope?: string[];
+  /**
+   * Optional name of the agent/operator that requested this approval.
+   * Mirrors the `requester` field on `hermes_request_handoff` payloads.
+   */
+  requester?: string | null;
 }

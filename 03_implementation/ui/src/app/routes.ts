@@ -1,4 +1,5 @@
 import {
+  AppWindow,
   Archive,
   BookOpen,
   CheckSquare,
@@ -34,6 +35,7 @@ export const TABS: TabDef[] = [
   { id: "learning", label: "Learning", icon: BookOpen },
   { id: "artifacts", label: "Artifacts", icon: Archive },
   { id: "approvals", label: "Approvals", icon: CheckSquare },
+  { id: "apps", label: "Apps", icon: AppWindow },
   { id: "plugins", label: "Plugins", icon: Puzzle },
   { id: "settings", label: "Settings", icon: SettingsIcon },
   { id: "roadmap", label: "Roadmap", icon: Map },

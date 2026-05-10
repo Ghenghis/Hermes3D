@@ -149,6 +149,7 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
     id: (typeof record.id === "string" ? record.id : "") || "(unknown)",
     name:
       (typeof record.name === "string" ? record.name : null) ??
+      (typeof record.display === "string" ? record.display : null) ??
       (typeof record.id === "string" ? record.id : "(unknown)"),
     current_version: readString(record, "current_version") ?? readString(record, "version"),
     tested_versions: readArray(record, "tested_versions").filter(
@@ -164,7 +165,7 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
   };
 }
 
-function toRegistryAppDetail(record: Record<string, unknown>): RegistryAppDetail {
+export function toRegistryAppDetail(record: Record<string, unknown>): RegistryAppDetail {
   const base = toRegistryApp(record);
   const recentRaw = readArray(record, "recent_proofs");
   const recent_proofs = recentRaw
@@ -183,6 +184,7 @@ function toRegistryAppDetail(record: Record<string, unknown>): RegistryAppDetail
     ...base,
     recent_proofs,
     rollback_runbook_url: readString(record, "rollback_runbook_url"),
+    proof_command: readString(record, "proof_command"),
     metadata: undefined,
   };
 }
@@ -273,11 +275,166 @@ export async function runProof(
  * Convenience client object. Mirrors the shape W6-5 ships in
  * `hermes3dClient.ts` (where `appsClient` is a sibling of `agentsClient`,
  * `mcpClient`, etc.).
+ *
+ * The singleton is built via `createAppsClient` so it inherits the
+ * `/api/apps` → `/api/source-os/modules` fallback semantics. The earlier
+ * shape that re-exported the module-level `listApps`/`getApp`/`runProof`
+ * trio bypassed the fallback entirely and silently called the wrong
+ * endpoint when the breadth E2E suite stubbed only `/api/apps/{id}`,
+ * which made `rollback_supported` always read as falsy on the detail
+ * panel (W9-2k UI-Final fix on PR #192).
  */
-export const appsClient = {
-  listApps,
-  getApp,
-  runProof,
-} as const;
+export type AppsClient = {
+  listApps: typeof listApps;
+  getApp: typeof getApp;
+  runProof: typeof runProof;
+};
 
-export type AppsClient = typeof appsClient;
+/** Error thrown when both `/api/apps` and `/api/source-os/modules` endpoints
+ *  return non-OK responses for the same operation. Used by the W8-2 detail
+ *  page to render an honest blocked state instead of fabricating data. */
+export class AppsClientError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AppsClientError";
+  }
+}
+
+/** Test-seam factory: build an `AppsClient` over a custom base URL and
+ *  optional fetcher. Used by Vitest unit tests and (eventually) by the
+ *  W6-5 hermes3dClient when it consolidates clients. The returned object
+ *  has the same `listApps`/`getApp`/`runProof` shape as the singleton
+ *  `appsClient`, but tries `/api/apps` first and falls back to
+ *  `/api/source-os/modules` when the registry endpoint is not yet wired. */
+export function createAppsClient(options: {
+  baseUrl: string;
+  fetcher?: typeof fetch;
+}): AppsClient {
+  const { baseUrl, fetcher = fetch } = options;
+  const appsUrl = `${baseUrl}/api/apps`;
+  const modulesUrl = `${baseUrl}/api/source-os/modules`;
+  const appUrl = (id: string) => `${baseUrl}/api/apps/${encodeURIComponent(id)}`;
+  const moduleUrl = (id: string) =>
+    `${baseUrl}/api/source-os/modules/${encodeURIComponent(id)}`;
+  const runProofUrl = (id: string) =>
+    `${baseUrl}/api/apps/${encodeURIComponent(id)}/run-proof`;
+  const moduleRunProofUrl = (id: string) =>
+    `${baseUrl}/api/source-os/modules/${encodeURIComponent(id)}/run-proof`;
+
+  function extractList(payload: unknown): RegistryApp[] {
+    if (Array.isArray(payload)) {
+      return payload.map((entry) => toRegistryApp(entry as Record<string, unknown>));
+    }
+    if (payload && typeof payload === "object") {
+      const obj = payload as { apps?: unknown[]; modules?: unknown[] };
+      if (Array.isArray(obj.apps)) {
+        return obj.apps.map((entry) => toRegistryApp(entry as Record<string, unknown>));
+      }
+      if (Array.isArray(obj.modules)) {
+        return obj.modules.map((entry) => toRegistryApp(entry as Record<string, unknown>));
+      }
+    }
+    return [];
+  }
+
+  return {
+    async listApps(signal?: AbortSignal): Promise<RegistryApp[]> {
+      const init: RequestInit = {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal,
+      };
+      const primary = await fetcher(appsUrl, init);
+      if (primary.ok) {
+        return extractList(await primary.json());
+      }
+      const fallback = await fetcher(modulesUrl, init);
+      if (fallback.ok) {
+        return extractList(await fallback.json());
+      }
+      throw new AppsClientError(
+        `apps registry not found in registry: ${primary.status}/${fallback.status}`,
+      );
+    },
+    async getApp(id: string, signal?: AbortSignal): Promise<RegistryAppDetail> {
+      const init: RequestInit = {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal,
+      };
+      const primary = await fetcher(appUrl(id), init);
+      if (primary.ok) {
+        return toRegistryAppDetail((await primary.json()) as Record<string, unknown>);
+      }
+      const fallback = await fetcher(moduleUrl(id), init);
+      if (fallback.ok) {
+        return toRegistryAppDetail((await fallback.json()) as Record<string, unknown>);
+      }
+      throw new AppsClientError(
+        `app "${id}" not found in registry: ${primary.status}/${fallback.status}`,
+      );
+    },
+    async runProof(
+      id: string,
+      reason = "operator requested from Hermes3D UI",
+      signal?: AbortSignal,
+    ): Promise<RegistryRunProofResponse> {
+      const init: RequestInit = {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason }),
+        cache: "no-store",
+        signal,
+      };
+      const primary = await fetcher(runProofUrl(id), init);
+      if (primary.ok) {
+        const payload = (await primary.json()) as {
+          accepted?: boolean;
+          proof_event_id?: string | null;
+          status?: ProofStatus | string;
+          reason?: string | null;
+        };
+        return {
+          accepted: payload.accepted ?? true,
+          proof_event_id: payload.proof_event_id ?? null,
+          status: readProofStatus(payload.status),
+          reason: redactProofReason(payload.reason ?? null),
+        };
+      }
+      const fallback = await fetcher(moduleRunProofUrl(id), init);
+      if (fallback.ok) {
+        const payload = (await fallback.json()) as {
+          accepted?: boolean;
+          proof_event_id?: string | null;
+          status?: ProofStatus | string;
+          reason?: string | null;
+        };
+        return {
+          accepted: payload.accepted ?? true,
+          proof_event_id: payload.proof_event_id ?? null,
+          status: readProofStatus(payload.status),
+          reason: redactProofReason(payload.reason ?? null),
+        };
+      }
+      return {
+        accepted: false,
+        proof_event_id: null,
+        status: "unknown",
+        reason: redactProofReason(
+          `run-proof not found in registry: ${primary.status}/${fallback.status}`,
+        ),
+      };
+    },
+  };
+}
+
+/**
+ * Singleton client used by GUI components. Built via `createAppsClient` so
+ * it inherits the `/api/apps` → `/api/source-os/modules` fallback semantics.
+ */
+export const appsClient: AppsClient = createAppsClient({ baseUrl: LIVE_BASE_URL });

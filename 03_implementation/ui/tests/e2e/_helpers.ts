@@ -43,6 +43,7 @@ export const TAB_FIXTURES: Record<string, TabFixture> = {
   learning: { label: "Learning", rootTestId: "learning-root" },
   artifacts: { label: "Artifacts", rootTestId: "artifacts-root" },
   approvals: { label: "Approvals", rootTestId: "approvals-root" },
+  apps: { label: "Apps", rootTestId: "apps-root" },
   plugins: { label: "Plugins", rootTestId: "plugins-root" },
   settings: { label: "Settings", rootTestId: "settings-root" },
   roadmap: { label: "Roadmap", rootTestId: "roadmap-root" },

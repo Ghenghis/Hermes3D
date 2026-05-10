@@ -120,7 +120,10 @@ export function AppDetailPanel({ appId, onClose }: AppDetailPanelProps) {
 
       {detail && (
         <>
-          <dl className="grid grid-cols-1 gap-3 rounded border border-border bg-surface p-3 text-[11px] sm:grid-cols-2">
+          <dl
+            data-testid="app-detail-versions"
+            className="grid grid-cols-1 gap-3 rounded border border-border bg-surface p-3 text-[11px] sm:grid-cols-2"
+          >
             <Field label="Current version" value={detail.current_version ?? "—"} />
             <Field
               label="License"

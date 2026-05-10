@@ -1161,6 +1161,10 @@ export function rejectApprovalLive(id: string, reason: string): Promise<void> {
   return postVoid(`/api/approvals/${encodeURIComponent(id)}/reject`, { reason });
 }
 
+export function deferApprovalLive(id: string, reason: string): Promise<void> {
+  return postVoid(`/api/approvals/${encodeURIComponent(id)}/defer`, { reason });
+}
+
 export function getRoadmapItemsLive(): Promise<RoadmapItem[]> {
   return fetchArray("/api/roadmap/status");
 }
