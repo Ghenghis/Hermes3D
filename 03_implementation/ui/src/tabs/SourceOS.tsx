@@ -4,6 +4,7 @@ import { AppDetailPanel } from "../components/source-os/AppDetailPanel";
 import { DockModeControls, type SourceOSDockMode } from "../components/source-os/DockModeControls";
 import { ModuleList } from "../components/source-os/ModuleList";
 import { SecondaryNav } from "../components/source-os/SecondaryNav";
+import { SixtyAppCoverageMatrix } from "../components/source-os/SixtyAppCoverageMatrix";
 import type { GateResult, GateVerdict, ProofBundle, ProofVerdict } from "../types/proof";
 import type { BridgeTask, DispatchGateStatus, InstallState, LaunchKind, SourceModuleCliSurfaceAudit, SourceModuleCliSurfaceRecord, SourceModuleRuntime, SourceModuleUpdateReadiness, SourceOSModule, SourceOSProvider } from "../types/source-os";
 
@@ -118,7 +119,34 @@ const TOOL_STATUS_LABEL: Record<ToolReadinessStatus, string> = {
 // SourceOSTab (main export)
 // ─────────────────────────────────────────────────────────────────────────────
 
+type SourceOSView = "matrix" | "registry";
+
+const VIEW_STORAGE_KEY = "h3d.sourceOs.view";
+
+function readInitialView(): SourceOSView {
+  // Default to the legacy "registry" view so the existing live-gui E2E
+  // contract (which expects the source-backed-modules subtitle and the
+  // runtime readiness bar on first open) keeps passing. Operators who
+  // prefer the 60-app matrix can switch via the ViewSwitch and the
+  // selection is persisted in localStorage below.
+  if (typeof window === "undefined") return "registry";
+  try {
+    const raw = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    if (raw === "registry") return "registry";
+    if (raw === "matrix") return "matrix";
+  } catch {
+    // localStorage unavailable (private mode / SSR snapshot) — fall through.
+  }
+  return "registry";
+}
+
+function navigateToAppDetail(id: string) {
+  if (typeof window === "undefined") return;
+  window.location.hash = `apps/${encodeURIComponent(id)}`;
+}
+
 export function SourceOSTab() {
+  const [view, setView] = useState<SourceOSView>(() => readInitialView());
   const [activeSection, setActiveSection] = useState("source_backed");
   const [dockMode, setDockMode] = useState<SourceOSDockMode>("dock");
   const [modules, setModules] = useState<SourceOSModule[]>([]);
@@ -167,13 +195,26 @@ export function SourceOSTab() {
   };
 
   useEffect(() => {
+    // The legacy registry view fetches /api/modules + 4 sibling endpoints
+    // which can hang on some environments. Defer them until the user opens
+    // the Module Registry view so the 60-App Matrix never trips on them.
+    if (view !== "registry") return;
     void loadModules();
     void loadUpdateReadiness(false);
     void loadVerifierSummary();
     void loadCliSurfaceSummary();
     void loadSourcesReadiness();
     void loadRunnerContracts();
-  }, []);
+  }, [view]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {
+      // Persistence is best-effort; never crash the UI over a storage write.
+    }
+  }, [view]);
 
   const loadVerifierSummary = async () => {
     try {
@@ -368,83 +409,144 @@ export function SourceOSTab() {
         <div className="min-w-0">
           <h1 className="truncate text-base font-semibold text-fg">Hermes3D OS</h1>
           <p className="truncate text-xs text-muted">
-            {modules.length} source-backed modules from the local API module registry.
+            {view === "matrix"
+              ? "60-app coverage matrix — backend-driven, no fabricated readiness."
+              : `${modules.length} source-backed modules from the local API module registry.`}
           </p>
         </div>
-        <DockModeControls mode={dockMode} onChange={setDockMode} />
+        <div className="flex flex-wrap items-center gap-2">
+          <ViewSwitch view={view} onChange={setView} />
+          <DockModeControls mode={dockMode} onChange={setDockMode} />
+        </div>
       </div>
 
-      {/* ── Status bars ── */}
-      <UpdateReadinessBar readiness={updateReadiness} busy={updateBusy} onDeepCheck={() => void loadUpdateReadiness(true)} />
-      <RuntimeReadinessBar
-        counts={runtimeCounts}
-        total={modules.length}
-        verifyBusy={runtimeVerifyBusy}
-        setupBusy={setupQueueBusy}
-        message={setupQueueMessage ?? runtimeVerifyMessage}
-        onVerifyAll={() => void verifyAllRuntimes()}
-        onPlanSetupQueue={() => void planSetupQueue()}
-        verifierSummary={verifierSummary}
-        cliSurfaceSummary={cliSurfaceSummary}
-        unclassifiedLaunchKinds={unclassifiedLaunchKinds}
-      />
+      {view === "matrix" ? (
+        <div
+          data-testid="source-os-matrix-view"
+          className={[
+            "flex min-h-0 flex-1 flex-col overflow-auto",
+            dockMode === "full" ? "h-full" : "",
+          ].join(" ")}
+        >
+          <SixtyAppCoverageMatrix bridgeBaseUrl={LIVE_BASE_URL} onNavigate={navigateToAppDetail} />
+        </div>
+      ) : (
+        <>
+          {/* ── Status bars ── */}
+          <UpdateReadinessBar readiness={updateReadiness} busy={updateBusy} onDeepCheck={() => void loadUpdateReadiness(true)} />
+          <RuntimeReadinessBar
+            counts={runtimeCounts}
+            total={modules.length}
+            verifyBusy={runtimeVerifyBusy}
+            setupBusy={setupQueueBusy}
+            message={setupQueueMessage ?? runtimeVerifyMessage}
+            onVerifyAll={() => void verifyAllRuntimes()}
+            onPlanSetupQueue={() => void planSetupQueue()}
+            verifierSummary={verifierSummary}
+            cliSurfaceSummary={cliSurfaceSummary}
+            unclassifiedLaunchKinds={unclassifiedLaunchKinds}
+          />
 
-      {/* ── CLI Readiness Panel ── */}
-      <CliReadinessPanel
-        readiness={sourcesReadiness}
-        loading={sourcesReadinessLoading}
-        expanded={cliPanelExpanded}
-        onToggle={() => setCliPanelExpanded((v) => !v)}
-        onRefresh={() => void loadSourcesReadiness()}
-        baseUrl={LIVE_BASE_URL}
-      />
+          {/* ── CLI Readiness Panel ── */}
+          <CliReadinessPanel
+            readiness={sourcesReadiness}
+            loading={sourcesReadinessLoading}
+            expanded={cliPanelExpanded}
+            onToggle={() => setCliPanelExpanded((v) => !v)}
+            onRefresh={() => void loadSourcesReadiness()}
+            baseUrl={LIVE_BASE_URL}
+          />
 
-      {/* ── Proof & Artifact Panel ── */}
-      <ProofArtifactPanel
-        readiness={sourcesReadiness}
-        expanded={proofPanelExpanded}
-        onToggle={() => setProofPanelExpanded((v) => !v)}
-        baseUrl={LIVE_BASE_URL}
-      />
+          {/* ── Proof & Artifact Panel ── */}
+          <ProofArtifactPanel
+            readiness={sourcesReadiness}
+            expanded={proofPanelExpanded}
+            onToggle={() => setProofPanelExpanded((v) => !v)}
+            baseUrl={LIVE_BASE_URL}
+          />
 
-      {/* ── Module registry browser ── */}
-      <SecondaryNav activeSection={activeSection} counts={counts} onSelect={handleSectionSelect} />
-      <div
+          {/* ── Module registry browser ── */}
+          <SecondaryNav activeSection={activeSection} counts={counts} onSelect={handleSectionSelect} />
+          <div
+            className={[
+              "flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row",
+              dockMode === "full" ? "h-full" : "",
+            ].join(" ")}
+          >
+            {loadState === "loading" ? (
+              <div className="flex flex-1 items-center justify-center text-sm text-muted">Loading Source OS modules from API.</div>
+            ) : modules.length === 0 ? (
+              <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted">
+                Source OS module registry is unavailable from {LIVE_BASE_URL}/api/modules.
+              </div>
+            ) : (
+              <>
+                <ModuleList
+                  modules={visibleModules}
+                  selectedId={selectedModule?.id ?? null}
+                  onSelect={setSelectedId}
+                  cliSurfaceByModule={cliSurfaceByModule}
+                  runnerContractsByModule={runnerContracts}
+                />
+                <AppDetailPanel
+                  module={selectedModule}
+                  updateRecord={selectedUpdateRecord}
+                  cliSurfaceRecord={selectedCliSurfaceRecord}
+                  runnerContract={selectedModule ? (runnerContracts[selectedModule.id] ?? null) : null}
+                  onRefresh={() => {
+                    void loadModules({ showLoading: false });
+                    void loadUpdateReadiness(updateReadiness?.deep ?? false);
+                    void loadCliSurfaceSummary();
+                    void loadRunnerContracts();
+                  }}
+                />
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ViewSwitch — toggle between the 60-app matrix and the legacy registry view.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ViewSwitch({ view, onChange }: { view: SourceOSView; onChange: (next: SourceOSView) => void }) {
+  return (
+    <div
+      role="tablist"
+      aria-label="Source OS view"
+      data-testid="source-os-view-switch"
+      className="inline-flex overflow-hidden rounded border border-border bg-bg/40"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "matrix"}
+        data-testid="source-os-view-matrix"
+        onClick={() => onChange("matrix")}
         className={[
-          "flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row",
-          dockMode === "full" ? "h-full" : "",
+          "px-2.5 py-1 text-[11px] transition-colors",
+          view === "matrix" ? "bg-accent-blue/20 text-fg" : "text-muted hover:text-fg",
         ].join(" ")}
       >
-        {loadState === "loading" ? (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted">Loading Source OS modules from API.</div>
-        ) : modules.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted">
-            Source OS module registry is unavailable from {LIVE_BASE_URL}/api/modules.
-          </div>
-        ) : (
-          <>
-            <ModuleList
-              modules={visibleModules}
-              selectedId={selectedModule?.id ?? null}
-              onSelect={setSelectedId}
-              cliSurfaceByModule={cliSurfaceByModule}
-              runnerContractsByModule={runnerContracts}
-            />
-            <AppDetailPanel
-              module={selectedModule}
-              updateRecord={selectedUpdateRecord}
-              cliSurfaceRecord={selectedCliSurfaceRecord}
-              runnerContract={selectedModule ? (runnerContracts[selectedModule.id] ?? null) : null}
-              onRefresh={() => {
-                void loadModules({ showLoading: false });
-                void loadUpdateReadiness(updateReadiness?.deep ?? false);
-                void loadCliSurfaceSummary();
-                void loadRunnerContracts();
-              }}
-            />
-          </>
-        )}
-      </div>
+        60-App Matrix
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={view === "registry"}
+        data-testid="source-os-view-registry"
+        onClick={() => onChange("registry")}
+        className={[
+          "px-2.5 py-1 text-[11px] transition-colors",
+          view === "registry" ? "bg-accent-blue/20 text-fg" : "text-muted hover:text-fg",
+        ].join(" ")}
+      >
+        Module Registry
+      </button>
     </div>
   );
 }

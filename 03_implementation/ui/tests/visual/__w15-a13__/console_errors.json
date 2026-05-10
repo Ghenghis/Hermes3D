@@ -1,0 +1,80 @@
+{
+  "source-os-60-app-coverage-matrix__truth": "60 of 60 apps loaded",
+  "source-os-60-app-coverage-matrix__cardCount": 120,
+  "source-os-60-app-coverage-matrix": {
+    "viewport": {
+      "width": 1672,
+      "height": 941
+    },
+    "path": "G:\\Github\\_claude_worktrees\\h3d-w15-a13-source-os\\03_implementation\\ui\\tests\\visual\\__w15-a13__\\source-os-60-app-coverage-matrix.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "network404": [],
+    "failedRequests": [
+      {
+        "url": "http://127.0.0.1:8765/api/agents/update/status",
+        "status": 502
+      },
+      {
+        "url": "http://127.0.0.1:8766/api/agents/update/status",
+        "status": "request-failed",
+        "reason": "net::ERR_CONNECTION_REFUSED"
+      }
+    ],
+    "passed": false
+  },
+  "source-os-remaining-categories__truth": "60 of 60 apps loaded",
+  "source-os-remaining-categories__cardCount": 120,
+  "source-os-remaining-categories": {
+    "viewport": {
+      "width": 1586,
+      "height": 992
+    },
+    "path": "G:\\Github\\_claude_worktrees\\h3d-w15-a13-source-os\\03_implementation\\ui\\tests\\visual\\__w15-a13__\\source-os-remaining-categories.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "network404": [],
+    "failedRequests": [
+      {
+        "url": "http://127.0.0.1:8765/api/agents/update/status",
+        "status": 502
+      },
+      {
+        "url": "http://127.0.0.1:8766/api/agents/update/status",
+        "status": "request-failed",
+        "reason": "net::ERR_CONNECTION_REFUSED"
+      }
+    ],
+    "passed": false
+  },
+  "source-os-core-categories__truth": "60 of 60 apps loaded",
+  "source-os-core-categories__cardCount": 120,
+  "source-os-core-categories": {
+    "viewport": {
+      "width": 1536,
+      "height": 1024
+    },
+    "path": "G:\\Github\\_claude_worktrees\\h3d-w15-a13-source-os\\03_implementation\\ui\\tests\\visual\\__w15-a13__\\source-os-core-categories.png",
+    "consoleErrors": [
+      "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+      "Failed to load resource: net::ERR_CONNECTION_REFUSED"
+    ],
+    "network404": [],
+    "failedRequests": [
+      {
+        "url": "http://127.0.0.1:8765/api/agents/update/status",
+        "status": 502
+      },
+      {
+        "url": "http://127.0.0.1:8766/api/agents/update/status",
+        "status": "request-failed",
+        "reason": "net::ERR_CONNECTION_REFUSED"
+      }
+    ],
+    "passed": false
+  }
+}
