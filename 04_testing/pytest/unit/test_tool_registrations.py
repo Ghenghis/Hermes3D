@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 import struct
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -451,11 +452,47 @@ def test_skill_lookup_invalid_kind_raises(isolated_paths):
 # ---------------------------------------------------------------------------
 
 
-def test_fleet_status_runs_against_offline_fleet(isolated_paths):
+def _offline_fleet_entries():
+    from hermes3d.core.farm.dashboard import _bed_descr
+    from hermes3d.core.printers import FLEET
+
+    return [
+        SimpleNamespace(
+            profile_id=profile.profile_id,
+            manufacturer=profile.manufacturer,
+            model=profile.model,
+            kinematics=profile.kinematics.value,
+            bed_descr=_bed_descr(profile),
+            z_height_mm=profile.z_height_mm,
+            moonraker_url=profile.moonraker_url_default,
+            reachable=False,
+            klippy_state=None,
+            moonraker_version=None,
+            active_job_id=None,
+            active_job_state=None,
+            loaded_spool_id=None,
+            loaded_spool_label=None,
+            loaded_spool_remaining_g=None,
+            error="offline test transport",
+        )
+        for profile in FLEET
+    ]
+
+
+def test_fleet_status_runs_against_offline_fleet(isolated_paths, monkeypatch):
     """We don't have real Moonraker hosts in this test environment, so every
     printer should come back unreachable. The shim must still successfully
-    enumerate all 12 of them with profile metadata intact."""
+    enumerate all 12 of them with profile metadata intact.
+
+    The unit contract is fleet-status mapping, not LAN reachability timing.
+    Keep this deterministic by injecting an offline fleet snapshot.
+    """
     from hermes3d.core.agents.tool_registrations import _tool_fleet_status
+    from hermes3d.core.farm import dashboard
+
+    monkeypatch.setattr(
+        dashboard, "collect_fleet_status", lambda **_kwargs: _offline_fleet_entries()
+    )
 
     result = _tool_fleet_status(include_offline=True, timeout_s=0.2)
     assert result["count"] == 12
@@ -480,8 +517,13 @@ def test_fleet_status_runs_against_offline_fleet(isolated_paths):
         assert by_id[expected]["kinematics"]
 
 
-def test_fleet_status_filter_offline(isolated_paths):
+def test_fleet_status_filter_offline(isolated_paths, monkeypatch):
     from hermes3d.core.agents.tool_registrations import _tool_fleet_status
+    from hermes3d.core.farm import dashboard
+
+    monkeypatch.setattr(
+        dashboard, "collect_fleet_status", lambda **_kwargs: _offline_fleet_entries()
+    )
 
     # In sandbox every printer is unreachable — include_offline=False => empty
     result = _tool_fleet_status(include_offline=False, timeout_s=0.2)

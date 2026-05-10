@@ -58,6 +58,11 @@ The following are violations and must fail CI:
    explicit expiry; no permanent warning debt.
 4. **Full wiring required.** GUI controls, REST endpoints, MCP tools,
    and CLI subcommands all reach real backend code.
+   If a backend, tool, credential, source checkout, web account, VPS,
+   or remote host is missing, the UI must render a disabled or
+   unavailable state that says what is missing. It must never invent
+   rows, previews, slicer output, printer telemetry, model results,
+   proof bundles, or agent activity.
 5. **Reproducible from clean clone.** `clone -> install -> run -> test`
    must succeed from a brand-new machine using the documented commands.
 6. **Truth Gate is the only gate.** No code path slices, uploads, or
@@ -69,6 +74,23 @@ The following are violations and must fail CI:
 8. **No silent mesh mutation.** Auto-repair and auto-orient produce a
    *new* file (`*.repaired.stl`, `*.oriented.stl`); the original is
    never overwritten.
+9. **Hermes Agents are user delegates.** When the user grants a Hermes
+   Agent a task, that agent is treated as an operator/admin delegate
+   across Hermes3D-OS, the user's PC, local files, installed apps, web
+   accounts/services, VPS/remote hosts, GitHub, source repositories,
+   and other user-controlled systems needed to complete the task. The
+   same proof, safety, lock, secret, and audit rules that bind a human
+   operator bind the agent.
+10. **Missing data means ask or block.** If Hermes3D does not know the
+    source path, repository URL, credential location, remote host,
+    printer state, model file, material, or user preference needed for
+    a task, it asks the user or marks the action blocked. It never
+    guesses and presents that guess as fact.
+11. **Current S1 safety lock.** FLSUN S1 at `192.168.0.12` is currently
+    offline/locked/no-test. Operators and Hermes Agents may edit its
+    status metadata, but movement, upload, capture, and test actions
+    must return a lock failure until the user explicitly clears that
+    safety state.
 
 Violations are tracked in `00_overview/contract/HONESTY_LEDGER.md` until fixed.
 
@@ -221,6 +243,13 @@ Endpoints: `/health`, `/fleet`, `/dispatch`, `/queue/jobs/*`,
 `api/mcp_server.py` — STDIO JSON-RPC, 10 tools so an agentic IDE
 (Claude Code, DaveAI-IDE, Roo Code) can drive the system directly.
 
+Hermes Agents using MCP are first-class user delegates, not observers.
+They may configure apps, edit source, run setup, use the user's PC,
+web services, VPS/remote hosts, source repositories, GitHub branches,
+commits, pushes, and PRs when those actions are part of the user task.
+They must still obey printer safety, proof envelopes, file locks,
+secret redaction, and branch/PR policy.
+
 ## §28  Auto-Recovery
 
 `core/agents/auto_recovery.py` performs soft → firmware Klipper
@@ -299,7 +328,9 @@ about what's missing — never under runnable.
 
 ## §38  What Is NOT in this Kit (Deliberately)
 
-- A fork of OrcaSlicer or PrusaSlicer (use upstream — we drive their CLIs)
+- A silent fork of OrcaSlicer or PrusaSlicer. Hermes3D may keep
+  source-backed upstream checkouts and drive real CLIs/apps, but it
+  must not present a hand-drawn or invented slicer as the real slicer.
 - A G-code generator (we use the slicer)
 - A Klipper firmware fork (we ship config + macros only)
 - Cloud printer management (Bambu Cloud, Creality Cloud — not used)

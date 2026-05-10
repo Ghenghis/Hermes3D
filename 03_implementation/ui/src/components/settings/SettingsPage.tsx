@@ -1,5 +1,5 @@
 /**
- * Settings landing page — Phase 2 mock-only.
+ * Settings landing page backed by the local GUI API.
  *
  * Hosts the four canonical subtabs:
  *   - Providers     · LLM endpoint config (read-only `llm_policy.yaml` view)
@@ -15,39 +15,77 @@
  * react-router; the universal shell uses the TABS pattern only.
  */
 import { useState } from "react";
-import { Cog, Cpu, Info, Printer as PrinterIcon, Terminal } from "lucide-react";
+import {
+  Bot,
+  Cog,
+  Cpu,
+  Info,
+  Lock,
+  Map,
+  MonitorCog,
+  Package,
+  Printer as PrinterIcon,
+  Terminal,
+} from "lucide-react";
 import { Panel } from "../layout/Panel";
+import { ResizablePane } from "../layout/ResizablePane";
+import { useStore } from "../../app/store";
+import { GeneralSubtab } from "./GeneralSubtab";
 import { ProvidersSubtab } from "./ProvidersSubtab";
 import { PrintersSubtab } from "./PrintersSubtab";
 import { EnvironmentSubtab } from "./EnvironmentSubtab";
 import { AboutSubtab } from "./AboutSubtab";
+import { AgentConfigSection } from "./AgentConfigSection";
+import { UpdateCenterSubtab } from "./UpdateCenterSubtab";
+import { McpSubtab } from "./McpSubtab";
 
-type SubtabKey = "providers" | "printers" | "environment" | "about";
+type SubtabKey =
+  | "general"
+  | "providers"
+  | "agents"
+  | "mcp"
+  | "printers"
+  | "environment"
+  | "about"
+  | "updates";
 
 const SUBTABS: { key: SubtabKey; label: string; Icon: typeof Cpu; description: string }[] = [
-  { key: "providers",   label: "Providers",   Icon: Cpu,         description: "LLM endpoints + policy" },
-  { key: "printers",    label: "Printers",    Icon: PrinterIcon, description: "Fleet + health" },
-  { key: "environment", label: "Environment", Icon: Terminal,    description: "env-var presence (redacted)" },
-  { key: "about",       label: "About",       Icon: Info,        description: "Version + links" },
+  { key: "general",     label: "General",       Icon: MonitorCog,  description: "Theme, language, defaults" },
+  { key: "providers",   label: "Providers",     Icon: Cpu,         description: "LLM endpoints + policy" },
+  { key: "agents",      label: "Agents",        Icon: Bot,         description: "Agent policy preview" },
+  { key: "mcp",         label: "MCP",           Icon: Lock,        description: "Active MCP file locks" },
+  { key: "printers",    label: "Printers",      Icon: PrinterIcon, description: "Fleet + health" },
+  { key: "environment", label: "Environment",   Icon: Terminal,    description: "env-var presence (redacted)" },
+  { key: "updates",     label: "Update Center", Icon: Package,     description: "Versions, updater, rollback" },
+  { key: "about",       label: "About",         Icon: Info,        description: "Version + links" },
 ];
 
 export function SettingsPage() {
-  const [active, setActive] = useState<SubtabKey>("providers");
+  const setActiveTabId = useStore((state) => state.setActiveTabId);
+  const [active, setActive] = useState<SubtabKey>("general");
   const meta = SUBTABS.find((s) => s.key === active) ?? SUBTABS[0];
 
   return (
     <div
-      className="grid grid-cols-12 gap-2.5 auto-rows-min"
+      className="flex min-h-[calc(100vh-6.5rem)] min-w-0 flex-col gap-2.5 lg:flex-row"
       data-testid="settings-root"
       data-active-subtab={active}
     >
-      <div className="col-span-12 lg:col-span-3">
+      <ResizablePane
+        storageKey="h3d.settings.subtabRail.width"
+        defaultWidth={320}
+        minWidth={220}
+        maxWidth={540}
+        label="Settings sections panel"
+        dataTestId="settings-side-rail"
+        className="min-h-0 w-full shrink-0 lg:w-[var(--pane-width)]"
+      >
         <Panel
           id="settings.subtabs"
           title="SETTINGS"
           dense
           status={{ tone: "muted", label: `${SUBTABS.length} sections` }}
-          className="h-[460px]"
+          className="h-full min-h-0"
         >
           <ul
             role="tablist"
@@ -85,17 +123,27 @@ export function SettingsPage() {
               );
             })}
           </ul>
+          <div className="mt-2 border-t border-border pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveTabId("roadmap")}
+              className="flex w-full items-center gap-2 rounded border border-border bg-surface2/40 px-2 py-1.5 text-left text-xs text-muted hover:text-fg"
+            >
+              <Map size={14} className="shrink-0" />
+              <span>Roadmap</span>
+            </button>
+          </div>
         </Panel>
-      </div>
+      </ResizablePane>
 
-      <div className="col-span-12 lg:col-span-9">
+      <div className="min-h-0 min-w-0 flex-1">
         <Panel
           id="settings.detail"
           title={meta.label.toUpperCase()}
           dense
           status={{ tone: "cyan", label: "config" }}
           headerExtra={<Cog size={11} className="text-muted" />}
-          className="min-h-[460px]"
+          className="h-full min-h-0"
         >
           <div
             role="tabpanel"
@@ -104,9 +152,13 @@ export function SettingsPage() {
             data-testid={`settings-panel-${active}`}
             className="h-full"
           >
+            {active === "general" && <GeneralSubtab />}
             {active === "providers" && <ProvidersSubtab />}
+            {active === "agents" && <AgentConfigSection />}
+            {active === "mcp" && <McpSubtab />}
             {active === "printers" && <PrintersSubtab />}
             {active === "environment" && <EnvironmentSubtab />}
+            {active === "updates" && <UpdateCenterSubtab />}
             {active === "about" && <AboutSubtab />}
           </div>
         </Panel>

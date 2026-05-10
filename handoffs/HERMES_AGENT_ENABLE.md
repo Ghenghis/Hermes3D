@@ -9,6 +9,21 @@
 
 ## TL;DR — fastest path
 
+This is a setup path, not proof of operational readiness. Hermes Agent coding
+authority is BLOCKED until the required provider lanes pass live
+chat-completions smoke through the same backend adapters used by coding and
+review tasks. Env-var presence, redacted key provenance, a provider `/models`
+response, or a local fallback provider does not satisfy the MiniMax + DeepSeek
+two-team proof requirement.
+
+Private env values are usable but never revealable. Claude agents, Codex agents,
+Hermes Agent, OpenCode, and OpenHands may use `G:/private/.env` only through
+approved backend provider adapters or redacted sandbox env injection. They may
+record env key names, provider names, redacted provenance, and pass/fail state;
+they must never print, diff, serialize, screenshot, copy into CLI args, commit,
+or include actual values in logs, proof bundles, markdown, PR bodies, browser UI,
+or CI output.
+
 ```bash
 # 1. Put your API keys in G:\private\.env (NEVER inside any repo)
 #    Required (one or more): DEEPSEEK_API_KEY, MINIMAX_API_KEY, SILICONFLOW_API_KEY
@@ -36,7 +51,12 @@ hermes_agent_request_user_session
 # → { ok: true, session: {...}, rationale: "...", provider_used: "deepseek", model_used: "deepseek-chat" }
 ```
 
-That's it. From this point, any caller of `hermes_user_check_authorization` against an action in scope will get `{allowed: true, granted_by: "hermes-agent"}` and the Hermes Agent's rationale is recorded in the evidence ledger.
+That enables the bridge to attempt scoped authorization. It is not daily-usable
+until `hermes_agent_health` and the Hermes3D provider smoke endpoint both prove
+the required provider lane with a non-mutating chat-completions request. If the
+provider smoke returns an auth error, timeout, missing model, or redacted
+blocked reason, the result is BLOCKED and must be corrected in `G:/private/.env`
+or provider policy before any Hermes Agent coding session is called working.
 
 ---
 
@@ -46,7 +66,7 @@ When the bridge is on:
 
 - **The user can sleep.** Hermes Agent acts as the USER role on STREAM/ messages tagged `BLOCKED`, calling `hermes_agent_resolve_blocked` to emit approve/decline/defer verdicts that close blocking handoffs without waking you.
 - **Auto-approval of pre-authorized scope.** Actions in the granted scope (`merge_pr`, `close_blocked`, etc.) pass `hermes_user_check_authorization` immediately; out-of-scope actions still require the human.
-- **Provider failover.** DeepSeek → MiniMax → SiliconFlow → LM Studio → Ollama → Hipfire → any of the **62 Continue LLM classes** registered in `policies/provider-registry/registry.yaml` for which you've supplied an API key.
+- **Provider failover.** DeepSeek → MiniMax → SiliconFlow → LM Studio → Ollama → Hipfire → any of the **62 Continue LLM classes** registered in `policies/provider-registry/registry.yaml` for which you've supplied an API key. Local fallback can assist explicitly marked fallback work, but it cannot replace the required MiniMax builder + DeepSeek reviewer proof for provider-backed Hermes Agent coding.
 - **Cross-client.** Same MCP tools work from every client; no special Claude or Codex glue.
 
 ---
@@ -92,6 +112,24 @@ Two modes documented in `policies/provider-registry/routing.yaml`:
 - local_fallback: `ollama`
 
 Switch with `export HERMES3D_ROUTING_MODE=local_private` (or `hybrid`).
+
+## Operational gate before any "working" claim
+
+Hermes Agent, OpenCode, and OpenHands coding are considered operational only
+when all of these are true in the current worktree:
+
+- `hermes_doctor` or equivalent MCP readiness reports healthy.
+- `MCP_LOCK_WORKSPACE` matches the exact worktree that will be edited.
+- MiniMax builder and DeepSeek reviewer both pass the Hermes3D provider smoke
+  route using chat-completions, with redacted proof and no secret leakage.
+- OpenCode/OpenHands, when used, pass executable/version detection and sandbox
+  readiness before any write-capable run.
+- A task has same-owner MCP task/file locks, pre-snapshots, bounded patch
+  proposal, review artifact, fixed gates, visual proof when UI changes, security
+  scan for auth/provider/process/filesystem/printer changes, branch/commit/PR
+  evidence, rollback proof, and released locks.
+
+Any missing item is a BLOCKED state, not partial success and not "almost done."
 
 ---
 

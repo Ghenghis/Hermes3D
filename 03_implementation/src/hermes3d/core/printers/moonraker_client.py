@@ -29,6 +29,7 @@ combination Dave runs on the fleet.
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import time
@@ -38,7 +39,7 @@ from pathlib import Path
 from typing import Any
 from urllib import request as urlrequest
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 # Default request timeout in seconds. Long uploads override per-call.
 DEFAULT_TIMEOUT_S = 15.0
@@ -113,6 +114,7 @@ class MoonrakerClient:
             raise ValueError("base_url is required")
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key or os.environ.get("MOONRAKER_API_KEY") or None
+        _validate_base_url(self.base_url, api_key_present=bool(self.api_key))
         self.timeout_s = float(timeout_s)
 
     # -- low-level helpers --------------------------------------------------
@@ -204,11 +206,12 @@ class MoonrakerClient:
         status = result.get("status", {})
         ps = status.get("print_stats", {}) or {}
         vs = status.get("virtual_sdcard", {}) or {}
+        filename_value = ps.get("filename") or vs.get("file_path") or ""
         return PrinterState(
             state=str(ps.get("state", "unknown")),
             state_message=str(ps.get("message", "")),
             progress=float(vs.get("progress", 0.0)),
-            filename=str(ps.get("filename", "") or vs.get("file_path", "")),
+            filename=str(filename_value),
             print_duration_s=float(ps.get("print_duration", 0.0)),
             raw=result,
         )
@@ -276,11 +279,14 @@ class MoonrakerClient:
             content_type=f"multipart/form-data; boundary={boundary}",
             timeout_s=timeout_s,
         )
-        # Moonraker returns: {"result": {"item": {"path": "...", "root": "gcodes"}, "print_started": false}}
+        # Moonraker may return either:
+        # {"result": {"item": {"path": "...", "root": "gcodes"}, "print_started": false}}
+        # or an empty body after a successful upload on some FLSUN builds.
         r = (result.get("result") or {}) if isinstance(result, dict) else {}
         item = r.get("item") or {}
+        fallback_path = f"{remote_subdir.strip('/')}/{gcode_path.name}" if remote_subdir.strip("/") else gcode_path.name
         return UploadResult(
-            item_path=str(item.get("path", "")),
+            item_path=str(item.get("path") or fallback_path),
             item_root=str(item.get("root", "gcodes")),
             print_started=bool(r.get("print_started", False)),
             raw=r,
@@ -333,6 +339,22 @@ def probe_fleet(timeout_s: float = 5.0) -> list[dict[str, Any]]:
             entry["error"] = f"{type(exc).__name__}: {exc}"
         out.append(entry)
     return out
+
+
+def _validate_base_url(base_url: str, *, api_key_present: bool) -> None:
+    parsed = urlparse(base_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("Moonraker base_url must be http(s) with a host")
+    if parsed.username or parsed.password:
+        raise ValueError("Moonraker base_url must not include credentials")
+    if not api_key_present:
+        return
+    try:
+        host = ipaddress.ip_address(parsed.hostname)
+    except ValueError as exc:
+        raise ValueError("Refusing to send MOONRAKER_API_KEY to a non-IP Moonraker host") from exc
+    if not (host.is_private or host.is_link_local):
+        raise ValueError("Refusing to send MOONRAKER_API_KEY outside the local printer LAN")
 
 
 __all__ = [

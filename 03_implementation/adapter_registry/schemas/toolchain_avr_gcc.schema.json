@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/toolchain_avr_gcc.schema.json",
+  "title": "avr-gcc toolchain descriptor",
+  "description": "Compile-only AVR toolchain descriptor (8-bit AVR firmwares: Marlin classic, Prusa-Firmware MK3). NEVER used for flashing; only --version probe.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "source_url", "install_check", "version_pattern"],
+  "properties": {
+    "name": {"type": "string", "const": "avr_gcc"},
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "default": "https://gcc.gnu.org/",
+      "description": "Upstream GCC project. Toolchain typically obtained via OS package manager (e.g. apt install gcc-avr, pacman -S avr-gcc, MSYS2 mingw-w64-x86_64-avr-gcc)."
+    },
+    "install_check": {
+      "type": "string",
+      "default": "avr-gcc --version",
+      "description": "Read-only version probe. NEVER a flash command (avrdude is explicitly excluded)."
+    },
+    "version_pattern": {
+      "type": "string",
+      "default": "avr-gcc \\(.*\\) ([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)",
+      "description": "Regex extracting the GCC version triple from --version output."
+    },
+    "compile_only": {"type": "boolean", "const": true},
+    "no_flash": {"type": "boolean", "const": true}
+  }
+}

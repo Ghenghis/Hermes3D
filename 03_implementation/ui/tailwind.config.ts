@@ -12,8 +12,17 @@ import type { Config } from "tailwindcss";
  *   matching the contract's deep-navy chrome.
  * - fg / muted: foreground text + secondary text.
  * - accent.{cyan,blue,green,amber,red}: status + glow accents.
+ *
+ * W8-3 update: enabled `darkMode: "class"` so the W8-3 theme provider
+ * can toggle the active palette via `<html class="dark">` /
+ * `<html class="light">`. Added a parallel `h3d.*` colour group whose
+ * values resolve from `--h3d-color-*` CSS custom properties — so any
+ * component using `bg-h3d-surface` etc. picks up theme switches at
+ * runtime without re-rendering. The original `bg`, `surface`, `fg`
+ * aliases are preserved verbatim for visual-contract back-compat.
  */
 const config: Config = {
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
@@ -31,9 +40,24 @@ const config: Config = {
           amber: "#f59e0b",
           red: "#ef4444",
         },
+        h3d: {
+          background: "var(--h3d-color-background)",
+          surface: "var(--h3d-color-surface)",
+          "surface-2": "var(--h3d-color-surface-2)",
+          border: "var(--h3d-color-border)",
+          "text-primary": "var(--h3d-color-text-primary)",
+          "text-secondary": "var(--h3d-color-text-secondary)",
+          primary: "var(--h3d-color-primary)",
+          secondary: "var(--h3d-color-secondary)",
+          accent: "var(--h3d-color-accent)",
+          error: "var(--h3d-color-error)",
+          warning: "var(--h3d-color-warning)",
+          success: "var(--h3d-color-success)",
+          info: "var(--h3d-color-info)",
+        },
       },
       borderRadius: {
-        card: "20px",
+        card: "8px",
         chip: "999px",
       },
       fontFamily: {

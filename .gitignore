@@ -21,6 +21,7 @@ var/
 logs/
 *.log
 *.tmp
+03_implementation/ui/public/hermes3d-runtime.json
 
 ## Sliced output / artifacts
 sliced/
@@ -84,8 +85,9 @@ node_modules/
 ## Workspace-relative scratch (audit clones, throwaway scripts)
 tmp/
 
+## Source OS upstream checkouts (real local source, never vendored into repo)
+03_implementation/source-lab/sources/
+03_implementation/source-lab/tools/
 
-## Hermes3D-OS app installs (vendored, large) — local-only, NEVER committed.
-## All downloaded open-source apps land here; nothing under apps/ is tracked.
+## Hermes3D-OS app installs (vendored, large) - local-only, never committed
 apps/
-

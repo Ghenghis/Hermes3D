@@ -9,8 +9,7 @@
  *   Row 4   Proof & Verification | System Logs | Quick Preview | Notifications
  *   Row 5   Dimensional Truth Engine (compact strip)
  *
- * Default mode renders deterministic mock data; Phase 3.1 live mode reads
- * local bridge snapshots through `AdapterAPI`.
+ * Renders live API snapshots through `AdapterAPI`.
  */
 import {
   Activity,
@@ -30,6 +29,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Panel } from "../components/layout/Panel";
+import { WhileAwayBanner } from "../components/dashboard/WhileAwayBanner";
 import { KpiCard } from "../components/cards/KpiCard";
 import { ResourceGauge } from "../components/charts/ResourceGauge";
 import { Sparkline } from "../components/charts/Sparkline";
@@ -37,25 +37,31 @@ import { StatusBadge, type StatusTone } from "../components/badges/StatusBadge";
 import { ProofChip } from "../components/badges/ProofChip";
 import { useStore } from "../app/store";
 import { adapters } from "../api/adapters";
-import { MOCK_PRINTERS } from "../data/mock/printers";
-import { MOCK_AGENTS } from "../data/mock/agents";
-import { MOCK_WORKFLOWS } from "../data/mock/workflows";
-import { MOCK_JOBS } from "../data/mock/jobs";
-import { LATEST_BUNDLE } from "../data/mock/proof";
-import { MOCK_SYSTEM_SNAPSHOT } from "../data/mock/system";
-import { MOCK_DIMENSIONAL_REPORTS } from "../data/mock/dimensional";
-import { MOCK_LOGS } from "../data/mock/logs";
-import { MOCK_NOTIFICATIONS } from "../data/mock/notifications";
 import type { Printer, PrinterDataSource, PrinterStatus } from "../types/printer";
 import type { Job } from "../types/job";
 import type { Agent } from "../types/agent";
-import type { LogLevel } from "../types/log";
-import type { NotificationSeverity } from "../types/notification";
+import type { LogEntry, LogLevel } from "../types/log";
+import type { Notification, NotificationSeverity } from "../types/notification";
+import type { Workflow } from "../types/workflow";
+import type { ProofBundle } from "../types/proof";
+import type { SystemSnapshot } from "../types/system";
+import type { DimensionalAccuracyReport } from "../types/dimensional";
 import { tokens } from "../styles/tokens";
-import { useEffect, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+
+type HermesImportMeta = ImportMeta & {
+  env: {
+    VITE_HERMES3D_BRIDGE_PORT?: string;
+  };
+};
+
+const DEFAULT_BRIDGE_PORT = "8765";
+const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
+const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
 
 const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   online: "green",
+  active: "green",
   printing: "cyan",
   paused: "amber",
   maintenance: "amber",
@@ -65,6 +71,7 @@ const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
 
 const PRINTER_LABEL: Record<PrinterStatus, string> = {
   online: "Online",
+  active: "Active",
   printing: "Printing",
   paused: "Paused",
   maintenance: "Maint.",
@@ -78,13 +85,7 @@ const JOB_TONE: Record<Job["status"], StatusTone> = {
   completed: "green",
   failed: "red",
   cancelled: "muted",
-};
-
-const AGENT_TONE: Record<Agent["status"], StatusTone> = {
-  active: "green",
-  idle: "muted",
-  paused: "amber",
-  error: "red",
+  rolled_back: "amber",
 };
 
 const LOG_TONE: Record<LogLevel, { dot: string; text: string }> = {
@@ -101,40 +102,117 @@ const NOTIF_VISUAL: Record<NotificationSeverity, { Icon: typeof Info; tone: stri
   error:   { Icon: XCircle,        tone: "text-accent-red" },
 };
 
-const PIPELINE_STAGES: { id: string; label: string; Icon: typeof Sparkles; status: "complete" | "active" | "pending" }[] = [
-  { id: "prompt",    label: "Prompt / Input", Icon: Sparkles,      status: "complete" },
-  { id: "gen3d",     label: "3D Generation",  Icon: Box,           status: "complete" },
-  { id: "blender",   label: "Blender MCP",    Icon: Layers,        status: "complete" },
-  { id: "validate",  label: "Validation",     Icon: ShieldCheck,   status: "complete" },
-  { id: "slice",     label: "Slicing",        Icon: Sliders,       status: "complete" },
-  { id: "print",     label: "Print",          Icon: PrinterIcon,   status: "active" },
+type DashboardPipelineStage = {
+  id: string;
+  label: string;
+  Icon: typeof Sparkles;
+  status: "complete" | "active" | "pending" | "failed";
+  detail?: string;
+};
+
+/** Icon-only lookup for pipeline stage nodes — status comes from live API, never from this table. */
+const PIPELINE_STAGE_ICONS: Array<{ id: string; label: string; Icon: typeof Sparkles }> = [
+  { id: "prompt",    label: "Prompt / Input", Icon: Sparkles    },
+  { id: "gen3d",     label: "3D Generation",  Icon: Box         },
+  { id: "blender",   label: "Blender MCP",    Icon: Layers      },
+  { id: "validate",  label: "Validation",     Icon: ShieldCheck },
+  { id: "slice",     label: "Slicing",        Icon: Sliders     },
+  { id: "print",     label: "Print",          Icon: PrinterIcon },
 ];
+
+type EvidenceEvent = {
+  type: string;
+  ts_utc: string;
+  source?: string;
+  message?: string;
+};
 
 export function Dashboard() {
   const setActiveTabId = useStore((s) => s.setActiveTabId);
-  const [printers, setPrinters] = useState<Printer[]>(MOCK_PRINTERS);
+  const [printers, setPrinters] = useState<Printer[]>([]);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [latestProof, setLatestProof] = useState<ProofBundle | null>(null);
+  const [systemSnapshot, setSystemSnapshot] = useState<SystemSnapshot | null>(null);
+  const [dimensionalReports, setDimensionalReports] = useState<DimensionalAccuracyReport[]>([]);
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [events, setEvents] = useState<EvidenceEvent[]>([]);
+  const [eventStreamStatus, setEventStreamStatus] = useState<"connecting" | "streaming" | "unreachable">("connecting");
   useEffect(() => {
     let mounted = true;
-    void adapters.getPrinters().then((nextPrinters) => {
-      if (mounted) {
-        setPrinters(nextPrinters);
+    void Promise.allSettled([
+      adapters.getPrinters(),
+      adapters.getJobs("printing,queued,running"),
+      adapters.getAgents(),
+      adapters.getActiveWorkflows(),
+      adapters.getLatestProofBundle(),
+      adapters.getSystemSnapshot(),
+      adapters.getDimensionalReports(),
+      adapters.getLogs(),
+      adapters.getNotifications(),
+    ]).then((results) => {
+      if (!mounted) {
+        return;
       }
-    }).catch(() => undefined);
+      setSettledValue(results[0], setPrinters);
+      setSettledValue(results[1], setJobs);
+      setSettledValue(results[2], setAgents);
+      setSettledValue(results[3], setWorkflows);
+      setSettledValue(results[4], setLatestProof);
+      setSettledValue(results[5], setSystemSnapshot);
+      setSettledValue(results[6], setDimensionalReports);
+      setSettledValue(results[7], setLogs);
+      setSettledValue(results[8], setNotifications);
+    });
     return () => {
       mounted = false;
     };
+  }, []);
+  useEffect(() => {
+    const stream = new EventSource(`${LIVE_BASE_URL}/api/events/stream`);
+    stream.onopen = () => setEventStreamStatus("streaming");
+    stream.onmessage = (message) => {
+      try {
+        const parsed = JSON.parse(message.data) as EvidenceEvent;
+        setEvents((current) => [parsed, ...current].slice(0, 50));
+      } catch {
+        setEvents((current) => [{
+          type: "event",
+          ts_utc: new Date().toISOString(),
+          message: message.data,
+        }, ...current].slice(0, 50));
+      }
+    };
+    stream.onerror = () => setEventStreamStatus("unreachable");
+    return () => stream.close();
   }, []);
 
   const totalPrinters = printers.length;
   const onlinePrinters = printers.filter((p) => p.status !== "offline").length;
   const offlinePrinters = totalPrinters - onlinePrinters;
   const activePrints = printers.filter((p) => p.status === "printing").length;
-  const queuedJobs = MOCK_JOBS.filter((j) => j.status === "queued").length;
-  const sys = MOCK_SYSTEM_SNAPSHOT;
-  const activeWorkflow = MOCK_WORKFLOWS.find((w) => w.status === "active") ?? MOCK_WORKFLOWS[0];
+  const queuedJobs = jobs.filter((j) => j.status === "queued").length;
+  const completedJobs = jobs.filter((j) => j.status === "completed").length;
+  const failedJobs = jobs.filter((j) => j.status === "failed").length;
+  const successRate = completedJobs + failedJobs > 0
+    ? Math.round((completedJobs / (completedJobs + failedJobs)) * 1000) / 10
+    : null;
+  const activeWorkflow = workflows.find((w) => w.status === "active") ?? workflows[0] ?? null;
+  const activeAgents = agents.filter((a) => a.status === "active").length;
+  const unreadNotifications = notifications.filter((n) => !n.read).length;
+  const systemTone: StatusTone = systemSnapshot
+    ? (systemSnapshot.system_status === "OK" ? "green" : systemSnapshot.system_status === "DEGRADED" ? "amber" : "red")
+    : "muted";
+  const systemHealthPct = systemSnapshot
+    ? (systemSnapshot.system_status === "OK" ? 100 : systemSnapshot.system_status === "DEGRADED" ? 75 : 0)
+    : null;
 
   return (
-    <div className="grid grid-cols-12 gap-2.5 auto-rows-min" data-testid="dashboard-root">
+    <div className="dashboard-grid" data-testid="dashboard-root">
+      <WhileAwayBanner notifications={notifications} />
+
       {/* ── Row 1 ─ 5 KPI cards ──────────────────────────────────────────── */}
       <div className="col-span-12 grid grid-cols-2 sm:grid-cols-5 gap-2.5">
         <KpiCard
@@ -142,42 +220,40 @@ export function Dashboard() {
           value={totalPrinters}
           delta={{ value: `${onlinePrinters} online · ${offlinePrinters} offline`, tone: "green" }}
           icon={<PrinterIcon size={20} />}
-          chart={<Sparkline data={[10, 11, 12, 12, 11, 12, 12]} />}
+          chart={<Sparkline data={flatSparkline(totalPrinters)} />}
         />
         <KpiCard
           label="Active Prints"
           value={activePrints}
           delta={{ value: "running now", tone: "muted" }}
           icon={<Activity size={20} />}
-          chart={<Sparkline data={[1, 2, 2, 3, 3, 2, activePrints]} color={tokens.chartColors.cyan} />}
+          chart={<Sparkline data={flatSparkline(activePrints)} color={tokens.chartColors.cyan} />}
         />
         <KpiCard
           label="Queued Prints"
           value={queuedJobs}
           delta={{ value: "in print queue", tone: "muted" }}
           icon={<ListOrdered size={20} />}
-          chart={<Sparkline data={[2, 3, 4, 4, 5, 5, queuedJobs]} color={tokens.chartColors.amber} />}
+          chart={<Sparkline data={flatSparkline(queuedJobs)} color={tokens.chartColors.amber} />}
         />
         <KpiCard
           label="Success Rate"
-          value="98.2%"
-          delta={{ value: "+0.3% vs 24h", tone: "green" }}
+          value={successRate == null ? "—" : `${successRate}%`}
+          delta={{ value: successRate == null ? "no completed jobs" : "from live jobs", tone: successRate == null ? "muted" : "green" }}
           icon={<Sparkles size={20} />}
-          chart={
-            <Sparkline data={[97.1, 97.4, 97.6, 98.0, 97.9, 98.1, 98.2]} color={tokens.chartColors.green} />
-          }
+          chart={successRate == null ? undefined : <Sparkline data={flatSparkline(successRate)} color={tokens.chartColors.green} />}
         />
         <KpiCard
           label="System Health"
-          value="100%"
-          delta={{ value: sys.gpu_name ?? "GPU OK", tone: "green" }}
+          value={systemSnapshot?.system_status ?? "Unavailable"}
+          delta={{ value: systemSnapshot?.gpu_name ?? "backend unavailable", tone: systemTone }}
           icon={<ShieldCheck size={20} />}
-          chart={<Sparkline data={[98, 99, 100, 100, 100, 100, 100]} color={tokens.chartColors.green} />}
+          chart={systemHealthPct == null ? undefined : <Sparkline data={flatSparkline(systemHealthPct)} color={tokens.chartColors.green} />}
         />
       </div>
 
       {/* ── Row 2 ─ Printer Fleet (col-7) + Workflow Pipeline + Preview (col-5) ─ */}
-      <div className="col-span-12 lg:col-span-7">
+      <div className="col-span-12 min-h-0 lg:col-span-7">
         <Panel
           id="dashboard.fleet"
           title="PRINTER FLEET"
@@ -185,154 +261,161 @@ export function Dashboard() {
           headerExtra={
             <button
               type="button"
-              onClick={() => setActiveTabId("fleet")}
+              onClick={() => setActiveTabId("printers")}
               className="text-accent-cyan hover:text-accent-blue text-xs font-medium flex items-center gap-1 px-2 py-0.5 rounded hover:bg-surface2 transition-colors"
             >
               View All <ExternalLink size={11} />
             </button>
           }
           dense
-          className="h-[300px]"
+          className="h-full min-h-0"
         >
           <FleetTable printers={printers} />
         </Panel>
       </div>
-      <div className="col-span-12 lg:col-span-5">
+      <div className="col-span-12 min-h-0 lg:col-span-5">
         <Panel
           id="dashboard.pipeline"
           title="AI WORKFLOW PIPELINE"
-          status={{ tone: "cyan", label: "active" }}
+          status={{ tone: activeWorkflow ? "cyan" : "muted", label: activeWorkflow ? "active" : "none" }}
           headerExtra={
-            <span className="text-muted text-xs truncate max-w-[180px]">{activeWorkflow.name}</span>
+            <span className="text-muted text-xs truncate max-w-[180px]">{activeWorkflow?.name ?? "No active workflow"}</span>
           }
           dense
-          className="h-[300px]"
+          className="h-full min-h-0"
         >
-          <PipelinePanel />
+          <PipelinePanel workflow={activeWorkflow} />
         </Panel>
       </div>
 
       {/* ── Row 3 ─ Active Agents | Agent Activity | Resources | Recent Jobs ─ */}
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.agents.active"
           title="ACTIVE AGENTS"
           status={{
             tone: "green",
-            label: `${MOCK_AGENTS.filter((a) => a.status === "active").length}/${MOCK_AGENTS.length}`,
+            label: `${activeAgents}/${agents.length}`,
           }}
           dense
-          className="h-[230px]"
+          className="h-full min-h-0"
         >
-          <ActiveAgentsList />
+          <ActiveAgentsList agents={agents} />
         </Panel>
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.agents.activity"
           title="AGENT ACTIVITY (LIVE)"
-          status={{ tone: "cyan", label: "streaming" }}
+          status={{ tone: eventStreamStatus === "unreachable" ? "amber" : "cyan", label: eventStreamStatus }}
           dense
-          className="h-[230px]"
+          className="h-full min-h-0"
         >
-          <AgentActivityLog />
+          <AgentActivityLog events={events} streamStatus={eventStreamStatus} />
         </Panel>
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.resources"
           title="SYSTEM RESOURCES"
-          status={{ tone: "green", label: sys.system_status }}
+          status={{ tone: systemTone, label: systemSnapshot?.system_status ?? "unavailable" }}
           dense
-          className="h-[230px]"
+          className="h-full min-h-0"
         >
-          <ResourcePanel />
+          <ResourcePanel snapshot={systemSnapshot} />
         </Panel>
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.jobs"
           title="RECENT JOBS"
-          status={{ tone: "muted", label: `${MOCK_JOBS.length} total` }}
+          status={{ tone: "muted", label: `${jobs.length} total` }}
           dense
-          className="h-[230px]"
+          className="h-full min-h-0"
         >
-          <RecentJobs printers={printers} />
+          <RecentJobs printers={printers} jobs={jobs} />
         </Panel>
       </div>
 
       {/* ── Row 4 ─ Proof | Logs | Quick Preview | Notifications ─────────── */}
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.proof"
           title="PROOF & VERIFICATION"
-          status={{ tone: "green", label: "LATEST" }}
-          headerExtra={<ProofChip status={LATEST_BUNDLE.verdict === "verified" ? "verified" : "pending"} />}
+          status={{ tone: latestProof ? "green" : "muted", label: latestProof ? "LATEST" : "none" }}
+          headerExtra={<ProofChip status={latestProof?.verdict === "verified" ? "verified" : "pending"} />}
           dense
-          className="h-[220px]"
+          className="h-full min-h-0"
         >
-          <ProofPanel />
+          <ProofPanel bundle={latestProof} />
         </Panel>
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.logs"
           title="SYSTEM LOGS"
           status={{ tone: "cyan", label: "LATEST" }}
-          headerExtra={<span className="text-muted text-xs">{MOCK_LOGS.length} recent</span>}
+          headerExtra={<span className="text-muted text-xs">{logs.length} recent</span>}
           dense
-          className="h-[220px]"
+          className="h-full min-h-0"
         >
-          <LogsPanel />
+          <LogsPanel logs={logs} />
         </Panel>
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.preview"
           title="QUICK PREVIEW"
           status={{ tone: "muted", label: "STL · 3MF" }}
           dense
-          className="h-[220px]"
+          className="h-full min-h-0"
         >
           <QuickPreview />
         </Panel>
       </div>
-      <div className="col-span-12 sm:col-span-6 lg:col-span-3">
+      <div className="col-span-12 min-h-0 sm:col-span-6 lg:col-span-3">
         <Panel
           id="dashboard.notifications"
           title="NOTIFICATIONS"
           status={{
-            tone: MOCK_NOTIFICATIONS.some((n) => !n.read) ? "amber" : "muted",
-            label: `${MOCK_NOTIFICATIONS.filter((n) => !n.read).length} unread`,
+            tone: unreadNotifications > 0 ? "amber" : "muted",
+            label: `${unreadNotifications} unread`,
           }}
           dense
-          className="h-[220px]"
+          className="h-full min-h-0"
         >
-          <NotificationsPanel />
+          <NotificationsPanel notifications={notifications} />
         </Panel>
       </div>
 
-      {/* ── Row 5 ─ Dimensional Truth Engine (compact strip) ─────────────── */}
-      <div className="col-span-12">
-        <Panel
-          id="dashboard.dimensional"
-          title="DIMENSIONAL TRUTH ENGINE"
-          status={{ tone: "amber", label: "phase 6 pending" }}
-          headerExtra={<span className="text-muted text-xs">UI-standards reservation · live in Phase 6</span>}
-          dense
-          className="h-[85px]"
-        >
-          <DimensionalStrip />
-        </Panel>
+      <div className="sr-only" aria-live="polite">
+        Dimensional Truth Engine reports loaded: {dimensionalReports.length}
       </div>
     </div>
   );
+}
+
+function setSettledValue<T>(
+  result: PromiseSettledResult<T>,
+  setter: Dispatch<SetStateAction<T>>,
+) {
+  if (result.status === "fulfilled") {
+    setter(result.value);
+  }
+}
+
+function flatSparkline(value: number): number[] {
+  return [value, value, value];
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Printer Fleet — numbered, IP, progress bars                         *
  * ────────────────────────────────────────────────────────────────────────── */
 function FleetTable({ printers }: { printers: Printer[] }) {
+  if (printers.length === 0) {
+    return <EmptyPanelState title="No live printers" detail="The printer API returned an empty fleet." />;
+  }
+
   return (
     <div className="w-full overflow-auto h-full">
       <table className="w-full text-xs">
@@ -385,10 +468,12 @@ function FleetTable({ printers }: { printers: Printer[] }) {
 
 function DataSourceChip({ source }: { source: PrinterDataSource }) {
   const tone = {
-    mock: "border-border text-muted",
     live: "border-accent-green/50 text-accent-green",
+    degraded: "border-accent-amber/50 text-accent-amber",
     error: "border-accent-red/50 text-accent-red",
-  }[source];
+    policy: "border-amber-500/50 text-amber-300",
+    config: "border-border text-muted",
+  }[source] ?? "border-border text-muted";
   return (
     <span
       data-source={source}
@@ -405,7 +490,7 @@ function FleetProgressBar({ value, status }: { value: number | null; status: Pri
     return <span className="text-muted text-[11px]">—</span>;
   }
   const tone =
-    status === "printing" ? "bg-accent-cyan" : status === "online" ? "bg-accent-green" : "bg-muted";
+    status === "printing" ? "bg-accent-cyan" : status === "online" || status === "active" ? "bg-accent-green" : "bg-muted";
   return (
     <div className="flex items-center gap-1.5">
       <div className="flex-1 h-1.5 bg-surface2 rounded-full overflow-hidden">
@@ -419,43 +504,65 @@ function FleetProgressBar({ value, status }: { value: number | null; status: Pri
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: AI Workflow Pipeline — large icons + project log + preview          *
  * ────────────────────────────────────────────────────────────────────────── */
-function PipelinePanel() {
-  const wf = MOCK_WORKFLOWS.find((w) => w.status === "active") ?? MOCK_WORKFLOWS[0];
+function PipelinePanel({ workflow }: { workflow: Workflow | null }) {
+  if (!workflow) {
+    return <EmptyPanelState title="No active workflow" detail="Live workflows will appear here after the backend starts one." />;
+  }
+
+  const stages = workflow.stages.length > 0
+    ? workflow.stages.map((stage, index): DashboardPipelineStage => ({
+      id: stage.id,
+      label: stage.label,
+      Icon: PIPELINE_STAGE_ICONS[index]?.Icon ?? CircleDot,
+      status: stage.status === "done" ? "complete" : stage.status === "active" ? "active" : stage.status === "failed" ? "failed" : "pending",
+      detail: stage.detail,
+    }))
+    : [];
+  const stageSummary = workflow.stages.length > 0
+    ? `stage ${Math.min(workflow.active_stage + 1, workflow.stages.length)}/${workflow.stages.length}`
+    : "stage telemetry unavailable";
   return (
-    <div className="grid grid-cols-3 gap-3 h-full">
-      <div className="col-span-2 flex flex-col gap-3 min-w-0">
-        {/* Stage row with large circular icons */}
-        <div className="flex items-center justify-between gap-1">
-          {PIPELINE_STAGES.map((stage, i) => (
-            <PipelineStageNode key={stage.id} stage={stage} isLast={i === PIPELINE_STAGES.length - 1} />
-          ))}
+    <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-3">
+      <div className="flex min-w-0 flex-col gap-3 xl:col-span-2">
+        <div className="min-h-[72px] rounded-md border border-border/60 bg-bg/20 p-2">
+          {stages.length > 0 ? (
+            <div className="flex items-center justify-between gap-1 overflow-x-auto pb-1">
+              {stages.map((stage, i) => (
+                <PipelineStageNode key={stage.id} stage={stage} isLast={i === stages.length - 1} />
+              ))}
+            </div>
+          ) : (
+            <EmptyPanelState title="No stage telemetry" detail="This live workflow has not reported stage events yet." />
+          )}
         </div>
         <div className="border-t border-border pt-2">
           <div className="text-muted text-[10px] uppercase tracking-wide mb-1">Current Job</div>
-          <div className="text-fg text-xs font-medium truncate">{wf.name}</div>
+          <div className="text-fg text-xs font-medium truncate">{workflow.name}</div>
           <div className="h-1.5 bg-surface2 rounded-full mt-2 overflow-hidden">
             <div
               className="h-full bg-accent-cyan rounded-full"
-              style={{ width: `${wf.progress}%` }}
+              style={{ width: `${workflow.progress}%` }}
             />
           </div>
           <div className="text-muted text-[10px] mt-1 font-mono tabular-nums">
-            {wf.progress}% · stage {wf.active_stage + 1}/{wf.stages.length}
+            {workflow.progress}% · {stageSummary}
           </div>
         </div>
         <div className="border-t border-border pt-2 flex-1 overflow-auto min-h-0">
-          <div className="text-muted text-[10px] uppercase tracking-wide mb-1">Project Timeline</div>
-          <ul className="flex flex-col gap-1 text-[11px]">
-            <TimelineRow label="Print started · T1 #1" time="10:20:14Z" tone="cyan" />
-            <TimelineRow label="Slice complete · 0.2mm PLA" time="10:18:02Z" tone="green" />
-            <TimelineRow label="3MF validated · mesh OK" time="10:16:47Z" tone="green" />
-            <TimelineRow label="Blender MCP export · 3MF" time="10:14:22Z" tone="green" />
-            <TimelineRow label="3D generated · TRELLIS" time="10:11:08Z" tone="green" />
-          </ul>
+          <div className="text-muted text-[10px] uppercase tracking-wide mb-1">Stage Status</div>
+          {stages.length > 0 ? (
+            <ul className="flex flex-col gap-1 text-[11px]">
+              {stages.map((stage) => (
+                <StageStatusRow key={stage.id} stage={stage} />
+              ))}
+            </ul>
+          ) : (
+            <EmptyPanelState title="No stage rows" detail="The workflow API returned no stage records for this job." />
+          )}
         </div>
       </div>
-      <div className="col-span-1 min-w-0">
-        <PreviewBox label="Active model" />
+      <div className="min-w-0 rounded-md border border-border/60 bg-bg/20">
+        <EmptyPanelState title="No workflow preview" detail="No live preview artifact is attached to this workflow." />
       </div>
     </div>
   );
@@ -465,7 +572,7 @@ function PipelineStageNode({
   stage,
   isLast,
 }: {
-  stage: (typeof PIPELINE_STAGES)[number];
+  stage: DashboardPipelineStage;
   isLast: boolean;
 }) {
   const visual =
@@ -473,7 +580,9 @@ function PipelineStageNode({
       ? { ring: "ring-accent-green/70", text: "text-accent-green", Indicator: Check }
       : stage.status === "active"
         ? { ring: "ring-accent-cyan/80 shadow-glow", text: "text-accent-cyan", Indicator: CircleDot }
-        : { ring: "ring-border", text: "text-muted", Indicator: CircleDot };
+        : stage.status === "failed"
+          ? { ring: "ring-accent-red/70", text: "text-accent-red", Indicator: CircleDot }
+          : { ring: "ring-border", text: "text-muted", Indicator: CircleDot };
   return (
     <div className="flex flex-col items-center gap-1 min-w-0 flex-1 relative">
       <div
@@ -488,7 +597,7 @@ function PipelineStageNode({
       {!isLast && (
         <div
           className={`absolute top-5 left-1/2 right-[-50%] h-px ${
-            stage.status === "complete" ? "bg-accent-green/50" : "bg-border"
+            stage.status === "complete" ? "bg-accent-green/50" : stage.status === "active" ? "bg-accent-cyan/50" : "bg-border"
           }`}
           aria-hidden
         />
@@ -497,87 +606,40 @@ function PipelineStageNode({
   );
 }
 
-function TimelineRow({
-  label,
-  time,
-  tone,
-}: {
-  label: string;
-  time: string;
-  tone: "cyan" | "green" | "amber";
-}) {
-  const dotClass =
-    tone === "cyan" ? "bg-accent-cyan" : tone === "green" ? "bg-accent-green" : "bg-accent-amber";
+function StageStatusRow({ stage }: { stage: DashboardPipelineStage }) {
+  const dotClass = {
+    complete: "bg-accent-green",
+    active: "bg-accent-cyan",
+    failed: "bg-accent-red",
+    pending: "bg-muted",
+  }[stage.status];
+  const textClass = {
+    complete: "text-accent-green",
+    active: "text-accent-cyan",
+    failed: "text-accent-red",
+    pending: "text-muted",
+  }[stage.status];
   return (
     <li className="flex items-center gap-2">
       <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} aria-hidden />
-      <span className="text-fg truncate flex-1">{label}</span>
-      <span className="text-muted font-mono shrink-0">{time}</span>
+      <span className="text-fg truncate flex-1">{stage.label}</span>
+      {stage.detail && <span className="text-muted truncate max-w-[120px]">{stage.detail}</span>}
+      <span className={`font-mono shrink-0 ${textClass}`}>{stage.status}</span>
     </li>
   );
-}
-
-/** Stylized dark wireframe placeholder — Phase 6 wires real STL/3MF preview. */
-function PreviewBox({ label }: { label: string }) {
-  return (
-    <div className="h-full w-full bg-gradient-to-br from-surface2 to-bg border border-accent-cyan/20 rounded-lg p-2 flex flex-col items-center justify-between overflow-hidden relative">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden>
-        {/* Subtle grid backdrop */}
-        <svg viewBox="0 0 100 100" className="w-full h-full opacity-10" preserveAspectRatio="none">
-          <defs>
-            <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-              <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#22d3ee" strokeWidth="0.3" />
-            </pattern>
-          </defs>
-          <rect width="100" height="100" fill="url(#grid)" />
-        </svg>
-        {/* Corner brackets */}
-        <CornerBracket pos="tl" />
-        <CornerBracket pos="tr" />
-        <CornerBracket pos="bl" />
-        <CornerBracket pos="br" />
-      </div>
-      <div className="text-accent-cyan/80 text-[9px] uppercase tracking-wider z-10">{label}</div>
-      <svg
-        viewBox="0 0 100 100"
-        className="w-full h-full max-h-[120px] text-accent-cyan z-10 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="0.6"
-        strokeLinejoin="round"
-      >
-        {/* Wireframe cube — front + top + side faces */}
-        <polygon points="25,35 75,35 75,82 25,82" stroke="currentColor" />
-        <polygon points="25,35 45,18 95,18 75,35" stroke="currentColor" />
-        <polygon points="75,35 95,18 95,65 75,82" stroke="currentColor" />
-        {/* Hidden edges */}
-        <line x1="25" y1="35" x2="45" y2="18" />
-        <line x1="45" y1="18" x2="45" y2="65" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="1,1" />
-        <line x1="45" y1="65" x2="25" y2="82" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="1,1" />
-        <line x1="45" y1="65" x2="95" y2="65" stroke="currentColor" strokeOpacity="0.25" strokeDasharray="1,1" />
-      </svg>
-      <div className="text-fg/90 text-[10px] font-mono z-10">frame-bracket-v3</div>
-    </div>
-  );
-}
-
-function CornerBracket({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
-  const positions = {
-    tl: "top-1 left-1 border-l border-t",
-    tr: "top-1 right-1 border-r border-t",
-    bl: "bottom-1 left-1 border-l border-b",
-    br: "bottom-1 right-1 border-r border-b",
-  } as const;
-  return <div className={`absolute h-2 w-2 border-accent-cyan/70 ${positions[pos]}`} />;
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Active Agents (left of mid row)                                     *
  * ────────────────────────────────────────────────────────────────────────── */
-function ActiveAgentsList() {
+function ActiveAgentsList({ agents }: { agents: Agent[] }) {
+  if (agents.length === 0) {
+    return <EmptyPanelState title="No live agents" detail="The agents API returned no registered agents." />;
+  }
+
   return (
     <ul className="flex flex-col gap-1 h-full overflow-auto">
-      {MOCK_AGENTS.map((a) => (
+      {agents.map((a) => (
         <li key={a.id} className="flex items-center gap-2 text-xs py-1">
           <span
             className={[
@@ -608,49 +670,55 @@ function ActiveAgentsList() {
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Agent Activity (Live)                                               *
  * ────────────────────────────────────────────────────────────────────────── */
-function AgentActivityLog() {
-  // Sort newest-first, deterministic on mock timestamps.
-  const sorted = [...MOCK_AGENTS].sort((a, b) =>
-    b.last_activity_utc.localeCompare(a.last_activity_utc),
-  );
-  return (
-    <ul className="flex flex-col gap-1.5 h-full overflow-auto">
-      {sorted.map((a) => (
-        <li key={a.id} className="flex items-start gap-2 text-xs">
-          <StatusBadge tone={AGENT_TONE[a.status]} label={a.status} />
-          <div className="flex flex-col min-w-0 flex-1 leading-tight">
-            <span className="text-fg truncate font-medium">{a.role}</span>
-            <span className="text-muted text-[10px] truncate font-mono">
-              {a.last_activity_utc.split("T")[1]?.slice(0, 8) ?? ""}Z · {a.model_provider}
-            </span>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
+function AgentActivityLog({ events, streamStatus }: { events: EvidenceEvent[]; streamStatus: "connecting" | "streaming" | "unreachable" }) {
+  if (events.length > 0) {
+    return (
+      <ul className="flex flex-col gap-1.5 h-full overflow-auto">
+        {events.map((event, index) => (
+          <li key={`${event.ts_utc}-${index}`} className="flex items-start gap-2 text-xs">
+            <StatusBadge tone="cyan" label={event.type} />
+            <div className="flex min-w-0 flex-1 flex-col leading-tight">
+              <span className="truncate font-medium text-fg">{event.message ?? event.source ?? "Evidence event"}</span>
+              <span className="truncate font-mono text-[10px] text-muted">
+                {event.ts_utc.split("T")[1]?.slice(0, 8) ?? ""}Z · live SSE
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (streamStatus === "unreachable") {
+    return <EmptyPanelState title="Event stream unavailable" detail="Backend SSE stream is unreachable; live activity is blocked." />;
+  }
+  return <EmptyPanelState title="No live activity" detail={streamStatus === "connecting" ? "Connecting to backend SSE events." : "Waiting for backend SSE events."} />;
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: System Resources — CPU/RAM/Disk gauges + network sparkline          *
  * ────────────────────────────────────────────────────────────────────────── */
-function ResourcePanel() {
-  const sys = MOCK_SYSTEM_SNAPSHOT;
+function ResourcePanel({ snapshot }: { snapshot: SystemSnapshot | null }) {
+  if (!snapshot) {
+    return <EmptyPanelState title="System telemetry unavailable" detail="The system snapshot API did not return data." />;
+  }
+
+  const network = snapshot.network_kbps.length > 0 ? snapshot.network_kbps : [0];
   return (
     <div className="flex flex-col h-full gap-2">
       <div className="grid grid-cols-3 gap-1 flex-1">
-        <ResourceGauge value={sys.cpu_pct} label="CPU" />
-        <ResourceGauge value={sys.ram_pct} label="RAM" />
-        <ResourceGauge value={sys.disk_pct} label="DISK" />
+        <ResourceGauge value={snapshot.cpu_pct} label="CPU" />
+        <ResourceGauge value={snapshot.ram_pct} label="RAM" />
+        <ResourceGauge value={snapshot.disk_pct} label="DISK" />
       </div>
       <div className="border-t border-border pt-1.5">
         <div className="flex items-center justify-between text-[10px] uppercase tracking-wide text-muted">
           <span>Network</span>
           <span className="font-mono tabular-nums text-fg">
-            {sys.network_kbps[sys.network_kbps.length - 1]} kbps
+            {network[network.length - 1]} kbps
           </span>
         </div>
         <div className="h-8">
-          <Sparkline data={sys.network_kbps} color={tokens.chartColors.cyan} />
+          <Sparkline data={network} color={tokens.chartColors.cyan} />
         </div>
       </div>
     </div>
@@ -660,12 +728,16 @@ function ResourcePanel() {
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Recent Jobs — name + printer + progress + done/check                *
  * ────────────────────────────────────────────────────────────────────────── */
-function RecentJobs({ printers }: { printers: Printer[] }) {
-  const jobs = MOCK_JOBS.slice(0, 7);
+function RecentJobs({ printers, jobs }: { printers: Printer[]; jobs: Job[] }) {
+  const visibleJobs = jobs.slice(0, 5);
+  if (visibleJobs.length === 0) {
+    return <EmptyPanelState title="No recent jobs" detail="The jobs API returned no queued or printing jobs." />;
+  }
+
   const printerNameById = new Map(printers.map((p) => [p.id, p.name]));
   return (
     <ul className="flex flex-col gap-1.5 h-full overflow-auto">
-      {jobs.map((j) => {
+      {visibleJobs.map((j) => {
         const isDone = j.status === "completed";
         const tone = JOB_TONE[j.status];
         return (
@@ -713,27 +785,30 @@ function RecentJobs({ printers }: { printers: Printer[] }) {
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Proof & Verification (LATEST)                                       *
  * ────────────────────────────────────────────────────────────────────────── */
-function ProofPanel() {
-  const b = LATEST_BUNDLE;
-  const passCount = b.gates.filter((g) => g.verdict === "pass").length;
+function ProofPanel({ bundle }: { bundle: ProofBundle | null }) {
+  if (!bundle) {
+    return <EmptyPanelState title="No proof bundle" detail="The proof API has not returned a latest bundle." />;
+  }
+
+  const passCount = bundle.gates.filter((g) => g.verdict === "pass").length;
   return (
     <div className="flex flex-col gap-2 h-full text-xs">
       <div className="flex flex-col leading-tight">
         <span className="text-muted text-[10px] uppercase tracking-wide">Bundle</span>
-        <span className="font-mono text-accent-cyan truncate">{b.id}</span>
+        <span className="font-mono text-accent-cyan truncate">{bundle.id}</span>
       </div>
       <div className="grid grid-cols-2 gap-1 leading-tight">
-        <KV k="Branch" v={<span className="font-mono text-fg text-[11px] truncate block">{b.branch}</span>} />
-        <KV k="Commit" v={<span className="font-mono text-fg text-[11px]">{b.commit.slice(0, 10)}</span>} />
-        <KV k="Files" v={<span className="text-fg text-[11px]">{b.files_count}</span>} />
-        <KV k="Size" v={<span className="text-fg text-[11px]">{(b.size_bytes / 1024).toFixed(1)} KB</span>} />
+        <KV k="Branch" v={<span className="font-mono text-fg text-[11px] truncate block">{bundle.branch}</span>} />
+        <KV k="Commit" v={<span className="font-mono text-fg text-[11px]">{bundle.commit.slice(0, 10)}</span>} />
+        <KV k="Files" v={<span className="text-fg text-[11px]">{bundle.files_count}</span>} />
+        <KV k="Size" v={<span className="text-fg text-[11px]">{(bundle.size_bytes / 1024).toFixed(1)} KB</span>} />
       </div>
       <div className="flex-1 overflow-auto border-t border-border pt-1.5">
         <div className="text-muted text-[10px] uppercase tracking-wide mb-1">
-          Gates · {passCount}/{b.gates.length} pass
+          Gates · {passCount}/{bundle.gates.length} pass
         </div>
         <ul className="flex flex-col gap-0.5">
-          {b.gates.slice(0, 6).map((g) => (
+          {bundle.gates.slice(0, 6).map((g) => (
             <li key={g.layer} className="flex items-center gap-1.5 text-[10px]">
               <span
                 className={[
@@ -759,10 +834,14 @@ function ProofPanel() {
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: System Logs (Latest)                                                *
  * ────────────────────────────────────────────────────────────────────────── */
-function LogsPanel() {
+function LogsPanel({ logs }: { logs: LogEntry[] }) {
+  if (logs.length === 0) {
+    return <EmptyPanelState title="No live logs" detail="The logs API returned no entries." />;
+  }
+
   return (
     <ul className="flex flex-col gap-1 h-full overflow-auto">
-      {MOCK_LOGS.map((log, i) => {
+      {logs.map((log, i) => {
         const tone = LOG_TONE[log.level];
         return (
           <li
@@ -784,65 +863,21 @@ function LogsPanel() {
   );
 }
 
-/* ────────────────────────────────────────────────────────────────────────── *
- * Panel: Quick Preview (3D model placeholder)                                *
- * ────────────────────────────────────────────────────────────────────────── */
 function QuickPreview() {
-  return (
-    <div className="h-full flex flex-col gap-1.5">
-      <div className="flex-1 bg-gradient-to-br from-surface2 to-bg border border-accent-cyan/20 rounded-lg flex items-center justify-center overflow-hidden relative">
-        <div className="absolute inset-0 pointer-events-none" aria-hidden>
-          <svg viewBox="0 0 100 100" className="w-full h-full opacity-10" preserveAspectRatio="none">
-            <defs>
-              <pattern id="grid-preview" width="8" height="8" patternUnits="userSpaceOnUse">
-                <path d="M 8 0 L 0 0 0 8" fill="none" stroke="#22d3ee" strokeWidth="0.3" />
-              </pattern>
-            </defs>
-            <rect width="100" height="100" fill="url(#grid-preview)" />
-          </svg>
-          <CornerBracket pos="tl" />
-          <CornerBracket pos="tr" />
-          <CornerBracket pos="bl" />
-          <CornerBracket pos="br" />
-        </div>
-        <svg
-          viewBox="0 0 100 100"
-          className="w-full h-full max-h-[140px] text-accent-cyan z-10 drop-shadow-[0_0_5px_rgba(34,211,238,0.45)]"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="0.6"
-          strokeLinejoin="round"
-        >
-          {/* Wireframe hexagonal prism */}
-          <polygon points="50,12 78,28 78,72 50,88 22,72 22,28" stroke="currentColor" />
-          <line x1="50" y1="12" x2="50" y2="88" stroke="currentColor" strokeOpacity="0.5" />
-          <line x1="22" y1="28" x2="78" y2="72" stroke="currentColor" strokeOpacity="0.35" />
-          <line x1="78" y1="28" x2="22" y2="72" stroke="currentColor" strokeOpacity="0.35" />
-          <line x1="50" y1="12" x2="22" y2="72" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="12" x2="78" y2="72" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="88" x2="22" y2="28" stroke="currentColor" strokeOpacity="0.3" />
-          <line x1="50" y1="88" x2="78" y2="28" stroke="currentColor" strokeOpacity="0.3" />
-          <circle cx="50" cy="50" r="1.5" fill="currentColor" />
-        </svg>
-      </div>
-      <div className="flex items-center justify-between text-[11px] px-0.5">
-        <div className="flex flex-col leading-tight min-w-0">
-          <span className="text-fg font-medium truncate">frame-bracket-v3.3mf</span>
-          <span className="text-muted font-mono text-[10px]">42.1 × 28.4 × 12.0 mm</span>
-        </div>
-        <Box size={13} className="text-accent-cyan/70 shrink-0" />
-      </div>
-    </div>
-  );
+  return <EmptyPanelState title="No model preview" detail="No live preview artifact was returned by the backend." />;
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
  * Panel: Notifications                                                       *
  * ────────────────────────────────────────────────────────────────────────── */
-function NotificationsPanel() {
+function NotificationsPanel({ notifications }: { notifications: Notification[] }) {
+  if (notifications.length === 0) {
+    return <EmptyPanelState title="No notifications" detail="The live notification inbox is empty." />;
+  }
+
   return (
     <ul className="flex flex-col gap-1.5 h-full overflow-auto">
-      {MOCK_NOTIFICATIONS.map((n) => {
+      {notifications.map((n) => {
         const v = NOTIF_VISUAL[n.severity];
         return (
           <li
@@ -867,90 +902,17 @@ function NotificationsPanel() {
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *
- * Strip: Dimensional Truth Engine (compact, below main grid)                 *
- * ────────────────────────────────────────────────────────────────────────── */
-function DimensionalStrip() {
-  const r = MOCK_DIMENSIONAL_REPORTS[0];
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 h-full text-[11px]">
-      <DimChip
-        label="Scale / Unit"
-        value={`${r.scale.scale_factor.toFixed(2)}× ${r.scale.unit}`}
-        sub={r.scale.confirmed_by ? `confirmed · ${r.scale.confirmed_by}` : "awaiting confirm"}
-        tone={r.scale.confirmed_by ? "green" : "amber"}
-      />
-      <DimChip
-        label="Measurement Changes"
-        value={r.changes.length === 0 ? "None requested" : `${r.changes.length} requested`}
-        sub={r.changes[0] ? `${r.changes[0].axis} → ${r.changes[0].to_mm}mm` : "—"}
-        tone="muted"
-      />
-      <DimChip
-        label="Printability"
-        value={r.printability}
-        sub="Phase 6 trimesh checks"
-        tone={r.printability === "pass" ? "green" : r.printability === "fail" ? "red" : "amber"}
-      />
-      <DimChip
-        label="Mesh Repair"
-        value={r.mesh_repair.applied ? "applied" : "not yet"}
-        sub={r.mesh_repair.notes}
-        tone={r.mesh_repair.applied ? "green" : "muted"}
-      />
-      <DimChip
-        label="Visual Fidelity"
-        value={r.fidelity ? `${r.fidelity.score}% · ${r.fidelity.method}` : "phase4_pending"}
-        sub="SSIM + human eyeball"
-        tone="muted"
-      />
-      <DimChip
-        label="Before / After"
-        value={r.before_after ? "Δ recorded" : "awaiting print + scan"}
-        sub={r.proof_bundle_ref ? `proof: ${r.proof_bundle_ref}` : "no proof yet"}
-        tone="muted"
-      />
-    </div>
-  );
-}
-
-function DimChip({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: React.ReactNode;
-  sub: React.ReactNode;
-  tone: "green" | "red" | "amber" | "muted";
-}) {
-  const toneClass = {
-    green: "border-accent-green/40",
-    red: "border-accent-red/40",
-    amber: "border-accent-amber/40",
-    muted: "border-border",
-  }[tone];
-  const dotClass = {
-    green: "bg-accent-green",
-    red: "bg-accent-red",
-    amber: "bg-accent-amber",
-    muted: "bg-muted",
-  }[tone];
-  return (
-    <div className={`flex items-center gap-2 px-2 py-1.5 rounded-md bg-surface2/40 border ${toneClass} min-w-0`}>
-      <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass}`} aria-hidden />
-      <div className="flex flex-col min-w-0 leading-tight">
-        <span className="text-muted text-[9px] uppercase tracking-wide">{label}</span>
-        <span className="text-fg text-[11px] truncate">{value}</span>
-        <span className="text-muted text-[9px] truncate">{sub}</span>
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────────── *
  * Helpers                                                                    *
  * ────────────────────────────────────────────────────────────────────────── */
+function EmptyPanelState({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-xs">
+      <div className="font-medium text-fg">{title}</div>
+      <div className="max-w-[280px] text-muted">{detail}</div>
+    </div>
+  );
+}
+
 function KV({ k, v }: { k: string; v: React.ReactNode }) {
   return (
     <div className="flex flex-col min-w-0 leading-tight">

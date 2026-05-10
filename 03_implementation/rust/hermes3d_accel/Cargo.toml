@@ -1,0 +1,10 @@
+[package]
+name = "hermes3d-accel"
+version = "0.1.0"
+edition = "2024"
+description = "Read-only Hermes3D acceleration helper for large proof hashes and bounded model metadata."
+license = "UNLICENSED"
+
+[dependencies]
+serde_json = "1.0"
+sha2 = "0.10"

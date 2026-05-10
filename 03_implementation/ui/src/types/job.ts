@@ -5,7 +5,8 @@ export type JobStatus =
   | "printing"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "rolled_back";
 
 export interface Job {
   id: string;

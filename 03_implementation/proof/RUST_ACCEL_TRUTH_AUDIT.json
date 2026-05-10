@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-05-07T14:28:12.2395715-07:00",
+  "task_id": "H3D-CODEX-RUST-ACCEL-GCODE-STL-PROOF",
+  "worker": "codex-master",
+  "scope": {
+    "rust_crate": "03_implementation/rust/hermes3d_accel",
+    "python_bridge": "03_implementation/src/hermes3d/services/rust_accel.py",
+    "integrations": [
+      "03_implementation/src/hermes3d/core/slicer/slicer_runner.py",
+      "03_implementation/src/hermes3d/core/proof/proof_envelope.py"
+    ]
+  },
+  "capabilities": [
+    {
+      "command": "sha256",
+      "kind": "read_only",
+      "claim": "Streams a file and returns size plus SHA-256 JSON for proof hashing."
+    },
+    {
+      "command": "gcode-meta",
+      "kind": "read_only",
+      "claim": "Reads bounded head/tail chunks and returns slicer metadata JSON."
+    },
+    {
+      "command": "stl-meta",
+      "kind": "read_only",
+      "claim": "Parses binary STL triangle count, bounding box, extents, size, and SHA-256 JSON."
+    }
+  ],
+  "safety": {
+    "printer_actions": "none",
+    "network_actions": "none",
+    "write_actions": "none",
+    "fallback": "Python implementation remains canonical when the Rust binary is not built or configured.",
+    "ui_truth": "No UI row is marked runtime-ready only because Rust exists."
+  },
+  "verification": [
+    {
+      "command": "cargo test --manifest-path 03_implementation/rust/hermes3d_accel/Cargo.toml",
+      "result": "pass",
+      "details": "3 passed"
+    },
+    {
+      "command": "cargo build --manifest-path 03_implementation/rust/hermes3d_accel/Cargo.toml",
+      "result": "pass",
+      "details": "debug binary built locally"
+    },
+    {
+      "command": "python -m pytest 04_testing\\\\pytest\\\\unit\\\\test_rust_accel.py -q",
+      "result": "pass",
+      "details": "4 passed"
+    },
+    {
+      "command": "python -m ruff check 03_implementation/src/hermes3d/services/rust_accel.py 03_implementation/src/hermes3d/core/slicer/slicer_runner.py 03_implementation/src/hermes3d/core/proof/proof_envelope.py 04_testing/pytest/unit/test_rust_accel.py",
+      "result": "pass",
+      "details": "All checks passed"
+    },
+    {
+      "command": "python -m py_compile 03_implementation/src/hermes3d/services/rust_accel.py 03_implementation/src/hermes3d/core/slicer/slicer_runner.py 03_implementation/src/hermes3d/core/proof/proof_envelope.py",
+      "result": "pass",
+      "details": "compiled successfully"
+    },
+    {
+      "command": "hermes3d-accel gcode-meta %TEMP%/hermes3d-rust-proof.gcode",
+      "result": "pass",
+      "details": "returned source=rust, estimated_minutes=2.5, layer_count=12"
+    }
+  ],
+  "next_candidates": [
+    "3MF metadata parser after fixture/parity tests exist",
+    "G-code bounds acceleration only after safety parser parity corpus exists",
+    "large tree hashing for proof bundles",
+    "camera frame transforms for Observe if profiling shows CPU-bound filter cost",
+    "sandbox/process-supervisor primitives for Source OS service runners"
+  ]
+}

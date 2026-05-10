@@ -27,6 +27,36 @@ Hermes3D-OS Lite is agentic in three concrete ways:
 When no LLM is reachable, every agentic path falls back to a
 deterministic "no-LLM" implementation. The system stays usable.
 
+### USER delegate rule
+
+Hermes Agents are user-authorized operator/admin delegates. When the
+user assigns a task, an agent may use the same surfaces and systems the
+user authorizes for the work: Hermes3D-OS GUI controls, REST/MCP APIs,
+local PC files and installed apps, web services/accounts, VPS or remote
+hosts, source checkouts, setup scripts, GitHub branches, commits,
+pushes, and pull requests.
+
+That access is not permission to guess. If a source repository is
+missing, a credential is not configured, a remote host is unknown, a
+model path is missing, a printer state is unclear, or a user preference
+is needed, the agent must ask the user or mark the action blocked with
+a specific missing-data reason. The GUI must show that blocked or
+unavailable state instead of inventing data.
+
+Hermes Agents inherit all hard safety rules:
+
+- Secrets are read only from approved runtime locations and are never
+  written into the frontend bundle, logs, proof artifacts, or PR text.
+- Printer write actions require the same truth gates, locks, and proof
+  records as human-triggered actions.
+- FLSUN S1 at `192.168.0.12` remains offline/locked/no-test until the
+  user explicitly clears it; agents may edit status metadata but must
+  not move, test, upload, or capture against it.
+- Source-backed apps must use real upstream source checkouts or report
+  the checkout/setup as missing. No drawn slicer, generated file,
+  telemetry row, proof event, or remote-host state may be presented as
+  real unless the system observed it.
+
 ---
 
 ## 2. The supervisor daemon

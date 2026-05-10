@@ -243,8 +243,9 @@ def cmd_slice(args: argparse.Namespace) -> int:
         print(f"Slice failed: {exc}", file=sys.stderr)
         return 1
     print(f"Sliced to: {result.gcode_path}")
-    if result.metadata:
-        for k, v in result.metadata.items():
+    metadata = result.to_dict()
+    if metadata:
+        for k, v in metadata.items():
             print(f"  {k}: {v}")
     return 0
 

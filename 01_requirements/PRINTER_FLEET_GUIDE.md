@@ -27,6 +27,22 @@ The canonical source of truth is `config/printers.toml`. Any change to
 the fleet should go there first; the Python profiles
 (`core.printers.printer_profiles.FLEET`) are loaded from that file.
 
+### Current live Moonraker fleet
+
+The current operator-confirmed local Moonraker/Klipper printers are:
+
+| Runtime ID | Printer | Moonraker IP | Current state | Test/upload/move |
+|---|---|---:|---|---|
+| `flsun_t1_a` | T1 #1 | `192.168.0.10` | online ready | allowed through safety gates |
+| `flsun_t1_b` | T1 #2 | `192.168.0.11` | online ready | allowed through safety gates |
+| `flsun_s1` | FLSUN S1 | `192.168.0.12` | offline/locked/no-test | blocked until user clears lock |
+| `flsun_v400` | FLSUN V400 | `192.168.0.34` | online ready | allowed through safety gates |
+
+Hermes Agents and users may update displayed status metadata, including
+S1 status. That does not clear the S1 movement/upload/test lock; those
+actions must remain blocked with an HTTP 423-style safety failure until
+the user explicitly authorizes S1 testing.
+
 ---
 
 ## Bed shape geometry

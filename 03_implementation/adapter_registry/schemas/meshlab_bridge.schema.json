@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "hermes3d://adapter_registry/schemas/meshlab_bridge.schema.json",
+  "title": "meshlab bridge config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "enabled"
+  ],
+  "properties": {
+    "enabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "endpoint": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional local or service endpoint URL."
+    },
+    "executable_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional absolute executable path."
+    },
+    "config_path": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "default": null,
+      "description": "Optional config or profile path."
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 100,
+      "default": 5000
+    },
+    "verify": {
+      "type": "object",
+      "description": "Real probe metadata consumed by scripts/verify_modelers.py. No fake or simulated checks.",
+      "additionalProperties": false,
+      "required": ["modeler_id", "kind", "version_probe", "install_check", "runtime_check"],
+      "properties": {
+        "modeler_id": {"type": "string", "const": "meshlab"},
+        "kind": {"type": "string", "enum": ["cli", "python_import"], "default": "python_import"},
+        "version_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"type": "string", "enum": ["cli_args", "python_import"]},
+            "args": {"type": "array", "items": {"type": "string"}, "default": ["--version"]},
+            "executable_candidates": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": [
+                "C:/Program Files/VCG/MeshLab/meshlabserver.exe",
+                "C:/Program Files/VCG/MeshLab/meshlab.exe",
+                "meshlabserver",
+                "meshlab"
+              ]
+            },
+            "import_module": {"type": "string", "default": "pymeshlab"},
+            "version_attr": {"type": "string", "default": "__version__"},
+            "version_regex": {"type": "string", "default": "MeshLab\\s+v?([0-9]+\\.[0-9]+(?:\\.[0-9]+)?)"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 10}
+          }
+        },
+        "install_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "executable_or_import_required": {"type": "boolean", "default": true},
+            "required_capabilities": {
+              "type": "array",
+              "items": {"type": "string"},
+              "default": ["mesh_clean", "mesh_remesh", "mesh_filters"]
+            }
+          }
+        },
+        "runtime_check": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "smoke_expression": {
+              "type": "string",
+              "default": "import pymeshlab; pymeshlab.MeshSet()"
+            },
+            "help_args": {"type": "array", "items": {"type": "string"}, "default": ["--help"]},
+            "expected_help_substring": {"type": "string", "default": "MeshLab"},
+            "timeout_s": {"type": "integer", "minimum": 1, "maximum": 60, "default": 15}
+          }
+        }
+      }
+    }
+  }
+}

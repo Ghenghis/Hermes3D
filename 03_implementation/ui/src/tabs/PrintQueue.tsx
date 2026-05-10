@@ -19,6 +19,7 @@ const JOB_TONE: Record<Job["status"], StatusTone> = {
   completed: "green",
   failed: "red",
   cancelled: "muted",
+  rolled_back: "amber",
 };
 
 export function PrintQueueTab() {

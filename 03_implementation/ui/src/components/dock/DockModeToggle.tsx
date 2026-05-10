@@ -3,7 +3,7 @@ import { type DockMode, useStore } from "../../app/store";
 
 const MODES: { mode: DockMode; Icon: typeof Maximize2; label: string; hint: string }[] = [
   { mode: "docked",     Icon: Minimize2,         label: "Docked",     hint: "Inline panel (default)" },
-  { mode: "undocked",   Icon: PictureInPicture2, label: "Undocked",   hint: "Floating CSS overlay (mock)" },
+  { mode: "undocked",   Icon: PictureInPicture2, label: "Undocked",   hint: "Floating panel overlay" },
   { mode: "fullscreen", Icon: Maximize2,         label: "Fullscreen", hint: "Expanded CSS overlay" },
 ];
 

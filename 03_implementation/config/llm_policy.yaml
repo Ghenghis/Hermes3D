@@ -2,7 +2,7 @@ default_mode: template
 # ADR-015: lm_studio + ollama are the local on-ramps; minimax / deepseek
 # remain on the allowlist for the paid-fallback path. hipfire only routes
 # traffic when HERMES3D_AMD_NODE=1 is set (HipfireProvider enforces this).
-provider_allowlist: [openai-fixture, lm_studio, ollama, hipfire]
+provider_allowlist: [openai-fixture, lm_studio, ollama, hipfire, minimax, deepseek]
 cost_cap_usd_per_run: 0.05
 cost_cap_usd_per_day: 1.00
 timeout_seconds: 30
@@ -19,6 +19,10 @@ providers:
     base_url: https://api.minimax.io/v1
     probe_path: /models
     completion_path: /chat/completions
+    # MiniMax highspeed token-plan keys are exclusive to the Token Plan
+    # product. Hermes prefers HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY /
+    # MINIMAX_TOKEN_PLAN_API_KEY when present, then falls back to this
+    # standard key name for older configs.
     api_key_env: HERMES3D_MINIMAX_API_KEY
     cost_cap_usd_per_run: 0.05
     cost_cap_usd_per_day: 1.00

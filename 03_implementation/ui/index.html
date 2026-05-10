@@ -7,6 +7,37 @@
   </head>
   <body class="bg-bg text-fg">
     <div id="root"></div>
+    <!--
+      W8-12: Pre-define the @vitejs/plugin-react Fast-Refresh global stubs
+      BEFORE any ESM module evaluates. Required because vite@8.0.10 +
+      @vitejs/plugin-react@6.0.1 do not reliably fire transformIndexHtml's
+      preamble injection for the plain SPA path, leading to
+      "ReferenceError: $RefreshReg$ is not defined" at the top of any
+      .tsx module that the OXC refresh-wrapper has decorated.
+
+      These stubs match exactly what the plugin's preambleCode installs
+      (see node_modules/@vitejs/plugin-react/dist/index.js lines 8-11):
+        window.$RefreshReg$ = () => {};
+        window.$RefreshSig$ = () => (type) => type;
+
+      In production, plugin-react sets skipFastRefresh=true and the
+      refresh-wrapper is never emitted, so these globals are unused dead
+      stubs (~150 bytes). The "import { injectIntoGlobalHook } from
+      '/@react-refresh'" piece of the original preamble is omitted here
+      because /@react-refresh is a vite-dev-only middleware route; the
+      plugin's per-module refresh wrapper imports it itself, so we do
+      not need to import it from the HTML.
+
+      Sources:
+        https://github.com/vitejs/vite-plugin-react/blob/plugin-react@6.0.1/packages/plugin-react/README.md#initialize-hmr-runtime-in-client-entrypoint
+        https://github.com/facebook/react/tree/main/packages/react-refresh
+    -->
+    <script>
+      window.$RefreshReg$ = function () {};
+      window.$RefreshSig$ = function () {
+        return function (type) { return type; };
+      };
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

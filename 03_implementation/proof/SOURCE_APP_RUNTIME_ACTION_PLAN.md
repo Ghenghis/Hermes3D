@@ -1,0 +1,278 @@
+# Source OS Runtime Action Plan
+
+Generated: 2026-05-08T09:27:46.742085+00:00
+
+This plan is generated from the Source OS proof JSONs. It is the durable queue for the remaining 60-app runtime work: no app row is considered Hermes Agent usable unless a bounded verifier proves it and the UI shows that proof.
+
+## Current Truth
+
+- Source-backed apps: 60
+- Runtime-ready apps: 36
+- Runner-not-registered rows: 7
+- Runtime-repair-required rows: 15
+- Source-install-available rows: 0
+- Open P0 runner/repair rows: 24
+- Verified Hermes Agent CLIs: 7
+- Agent-executable runner contracts: 7
+- Read-only runner smoke rows: 8
+- Executable path runner smoke rows: 3
+- Python import repair preflight rows: 5
+- CLI install/config preflight rows: 2
+- NPM package metadata preflight rows: 1
+- CLI/service signals needing verifiers: 24
+- Blocked rows: 2
+
+## Correction Rules
+
+- A source checkout is not a working app by itself.
+- A README command, package script, or desktop launcher is only a signal until a local non-destructive verifier passes.
+- Hermes Agents may execute only verifier-backed runners, never raw unreviewed shell commands from docs.
+- Read-only runner smoke is allowed only for already-ready package/import/local API verifier rows and cannot launch, install, update, write output, or touch printers.
+- Executable path runner smoke is allowed only for installed launcher metadata rows and can read file metadata/hash only; it cannot launch apps, install, update, write output, or touch printers.
+- Python import repair preflight is allowed only for failed Python import verifier rows with a local source checkout. It can read source/dependency metadata only; it cannot install packages, create environments, start workers, write output, or touch printers.
+- CLI install/config preflight is allowed only for Slic3r/SuperSlicer rows with source/schema/profile proof. It can read metadata only; it cannot install apps, launch slicers, slice files, write output, update source, or touch printers.
+- NPM package metadata preflight is allowed only for registered npm package rows with local package.json proof. It can read package/script/lockfile metadata only; it cannot run npm, install packages, start processes, write output, update source, or touch printers.
+- Setup/update/install stays plan-only until backup, smoke gate, proof event, and rollback policy exist.
+- S1 remains camera/read-only and action-locked until the user changes printer policy.
+
+## Safe Service Start Runner Contracts
+
+These rows now have a registered setup/start preflight contract at `/api/modules/{module_id}/runtime/start-runner`. The contract checks the configured local/private URL key, local checkout, command family, and port state, writes proof, and still does not launch a process until a sandbox/process supervisor gate is enabled. Runtime-ready status still requires the health/version verifier to pass after startup.
+
+| App | Env key | Default URL | Command family | Start command preview | Current execution mode |
+| --- | --- | --- | --- | --- | --- |
+| ComfyUI local system stats | HERMES3D_SOURCE_COMFYUI_URL | http://127.0.0.1:8188 | python_gpu_service | C:\Python314\python.exe main.py --listen 127.0.0.1 --port 8188 | preflight/proof only; no process launch until supervisor gate |
+| ComfyUI TRELLIS wrapper local health | HERMES3D_SOURCE_COMFYUI_TRELLIS_WRAPPER_URL | http://127.0.0.1:8188 | comfyui_extension | wrapper inside ComfyUI | preflight/proof only; no process launch until supervisor gate |
+| FDM Monster local health | HERMES3D_SOURCE_FDM_MONSTER_URL | http://127.0.0.1:4000 | node_service | npm run start | preflight/proof only; no process launch until supervisor gate |
+| Fluidd local health | HERMES3D_SOURCE_FLUIDD_URL | http://127.0.0.1:8083 | node_web_preview | npm run serve -- --host 127.0.0.1 --port 8083 | preflight/proof only; no process launch until supervisor gate |
+| Kiri:Moto / GridSpace local health | HERMES3D_SOURCE_KIRIMOTO_GRIDSPACE_URL | http://127.0.0.1:8081/kiri | container_web_app | docker compose up --no-build | preflight/proof only; no process launch until supervisor gate |
+| Mainsail local health | HERMES3D_SOURCE_MAINSAIL_URL | http://127.0.0.1:4173 | node_web_preview | npm run serve -- --host 127.0.0.1 --port 4173 | preflight/proof only; no process launch until supervisor gate |
+| Manyfold local health | HERMES3D_SOURCE_MANYFOLD_URL | http://127.0.0.1:3214 | rails_service | bin/dev | preflight/proof only; no process launch until supervisor gate |
+| OctoFarm local health | HERMES3D_SOURCE_OCTOFARM_URL | http://127.0.0.1:4001 | node_service | npm run start | preflight/proof only; no process launch until supervisor gate |
+| OctoPrint local version API | HERMES3D_SOURCE_OCTOPRINT_URL | http://127.0.0.1:5000 | python_service_cli | octoprint serve --host=127.0.0.1 --port=5000 | preflight/proof only; no process launch until supervisor gate |
+| Open Filament Database local health | HERMES3D_SOURCE_OPEN_FILAMENT_DATABASE_URL | http://127.0.0.1:3000 | material_database_service | ofd.bat webui --port 3000 | preflight/proof only; no process launch until supervisor gate |
+
+## Read-Only Runner Smoke Rows
+
+These rows now have `/api/modules/{module_id}/runtime/read-only-runner`. The route reruns only the registered package/import/local API proof and appends evidence. It is not full app execution and does not mutate source, files, services, or printers.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Blender MCP Candidates | agents | Blender MCP source import | python-source-import-verifier-v1 | /api/modules/blender_mcp_candidates/runtime/read-only-runner |
+| Model Context Protocol | agents | Model Context Protocol SDK package | node-package-verifier-v1 | /api/modules/model_context_protocol/runtime/read-only-runner |
+| Klipper | firmware | Klipper firmware fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/firmware_klipper/runtime/read-only-runner |
+| Manifold | modelers | Manifold Python import | python-import-verifier-v1 | /api/modules/manifold/runtime/read-only-runner |
+| MeshLab | modelers | MeshLab pymeshlab Python bridge | python-import-verifier-v1 | /api/modules/meshlab/runtime/read-only-runner |
+| trimesh | modelers | Trimesh Python import | python-import-verifier-v1 | /api/modules/trimesh/runtime/read-only-runner |
+| Klipper | print_farm | Klipper fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/klipper/runtime/read-only-runner |
+| Moonraker | print_farm | Moonraker fleet read-only API | moonraker-fleet-verifier-v1 | /api/modules/moonraker/runtime/read-only-runner |
+
+## Executable Path Runner Smoke Rows
+
+These rows now have `/api/modules/{module_id}/runtime/executable-path-runner`. The route reads only installed executable metadata/hash and appends evidence. It is not a CLI bridge, desktop automation bridge, or launch permission.
+
+| App | Section | Launcher | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Printrun | print_farm | G:/Github/apps/Pronterface.exe | runtime-verifier-v1 | /api/modules/printrun/runtime/executable-path-runner |
+| BambuStudio | slicers | C:/Program Files/Bambu Studio/bambu-studio.exe | desktop-launcher-metadata-v1 | /api/modules/bambustudio/runtime/executable-path-runner |
+| Ultimaker Cura | slicers | C:/Program Files/UltiMaker Cura 5.12.1/UltiMaker-Cura.exe | desktop-launcher-metadata-v1 | /api/modules/cura/runtime/executable-path-runner |
+
+## Python Import Repair Preflight Rows
+
+These rows now have `/api/modules/{module_id}/runtime/python-import-repair-runner`. The route reads only the failed import proof plus source/dependency manifest metadata and appends evidence. It is not package installation, worker startup, or runtime readiness.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| CadQuery | modelers | CadQuery Python import | python-import-verifier-v1 | /api/modules/cadquery/runtime/python-import-repair-runner |
+| Open3D | modelers | Open3D Python import | python-import-verifier-v1 | /api/modules/open3d/runtime/python-import-repair-runner |
+| build123d | modelers | build123d Python import | python-import-verifier-v1 | /api/modules/build123d/runtime/python-import-repair-runner |
+| numpy-stl | modelers | numpy-stl Python import | python-import-verifier-v1 | /api/modules/numpy_stl/runtime/python-import-repair-runner |
+| pymesh | modelers | PyMesh/pymeshfix Python import | python-import-verifier-v1 | /api/modules/pymesh/runtime/python-import-repair-runner |
+
+## CLI Install/Config Preflight Rows
+
+These rows now have `/api/modules/{module_id}/runtime/cli-install-config-runner`. The route reads only Slic3r/SuperSlicer source checkout, adapter schema, profile/config, and candidate executable metadata. It is not install permission, launch permission, slicing permission, or runtime readiness.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Slic3r | slicers | Slic3r CLI | runtime-verifier-v1 | /api/modules/slic3r/runtime/cli-install-config-runner |
+| SuperSlicer | slicers | SuperSlicer CLI | runtime-verifier-v1 | /api/modules/superslicer/runtime/cli-install-config-runner |
+
+## NPM Package Metadata Preflight Rows
+
+These rows now have `/api/modules/{module_id}/runtime/npm-package-runner`. The route reads only package.json metadata, script names, lockfile/manifests, and local node/npm executable presence. It is not npm install permission, npm run permission, process start permission, or runtime readiness.
+
+| App | Section | Verifier | Proof gate | Route |
+| --- | --- | --- | --- | --- |
+| Azure Speech SDK JS | agents | source checkout |  | /api/modules/azure_speech_sdk_js/runtime/npm-package-runner |
+
+## Verified Agent CLI Rows
+
+| App | Section | Verifier | Proof gate | Next safe work |
+| --- | --- | --- | --- | --- |
+| Hermes Agent (NousResearch) | agents | Hermes Agent source CLI | python-module-cli-verifier-v1 | Expose bounded Hermes Agent runner using Hermes Agent source CLI; add dry-run smoke before mutating outputs. |
+| Blender | modelers | Blender CLI | agent-cli-verifier-v1 | Expose bounded Hermes Agent runner using Blender CLI; add dry-run smoke before mutating outputs. |
+| OpenSCAD | modelers | OpenSCAD CLI | runtime-verifier-v1 | Expose bounded Hermes Agent runner using OpenSCAD CLI; add dry-run smoke before mutating outputs. |
+| CuraEngine | slicers | CuraEngine CLI | agent-cli-verifier-v1 | Expose bounded Hermes Agent runner using CuraEngine CLI; add dry-run smoke before mutating outputs. |
+| FLSUN Slicer | slicers | FLSUN Slicer CLI | runtime-verifier-v1 | Expose bounded Hermes Agent runner using FLSUN Slicer CLI; add dry-run smoke before mutating outputs. |
+| OrcaSlicer | slicers | OrcaSlicer CLI | runtime-verifier-v1 | Expose bounded Hermes Agent runner using OrcaSlicer CLI; add dry-run smoke before mutating outputs. |
+| PrusaSlicer | slicers | PrusaSlicer CLI | runtime-verifier-v1 | Expose bounded Hermes Agent runner using PrusaSlicer CLI; add dry-run smoke before mutating outputs. |
+
+## P0 Runner Gaps
+
+These rows are installed/source-ready but not Hermes Agent runnable yet. They must remain disabled or plan-only until the acceptance gate passes.
+
+Open P0 rows: 24
+
+### Cli Preferred Gap (2)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| Slic3r | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/slic3r/runtime/verify` must return ready with proof before any agent execution. |
+| SuperSlicer | slicers | desktop_or_cli | documentation_cli_signal_needs_verifier | cli_version_help_or_dry_run | Register cli_version_help_or_dry_run; then `/api/modules/superslicer/runtime/verify` must return ready with proof before any agent execution. |
+
+### Desktop App Gap (3)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| FreeCAD | modelers | desktop_app | no_local_cli_signal | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/freecad/runtime/verify` must return ready with proof before any agent execution. |
+| SolveSpace | modelers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/solvespace/runtime/verify` must return ready with proof before any agent execution. |
+| MatterControl | slicers | desktop_app | documentation_cli_signal_needs_verifier | Find a safe CLI/headless mode or add an explicit desktop bridge smoke. | Register module_specific_safe_verifier; then `/api/modules/mattercontrol/runtime/verify` must return ready with proof before any agent execution. |
+
+### Gpu Worker Gap (3)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| Microsoft TRELLIS.2 | three_d_generation | gpu_worker | documentation_cli_signal_needs_verifier | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/trellis/runtime/verify` must return ready with proof before any agent execution. |
+| Tencent Hunyuan3D 2.1 | three_d_generation | gpu_worker | no_local_cli_signal | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/hunyuan3d_2_1/runtime/verify` must return ready with proof before any agent execution. |
+| TripoSR | three_d_generation | gpu_worker | no_local_cli_signal | dependency_model_cache_gpu_probe | Register dependency_model_cache_gpu_probe; then `/api/modules/triposr/runtime/verify` must return ready with proof before any agent execution. |
+
+### Npm Package Gap (1)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| Azure Speech SDK JS | agents | npm_package | documentation_cli_signal_needs_verifier | node_package_metadata_or_script_help | Register node_package_metadata_or_script_help; then `/api/modules/azure_speech_sdk_js/runtime/verify` must return ready with proof before any agent execution. |
+
+### Python Worker Gap (5)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| CadQuery | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/cadquery/runtime/verify` must return ready with proof before any agent execution. |
+| Open3D | modelers | python_worker | documentation_cli_signal_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/open3d/runtime/verify` must return ready with proof before any agent execution. |
+| build123d | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/build123d/runtime/verify` must return ready with proof before any agent execution. |
+| numpy-stl | modelers | python_worker | cli_candidate_needs_verifier | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/numpy_stl/runtime/verify` must return ready with proof before any agent execution. |
+| pymesh | modelers | python_worker | no_local_cli_signal | python_import_or_module_cli | Register python_import_or_module_cli; then `/api/modules/pymesh/runtime/verify` must return ready with proof before any agent execution. |
+
+### Runner Gap (1)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| OctoFarm | print_farm | service_reference | service_or_setup_candidate_needs_verifier | Add a health/version/setup verifier before exposing service or setup actions. | Register module_specific_safe_verifier; then `/api/modules/octofarm/runtime/verify` must return ready with proof before any agent execution. |
+
+### Service Gap (6)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| Manyfold | library | service | documentation_cli_signal_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/manyfold/runtime/verify` must return ready with proof before any agent execution. |
+| Open Filament Database | materials | service | cli_candidate_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/open_filament_database/runtime/verify` must return ready with proof before any agent execution. |
+| FDM Monster | print_farm | service | cli_candidate_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/fdm_monster/runtime/verify` must return ready with proof before any agent execution. |
+| OctoPrint | print_farm | service | cli_candidate_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/octoprint/runtime/verify` must return ready with proof before any agent execution. |
+| ComfyUI | three_d_generation | service | documentation_cli_signal_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/comfyui/runtime/verify` must return ready with proof before any agent execution. |
+| ComfyUI TRELLIS.2 Wrapper | three_d_generation | service | documentation_cli_signal_needs_verifier | local_health_endpoint_or_process_probe | Register local_health_endpoint_or_process_probe; then `/api/modules/comfyui_trellis_wrapper/runtime/verify` must return ready with proof before any agent execution. |
+
+### Web App Gap (3)
+
+| App | Section | Launch kind | CLI surface | Required correction | Acceptance gate |
+| --- | --- | --- | --- | --- | --- |
+| Fluidd | print_farm | web_app | service_or_setup_candidate_needs_verifier | local_http_health_or_route_smoke | Register local_http_health_or_route_smoke; then `/api/modules/fluidd/runtime/verify` must return ready with proof before any agent execution. |
+| Mainsail | print_farm | web_app | service_or_setup_candidate_needs_verifier | local_http_health_or_route_smoke | Register local_http_health_or_route_smoke; then `/api/modules/mainsail/runtime/verify` must return ready with proof before any agent execution. |
+| Kiri:Moto / GridSpace | slicers | web_app | service_or_setup_candidate_needs_verifier | local_http_health_or_route_smoke | Register local_http_health_or_route_smoke; then `/api/modules/kirimoto_gridspace/runtime/verify` must return ready with proof before any agent execution. |
+
+## Runner Contract Status
+
+/api/modules/runtime/runner-contracts is the canonical execution matrix for Hermes Agents. A row is executable only when its contract says `agent_executable=true`; all other rows stay Verify/Setup Plan only.
+
+- agent_cli_ready: 7
+- blocked: 2
+- desktop_app_runner_gap: 3
+- gpu_worker_runner_gap: 3
+- launcher_metadata_only: 3
+- metadata_ready_needs_runner: 5
+- npm_package_runner_gap: 1
+- readonly_api_ready: 3
+- runtime_repair_required: 15
+- source_reference_only: 18
+
+## P1 CLI/Service Signals Needing Verifiers
+
+These include some rows that are already source/reference/package ready. They still are not agent-executable unless they also appear in the verified Agent CLI list above.
+
+| App | Section | Signal type | Current proof tier | Next verifier |
+| --- | --- | --- | --- | --- |
+| Azure Speech SDK JS | agents | documentation_cli_signal_needs_verifier | npm_package_gap | Confirm the documented command in the local runtime and register a verifier. |
+| Blender MCP Candidates | agents | cli_candidate_needs_verifier | package_or_import_ready | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| Manyfold | library | documentation_cli_signal_needs_verifier | service_gap | Confirm the documented command in the local runtime and register a verifier. |
+| Open Filament Database | materials | cli_candidate_needs_verifier | service_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| CadQuery | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
+| Open3D | modelers | documentation_cli_signal_needs_verifier | python_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
+| SolveSpace | modelers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
+| numpy-stl | modelers | cli_candidate_needs_verifier | python_worker_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| trimesh | modelers | cli_candidate_needs_verifier | package_or_import_ready | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| FDM Monster | print_farm | cli_candidate_needs_verifier | service_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| Fluidd | print_farm | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
+| Mainsail | print_farm | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
+| Moonraker | print_farm | cli_candidate_needs_verifier | service_api_ready | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| OctoFarm | print_farm | service_or_setup_candidate_needs_verifier | runner_gap | Add a health/version/setup verifier before exposing service or setup actions. |
+| OctoPrint | print_farm | cli_candidate_needs_verifier | service_gap | Add a non-destructive CLI verifier before exposing this to Hermes Agents. |
+| Kiri:Moto / GridSpace | slicers | service_or_setup_candidate_needs_verifier | web_app_gap | Add a health/version/setup verifier before exposing service or setup actions. |
+| MatterControl | slicers | documentation_cli_signal_needs_verifier | desktop_app_gap | Confirm the documented command in the local runtime and register a verifier. |
+| Slic3r | slicers | documentation_cli_signal_needs_verifier | cli_preferred_gap | Confirm the documented command in the local runtime and register a verifier. |
+| SuperSlicer | slicers | documentation_cli_signal_needs_verifier | cli_preferred_gap | Confirm the documented command in the local runtime and register a verifier. |
+| ComfyUI | three_d_generation | documentation_cli_signal_needs_verifier | service_gap | Confirm the documented command in the local runtime and register a verifier. |
+| ComfyUI Frontend | three_d_generation | service_or_setup_candidate_needs_verifier | source_reference_ready | Add a health/version/setup verifier before exposing service or setup actions. |
+| ComfyUI TRELLIS.2 Wrapper | three_d_generation | documentation_cli_signal_needs_verifier | service_gap | Confirm the documented command in the local runtime and register a verifier. |
+| Microsoft TRELLIS.2 | three_d_generation | documentation_cli_signal_needs_verifier | gpu_worker_gap | Confirm the documented command in the local runtime and register a verifier. |
+| 3D Box Generator | utilities | service_or_setup_candidate_needs_verifier | source_reference_ready | Add a health/version/setup verifier before exposing service or setup actions. |
+
+## Launcher Metadata Only
+
+These can prove local desktop app presence, but they are not Hermes Agent CLI runners yet.
+
+| App | Section | Launcher | Required correction |
+| --- | --- | --- | --- |
+| Printrun | print_farm | G:/Github/apps/Pronterface.exe | /api/modules/printrun/runtime/executable-path-runner |
+| BambuStudio | slicers | C:/Program Files/Bambu Studio/bambu-studio.exe | /api/modules/bambustudio/runtime/executable-path-runner |
+| Ultimaker Cura | slicers | C:/Program Files/UltiMaker Cura 5.12.1/UltiMaker-Cura.exe | /api/modules/cura/runtime/executable-path-runner |
+
+## Rollup
+
+### Runner Gap Tiers
+
+- cli_preferred_gap: 2
+- desktop_app_gap: 3
+- gpu_worker_gap: 3
+- npm_package_gap: 1
+- python_worker_gap: 5
+- runner_gap: 1
+- service_gap: 6
+- web_app_gap: 3
+
+### CLI Surface Candidate Tiers
+
+- cli_candidate_needs_verifier: 7
+- documentation_cli_signal_needs_verifier: 11
+- service_or_setup_candidate_needs_verifier: 6
+
+## Verification Commands
+
+Run these after any Source OS runtime, verifier, or UI wording change:
+
+```powershell
+python 03_implementation\scripts\audit_source_registry_truth.py
+python 03_implementation\scripts\audit_source_cli_agent_readiness.py
+python 03_implementation\scripts\audit_source_cli_surface.py
+python 03_implementation\scripts\audit_source_app_completion.py
+python 03_implementation\scripts\write_source_runtime_action_plan.py
+python 03_implementation\scripts\scan_active_ui_no_fake.py
+cd 03_implementation\ui; npm run lint; npx.cmd playwright test --config=playwright.e2e.config.ts --grep "Source OS|Plugins|Roadmap|Settings Environment"
+```

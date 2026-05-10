@@ -1,0 +1,272 @@
+{
+  "$schema": "hermes3d://proof/gen3d_verify_v1",
+  "generated_at_utc": "2026-05-06T22:29:10.948471+00:00",
+  "git_available": true,
+  "host_platform": "win32",
+  "lane": "H3D-CLAUDE-SOURCE-GEN3D",
+  "pip_command": [
+    "C:\\Python314\\python.exe",
+    "-m",
+    "pip"
+  ],
+  "policy": {
+    "desktop_apps": "executable presence only (no launch)",
+    "downloads": "forbidden",
+    "git": "ls-remote only (no clone)",
+    "pip": "show only (no install)",
+    "weights": "boolean cache presence only (no fetch)"
+  },
+  "providers": [
+    {
+      "executable_path": null,
+      "executable_present": {
+        "present": false,
+        "reason": "no executable_path declared"
+      },
+      "id": "comfyui",
+      "installed": false,
+      "kind": "python_runtime",
+      "label": "ComfyUI",
+      "pip_package": null,
+      "pip_show": {
+        "installed": false,
+        "reason": "no pip_package declared"
+      },
+      "proof_gate_version": "gen3d-source-runtime-verifier-v1",
+      "repo_reachable": {
+        "first_ref": "3b1c60b4ba368455404c787ccfddf6acff86af60\trefs/heads/CORE-134",
+        "reachable": true,
+        "ref_count": 200,
+        "return_code": 0,
+        "stderr_head": []
+      },
+      "schema_path": "adapter_registry\\schemas\\comfyui.schema.json",
+      "schema_valid": true,
+      "source_repo": "https://github.com/comfyanonymous/ComfyUI.git",
+      "weights_cache_dirs": [
+        "~/comfy/models",
+        "~/ComfyUI/models"
+      ],
+      "weights_present": {
+        "any_present": false,
+        "checked": [
+          {
+            "configured": "~/comfy/models",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\comfy\\models"
+          },
+          {
+            "configured": "~/ComfyUI/models",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\ComfyUI\\models"
+          }
+        ]
+      }
+    },
+    {
+      "executable_path": null,
+      "executable_present": {
+        "present": false,
+        "reason": "no executable_path declared"
+      },
+      "id": "trellis2",
+      "installed": false,
+      "kind": "python_runtime",
+      "label": "TRELLIS",
+      "pip_package": "trellis",
+      "pip_show": {
+        "installed": false,
+        "location": null,
+        "return_code": 1,
+        "version": null
+      },
+      "proof_gate_version": "gen3d-source-runtime-verifier-v1",
+      "repo_reachable": {
+        "first_ref": "442aa1e1afb9014e80681d3bf604e8d728a86ee7\trefs/heads/main",
+        "reachable": true,
+        "ref_count": 2,
+        "return_code": 0,
+        "stderr_head": []
+      },
+      "schema_path": "adapter_registry\\schemas\\trellis2.schema.json",
+      "schema_valid": true,
+      "source_repo": "https://github.com/microsoft/TRELLIS.git",
+      "weights_cache_dirs": [
+        "~/.cache/huggingface/hub/models--microsoft--TRELLIS-image-large",
+        "~/.cache/trellis"
+      ],
+      "weights_present": {
+        "any_present": false,
+        "checked": [
+          {
+            "configured": "~/.cache/huggingface/hub/models--microsoft--TRELLIS-image-large",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\.cache\\huggingface\\hub\\models--microsoft--TRELLIS-image-large"
+          },
+          {
+            "configured": "~/.cache/trellis",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\.cache\\trellis"
+          }
+        ]
+      }
+    },
+    {
+      "executable_path": null,
+      "executable_present": {
+        "present": false,
+        "reason": "no executable_path declared"
+      },
+      "id": "hunyuan3d",
+      "installed": false,
+      "kind": "python_runtime",
+      "label": "Hunyuan3D",
+      "pip_package": "hunyuan3d",
+      "pip_show": {
+        "installed": false,
+        "location": null,
+        "return_code": 1,
+        "version": null
+      },
+      "proof_gate_version": "gen3d-source-runtime-verifier-v1",
+      "repo_reachable": {
+        "first_ref": "f8db63096c8282cb27354314d896feba5ba6ff8a\trefs/heads/main",
+        "reachable": true,
+        "ref_count": 1,
+        "return_code": 0,
+        "stderr_head": []
+      },
+      "schema_path": "adapter_registry\\schemas\\hunyuan3d.schema.json",
+      "schema_valid": true,
+      "source_repo": "https://github.com/Tencent/Hunyuan3D-2.git",
+      "weights_cache_dirs": [
+        "~/.cache/huggingface/hub/models--tencent--Hunyuan3D-2",
+        "~/.cache/hunyuan3d"
+      ],
+      "weights_present": {
+        "any_present": false,
+        "checked": [
+          {
+            "configured": "~/.cache/huggingface/hub/models--tencent--Hunyuan3D-2",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\.cache\\huggingface\\hub\\models--tencent--Hunyuan3D-2"
+          },
+          {
+            "configured": "~/.cache/hunyuan3d",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\.cache\\hunyuan3d"
+          }
+        ]
+      }
+    },
+    {
+      "executable_path": null,
+      "executable_present": {
+        "present": false,
+        "reason": "no executable_path declared"
+      },
+      "id": "triposr",
+      "installed": false,
+      "kind": "python_runtime",
+      "label": "TripoSR",
+      "pip_package": "triposr",
+      "pip_show": {
+        "installed": false,
+        "location": null,
+        "return_code": 1,
+        "version": null
+      },
+      "proof_gate_version": "gen3d-source-runtime-verifier-v1",
+      "repo_reachable": {
+        "first_ref": "e82c7a2ecf89a00a9324312ce30ec38a1f304fe9\trefs/heads/examples_revert",
+        "reachable": true,
+        "ref_count": 3,
+        "return_code": 0,
+        "stderr_head": []
+      },
+      "schema_path": "adapter_registry\\schemas\\triposr.schema.json",
+      "schema_valid": true,
+      "source_repo": "https://github.com/VAST-AI-Research/TripoSR.git",
+      "weights_cache_dirs": [
+        "~/.cache/huggingface/hub/models--stabilityai--TripoSR",
+        "~/.cache/triposr"
+      ],
+      "weights_present": {
+        "any_present": false,
+        "checked": [
+          {
+            "configured": "~/.cache/huggingface/hub/models--stabilityai--TripoSR",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\.cache\\huggingface\\hub\\models--stabilityai--TripoSR"
+          },
+          {
+            "configured": "~/.cache/triposr",
+            "exists": false,
+            "is_dir": false,
+            "resolved": "C:\\Users\\Admin\\.cache\\triposr"
+          }
+        ]
+      }
+    },
+    {
+      "executable_path": "C:/Program Files/Bambu Studio/bambu-studio.exe",
+      "executable_present": {
+        "configured": "C:/Program Files/Bambu Studio/bambu-studio.exe",
+        "present": true,
+        "resolved": "C:\\Program Files\\Bambu Studio\\bambu-studio.exe"
+      },
+      "id": "bambustudio_bridge",
+      "installed": true,
+      "kind": "desktop_app",
+      "label": "Bambu Studio",
+      "pip_package": null,
+      "pip_show": {
+        "installed": false,
+        "reason": "no pip_package declared"
+      },
+      "proof_gate_version": "gen3d-source-runtime-verifier-v1",
+      "repo_reachable": {
+        "first_ref": "a092bf34dcc1e39f4a8d5b8380f3bc1b3b6ba79e\trefs/heads/SaltWei-patch-1",
+        "reachable": true,
+        "ref_count": 15,
+        "return_code": 0,
+        "stderr_head": []
+      },
+      "schema_path": "adapter_registry\\schemas\\bambustudio_bridge.schema.json",
+      "schema_valid": true,
+      "source_repo": "https://github.com/bambulab/BambuStudio.git",
+      "weights_cache_dirs": [],
+      "weights_present": {
+        "any_present": false,
+        "checked": []
+      }
+    }
+  ],
+  "summary": {
+    "installed": [
+      "bambustudio_bridge"
+    ],
+    "not_installed": [
+      "comfyui",
+      "trellis2",
+      "hunyuan3d",
+      "triposr"
+    ],
+    "repo_reachable": [
+      "comfyui",
+      "trellis2",
+      "hunyuan3d",
+      "triposr",
+      "bambustudio_bridge"
+    ],
+    "total": 5,
+    "weights_present": []
+  }
+}

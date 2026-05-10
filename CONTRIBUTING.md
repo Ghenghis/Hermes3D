@@ -129,3 +129,21 @@ The lock layer guarantees that concurrent agents don't clobber each other's work
 ## License
 
 By contributing, you agree your contributions will be licensed under the MIT License (see [`LICENSE`](./LICENSE)).
+
+---
+
+## PR body conventions (added 2026-05-09 per Wave 7 audit)
+
+### Tests-added phrasing
+
+When listing tests in a PR body, use the format:
+
+- `Tests added (N file(s), M cases — all green)` instead of `Tests added (5, all green)` (which is ambiguous about file vs case count).
+- Reference: PR #143 audit finding F-DRIFT-143-01 (P3, cosmetic).
+
+### Re-target tag
+
+When a PR is opened against a stacked feature branch (not `develop`/`main`), include in the PR body:
+
+- `Stacked-on: <base-branch-name>`
+- `Reland-of: #<original-PR-number>` if the PR replaces an auto-closed predecessor (per W7-2's #168→#173, #170→#174 verified-equivalent pattern).
