@@ -95,17 +95,11 @@ def test_probe_slicer_cli_found_sets_status_ready(monkeypatch, tmp_path: Path) -
     fake_exe = tmp_path / "prusa-slicer-console.exe"
     fake_exe.write_bytes(b"")
 
-    def _fake_is_file(self: Path) -> bool:
-        return self == fake_exe or self.name == fake_exe.name
-
-    # Return fake exe as the found path
-    def _fake_probe_config(module_id: str) -> dict[str, Any] | None:
-        cfg = module_runtime.BUILTIN_RUNTIME_PROBES.get(module_id)
-        if cfg is None:
-            return None
-        return {**cfg, "path": str(fake_exe), "registry_source": "builtin"}
-
-    monkeypatch.setattr(module_runtime, "runtime_probe_config", _fake_probe_config)
+    monkeypatch.setattr(
+        module_runtime,
+        "_find_slicer_executable",
+        lambda _module_id: (str(fake_exe), ""),
+    )
 
     mock_proc = MagicMock()
     mock_proc.returncode = 0
@@ -128,13 +122,11 @@ def test_probe_slicer_cli_prusaslicer_version_accepts_nonzero_rc(
     fake_exe = tmp_path / "prusa-slicer-console.exe"
     fake_exe.write_bytes(b"")
 
-    def _fake_probe_config(module_id: str) -> dict[str, Any] | None:
-        cfg = module_runtime.BUILTIN_RUNTIME_PROBES.get(module_id)
-        if cfg is None:
-            return None
-        return {**cfg, "path": str(fake_exe), "registry_source": "builtin"}
-
-    monkeypatch.setattr(module_runtime, "runtime_probe_config", _fake_probe_config)
+    monkeypatch.setattr(
+        module_runtime,
+        "_find_slicer_executable",
+        lambda _module_id: (str(fake_exe), ""),
+    )
 
     mock_proc = MagicMock()
     mock_proc.returncode = 1  # PrusaSlicer --version exits non-zero
