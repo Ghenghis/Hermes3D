@@ -1248,6 +1248,76 @@ def run_agent_e2e_job(
     }
 
 
+def _git_common_dir(path: Path) -> Path | None:
+    """Return resolved ``git rev-parse --git-common-dir`` for ``path``, or None.
+
+    Two paths share the same git repository (and therefore the same lock-able
+    workspace tree) iff their git-common-dir resolves to the same directory.
+    This is the contract documented in ``git-worktree(1)`` -- "linked working
+    trees share the same repository data" via ``$GIT_DIR/worktrees/<name>``.
+
+    See: ``git help worktree`` (Description), and ``pathlib.Path.resolve``
+    (which canonicalises symlinks/junctions like a worktree's gitdir link).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    raw = (result.stdout or "").strip()
+    if not raw:
+        return None
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        candidate = (path / candidate)
+    try:
+        return candidate.resolve(strict=False)
+    except OSError:
+        return None
+
+
+def _workspace_paths_equivalent(configured: str, project_root: Path) -> bool:
+    """Return True if ``configured`` and ``project_root`` are the same workspace.
+
+    Two cases are accepted:
+
+    1. The two paths resolve to the same canonical filesystem path. This is
+       the historical exact-equality check and remains the fast path for the
+       canonical workspace.
+    2. Both paths are linked worktrees of the same git repository -- i.e.
+       both produce the same resolved ``git rev-parse --git-common-dir``.
+       This lets recovery / lock paths run from any worktree of the same
+       repo without falsely flagging a workspace mismatch (W7-3 truth-check
+       finding 2026-05-09; previously broke 6 ``test_recovery_*`` tests).
+
+    The check intentionally does NOT widen to "any subpath of configured" or
+    "any path that contains a .git". It only accepts paths that prove they
+    share the same git repository data.
+    """
+    try:
+        configured_resolved = Path(configured).resolve()
+    except OSError:
+        return False
+    try:
+        project_resolved = project_root.resolve()
+    except OSError:
+        return False
+    if configured_resolved == project_resolved:
+        return True
+    configured_common = _git_common_dir(configured_resolved)
+    project_common = _git_common_dir(project_resolved)
+    if configured_common is None or project_common is None:
+        return False
+    return configured_common == project_common
+
+
 def mcp_lock_readiness(private_values: dict[str, str] | None = None) -> dict[str, Any]:
     values = private_values if private_values is not None else private_env()
     configured_workspace = (
@@ -1259,10 +1329,7 @@ def mcp_lock_readiness(private_values: dict[str, str] | None = None) -> dict[str
     trusted_server = _trusted_lock_server_entry()
     workspace_matches = False
     if configured_workspace:
-        try:
-            workspace_matches = Path(configured_workspace).resolve() == PROJECT_ROOT.resolve()
-        except OSError:
-            workspace_matches = False
+        workspace_matches = _workspace_paths_equivalent(configured_workspace, PROJECT_ROOT)
     server_exists = trusted_server.exists()
     source_exists = LOCK_ORCHESTRATOR_ROOT.exists()
     if not source_exists:
@@ -3649,7 +3716,11 @@ def _call_mcp_tool(tool_name: str, arguments: dict[str, Any], *, timeout_s: int 
     private_values = private_env()
     server = _trusted_lock_server_entry()
     workspace = env_value("MCP_LOCK_WORKSPACE", private_values) or env_value("HERMES3D_WORKSPACE", private_values) or str(PROJECT_ROOT)
-    if Path(workspace).resolve() != PROJECT_ROOT.resolve():
+    # W8-7 fix (2026-05-09): accept any worktree of the same git repo, not
+    # just byte-equal resolved paths. ``_workspace_paths_equivalent`` falls
+    # back to ``git rev-parse --git-common-dir`` for paths that disagree on
+    # the surface but point at the same repository. See helper docstring.
+    if not _workspace_paths_equivalent(workspace, PROJECT_ROOT):
         raise ValueError("MCP lock workspace does not match the Hermes3D edit workspace.")
     if not server.exists():
         raise FileNotFoundError("Hermes MCP lock server entry is missing.")
