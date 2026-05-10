@@ -203,6 +203,20 @@ class CliRunnerRunRequest(StrictBody):
     target_branch: str | None = None
 
 
+class CliRunnerBoundedTaskRequest(StrictBody):
+    """BLK-013 bounded CLI runner task — single-file, no objective string.
+
+    The prompt is fixed server-side (``code_history.BOUNDED_TASK_PROMPT``);
+    callers cannot inject. ``files`` must contain exactly one project-relative
+    ``.py`` path.
+    """
+
+    runner_id: str = Field(min_length=1, max_length=40)
+    task_id: str
+    title: str = Field(min_length=1, max_length=180)
+    files: list[str] = Field(min_length=1, max_length=1)
+
+
 @router.get("/programming-readiness")
 def programming_readiness() -> dict[str, Any]:
     return code_history.programming_readiness()
@@ -263,6 +277,25 @@ def run_code_cli_runner(body: CliRunnerRunRequest) -> dict[str, Any]:
             files=body.files,
             objective=body.objective,
             target_branch=body.target_branch,
+        )
+    except (RuntimeError, ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc
+
+
+@router.post("/cli-runners/run-bounded-task")
+def run_bounded_code_cli_task(body: CliRunnerBoundedTaskRequest) -> dict[str, Any]:
+    """BLK-013 — execute a bounded CLI runner task on the hardened docker sandbox.
+
+    Single fixed prompt, single file, ``--network=none``, stderr returned only as
+    sha256, 30s wall-clock timeout, 8 KiB redacted stdout cap.
+    """
+    try:
+        return code_history.run_bounded_code_cli_task(
+            runner_id=body.runner_id,
+            owner=CODE_OPERATOR_ACTOR,
+            task_id=body.task_id,
+            title=body.title,
+            files=body.files,
         )
     except (RuntimeError, ValueError, FileNotFoundError) as exc:
         raise HTTPException(status_code=422, detail={"reason": str(exc)}) from exc

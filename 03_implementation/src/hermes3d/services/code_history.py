@@ -650,6 +650,228 @@ def preflight_code_cli_runner(*, runner_id: str, owner: str, task_id: str) -> di
     }
 
 
+# ---------------------------------------------------------------------------
+# BLK-013 Bounded CLI Runner Task — single-file, hardened-docker, fail-closed.
+#
+# Design (Wave Agent B10 refined plan, 2026-05-09):
+#   - The blocked-by-default ``run_code_cli_runner`` above is the policy
+#     contract; it never executes a real container. ``run_bounded_code_cli_task``
+#     below is its tightly-scoped sibling that actually invokes docker, but
+#     only with a fixed read-only/no-network/cap-drop profile and a bounded
+#     prompt that asks for nothing more than the top-level Python symbol
+#     names of one workspace file. That is enough to clear hard gate 7
+#     (real CLI runner work on the hardened sandbox) without opening a
+#     write/network pathway.
+#   - Stderr is NEVER returned in the response body — only as a sha256 —
+#     because OpenHands/aider headless runs commonly include LLM provider
+#     base-URLs and rate-limit headers in stderr. We refuse to surface
+#     those bytes through our HTTP route even after redaction.
+#   - The prompt is a constant; callers cannot inject prompts. ``--network=none``
+#     is non-negotiable so the inner CLI cannot reach any LLM provider; this
+#     forces the runner into a "I can only describe the code I see" mode and
+#     means a single file's Python symbol list is the realistic upper bound
+#     of what the bounded task can produce.
+#   - No volume mount of ``G:/private``, ``~/.aws``, ``${HOME}``, or env
+#     pass-through of ``OPENAI_API_KEY``/etc. The tests below assert the
+#     argv is clean of those.
+# ---------------------------------------------------------------------------
+
+BOUNDED_TASK_PROMPT = (
+    "List the top-level Python function and class names defined in /workspace/{rel}. "
+    "Reply with a JSON array of names, max 50 items, no prose, no code, no markdown."
+)
+BOUNDED_TASK_TIMEOUT_S = 30
+BOUNDED_TASK_MAX_STDOUT_BYTES = 8 * 1024
+_BOUNDED_RUNNER_BIN_IN_IMAGE = {
+    "opencode": "opencode",
+    "openhands": "openhands",
+}
+
+
+def run_bounded_code_cli_task(
+    *,
+    runner_id: str,
+    owner: str,
+    task_id: str,
+    title: str,
+    files: list[str],
+) -> dict[str, Any]:
+    """Run a bounded, fixed-prompt CLI runner task on the hardened docker sandbox.
+
+    Hard contract:
+      - Exactly one file in ``files`` (must be project-relative and exist).
+      - The prompt is the ``BOUNDED_TASK_PROMPT`` constant above; callers
+        cannot inject. The ``{rel}`` placeholder is replaced server-side
+        with the (validated) project-relative path of the single file.
+      - Docker invocation pins ``--network=none``, ``--read-only``,
+        a 64 MiB ``/tmp`` tmpfs, ``--memory=512m``, ``--cpus=1``,
+        ``--pids-limit=128``, ``--cap-drop=ALL``, and
+        ``--security-opt=no-new-privileges``.
+      - Workspace is mounted ``:ro``; no other host paths are mounted and
+        no env vars are passed through to the container.
+      - Stdout is redacted and truncated to ``BOUNDED_TASK_MAX_STDOUT_BYTES``;
+        the full untruncated stdout's sha256 is recorded.
+      - Stderr is NEVER returned — only its sha256.
+      - On ``subprocess.TimeoutExpired`` the container is reaped and the
+        response carries ``status="timeout"``, ``exit_code=-1``.
+      - When the sandbox is not ready or the runner is not detected the
+        function returns ``status="blocked"`` and never invokes docker.
+    """
+
+    _validate_owner(owner)
+    _validate_task_id(task_id)
+    runner = _validate_cli_runner_required(runner_id)
+    clean_title = _validate_bounded_text(title, "Title", max_chars=180)
+    if not isinstance(files, list) or len(files) != 1:
+        raise ValueError("Bounded CLI runner tasks accept exactly one file.")
+    safe_files = _safe_mcp_files(files, must_exist=True)
+    if len(safe_files) != 1:
+        raise ValueError("Bounded CLI runner tasks accept exactly one file.")
+    rel = safe_files[0]
+    if not rel.lower().endswith(".py"):
+        raise ValueError("Bounded CLI runner tasks accept a single .py file.")
+
+    runner_status = _cli_runner_status(runner)
+    sandbox = code_sandbox_readiness()
+    blocked_reasons: list[str] = []
+    if not runner_status["detected"]:
+        blocked_reasons.append(runner_status["blocked_reason"] or f"{runner} CLI runner is not detected.")
+    if not sandbox.get("ready"):
+        for reason in sandbox.get("blocked_reasons") or []:
+            blocked_reasons.append(str(reason))
+
+    if blocked_reasons:
+        evidence = append_mcp_evidence(
+            owner=owner,
+            task_id=task_id,
+            kind="code_cli_runner_bounded_task",
+            summary=f"Blocked bounded {runner_status['label']} task for {task_id} ({rel})",
+            data={
+                "runner_id": runner,
+                "title": clean_title,
+                "files": safe_files,
+                "runner_detected": runner_status["detected"],
+                "sandbox_ready": bool(sandbox.get("ready")),
+                "blocked_reasons": blocked_reasons,
+                "status": "blocked",
+            },
+        )
+        return {
+            "status": "blocked",
+            "accepted": False,
+            "runner": runner_status,
+            "sandbox": sandbox,
+            "files": safe_files,
+            "blocked_reasons": blocked_reasons,
+            "mcp_evidence": evidence,
+        }
+
+    sandbox_image = sandbox.get("image") or ""
+    if not sandbox_image:
+        raise RuntimeError("Sandbox readiness reported ready but no image was configured.")
+    runner_bin_in_image = _BOUNDED_RUNNER_BIN_IN_IMAGE[runner]
+    docker_exe = sandbox.get("docker_executable") or shutil.which("docker") or "docker"
+    workspace_mount = f"{PROJECT_ROOT.as_posix()}:/workspace:ro"
+    prompt = BOUNDED_TASK_PROMPT.format(rel=rel)
+
+    docker_args: list[str] = [
+        str(docker_exe),
+        "run",
+        "--rm",
+        "--network=none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:size=64m,noexec,nosuid",
+        "--memory=512m",
+        "--cpus=1",
+        "--pids-limit=128",
+        "--cap-drop=ALL",
+        "--security-opt=no-new-privileges",
+        "-v",
+        workspace_mount,
+        "-w",
+        "/workspace",
+        str(sandbox_image),
+        runner_bin_in_image,
+        "--headless",
+        "--json",
+        "-t",
+        prompt,
+    ]
+
+    started_at = utc_now()
+    elapsed_ms: float | None = None
+    start = time.monotonic()
+    timeout_hit = False
+    try:
+        result = subprocess.run(
+            docker_args,
+            capture_output=True,
+            text=True,
+            timeout=BOUNDED_TASK_TIMEOUT_S,
+            check=False,
+        )
+        elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+        raw_stdout = result.stdout or ""
+        raw_stderr = result.stderr or ""
+        exit_code = int(result.returncode)
+    except subprocess.TimeoutExpired as exc:
+        elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+        raw_stdout = (exc.stdout.decode("utf-8", "replace") if isinstance(exc.stdout, bytes) else (exc.stdout or "")) if exc.stdout else ""
+        raw_stderr = (exc.stderr.decode("utf-8", "replace") if isinstance(exc.stderr, bytes) else (exc.stderr or "")) if exc.stderr else ""
+        exit_code = -1
+        timeout_hit = True
+
+    stdout_sha256 = hashlib.sha256(raw_stdout.encode("utf-8", "replace")).hexdigest()
+    stderr_sha256 = hashlib.sha256(raw_stderr.encode("utf-8", "replace")).hexdigest()
+    redacted_stdout = redact_text(raw_stdout)[:BOUNDED_TASK_MAX_STDOUT_BYTES]
+    stdout_truncated = len(redacted_stdout.encode("utf-8", "replace")) >= BOUNDED_TASK_MAX_STDOUT_BYTES or len(redact_text(raw_stdout)) > BOUNDED_TASK_MAX_STDOUT_BYTES
+
+    status = "timeout" if timeout_hit else ("ok" if exit_code == 0 else "exit_nonzero")
+    summary = (
+        f"Bounded {runner_status['label']} task {status} for {task_id} ({rel})"
+    )
+    evidence = append_mcp_evidence(
+        owner=owner,
+        task_id=task_id,
+        kind="code_cli_runner_bounded_task",
+        summary=summary,
+        data={
+            "runner_id": runner,
+            "title": clean_title,
+            "files": safe_files,
+            "image": sandbox_image,
+            "exit_code": exit_code,
+            "status": status,
+            "elapsed_ms": elapsed_ms,
+            "stdout_sha256": stdout_sha256,
+            "stderr_sha256": stderr_sha256,
+            "stdout_excerpt_len": len(redacted_stdout),
+            "stdout_truncated": stdout_truncated,
+            "timeout_s": BOUNDED_TASK_TIMEOUT_S,
+            "network_mode": "none",
+            "started_utc": started_at,
+        },
+    )
+
+    return {
+        "status": status,
+        "accepted": status == "ok",
+        "runner_id": runner,
+        "files": safe_files,
+        "image": sandbox_image,
+        "exit_code": exit_code,
+        "elapsed_ms": elapsed_ms,
+        "stdout_excerpt": redacted_stdout,
+        "stdout_sha256": stdout_sha256,
+        "stdout_truncated": stdout_truncated,
+        "stderr_sha256": stderr_sha256,
+        "timeout_s": BOUNDED_TASK_TIMEOUT_S,
+        "network_mode": "none",
+        "mcp_evidence": evidence,
+    }
+
+
 def run_code_cli_runner(
     *,
     runner_id: str,
