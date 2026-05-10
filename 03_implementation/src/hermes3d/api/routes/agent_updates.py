@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -17,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id
+from hermes3d.services.agent_checkout import DEFAULT_AGENT_CHECKOUT
 from hermes3d.services.agent_checkout import hermes_agent_checkout
 from hermes3d.services.proof_helpers import attach_version_fields
 
@@ -32,7 +34,15 @@ BACKUP_ROOT = IMPLEMENTATION_ROOT / "var" / "hermes_agent_backups"
 # ``_repo_path()`` is called, so flipping ``HERMES_AGENT_CHECKOUT`` between
 # requests works as expected. ``DEFAULT_CHECKOUT`` retained for any
 # downstream import (e.g. tests that monkeypatch the constant).
-DEFAULT_CHECKOUT = Path(os.environ.get("HERMES_AGENT_CHECKOUT", "G:/Github/hermes-agent-fresh"))
+#
+# F4 fix (P1-8 post-promotion hardening, 2026-05-09): the prior literal
+# ``"G:/Github/hermes-agent-fresh"`` (v0.12 path) was misleading after
+# Wave 1 promoted v0.13 to default. Realign this module-level alias to
+# the resolver's authoritative default so any back-compat consumer
+# (e.g. a test that imports the constant) gets the post-promotion path.
+# DO NOT import this from new code — call ``hermes_agent_checkout()``
+# per-call instead so live env flips propagate.
+DEFAULT_CHECKOUT = DEFAULT_AGENT_CHECKOUT
 UPSTREAM_URL = os.environ.get("HERMES_AGENT_UPSTREAM_URL", "https://github.com/NousResearch/Hermes-Agent.git")
 LATEST_RELEASE_API = "https://api.github.com/repos/NousResearch/hermes-agent/releases/latest"
 RELEASES_API = "https://api.github.com/repos/NousResearch/hermes-agent/releases?per_page=100"
@@ -204,7 +214,40 @@ def rollback_update(body: RollbackRequest) -> dict[str, Any]:
     state = _repo_state(repo)
     if not state["repo_ready"]:
         raise HTTPException(status_code=409, detail=state["reason"])
-    backup = _find_backup(body.backup_id) if body.backup_id else _latest_backup()
+    if body.backup_id:
+        backup = _find_backup(body.backup_id)
+        # F1 fix (P1-8 post-promotion hardening, 2026-05-09): even when
+        # the operator names a specific backup_id, the recorded
+        # ``checkout_path`` (if present) must match the active checkout.
+        # Otherwise a v0.13 backup would be checked out into the v0.12
+        # working tree (or vice-versa), corrupting the repo.
+        if backup is not None:
+            recorded_path = backup.get("checkout_path")
+            if recorded_path is not None and recorded_path != str(repo):
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "Rollback refused: requested backup was taken on a "
+                        f"different checkout ({recorded_path!r}) than the "
+                        f"active one ({str(repo)!r}). Set "
+                        "HERMES_AGENT_CHECKOUT to the version that owns "
+                        "the backup, or take a fresh backup."
+                    ),
+                )
+    else:
+        # F1 fix: filter the implicit "latest backup" by current
+        # checkout. If none match, refuse rather than risk a
+        # cross-version rollback.
+        backup = _latest_backup(checkout_path=repo)
+        if backup is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "no backup found for current checkout; rollback "
+                    "refused. set HERMES_AGENT_CHECKOUT to the version "
+                    "that owns the backup, or take a fresh backup."
+                ),
+            )
     if not backup:
         raise HTTPException(status_code=409, detail="Rollback requires an existing Hermes Agent backup record.")
     recorded_targets = [backup.get("tag"), backup.get("branch"), backup.get("commit")]
@@ -352,6 +395,18 @@ def _pending_tags(tags: list[str], current_tag: str | None, target_tag: str | No
     return [target_tag]
 
 
+def _checkout_path_hash(repo: Path) -> str:
+    """8-char SHA-256 prefix of the absolute checkout path.
+
+    F1 fix (P1-8 post-promotion hardening, 2026-05-09): backup_ids must
+    encode the checkout that produced them so a v0.13-side backup
+    cannot be silently selected by a v0.12 rollback (or vice-versa).
+    Hashing the absolute path keeps the id filename-safe across
+    platforms while still being a stable per-checkout label.
+    """
+    return hashlib.sha256(str(repo).encode("utf-8")).hexdigest()[:8]
+
+
 def _create_backup(repo: Path, note: str) -> dict[str, Any]:
     state = _repo_state(repo)
     if not state["repo_ready"]:
@@ -359,7 +414,12 @@ def _create_backup(repo: Path, note: str) -> dict[str, Any]:
     BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     safe_tag = str(state.get("exact_tag") or state.get("nearest_tag") or "untagged").replace("/", "_")
-    backup_id = f"{stamp}_{safe_tag}_{state['commit']}"
+    # F1 fix: include short path-hash so cross-version (v0.13 vs v0.12)
+    # backups carry distinct ids; ``_latest_backup(checkout_path=...)``
+    # filters on ``metadata["checkout_path"]`` and the new id segment is
+    # a defense-in-depth disambiguator if the metadata is ever truncated.
+    path_hash = _checkout_path_hash(repo)
+    backup_id = f"{stamp}_{path_hash}_{safe_tag}_{state['commit']}"
     bundle_path = BACKUP_ROOT / f"{backup_id}.bundle"
     dirty_zip = BACKUP_ROOT / f"{backup_id}.dirty.zip"
     meta_path = BACKUP_ROOT / f"{backup_id}.json"
@@ -370,7 +430,13 @@ def _create_backup(repo: Path, note: str) -> dict[str, Any]:
         "backup_id": backup_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "note": note,
+        # F1 fix: ``checkout_path`` was already persisted (line was here
+        # pre-fix); the post-fix ``_latest_backup(checkout_path=...)`` now
+        # filters on this exact field. Old backups missing this key are
+        # excluded from a filtered query because they are untrustworthy
+        # across versions.
         "checkout_path": str(repo),
+        "checkout_path_hash": path_hash,
         "bundle_path": str(bundle_path),
         "dirty_zip_path": str(dirty_zip) if dirty_zip.exists() else None,
         "tag": state.get("exact_tag") or state.get("nearest_tag"),
@@ -447,16 +513,49 @@ def _zip_dirty_entries(repo: Path, paths: list[Path], target: Path) -> None:
             archive.write(path, arcname)
 
 
-def _latest_backup() -> dict[str, Any] | None:
+def _latest_backup(checkout_path: Path | None = None) -> dict[str, Any] | None:
+    """Return the most recent Hermes Agent backup metadata, optionally filtered.
+
+    F1 fix (P1-8 post-promotion hardening, 2026-05-09): when
+    ``checkout_path`` is supplied, only consider backups whose
+    persisted ``metadata["checkout_path"]`` exactly matches
+    ``str(checkout_path)``. This prevents the documented rollback
+    hazard where an operator flips ``HERMES_AGENT_CHECKOUT`` from v0.13
+    (default) to v0.12 (fallback) and the rollback endpoint silently
+    selects a v0.13-side backup that would corrupt the v0.12 working
+    tree.
+
+    Backups WITHOUT ``metadata["checkout_path"]`` (legacy, pre-F1) are
+    EXCLUDED from a filtered query: they are untrustworthy across
+    versions because their producing checkout is unknown.
+
+    When ``checkout_path is None`` the legacy "newest first wins"
+    behavior is preserved for back-compat with existing callers.
+    """
     if not BACKUP_ROOT.exists():
         return None
     backups = sorted(BACKUP_ROOT.glob("*.json"), key=lambda path: path.stat().st_mtime, reverse=True)
     if not backups:
         return None
-    try:
-        return json.loads(backups[0].read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return None
+    if checkout_path is None:
+        # Back-compat: untouched legacy behavior.
+        try:
+            return json.loads(backups[0].read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return None
+    target = str(checkout_path)
+    for path in backups:
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, dict):
+            continue
+        # Pre-F1 backups lacking ``checkout_path`` are excluded — we
+        # cannot prove they belong to the requested checkout.
+        if payload.get("checkout_path") == target:
+            return payload
+    return None
 
 
 def _find_backup(backup_id: str | None) -> dict[str, Any] | None:
