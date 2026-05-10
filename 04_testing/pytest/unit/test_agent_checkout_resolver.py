@@ -214,3 +214,22 @@ def test_v013_default_when_env_unset(
     assert str(agent_updates._repo_path()) == str(Path(V013_DEFAULT))
     # Test the resolver directly.
     assert str(ac.hermes_agent_checkout()) == str(Path(V013_DEFAULT))
+
+
+# ---------------------------------------------------------------------------
+# F4 pin (P1-8 post-promotion hardening, 2026-05-09)
+# ---------------------------------------------------------------------------
+
+
+def test_agent_updates_default_checkout_aligned_to_resolver() -> None:
+    """F4 pin: post-promotion ``DEFAULT_CHECKOUT`` in ``agent_updates``
+    equals ``DEFAULT_AGENT_CHECKOUT`` from the resolver module.
+
+    Pre-fix the alias was a stale literal pointing at the v0.12 fallback
+    path. Post-fix the alias is the resolver's canonical default so any
+    back-compat consumer gets the post-promotion path.
+    """
+    from hermes3d.api.routes.agent_updates import DEFAULT_CHECKOUT as au_default
+
+    assert au_default == ac.DEFAULT_AGENT_CHECKOUT
+    assert au_default == Path(V013_DEFAULT)
