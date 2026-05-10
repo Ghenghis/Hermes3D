@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermes3D Action Window</title>
+    <!--
+      Fast Refresh preamble. @vitejs/plugin-react normally injects this via
+      transformIndexHtml, but the transform is not consistently applied to
+      the second HTML entry (action-window.html) under vite 8.0.10 with
+      plugin-react 6.0.1. Importing the virtual preamble module is the
+      documented fallback (https://vite.dev/guide/api-plugin#vite-plugin-react).
+      Production builds skip Fast Refresh entirely, so this script is a
+      no-op in `vite build` output.
+    -->
+    <script type="module">
+      import "@vitejs/plugin-react/preamble";
+    </script>
+  </head>
+  <body class="bg-bg text-fg">
+    <div id="root" style="height: 100vh"></div>
+    <script type="module" src="/src/action-window-detached.tsx"></script>
+  </body>
+</html>
