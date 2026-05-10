@@ -1,9 +1,21 @@
 /**
  * W6-6 Playwright visual-proof harness against the Images-GUI/ reference pack.
+ * W8-14 patch:
+ *   - reference PNGs are now read from tests/visual/__refs__/ (mirrored from
+ *     Images-GUI/ by global-setup.ts). Playwright rejects snapshot paths that
+ *     escape the test root with "outputPath is not allowed outside of the
+ *     parent directory" — keeping references inside the test root sidesteps
+ *     that safety check while preserving Images-GUI/ as the source of truth.
+ *   - waitForStable() drops `waitForLoadState("networkidle")` (the SPA's
+ *     long-poll and SSE channels keep the network busy beyond 30s), in favor
+ *     of `domcontentloaded` + a 500ms quiet timeout. Per the Playwright docs
+ *     (https://playwright.dev/docs/api/class-page#page-wait-for-load-state)
+ *     `networkidle` is "DISCOURAGED" precisely for SPAs of this shape.
  *
  * For each entry in visual-targets.json with status === "live":
  *   1. Navigate to target.route on the live dev server (via webServer)
- *   2. Wait for wait_test_id, networkidle, and a 500ms quiet period
+ *   2. Wait for wait_test_id (15s timeout), domcontentloaded, and a 500ms
+ *      quiet period for the SPA to settle.
  *   3. Call expect(page).toHaveScreenshot([...path]) with the target's
  *      tolerance as maxDiffPixelRatio. Playwright uses its bundled
  *      pixelmatch implementation; diff PNGs land under test-results/ when a
@@ -17,21 +29,25 @@
  *      https://playwright.dev/docs/test-snapshots
  *  - Playwright toHaveScreenshot API:
  *      https://playwright.dev/docs/api/class-pageassertions#page-assertions-to-have-screenshot
+ *  - Playwright page.waitForLoadState reference (W8-14 networkidle fix):
+ *      https://playwright.dev/docs/api/class-page#page-wait-for-load-state
  *
  * No-fake / no-paid contract:
  *  - This spec NEVER auto-updates reference PNGs. The visual config sets
  *    updateSnapshots: "none". Refresh requires an explicit operator action
  *    (run with --update-snapshots, then review diff in the PR).
+ *  - The __refs__/ mirror is one-way: Images-GUI/ -> __refs__/. Never the
+ *    reverse. globalSetup verifies size+mtime parity on every run.
  *  - This spec only reports diff data; component fixes are out of scope and
  *    are owned by W6-3 / W6-4.
  *  - No paid services are used; everything runs against the local dev server
  *    started by scripts/start-e2e-stack.mjs.
  *
- * Snapshot path resolution: snapshotPathTemplate is configured to "{arg}{ext}"
- * so that an array-form arg passed to toHaveScreenshot is path.join'd as-is
- * and then resolved relative to the playwright config dir (UI_ROOT). We pass
- * the array as a relative chain back to the repo root and into Images-GUI/,
- * which keeps the actual reference PNG as the single source of truth.
+ * Snapshot path resolution: snapshotPathTemplate is "{arg}{ext}" so the array
+ * passed to toHaveScreenshot is path.join'd and resolved relative to the
+ * playwright config dir (UI_ROOT). After W8-14 we pass a forward-only chain
+ * into tests/visual/__refs__/<category>/<file>.png — fully inside the test
+ * root, so Playwright accepts it.
  */
 import { test, expect, type Page } from "@playwright/test";
 import path from "node:path";
@@ -61,27 +77,43 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const TARGETS_PATH = path.join(HERE, "visual-targets.json");
 const UI_ROOT = path.resolve(HERE, "..", "..");
 const REPO_ROOT = path.resolve(UI_ROOT, "..", "..");
+// W8-14: refs are mirrored INSIDE the test root so snapshotPathTemplate
+// "{arg}{ext}" resolves forward-only and Playwright accepts the path.
+// global-setup.ts populates this directory before any tests run.
+const REFS_LOCAL_ROOT = path.join(HERE, "__refs__");
 const targetsFile = JSON.parse(fs.readFileSync(TARGETS_PATH, "utf-8")) as VisualTargetsFile;
 
 /**
- * Wait for the SPA to settle: networkidle plus quietMs of no nav.
- * 500ms is the W5-3 smoke convention; tighten via env var if needed.
+ * Wait for the SPA to settle: domcontentloaded plus quietMs of no nav.
+ *
+ * W8-14: networkidle was removed because the Hermes3D SPA opens long-poll
+ * and SSE channels (recovery_controller, agent updates, A2A) that never go
+ * idle within Playwright's 30s default. Playwright's docs flag networkidle
+ * as DISCOURAGED for SPAs of this shape:
+ *   https://playwright.dev/docs/api/class-page#page-wait-for-load-state
+ * The wait_test_id assertion in each test (toBeVisible, 15s) plus a 500ms
+ * quiet period is sufficient to prove the route mounted and rendered.
  */
 async function waitForStable(page: Page, quietMs = 500): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
-  await page.waitForLoadState("networkidle");
   await page.waitForTimeout(quietMs);
 }
 
 /**
  * Build the snapshot-name array for toHaveScreenshot from a reference path.
+ *
  * Reference paths in visual-targets.json are repo-relative (e.g.
- * "Images-GUI/01-dashboard-modes/advanced-dashboard-a.png"). We need a path
- * relative to the playwright config dir (UI_ROOT) so that the configured
- * snapshotPathTemplate "{arg}{ext}" resolves to the actual reference PNG.
+ * "Images-GUI/01-dashboard-modes/advanced-dashboard-a.png"). W8-14 changes
+ * the resolution to point at the LOCAL mirror under tests/visual/__refs__/
+ * (populated by global-setup.ts). The returned chain is relative to UI_ROOT
+ * (the playwright config dir) and stays entirely INSIDE the test root, which
+ * sidesteps Playwright's "outputPath is not allowed outside of the parent
+ * directory" check on snapshotPathTemplate "{arg}{ext}".
  */
 function snapshotPathSegments(referenceRepoRel: string): string[] {
-  const referenceAbs = path.resolve(REPO_ROOT, referenceRepoRel);
+  // Strip the leading "Images-GUI/" segment so the rest maps 1:1 into __refs__/.
+  const subPath = referenceRepoRel.replace(/^Images-GUI[\\/]+/i, "");
+  const referenceAbs = path.join(REFS_LOCAL_ROOT, subPath);
   const fromUiRoot = path.relative(UI_ROOT, referenceAbs);
   // Keep the .png on the last segment so toHaveScreenshot infers the ext;
   // splitting by both separators tolerates Windows backslashes.

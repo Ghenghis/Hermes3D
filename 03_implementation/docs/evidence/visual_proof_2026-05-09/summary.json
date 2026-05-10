@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-05-10T04:01:09.572Z",
-  "started_at": "2026-05-10T03:57:45.102Z",
+  "generated_at": "2026-05-10T04:17:31.645Z",
+  "started_at": "2026-05-10T04:16:53.826Z",
   "run_status": "failed",
   "owner": "claude-w6-6-visual-proof",
   "lane": "W6-6 Playwright visual proof against Images-GUI/",
   "counts": {
     "total": 31,
-    "error": 11,
+    "diff": 11,
     "skipped-future": 20
   },
   "rows": [
@@ -20,8 +20,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 1 — direction PNG, not a 1:1 page snapshot. Skipped from strict comparison; tracked for visual direction only.",
-      "started_at": "2026-05-10T04:01:08.883Z",
-      "finished_at": "2026-05-10T04:01:08.883Z"
+      "started_at": "2026-05-10T04:17:31.425Z",
+      "finished_at": "2026-05-10T04:17:31.425Z"
     },
     {
       "target": "00_user_generated_2",
@@ -32,8 +32,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 2.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_3",
@@ -44,8 +44,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 3.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_4",
@@ -56,8 +56,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 4.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_5",
@@ -68,8 +68,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 5.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_6",
@@ -80,8 +80,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 6.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_7",
@@ -92,8 +92,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 7.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_8",
@@ -104,8 +104,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 8.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_generated_9",
@@ -116,32 +116,36 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Generated reference 9.",
-      "started_at": "2026-05-10T04:01:08.884Z",
-      "finished_at": "2026-05-10T04:01:08.884Z"
+      "started_at": "2026-05-10T04:17:31.426Z",
+      "finished_at": "2026-05-10T04:17:31.426Z"
     },
     {
       "target": "00_user_hermes3d",
-      "status": "error",
+      "status": "diff",
       "route": "/",
       "reference": "Images-GUI/00-user-current-downloads/Hermes3D.png",
       "tolerance": 0.15,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-      "started_at": "2026-05-10T04:00:37.997Z",
-      "finished_at": "2026-05-10T04:01:08.317Z"
+      "diff_pixels": 597881,
+      "ratio": 0.29,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-00-use-a3507-rence-within-tolerance-0-15-visual-chromium-1920x1080/tests/visual/__refs__/00-user-current-downloads/Hermes3D-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-00-use-a3507-rence-within-tolerance-0-15-visual-chromium-1920x1080/tests/visual/__refs__/00-user-current-downloads/Hermes3D-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:28.690Z",
+      "finished_at": "2026-05-10T04:17:31.126Z"
     },
     {
       "target": "01_dashboard_advanced_a",
-      "status": "error",
+      "status": "diff",
       "route": "/#dashboard",
       "reference": "Images-GUI/01-dashboard-modes/advanced-dashboard-a.png",
       "tolerance": 0.1,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-      "started_at": "2026-05-10T03:57:48.808Z",
-      "finished_at": "2026-05-10T03:58:19.004Z"
+      "diff_pixels": 594010,
+      "ratio": 0.29,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-01-das-f89db-erence-within-tolerance-0-1-visual-chromium-1920x1080/tests/visual/__refs__/01-dashboard-modes/advanced-dashboard-a-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-01-das-f89db-erence-within-tolerance-0-1-visual-chromium-1920x1080/tests/visual/__refs__/01-dashboard-modes/advanced-dashboard-a-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:16:54.702Z",
+      "finished_at": "2026-05-10T04:16:57.199Z"
     },
     {
       "target": "01_dashboard_advanced_b",
@@ -152,8 +156,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Advanced dashboard alt view B. Future target — owned by Wave 6 lane 3.",
-      "started_at": "2026-05-10T03:58:20.114Z",
-      "finished_at": "2026-05-10T03:58:20.114Z"
+      "started_at": "2026-05-10T04:16:58.174Z",
+      "finished_at": "2026-05-10T04:16:58.174Z"
     },
     {
       "target": "01_dashboard_custom_a",
@@ -164,8 +168,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Custom dashboard with draggable widgets — not implemented yet. Future target — owned by Wave 6 lane 3 / 4.",
-      "started_at": "2026-05-10T03:58:20.116Z",
-      "finished_at": "2026-05-10T03:58:20.116Z"
+      "started_at": "2026-05-10T04:16:58.175Z",
+      "finished_at": "2026-05-10T04:16:58.175Z"
     },
     {
       "target": "01_dashboard_custom_b",
@@ -176,8 +180,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Custom dashboard alt B. Future target.",
-      "started_at": "2026-05-10T03:58:20.116Z",
-      "finished_at": "2026-05-10T03:58:20.116Z"
+      "started_at": "2026-05-10T04:16:58.175Z",
+      "finished_at": "2026-05-10T04:16:58.175Z"
     },
     {
       "target": "01_dashboard_simple_a",
@@ -188,8 +192,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Simple dashboard mode A. Mode switcher is being added by W6-3.",
-      "started_at": "2026-05-10T03:58:20.116Z",
-      "finished_at": "2026-05-10T03:58:20.116Z"
+      "started_at": "2026-05-10T04:16:58.175Z",
+      "finished_at": "2026-05-10T04:16:58.175Z"
     },
     {
       "target": "01_dashboard_simple_b",
@@ -200,104 +204,120 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Simple dashboard mode B. Future target — owned by Wave 6 lane 3.",
-      "started_at": "2026-05-10T03:58:20.116Z",
-      "finished_at": "2026-05-10T03:58:20.116Z"
+      "started_at": "2026-05-10T04:16:58.175Z",
+      "finished_at": "2026-05-10T04:16:58.175Z"
     },
     {
       "target": "02_primary_artifacts_approvals_plugins_roadmap",
-      "status": "error",
+      "status": "diff",
       "route": "/#artifacts",
       "reference": "Images-GUI/02-primary-pages/primary-tabs-artifacts-approvals-plugins-roadmap.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:58:32.741Z",
-      "finished_at": "2026-05-10T03:58:36.442Z"
+      "diff_pixels": 637483,
+      "ratio": 0.31,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-02-pri-17957-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/02-primary-pages/primary-tabs-artifacts-approvals-plugins-roadmap-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-02-pri-17957-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/02-primary-pages/primary-tabs-artifacts-approvals-plugins-roadmap-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:04.472Z",
+      "finished_at": "2026-05-10T04:17:06.901Z"
     },
     {
       "target": "02_primary_autopilot_design_gen3d_jobs",
-      "status": "error",
+      "status": "diff",
       "route": "/#autopilot",
       "reference": "Images-GUI/02-primary-pages/primary-tabs-autopilot-design-gen3d-jobs.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:58:20.117Z",
-      "finished_at": "2026-05-10T03:58:23.264Z"
+      "diff_pixels": 593688,
+      "ratio": 0.29,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-02-pri-e75e9-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/02-primary-pages/primary-tabs-autopilot-design-gen3d-jobs-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-02-pri-e75e9-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/02-primary-pages/primary-tabs-autopilot-design-gen3d-jobs-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:16:58.175Z",
+      "finished_at": "2026-05-10T04:17:00.308Z"
     },
     {
       "target": "02_primary_printers_observe_agents_learning",
-      "status": "error",
+      "status": "diff",
       "route": "/#printers",
       "reference": "Images-GUI/02-primary-pages/primary-tabs-printers-observe-agents-learning.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:58:25.700Z",
-      "finished_at": "2026-05-10T03:58:30.977Z"
+      "diff_pixels": 573216,
+      "ratio": 0.28,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-02-pri-15322-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/02-primary-pages/primary-tabs-printers-observe-agents-learning-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-02-pri-15322-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/02-primary-pages/primary-tabs-printers-observe-agents-learning-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:01.326Z",
+      "finished_at": "2026-05-10T04:17:03.492Z"
     },
     {
       "target": "03_settings_subtabs_all",
-      "status": "error",
+      "status": "diff",
       "route": "/#settings",
       "reference": "Images-GUI/03-settings-voice/settings-subtabs-all.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:58:37.612Z",
-      "finished_at": "2026-05-10T03:58:40.517Z"
+      "diff_pixels": 586980,
+      "ratio": 0.29,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-03-set-b847f-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/03-settings-voice/settings-subtabs-all-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-03-set-b847f-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/03-settings-voice/settings-subtabs-all-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:07.878Z",
+      "finished_at": "2026-05-10T04:17:10.048Z"
     },
     {
       "target": "03_voice_communication_subtabs",
-      "status": "error",
+      "status": "diff",
       "route": "/#voice",
       "reference": "Images-GUI/03-settings-voice/voice-communication-subtabs.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:58:42.090Z",
-      "finished_at": "2026-05-10T03:58:45.658Z"
+      "diff_pixels": 611086,
+      "ratio": 0.3,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-03-voi-2ee09-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/03-settings-voice/voice-communication-subtabs-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-03-voi-2ee09-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/03-settings-voice/voice-communication-subtabs-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:11.019Z",
+      "finished_at": "2026-05-10T04:17:13.384Z"
     },
     {
       "target": "04_source_os_60_app_coverage_matrix",
-      "status": "error",
+      "status": "diff",
       "route": "/#sources",
       "reference": "Images-GUI/04-source-os/source-os-60-app-coverage-matrix.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
-      "started_at": "2026-05-10T03:58:48.199Z",
-      "finished_at": "2026-05-10T03:59:18.353Z"
+      "diff_pixels": 574432,
+      "ratio": 0.28,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-04-sou-8fd96-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/04-source-os/source-os-60-app-coverage-matrix-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-04-sou-8fd96-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/04-source-os/source-os-60-app-coverage-matrix-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:14.311Z",
+      "finished_at": "2026-05-10T04:17:16.602Z"
     },
     {
       "target": "04_source_os_core_categories",
-      "status": "error",
+      "status": "diff",
       "route": "/#sources",
       "reference": "Images-GUI/04-source-os/source-os-core-categories.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:59:20.008Z",
-      "finished_at": "2026-05-10T03:59:43.751Z"
+      "diff_pixels": 592168,
+      "ratio": 0.29,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-04-sou-1e98a-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/04-source-os/source-os-core-categories-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-04-sou-1e98a-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/04-source-os/source-os-core-categories-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:17.670Z",
+      "finished_at": "2026-05-10T04:17:19.867Z"
     },
     {
       "target": "04_source_os_remaining_categories",
-      "status": "error",
+      "status": "diff",
       "route": "/#sources",
       "reference": "Images-GUI/04-source-os/source-os-remaining-categories.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T03:59:44.900Z",
-      "finished_at": "2026-05-10T04:00:11.717Z"
+      "diff_pixels": 587367,
+      "ratio": 0.29,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-04-sou-b6dc2-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/04-source-os/source-os-remaining-categories-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-04-sou-b6dc2-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/04-source-os/source-os-remaining-categories-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:20.902Z",
+      "finished_at": "2026-05-10T04:17:23.501Z"
     },
     {
       "target": "05_action_window_advanced_tools",
@@ -308,8 +328,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Action Window advanced-tools template. Future target — owned by W6-4.",
-      "started_at": "2026-05-10T04:00:12.961Z",
-      "finished_at": "2026-05-10T04:00:12.961Z"
+      "started_at": "2026-05-10T04:17:24.633Z",
+      "finished_at": "2026-05-10T04:17:24.633Z"
     },
     {
       "target": "05_action_window_core_apps",
@@ -320,8 +340,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Action Window core-apps template. Action Window is being added by W6-4.",
-      "started_at": "2026-05-10T04:00:12.960Z",
-      "finished_at": "2026-05-10T04:00:12.960Z"
+      "started_at": "2026-05-10T04:17:24.632Z",
+      "finished_at": "2026-05-10T04:17:24.632Z"
     },
     {
       "target": "06_states_responsive_reference",
@@ -332,20 +352,22 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Loading/empty/blocked/recovering responsive states reference. Per-state specs are out of scope for this lane.",
-      "started_at": "2026-05-10T04:00:12.962Z",
-      "finished_at": "2026-05-10T04:00:12.962Z"
+      "started_at": "2026-05-10T04:17:24.633Z",
+      "finished_at": "2026-05-10T04:17:24.633Z"
     },
     {
       "target": "07_plugins_skills_mcp_app_connectors",
-      "status": "error",
+      "status": "diff",
       "route": "/#plugins",
       "reference": "Images-GUI/07-plugins-skills-mcp/plugins-skills-mcp-app-connectors.png",
       "tolerance": 0.12,
-      "evidence_path": null,
-      "diff_path": null,
-      "error": "Error: The outputPath is not allowed outside of the parent directory. Please fix the defined path. ",
-      "started_at": "2026-05-10T04:00:12.962Z",
-      "finished_at": "2026-05-10T04:00:36.574Z"
+      "diff_pixels": 608243,
+      "ratio": 0.3,
+      "evidence_path": "03_implementation/ui/test-results/visual/visual-proof-visual-07-plu-6b39e-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/07-plugins-skills-mcp/plugins-skills-mcp-app-connectors-actual.png",
+      "diff_path": "03_implementation/ui/test-results/visual/visual-proof-visual-07-plu-6b39e-rence-within-tolerance-0-12-visual-chromium-1920x1080/tests/visual/__refs__/07-plugins-skills-mcp/plugins-skills-mcp-app-connectors-diff.png",
+      "error": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mpage\u001b[39m\u001b[2m).\u001b[22mtoHaveScreenshot\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed ",
+      "started_at": "2026-05-10T04:17:24.633Z",
+      "finished_at": "2026-05-10T04:17:27.395Z"
     },
     {
       "target": "08_proof_health_notifications_safety",
@@ -356,8 +378,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Composite of proof + health + notifications + safety. Anchored to Observe. Future target.",
-      "started_at": "2026-05-10T04:00:37.996Z",
-      "finished_at": "2026-05-10T04:00:37.996Z"
+      "started_at": "2026-05-10T04:17:28.689Z",
+      "finished_at": "2026-05-10T04:17:28.689Z"
     },
     {
       "target": "08_workflow_printqueue_files_logs",
@@ -368,8 +390,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Composite of workflow + print queue + files + logs. No single route maps yet; uses Jobs as anchor. Future target — split by lane 3/4.",
-      "started_at": "2026-05-10T04:00:37.994Z",
-      "finished_at": "2026-05-10T04:00:37.994Z"
+      "started_at": "2026-05-10T04:17:28.688Z",
+      "finished_at": "2026-05-10T04:17:28.688Z"
     },
     {
       "target": "09_theme_variants_reference",
@@ -380,8 +402,8 @@
       "evidence_path": null,
       "diff_path": null,
       "error": "Theme palette reference (default/cyberpunk/matrix/tron/forge/aurora). Theme switcher not implemented; future target.",
-      "started_at": "2026-05-10T04:00:37.996Z",
-      "finished_at": "2026-05-10T04:00:37.996Z"
+      "started_at": "2026-05-10T04:17:28.689Z",
+      "finished_at": "2026-05-10T04:17:28.689Z"
     }
   ]
 }
