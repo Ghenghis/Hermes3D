@@ -637,74 +637,98 @@ BUILTIN_RUNTIME_PROBES: dict[str, dict[str, Any]] = {
     "firmware_klipper": {
         "tool_key": "firmware_source_inventory",
         "label": "Klipper firmware source inventory",
-        "path": "G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
+        # NOTE (W8-8 2026-05-09): path stays empty so _source_inventory_probe
+        # falls back to mod.local_path; firmware checkout is in
+        # FIRMWARE_SOURCE_PATHS for the dedicated probe_firmware_source_inventory
+        # flow. PR #120 wrote a hardcoded absolute path here which broke
+        # tmp_path-based unit tests in CI; W8-8 reverted that to "".
+        "path": "",
         "args": ["README.md", "klippy"],
         "capabilities": ["firmware_source_reference", "klipper_firmware_source"],
-        "kind": "firmware_source_inventory",
+        # NOTE (W8-8 2026-05-09): kind MUST stay "source_inventory" — it routes
+        # through _safe_runtime_probe -> _source_inventory_probe and the
+        # downstream _runner_status check at module_runtime.py:_runner_status
+        # only assigns "source_reference_only" when verifier_kind ==
+        # "source_inventory". PR #120 briefly changed this to
+        # "firmware_source_inventory" which broke 5 parametrized firmware
+        # tests (regression caught by W7-3, fixed by W8-8). The
+        # firmware-specific provenance is carried by tool_key + path +
+        # proof_gate_version, NOT by kind.
+        "kind": "source_inventory",
         "execute": False,
         "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path (canonical): G:/Github/Hermes3D-OS/source-lab/sources/print-farm/Klipper",
     },
     "marlin": {
         "tool_key": "firmware_source_inventory",
         "label": "Marlin firmware source inventory",
-        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
+        # See W8-8 NOTE on firmware_klipper above — keep path empty.
+        "path": "",
         "args": ["README.md", "docs"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "firmware_source_inventory",
+        # See W8-8 NOTE on firmware_klipper above — keep kind = source_inventory.
+        "kind": "source_inventory",
         "execute": False,
         "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path (canonical): G:/Github/Hermes3D-OS/source-lab/sources/firmware/Marlin",
     },
     "prusa_firmware": {
         "tool_key": "firmware_source_inventory",
         "label": "Prusa Firmware source inventory",
-        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
+        # See W8-8 NOTE on firmware_klipper above — keep path empty.
+        "path": "",
         "args": ["README.md", "CMakeLists.txt", "Firmware"],
         "capabilities": ["firmware_source_reference", "cmake_reference"],
-        "kind": "firmware_source_inventory",
+        # See W8-8 NOTE on firmware_klipper above — keep kind = source_inventory.
+        "kind": "source_inventory",
         "execute": False,
         "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path (canonical): G:/Github/Hermes3D-OS/source-lab/sources/firmware/Prusa-Firmware",
     },
     "reprapfirmware": {
         "tool_key": "firmware_source_inventory",
         "label": "RepRapFirmware source inventory",
-        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
+        # See W8-8 NOTE on firmware_klipper above — keep path empty.
+        "path": "",
         "args": ["README.md", "src"],
         "capabilities": ["firmware_source_reference", "duet_firmware_reference"],
-        "kind": "firmware_source_inventory",
+        # See W8-8 NOTE on firmware_klipper above — keep kind = source_inventory.
+        "kind": "source_inventory",
         "execute": False,
         "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path (canonical): G:/Github/Hermes3D-OS/source-lab/sources/firmware/RepRapFirmware",
     },
     "repetier_firmware": {
         "tool_key": "firmware_source_inventory",
         "label": "Repetier Firmware source inventory",
-        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
+        # See W8-8 NOTE on firmware_klipper above — keep path empty.
+        "path": "",
         "args": ["README.md", "src"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "firmware_source_inventory",
+        # See W8-8 NOTE on firmware_klipper above — keep kind = source_inventory.
+        "kind": "source_inventory",
         "execute": False,
         "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path (canonical): G:/Github/Hermes3D-OS/source-lab/sources/firmware/Repetier-Firmware",
     },
     "smoothieware": {
         "tool_key": "firmware_source_inventory",
         "label": "Smoothieware source inventory",
-        "path": "G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
+        # See W8-8 NOTE on firmware_klipper above — keep path empty.
+        "path": "",
         "args": ["COPYING", "src"],
         "capabilities": ["firmware_source_reference", "configuration_reference"],
-        "kind": "firmware_source_inventory",
+        # See W8-8 NOTE on firmware_klipper above — keep kind = source_inventory.
+        "kind": "source_inventory",
         "execute": False,
         "timeout_s": 5,
         "proof_gate_version": "firmware-source-inventory-v1",
-        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path: G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
+        "notes": "Read-only firmware source inventory only; no compile, flash, upload, or printer action is exposed. Source path (canonical): G:/Github/Hermes3D-OS/source-lab/sources/firmware/Smoothieware",
     },
 }
 

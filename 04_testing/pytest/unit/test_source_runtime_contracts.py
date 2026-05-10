@@ -304,6 +304,61 @@ def test_firmware_source_inventory_is_reference_only_not_executable(
     assert contract["safe_actions"] == ["verify", "setup_plan", "read_metadata"]
 
 
+def test_firmware_probe_returns_ready_when_files_exist_and_verifier_index_empty(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    """W8-8 regression pin: firmware row must report ``status=ready`` with
+    ``kind="source_inventory"`` when ``_runtime_verifier_index() == (False, {})``
+    AND the required source files exist under ``mod.local_path``.
+
+    Background — PR #120 changed BUILTIN_RUNTIME_PROBES firmware entries to
+    ``kind="firmware_source_inventory"`` and to a hardcoded absolute ``path``,
+    which made ``module_runtime_probe`` route to the default branch in
+    ``_safe_runtime_probe`` (no dispatch for ``firmware_source_inventory``)
+    AND skip the ``mod.local_path`` fallback in ``_source_inventory_probe``.
+    Both regressions surface as ``status="blocked"`` instead of ``status="ready"``.
+
+    This test pins the contract so a future probe rename / dispatcher change
+    cannot silently re-break the 5 parametrized firmware rows.
+    """
+
+    monkeypatch.setattr(
+        module_runtime, "_runtime_verifier_index", lambda: (False, {})
+    )
+    # The Marlin entry registers args=["README.md", "docs"]. Create both under
+    # tmp_path so _source_inventory_probe falls back to mod.local_path and
+    # finds them — proving probe.path is empty (not hardcoded) and the kind
+    # routes through _source_inventory_probe.
+    (tmp_path / "README.md").write_text(
+        "marlin firmware source inventory proof\n", encoding="utf-8"
+    )
+    (tmp_path / "docs").mkdir(parents=True, exist_ok=True)
+
+    runtime = module_runtime.module_runtime_probe(
+        {
+            "id": "marlin",
+            "display_name": "Marlin",
+            "section": "firmware",
+            "launch_kind": "firmware_source",
+            "install_state": "installed",
+            "local_path": str(tmp_path),
+        }
+    )
+
+    # Pin 1: status MUST be ready, NOT blocked. This is the bit PR #120 broke.
+    assert runtime["status"] == "ready", (
+        "Firmware probe regressed to blocked — see PR #120/W8-8 fix; "
+        "BUILTIN_RUNTIME_PROBES['marlin']['kind'] must stay 'source_inventory' "
+        "and ['path'] must stay '' for mod.local_path fallback."
+    )
+    # Pin 2: kind MUST stay source_inventory so _runner_status maps it to
+    # source_reference_only (not blocked).
+    assert runtime["kind"] == "source_inventory"
+    # Pin 3: firmware-specific provenance is preserved by proof_gate_version.
+    assert runtime["proof_gate_version"] == "firmware-source-inventory-v1"
+
+
 def test_readonly_http_contract_is_not_agent_executable(monkeypatch) -> None:
     """A live health API proof is useful, but it is still read-only metadata."""
 
