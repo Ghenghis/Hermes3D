@@ -13,6 +13,7 @@ from hermes3d.api.routes import (
     agent_updates,
     agents,
     approvals,
+    apps,
     artifacts,
     autonomous,
     autopilot,
@@ -79,6 +80,7 @@ def create_gui_app() -> FastAPI:
 
     for route_module in [
         modules,
+        apps,
         jobs,
         approvals,
         artifacts,

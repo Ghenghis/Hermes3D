@@ -366,8 +366,11 @@ def load_modules() -> int:
     a try/except around the loop runs ``conn.rollback()`` on any exception
     before re-raising, so partial loads do NOT leave half-committed state.
     """
-    if not DB_PATH.exists():
-        init_db()
+    # W6-7 (2026-05-09): always call init_db() so the migration runs on
+    # an existing DB, not just on first creation. init_db() is idempotent
+    # — _migrate() checks for column existence before ALTER, so running
+    # it on an already-migrated DB is a no-op.
+    init_db()
     try:
         registry = _parse_registry(_registry_path())
     except FileNotFoundError:
@@ -390,13 +393,35 @@ def load_modules() -> int:
                     tasks = entry.get("required_actions") or entry.get("bridge_tasks") or []
                     if isinstance(tasks, str):
                         tasks = [tasks]
+                    # W6-7 (2026-05-09): switched from INSERT OR REPLACE to
+                    # INSERT ... ON CONFLICT DO UPDATE so the per-app
+                    # extension fields (tested_versions, license_spdx,
+                    # rollback_supported, rollback_runbook_url, proof_command,
+                    # update_lane, last_proof_status, last_proof_at) are
+                    # preserved across re-runs of load_modules(). REPLACE
+                    # was deleting the whole row + re-inserting, which
+                    # reset the extension columns to their defaults.
                     conn.execute(
                         """
-                        INSERT OR REPLACE INTO modules
+                        INSERT INTO modules
                             (id, display_name, section, priority, license, repo_url, local_path,
                              install_state, install_progress, detected_version, health, launch_kind,
                              bridge_tasks, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                        ON CONFLICT(id) DO UPDATE SET
+                            display_name = excluded.display_name,
+                            section = excluded.section,
+                            priority = excluded.priority,
+                            license = excluded.license,
+                            repo_url = excluded.repo_url,
+                            local_path = excluded.local_path,
+                            install_state = excluded.install_state,
+                            install_progress = excluded.install_progress,
+                            detected_version = excluded.detected_version,
+                            health = excluded.health,
+                            launch_kind = excluded.launch_kind,
+                            bridge_tasks = excluded.bridge_tasks,
+                            updated_at = datetime('now')
                         """,
                         (
                             unique_id,
@@ -424,6 +449,12 @@ def load_modules() -> int:
                             (task_id, unique_id, str(task_name)),
                         )
                     count += 1
+            # W6-7 (2026-05-09): apply per-app extension fields AFTER all
+            # rows are inserted but BEFORE commit, so the extension values
+            # are persisted in the same transaction. Lazy import to avoid a
+            # bootstrap-time cycle.
+            from hermes3d.db.app_registry_extensions import apply_app_extensions
+            apply_app_extensions(conn)
             conn.commit()
         except Exception:
             # Bonus 12 #10: roll back partial inserts so the next caller

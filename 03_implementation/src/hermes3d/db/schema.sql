@@ -17,6 +17,20 @@ CREATE TABLE IF NOT EXISTS modules (
     bridge_tasks TEXT,
     last_sync_at TEXT,
     lock_hash TEXT,
+    -- W6-7 (2026-05-09): app-registry completion fields. JSON-encoded list
+    -- (tested_versions); SPDX identifier (license_spdx, separate from the
+    -- legacy free-form `license` column above so existing seeds keep working);
+    -- rollback metadata; idempotent proof command string; update lane
+    -- (stable | canary | frozen). Defaults are conservative: empty list,
+    -- no rollback, no proof command, frozen lane.
+    tested_versions TEXT NOT NULL DEFAULT '[]',
+    license_spdx TEXT,
+    rollback_supported INTEGER NOT NULL DEFAULT 0,
+    rollback_runbook_url TEXT,
+    proof_command TEXT,
+    update_lane TEXT NOT NULL DEFAULT 'frozen',
+    last_proof_status TEXT,
+    last_proof_at TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
 );
