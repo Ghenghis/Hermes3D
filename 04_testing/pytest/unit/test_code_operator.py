@@ -953,3 +953,247 @@ def test_workspace_check_accepts_worktrees(tmp_path: Path) -> None:
         capture_output=True,
     )
     assert helper(str(other_repo), main_repo) is False
+
+
+# ---------------------------------------------------------------------------
+# W11-3 closes W10-A9 PARTIAL on PR #83 — git-shipping lane test coverage.
+#
+# W10-A3 + W10-A9 confirmed all 6 ``code.git.*`` route handlers exist in
+# ``code_operator.py`` (``git_readiness``, ``git_branch``, ``git_stage_owned``,
+# ``git_commit_owned``, ``git_push``, ``git_pr``) but only one direct unit
+# test was on the branch shipped in PR #83. These five tests close the gap.
+#
+# Each test mirrors the existing monkeypatched service-level pattern used
+# by ``test_git_stage_requires_snapshot_and_same_owner_lock`` and the
+# fastapi ``TestClient`` pattern used by ``test_git_commit_rejects_spoofed_
+# actor_fields``. Synthetic-only fixtures: no real tokens, no real PR body.
+#
+# Sources:
+#   1. pytest parametrize docs (parametrizing test functions, multiple
+#      arguments). https://docs.pytest.org/en/stable/how-to/parametrize.html
+#   2. existing test pattern in this file (lines 610-641):
+#      ``test_git_branch_names_are_limited_to_agent_prefixes`` and
+#      ``test_git_stage_requires_snapshot_and_same_owner_lock`` — same-owner
+#      MCP lock + snapshot fixtures, monkeypatched ``_run_git``.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "unsafe_branch",
+    [
+        "codex/../escape",
+        "hermes-agent/foo/../etc",
+        "/absolute/codex/branch",
+        "C:/Windows/codex/branch",
+        "codex/branch with space",
+        "codex/branch\\backslash",
+        "codex/trailing.",
+        "codex/trailing/",
+        "main",
+    ],
+)
+def test_git_create_branch_rejects_unsafe_prefix(
+    monkeypatch: pytest.MonkeyPatch, unsafe_branch: str
+) -> None:
+    """W11-3 #1: ``git_create_branch`` must reject branch names with ``..``,
+    absolute paths, disallowed prefixes, or unsafe characters → ValueError
+    surfaces as 422 in the route layer."""
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    # Pretend a clean worktree so we exercise branch validation, not the
+    # "dirty worktree" guard.
+    monkeypatch.setattr(code_history, "_changed_git_files", lambda: set())
+
+    with pytest.raises(ValueError):
+        code_history.git_create_branch(
+            owner="hermes-agent",
+            task_id="W11-3-TEST-BRANCH",
+            branch_name=unsafe_branch,
+        )
+
+    # Confirm the same path through the HTTP layer becomes a 422 (not a 500).
+    client = TestClient(create_gui_app())
+    response = client.post(
+        "/api/code-operator/git/branch",
+        json={
+            "task_id": "W11-3-TEST-BRANCH",
+            "branch_name": unsafe_branch,
+        },
+    )
+    assert response.status_code == 422, response.text
+
+
+def test_git_readiness_clean(monkeypatch: pytest.MonkeyPatch) -> None:
+    """W11-3 #2: ``git/readiness`` returns 200 with the documented fields when
+    the repo is clean and the worktree is on an allowed agent branch."""
+    monkeypatch.setattr(
+        code_history,
+        "code_write_readiness",
+        lambda: {"ready": True, "blocked_reasons": [], "warnings": []},
+    )
+    monkeypatch.setattr(code_history, "_current_branch", lambda: "codex/clean-lane")
+    monkeypatch.setattr(code_history, "_changed_git_files", lambda: set())
+    monkeypatch.setattr(code_history, "_staged_git_files", lambda: set())
+
+    client = TestClient(create_gui_app())
+    response = client.get("/api/code-operator/git/readiness")
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["ready"] is True
+    assert payload["branch"] == "codex/clean-lane"
+    assert payload["branch_allowed"] is True
+    assert payload["dirty_files"] == []
+    assert payload["staged_files"] == []
+    assert payload["blocked_reasons"] == []
+    # Required-flow contract — the route must publish the full ship sequence.
+    assert "claim task" in payload["required_flow"]
+    assert "lock files" in payload["required_flow"]
+    assert "open PR" in payload["required_flow"]
+    assert isinstance(payload["allowed_branch_prefixes"], list)
+
+
+def test_git_stage_blocks_unowned_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    """W11-3 #3: ``git_stage_owned_files`` must refuse to stage a file that
+    has no MCP file lock owned by the caller — same-owner-lock invariant."""
+    git_calls: list[list[str]] = []
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    # File is in the snapshot set and has git changes, so the only remaining
+    # gate is the same-owner MCP lock.
+    monkeypatch.setattr(code_history, "_agent_snapshot_files", lambda owner: {"README.md"})
+    monkeypatch.setattr(code_history, "_changed_git_files", lambda: {"README.md"})
+
+    def deny_lock(*_args: object, **_kwargs: object) -> dict[str, object]:
+        raise ValueError("Active Hermes MCP file lock is required for README.md.")
+
+    monkeypatch.setattr(code_history, "_require_active_mcp_lock", deny_lock)
+    monkeypatch.setattr(
+        code_history,
+        "_run_git",
+        lambda args, **_kwargs: git_calls.append(args)
+        or {"stdout": "", "stderr": "", "returncode": 0},
+    )
+
+    with pytest.raises(ValueError, match="Active Hermes MCP file lock"):
+        code_history.git_stage_owned_files(
+            owner="hermes-agent", task_id="W11-3-TEST-STAGE", files=["README.md"]
+        )
+
+    # Production code must not have run ``git add`` when the lock check fails.
+    assert git_calls == []
+
+
+def test_git_push_refuses_dirty(monkeypatch: pytest.MonkeyPatch) -> None:
+    """W11-3 #4: ``git_push_current_branch`` must refuse to push when the
+    worktree is dirty, and the route layer surfaces it as 422 with a redacted
+    reason (no secret value should appear in the response)."""
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(code_history, "_current_branch", lambda: "codex/dirty-lane")
+    monkeypatch.setattr(
+        code_history,
+        "_validate_agent_branch_name",
+        lambda value: "codex/dirty-lane",
+    )
+    monkeypatch.setattr(
+        code_history,
+        "_changed_git_files",
+        lambda: {"README.md", "do-not-leak-test-token.env"},
+    )
+
+    pushed: list[list[str]] = []
+    monkeypatch.setattr(
+        code_history,
+        "_run_git",
+        lambda args, **_kwargs: pushed.append(args)
+        or {"stdout": "", "stderr": "", "returncode": 0},
+    )
+
+    with pytest.raises(ValueError, match="clean worktree"):
+        code_history.git_push_current_branch(
+            owner="hermes-agent", task_id="W11-3-TEST-PUSH"
+        )
+    # Push must not have been invoked when the dirty guard fires.
+    assert pushed == []
+
+    # Through the route, the same dirty state becomes a 422 with the
+    # synthetic file name omitted from the failure body (redaction lives
+    # in the validator's message — we assert the stable contract).
+    client = TestClient(create_gui_app())
+    response = client.post(
+        "/api/code-operator/git/push",
+        json={"task_id": "W11-3-TEST-PUSH", "remote": "origin"},
+    )
+    assert response.status_code == 422, response.text
+    body_text = response.text
+    assert "do-not-leak-test-token.env" not in body_text
+
+
+def test_git_pr_uses_body_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """W11-3 #5: ``git_open_pull_request`` must hand the PR body to ``gh``
+    via ``--body-file`` (a real file on disk) and not as an inline ``--body``
+    argument — the body argument is what we feed in, but the argv must
+    reference the temp file path."""
+    monkeypatch.setattr(code_history, "_require_mcp_locks_ready", lambda: None)
+    monkeypatch.setattr(code_history, "_current_branch", lambda: "codex/pr-lane")
+    monkeypatch.setattr(
+        code_history,
+        "_validate_agent_branch_name",
+        lambda value: "codex/pr-lane",
+    )
+    captured_args: list[list[str]] = []
+    captured_body_files: list[str] = []
+    fake_pr_body = "fake-pr-body for W11-3 contract test (do-not-leak-test-token NOT present)"
+
+    def fake_run_gh(args: list[str], **_kwargs: object) -> dict[str, str | int]:
+        captured_args.append(list(args))
+        # Locate the --body-file argument and read its contents now,
+        # since git_open_pull_request unlinks the temp file after _run_gh.
+        if "--body-file" in args:
+            idx = args.index("--body-file") + 1
+            body_path = Path(args[idx])
+            if body_path.exists():
+                captured_body_files.append(body_path.read_text(encoding="utf-8"))
+        return {
+            "stdout": "https://github.com/Ghenghis/Hermes3D/pull/9999\n",
+            "stderr": "",
+            "returncode": 0,
+        }
+
+    monkeypatch.setattr(code_history, "_run_gh", fake_run_gh)
+    monkeypatch.setattr(
+        code_history,
+        "_record_git_proof",
+        lambda **_kwargs: "proof-w11-3-pr",
+    )
+    monkeypatch.setattr(
+        code_history,
+        "append_mcp_evidence",
+        lambda **_kwargs: {"status": "recorded", "evidence_id": "ev-w11-3-pr"},
+    )
+
+    result = code_history.git_open_pull_request(
+        owner="hermes-agent",
+        task_id="W11-3-TEST-PR",
+        base_ref="main",
+        title="W11-3 close PR #83 git-test gap",
+        body=fake_pr_body,
+        draft=True,
+    )
+
+    assert result["status"] == "opened"
+    assert result["url"] == "https://github.com/Ghenghis/Hermes3D/pull/9999"
+    assert result["draft"] is True
+
+    # Argv contract: --body-file with an actual path, no inline --body.
+    assert len(captured_args) == 1
+    args = captured_args[0]
+    assert "--body-file" in args, f"argv missing --body-file: {args}"
+    assert "--body" not in args, f"argv must use --body-file, not inline --body: {args}"
+    body_file_idx = args.index("--body-file") + 1
+    body_file_arg = args[body_file_idx]
+    # The path must look like a real filesystem path, not the inline body string.
+    assert body_file_arg != fake_pr_body
+    assert body_file_arg.endswith(".md")
+    # And the file's contents (read inside fake_run_gh) must be exactly what
+    # we asked the route to ship.
+    assert captured_body_files == [fake_pr_body]
