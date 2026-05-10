@@ -1,0 +1,7 @@
+# W8-14: __refs__/ is a local mirror of the repo's Images-GUI/ reference pack,
+# populated by tests/visual/global-setup.ts on every visual-proof run.
+# We never commit the mirror — Images-GUI/ remains the single source of truth.
+# .gitkeep is committed so the directory exists in fresh checkouts.
+__refs__/**/*.png
+__refs__/**/*.PNG
+!__refs__/.gitkeep
