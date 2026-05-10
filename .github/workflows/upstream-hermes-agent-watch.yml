@@ -1,0 +1,65 @@
+name: upstream-hermes-agent-watch
+
+# Weekly cron — every Sunday 00:17 UTC (off the top of the hour to dodge
+# GitHub Actions hourly load shedding; see GitHub docs note that scheduled
+# workflows running at :00 are most likely to be delayed/dropped).
+#
+# What it does: polls NousResearch/hermes-agent for the 3-condition
+# readiness signal (latest tag > v2026.5.7, last-5 successful Tests runs
+# cover 5 distinct head_shas, and a PR #22567 successor exists). If all
+# three hold, opens a tracking issue tagged `hermes-agent-upstream-watch`.
+#
+# Manual trigger via workflow_dispatch is supported for ad-hoc checks.
+
+on:
+  schedule:
+    - cron: "17 0 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watch:
+    name: Poll upstream Hermes Agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run upstream watcher
+        id: watch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          python 03_implementation/scripts/upstream_hermes_agent_watch.py > evidence.json
+          rc=$?
+          set -e
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          if [ "$rc" -eq 0 ]; then
+            echo "hit=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "hit=false" >> "$GITHUB_OUTPUT"
+          fi
+          cat evidence.json
+      - name: Open tracking issue (only when triple-condition holds)
+        if: steps.watch.outputs.hit == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag_url=$(jq -r '.tag_check.url' evidence.json)
+          runs_url=$(jq -r '.sustained_check.url' evidence.json)
+          pr_url=$(jq -r '.pr_check.url' evidence.json)
+          body=$(printf 'Auto-detected by upstream-hermes-agent-watch.\n\nEvidence:\n- Tags: %s\n- Tests workflow runs: %s\n- PR query: %s\n\nLatest tag: %s\nMatching PR: %s\n' \
+            "$tag_url" "$runs_url" "$pr_url" \
+            "$(jq -r '.tag_check.latest_tag' evidence.json)" \
+            "$(jq -r '.pr_check.matching_pr_url' evidence.json)")
+          gh issue create \
+            --repo Ghenghis/Hermes3D \
+            --title "upstream Hermes Agent v0.14 readiness check (auto-detected)" \
+            --label hermes-agent-upstream-watch \
+            --body "$body"
