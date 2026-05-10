@@ -275,14 +275,20 @@ export async function runProof(
  * Convenience client object. Mirrors the shape W6-5 ships in
  * `hermes3dClient.ts` (where `appsClient` is a sibling of `agentsClient`,
  * `mcpClient`, etc.).
+ *
+ * The singleton is built via `createAppsClient` so it inherits the
+ * `/api/apps` → `/api/source-os/modules` fallback semantics. The earlier
+ * shape that re-exported the module-level `listApps`/`getApp`/`runProof`
+ * trio bypassed the fallback entirely and silently called the wrong
+ * endpoint when the breadth E2E suite stubbed only `/api/apps/{id}`,
+ * which made `rollback_supported` always read as falsy on the detail
+ * panel (W9-2k UI-Final fix on PR #192).
  */
-export const appsClient = {
-  listApps,
-  getApp,
-  runProof,
-} as const;
-
-export type AppsClient = typeof appsClient;
+export type AppsClient = {
+  listApps: typeof listApps;
+  getApp: typeof getApp;
+  runProof: typeof runProof;
+};
 
 /** Error thrown when both `/api/apps` and `/api/source-os/modules` endpoints
  *  return non-OK responses for the same operation. Used by the W8-2 detail
@@ -426,3 +432,9 @@ export function createAppsClient(options: {
     },
   };
 }
+
+/**
+ * Singleton client used by GUI components. Built via `createAppsClient` so
+ * it inherits the `/api/apps` → `/api/source-os/modules` fallback semantics.
+ */
+export const appsClient: AppsClient = createAppsClient({ baseUrl: LIVE_BASE_URL });
