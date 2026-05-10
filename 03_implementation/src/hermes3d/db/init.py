@@ -51,6 +51,42 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "ip" not in columns:
         conn.execute("ALTER TABLE onboarded_printers ADD COLUMN ip TEXT")
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_onboarded_printers_ip ON onboarded_printers(ip)")
+    _migrate_modules_w6_7(conn)
+
+
+def _migrate_modules_w6_7(conn: sqlite3.Connection) -> None:
+    """W6-7 (2026-05-09): forward-migrate `modules` to add the 5 + 2 audit
+    fields (tested_versions, license_spdx, rollback_supported,
+    rollback_runbook_url, proof_command, update_lane, last_proof_status,
+    last_proof_at).
+
+    SQLite ALTER TABLE only supports a single column-add per statement; each
+    add is wrapped in an ``if column not present`` check so re-running the
+    migration on an already-migrated DB is a no-op (idempotent).
+    """
+    module_cols = {row["name"] for row in conn.execute("PRAGMA table_info(modules)").fetchall()}
+    if "tested_versions" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN tested_versions TEXT NOT NULL DEFAULT '[]'")
+    if "license_spdx" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN license_spdx TEXT")
+    if "rollback_supported" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN rollback_supported INTEGER NOT NULL DEFAULT 0")
+    if "rollback_runbook_url" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN rollback_runbook_url TEXT")
+    if "proof_command" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN proof_command TEXT")
+    if "update_lane" not in module_cols:
+        conn.execute(
+            "ALTER TABLE modules ADD COLUMN update_lane TEXT NOT NULL DEFAULT 'frozen'"
+        )
+    if "last_proof_status" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN last_proof_status TEXT")
+    if "last_proof_at" not in module_cols:
+        conn.execute("ALTER TABLE modules ADD COLUMN last_proof_at TEXT")
+    # Index for `update_lane` queries (stable/canary/frozen filters).
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_modules_update_lane ON modules(update_lane)"
+    )
 
 
 def _seed(conn: sqlite3.Connection) -> None:
@@ -60,6 +96,10 @@ def _seed(conn: sqlite3.Connection) -> None:
     _seed_settings(conn)
     _seed_module_runtime_verifiers(conn)
     _seed_module_providers(conn)
+    # W6-7 (2026-05-09): app-registry extension fields are applied by
+    # ``hermes3d.db.load_modules.load_modules()`` AFTER it inserts the
+    # 60 module rows. Calling it here would be a no-op (no rows yet) so
+    # we leave it out of the init seed flow.
 
 
 def _seed_roadmap(conn: sqlite3.Connection) -> None:
