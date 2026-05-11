@@ -10,6 +10,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -21,6 +22,19 @@ from hermes3d.api.routes._common import as_json, execute, new_id, rows, utc_now
 from hermes3d.db.init import DB_PATH
 from hermes3d.services.agent_runtime import runtime_probe
 from hermes3d.services.local_state import implementation_path, local_printers
+
+# W18-A21 fix (2026-05-11): /api/providers/health was hardcoding status="idle"
+# for every cloud provider (minimax/deepseek/openrouter) whose API key was
+# present in private env, regardless of whether the latest live smoke proof
+# said the provider was ready, failed, or never probed. Operators saw
+# all-idle even after a successful MiniMax/DeepSeek smoke at /api/code-operator/providers/smoke
+# wrote a code_provider_smoke evidence row. We now read the smoke status
+# file written by hermes3d.services.code_history._write_provider_smoke_status
+# and use it to enrich the cloud provider entries.
+PROVIDER_SMOKE_STATUS_FILE = (
+    implementation_path("var", "code-history") / "provider-smoke-status.json"
+)
+PROVIDER_SMOKE_STALENESS_S = 300  # 5 minutes — matches operator expectation
 
 router = APIRouter()
 SELF_BRIDGE_PORTS = {8765, 8642}
@@ -239,6 +253,7 @@ def provider_health() -> dict[str, list[dict[str, Any]]]:
             "/api/tags",
         ),
     ]
+    smoke_statuses = _read_provider_smoke_statuses()
     for provider_id, key_names in [
         ("minimax", ("HERMES3D_MINIMAX_API_KEY", "MINIMAX_API_KEY")),
         ("deepseek", ("HERMES3D_DEEPSEEK_API_KEY", "DEEPSEEK_API_KEY")),
@@ -246,17 +261,100 @@ def provider_health() -> dict[str, list[dict[str, Any]]]:
     ]:
         binding = _env_binding(private_env, *key_names)
         if binding["set"]:
-            providers.append(
-                {
-                    "provider_id": provider_id,
-                    "status": "idle",
-                    "last_probe_utc": utc_now(),
-                    "http_status": None,
-                    "latency_ms": None,
-                    "stale": False,
-                }
-            )
+            providers.append(_cloud_provider_health_entry(provider_id, smoke_statuses))
     return {"providers": providers}
+
+
+def _read_provider_smoke_statuses() -> dict[str, Any]:
+    """Read the latest provider smoke statuses written by code_history.
+
+    Returns an empty dict when the file is missing or unparseable; never
+    raises so /api/providers/health stays responsive when no smokes have
+    been run yet.
+    """
+    try:
+        raw = json.loads(PROVIDER_SMOKE_STATUS_FILE.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+    providers = raw.get("providers") if isinstance(raw, dict) else None
+    return providers if isinstance(providers, dict) else {}
+
+
+def _cloud_provider_health_entry(
+    provider_id: str, smoke_statuses: dict[str, Any]
+) -> dict[str, Any]:
+    """Build a /api/providers/health entry for a cloud provider.
+
+    Enriches the entry from the latest code_provider_smoke evidence row so
+    operators see real status (green/red/amber) instead of stub 'idle' once
+    a live smoke has succeeded or failed. Returns honest 'idle' only when
+    no smoke evidence exists or the smoke is older than the staleness
+    window — never fabricates a passing status.
+    """
+    base: dict[str, Any] = {
+        "provider_id": provider_id,
+        "status": "idle",
+        "last_probe_utc": utc_now(),
+        "http_status": None,
+        "latency_ms": None,
+        "stale": False,
+        "blocked_reason": None,
+        "evidence_id": None,
+    }
+    record = smoke_statuses.get(provider_id)
+    if not isinstance(record, dict):
+        return base
+    smoke_status = str(record.get("status") or "").strip().lower()
+    ts = str(record.get("ts_utc") or "")
+    parsed_ts = _parse_iso_utc(ts)
+    is_stale = False
+    if parsed_ts is not None:
+        age_s = max(0.0, (datetime.now(timezone.utc) - parsed_ts).total_seconds())
+        is_stale = age_s > PROVIDER_SMOKE_STALENESS_S
+    base["last_probe_utc"] = ts or base["last_probe_utc"]
+    base["evidence_id"] = record.get("evidence_id")
+    auth_contract = (
+        record.get("auth_contract") if isinstance(record.get("auth_contract"), dict) else {}
+    )
+    base["base_url_label"] = auth_contract.get("base_url_label")
+    base["model"] = auth_contract.get("model")
+    blocked_reasons = record.get("blocked_reasons")
+    if isinstance(blocked_reasons, list) and blocked_reasons:
+        base["blocked_reason"] = str(blocked_reasons[0])
+    if smoke_status == "ready" and not is_stale:
+        base["status"] = "green"
+        base["stale"] = False
+        # Real smoke calls populate response objects with HTTP 200 and
+        # latency; we surface the smoke's content hash existence as a
+        # confirmation rather than re-probing here.
+        base["http_status"] = 200
+        base["latency_ms"] = base.get("latency_ms")
+        base["content_sha256"] = record.get("content_sha256")
+        base["blocked_reason"] = None
+    elif smoke_status == "ready" and is_stale:
+        base["status"] = "idle"
+        base["stale"] = True
+        base["blocked_reason"] = (
+            "Smoke proof is older than the staleness window; rerun provider smoke."
+        )
+    elif smoke_status in {"blocked", "missing_config", "auth_failed", "smoke_failed"}:
+        base["status"] = "red"
+        base["stale"] = is_stale
+    else:
+        # Unknown / never-smoked -> remain honestly idle.
+        base["status"] = "idle"
+    return base
+
+
+def _parse_iso_utc(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        # Accept either trailing 'Z' or +00:00 forms.
+        normalized = value.replace("Z", "+00:00") if value.endswith("Z") else value
+        return datetime.fromisoformat(normalized)
+    except (TypeError, ValueError):
+        return None
 
 
 @router.get("/api/env/status")
