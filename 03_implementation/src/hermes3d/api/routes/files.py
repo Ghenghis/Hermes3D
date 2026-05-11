@@ -1,6 +1,6 @@
 """W19-4/5 — /api/files real var/ scanner + orphan reconciliation.
 
-Replaces the honest-blocked placeholder with a scanner that walks
+Supersedes the honest-blocked interim implementation with a scanner that walks
 var/generation/, var/designs/, and var/slicer/ and returns FileItem
 rows for every file found.  POST write semantics remain 501 until a
 real upload path is wired.
