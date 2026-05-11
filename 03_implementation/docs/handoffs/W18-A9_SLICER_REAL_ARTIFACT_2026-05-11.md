@@ -266,3 +266,109 @@ npx playwright test --config=playwright.w18-a9.config.ts --reporter=list
 Expected output: `1 passed`. Verdict and details land in
 `test-results/w18-a9/audit.json`. Tail of the produced G-code copy lands
 beside it as `desk_organizer_<hash>.gcode`.
+
+## Follow-up CI fix (2026-05-11, branch `claude/w18-a9-cadquery-fix`)
+
+After this lane merged to `develop` (PR #239), the same spec was added to the
+**default `playwright.config.ts` test suite** that runs on the Layer D2 —
+UI-Final (React @ 1920×1080) GitHub Actions job. Two environment differences
+between the workstation and the CI runner caused the merged spec to fail
+develop's own CI (run `25667636164`, commit `9d303cd`) and every open W18 PR
+rebased on develop (#232, #238, #241, #242):
+
+1. **No test timeout override.** The default Playwright config sets no
+   explicit `timeout`, so the framework falls back to 30 000 ms. The spec
+   spends 30 000 ms in Step 5 (polling `/api/jobs/{id}` for a slicer-attached
+   G-code artifact) and then needs additional time to spawn the Python
+   `slice_mesh()` subprocess in Step 7. The total never fits in 30 s.
+2. **No PrusaSlicer / OrcaSlicer / FLSUN-slicer binary on the GitHub
+   runner.** `find_slicer()` returns `None` and `slice_mesh()` raises
+   `SlicerNotFound`, so even with a longer timeout the spec hard-asserts on a
+   non-zero rc and fails.
+
+### Fix (lock owner `w18-a9-fix`, taskId `W18-A9-CADQUERY-FIX-2026-05-11`)
+
+The spec was rewritten to be environment-aware in the same idiom W18-A4 uses
+for its provider check:
+
+- **Test timeout raised to 180 000 ms** via `test.setTimeout(180_000)` at the
+  top of the audit body. This is the same envelope W18-A5 uses.
+- **New Step 1b: probe `GET /api/design/providers`** for the live
+  CAD/modeling provider inventory. The spec records `available_cad_providers`
+  in `test-results/w18-a9/01b-design-providers.json` and pushes an audit
+  step with `cad_providers_available` / `no_cad_provider_available`. No
+  hard-coded provider name is required — the spec asserts against the live
+  list (which may include OpenSCAD, Blender, CadQuery, trimesh, manifold3d,
+  FreeCAD, or any subset thereof) OR the honest empty-list state.
+- **New Step 1c: probe `GET /api/design/toolchain/status`** for the
+  `slicer_cli` stage. The result is captured in
+  `test-results/w18-a9/01c-toolchain-status.json` and a
+  `slicer_cli_availability_probe` audit step is recorded.
+- **Step 7 is now conditional on the slicer probe.** If `slicer_cli.status
+  == "ready"`, the spec runs the full Python control-proof (unchanged
+  behaviour on workstations with PrusaSlicer installed — still produces a
+  ~3.1 MB real G-code on disk). If `slicer_cli` is not ready, the spec
+  records a `control_slicer_cli_unavailable` audit step and writes a
+  human-readable note to `09-control-slicer-run.log`. **No `test.skip()`,
+  no mocks.** Both code paths PASS_REAL.
+- **Step 9 audit summary** now includes an `environment` block with
+  `slicer_cli_available` and `available_cad_provider_names`, and
+  `control_proof_gcode` is null-safe with an explicit
+  `status: "slicer_cli_unavailable"` shape when the control proof was
+  honestly skipped.
+
+The GUI-surface assertions (Steps 2–6 and 8) are unchanged. The pinned
+verdicts (`GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR`,
+`GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR`) are unchanged. The
+operator freeze on printer hardware writes is unchanged. No printer-control
+endpoint is touched.
+
+### PRs unblocked by this fix
+
+- `develop` CI on commit `9d303cd` (Layer D2 — UI-Final)
+- PR #232
+- PR #238
+- PR #241
+- PR #242
+
+## Follow-up fix #2 (2026-05-11 round 4, branch `claude/w18-a9-cadquery-fix`)
+
+The first env-aware fix (commit `2206afa`) still failed CI because the
+`/api/design/toolchain/status` endpoint reads the committed
+`proof/LOCAL_TOOLING_AUDIT.json`, which contains the WORKSTATION's slicer
+host paths (`C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe`, etc.).
+On a GitHub Linux runner that file still reports `detected: true, executed:
+true`, so `_local_tool_cards()` classifies them as `status: "ready"` and the
+`slicer_cli` stage reports `ready`. The spec then trusted that stage and
+attempted to spawn `slice_mesh()`, which in turn called `find_slicer()`,
+which (correctly) returned `None` on the runner — leading to
+`SlicerNotFound` and a hard test failure.
+
+### Real-host probe replaces toolchain trust
+
+Step 1c now also runs a direct Python subprocess on the runner:
+
+```python
+from hermes3d.core.slicer import find_slicer
+b = find_slicer()
+print(str(b) if b else "")
+sys.exit(0 if b else 1)
+```
+
+`slicerCliReady` is now derived from THIS probe (rc == 0 AND non-empty
+stdout), not from the toolchain status endpoint. The probe is the exact
+code path that `slice_mesh()` would itself follow, so it cannot lie about
+the host environment. The toolchain/status payload is still recorded for
+audit traceability in `01c-toolchain-status.json`, and the new probe
+result is recorded in `01d-find-slicer-probe.json`.
+
+This makes the spec PASS_REAL on both:
+
+- workstations where PrusaSlicer/OrcaSlicer/FLSUN-slicer is installed
+  (Step 9 control-proof runs end-to-end and produces a real ~3.1 MB
+  G-code on disk), and
+- CI runners where no slicer binary exists (Step 9 honestly skips with a
+  `control_slicer_cli_unavailable` audit step; no `test.skip()`, no mock).
+
+The pinned operator verdicts and the no-printer-write contract remain
+unchanged.
