@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ok 1 [chromium-w18-a11] › tests\e2e\w18-a11-app-registry-real-data.spec.ts:188:1 › W18-A11 — App Registry real-data audit, no mocks, no printer writes (21.4s)
+
+  1 passed (22.5s)

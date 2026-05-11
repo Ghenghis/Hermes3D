@@ -1,0 +1,25 @@
+{
+  "task_id": "W18-A15-FULL-REGRESSION-RUNNER-2026-05-11",
+  "captured_utc": "2026-05-11T11:34:45Z",
+  "source_config": "playwright.visual.config.ts",
+  "note": "Captured via report builder during the W18-A15 regression run. The on-disk file 03_implementation/docs/evidence/visual_proof_2026-05-09/summary.json was rolled back to develop's pre-run state to avoid committing a moving side artifact.",
+  "oracle_total": 31,
+  "oracle_counts": {
+    "match": 11,
+    "diff": 0,
+    "error": 0,
+    "skipped-future": 20
+  },
+  "oracle_gate_fails": {
+    "console": 0,
+    "network": 0,
+    "no_fake": 0
+  },
+  "playwright_stats": {
+    "passed": 25,
+    "failed": 16,
+    "skipped": 20,
+    "flaky": 0,
+    "duration_ms_estimate": 294000
+  }
+}

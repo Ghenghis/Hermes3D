@@ -1,0 +1,253 @@
+{
+  "task_id": "W18-A15-FULL-REGRESSION-RUNNER-2026-05-11",
+  "generated_utc": "2026-05-11T11:47:45.477Z",
+  "watchdog": {
+    "iter": 6,
+    "now": "2026-05-11T11:29:02.423Z",
+    "elapsedHours": 0.16794805555555556,
+    "mergedCount": 3,
+    "openCount": 3,
+    "mergedLanes": [
+      {
+        "lane": "a5",
+        "pr": 237,
+        "url": "https://github.com/Ghenghis/Hermes3D/pull/237"
+      },
+      {
+        "lane": "a7",
+        "pr": 233,
+        "url": "https://github.com/Ghenghis/Hermes3D/pull/233"
+      },
+      {
+        "lane": "a11",
+        "pr": 240,
+        "url": "https://github.com/Ghenghis/Hermes3D/pull/240"
+      }
+    ],
+    "openLanes": [
+      {
+        "lane": "a4",
+        "pr": 232,
+        "url": "https://github.com/Ghenghis/Hermes3D/pull/232"
+      },
+      {
+        "lane": "a8",
+        "pr": 238,
+        "url": "https://github.com/Ghenghis/Hermes3D/pull/238"
+      },
+      {
+        "lane": "a9",
+        "pr": 239,
+        "url": "https://github.com/Ghenghis/Hermes3D/pull/239"
+      }
+    ]
+  },
+  "configs": [
+    {
+      "id": "playwright.e2e.config.ts",
+      "label": "e2e (full stack)",
+      "verdict": "FAIL",
+      "stats": {
+        "passed": 88,
+        "failed": 3,
+        "skipped": 0,
+        "flaky": 0,
+        "duration_ms": 217738.16600000003
+      },
+      "failedSpecs": [
+        {
+          "spec": "printer panel reflects operator IPs and keeps S1 test locked",
+          "file": "live-gui.spec.ts",
+          "breadcrumb": "live-gui.spec.ts",
+          "errors": [
+            "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByTestId('printers-root').locator('section').filter({ hasText: 'T1 #1' }).getByText(/MOONRAKER (OK|FAIL)/i)\nExpected: visible\nTimeout: 20000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 20000ms\u001b[22m\n\u001b[2m  - waiting for getByTestId('printers-root').locator('section').filter({ hasText: 'T1 #1' }).getByText(/MOONRAKER (OK|FAIL)/i)\u001b[22m\n\n\n  640 |   await expect(t1Panel.getByRole(\"button\", { name: \"Test\", exact: true })).toBeEnabled();\n  641 |   await t1Panel.getByRole(\"button\", { name: \"Test\", exact: true }).click();\n> 642 |   await expect(t1Panel.getByText(/MOONRAKER (OK|FAIL)/i)).toBeVisible({ timeout: 20_000 });\n      |                                                           ^\n  643 | });\n  644 |\n  645 | test(\"Printers appends onboarded fleet rows after the fixed operator printers\", async ({ page }) => {\n    at G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\tests\\e2e\\live-gui.spec.ts:642:59"
+          ]
+        },
+        {
+          "spec": "Source OS wires source app backup, update check, and gated update execution",
+          "file": "live-gui.spec.ts",
+          "breadcrumb": "live-gui.spec.ts",
+          "errors": [
+            "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m",
+            "Error: locator.click: Test timeout of 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByTestId('source-os-root').getByRole('button', { name: 'Setup Queue', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button disabled type=\"button\" class=\"rounded border border-border px-2 py-1 text-[11px] text-fg hover:border-accent-blue/40 disabled:cursor-not-allowed disabled:opacity-50\">Setup Queue</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is not enabled\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    56 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m       - element is not enabled\u001b[22m\n\u001b[2m     - retrying click action\u001b[22m\n\u001b[2m       - waiting 500ms\u001b[22m\n\n\n  925 |   await expect(sourceRoot.getByText(/Verify All accepted/)).toBeVisible();\n  926 |   expect(verifyAllRequests).toBe(1);\n> 927 |   await sourceRoot.getByRole(\"button\", { name: \"Setup Queue\", exact: true }).click();\n      |                                                                              ^\n  928 |   await expect(sourceRoot.getByText(/Setup Queue accepted/)).toBeVisible();\n  929 |   await expect(sourceRoot.getByText(/proof-setup-queue/)).toBeVisible();\n  930 |   expect(setupQueuePostRequests).toBe(1);\n    at G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\tests\\e2e\\live-gui.spec.ts:927:78"
+          ]
+        },
+        {
+          "spec": "Audit: GUI surface -> slicer -> real G-code on disk + no printer-control",
+          "file": "w18-a9-slicer-real-artifact.spec.ts",
+          "breadcrumb": "w18-a9-slicer-real-artifact.spec.ts > W18-A9 modeler -> slicer real-artifact proof",
+          "errors": [
+            "\u001b[31mTest timeout of 30000ms exceeded.\u001b[39m"
+          ]
+        }
+      ],
+      "marker": null,
+      "visualDetail": null
+    },
+    {
+      "id": "playwright.visual.config.ts",
+      "label": "visual proof (Images-GUI oracle)",
+      "verdict": "FAIL",
+      "stats": {
+        "passed": 25,
+        "failed": 16,
+        "skipped": 20,
+        "flaky": 0,
+        "duration_ms": 0
+      },
+      "failedSpecs": [
+        {
+          "spec": "tests\\visual\\dashboard.visual.spec.ts:44:3 › Dashboard @ 1920×1080 › renders all panels and matches visual baseline",
+          "file": "tests\\visual\\dashboard.visual.spec.ts:44:3",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\dock.spec.ts:61:3 › Panel dock state machine @ 1920×1080 › every tab panel exposes required Phase 2 chrome",
+          "file": "tests\\visual\\dock.spec.ts:61:3",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\dock.spec.ts:101:3 › Panel dock state machine @ 1920×1080 › fullscreen overlay renders fixed-position CSS (no native window)",
+          "file": "tests\\visual\\dock.spec.ts:101:3",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\dock.spec.ts:149:3 › Panel dock state machine @ 1920×1080 › no external window or network calls during dock interactions",
+          "file": "tests\\visual\\dock.spec.ts:149:3",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\dock.spec.ts:203:3 › Panel dock state machine @ 1920×1080 › source has no external window/process launch path",
+          "file": "tests\\visual\\dock.spec.ts:203:3",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\fleet.live.spec.ts:81:1 › live mode reads local bridge and marks four fixture printers as live",
+          "file": "tests\\visual\\fleet.live.spec.ts:81:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\gen3d.plan_preview.spec.ts:28:1 › live mode previews a planner DAG without execution affordances",
+          "file": "tests\\visual\\gen3d.plan_preview.spec.ts:28:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\gen3d.planner_mode.spec.ts:28:1 › live mode shows via-LLM badge when bridge response sets planner_mode=llm",
+          "file": "tests\\visual\\gen3d.planner_mode.spec.ts:28:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\gen3d.planner_mode.spec.ts:78:1 › live mode shows template badge when bridge response sets planner_mode=template",
+          "file": "tests\\visual\\gen3d.planner_mode.spec.ts:78:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\gen3d.provider_health.spec.ts:3:1 › live mode shows green and amber dots when bridge response provides them",
+          "file": "tests\\visual\\gen3d.provider_health.spec.ts:3:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\gen3d.provider_health.spec.ts:61:1 › live mode shows red dot when probe failed",
+          "file": "tests\\visual\\gen3d.provider_health.spec.ts:61:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\gen3d.provider_health.spec.ts:109:1 › live mode shows idle dots when no probes have been run",
+          "file": "tests\\visual\\gen3d.provider_health.spec.ts:109:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\health-page.spec.ts:18:1 › mock-mode renders a Service Health tab with cards",
+          "file": "tests\\visual\\health-page.spec.ts:18:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\health-page.spec.ts:33:1 › live-mode fetches /api/health/services and renders the response",
+          "file": "tests\\visual\\health-page.spec.ts:33:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\health-page.spec.ts:90:1 › re-probe now button triggers another fetch",
+          "file": "tests\\visual\\health-page.spec.ts:90:1",
+          "errors": []
+        },
+        {
+          "spec": "tests\\visual\\health-page.spec.ts:125:1 › pause auto-refresh toggles aria-pressed",
+          "file": "tests\\visual\\health-page.spec.ts:125:1",
+          "errors": []
+        }
+      ],
+      "visualDetail": {
+        "total": 31,
+        "counts": {
+          "match": 9,
+          "diff": 1,
+          "missing-baseline": 0,
+          "error": 1,
+          "not-run": 0,
+          "future": 0,
+          "other": 20
+        },
+        "failedTargets": [
+          {
+            "target": "04_source_os_60_app_coverage_matrix",
+            "status": "diff",
+            "diff_pixels": 320638,
+            "reference": "Images-GUI/04-source-os/source-os-60-app-coverage-matrix.png"
+          },
+          {
+            "target": "04_source_os_remaining_categories",
+            "status": "error",
+            "reference": "Images-GUI/04-source-os/source-os-remaining-categories.png"
+          }
+        ]
+      }
+    },
+    {
+      "id": "playwright.breadth.config.ts",
+      "label": "breadth (Vite preview, stubbed backend)",
+      "verdict": "PASS_REAL",
+      "stats": {
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "duration_ms": 11498.918
+      },
+      "failedSpecs": [],
+      "marker": null,
+      "visualDetail": null
+    },
+    {
+      "id": "playwright.w18-a11.config.ts",
+      "label": "lane w18-a11",
+      "verdict": "PASS_REAL",
+      "stats": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "duration_ms": 22489.713
+      },
+      "failedSpecs": [],
+      "marker": null,
+      "visualDetail": null
+    },
+    {
+      "id": "playwright.w18-a9.config.ts",
+      "label": "lane w18-a9",
+      "verdict": "PASS_REAL",
+      "stats": {
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "flaky": 0,
+        "duration_ms": 33191.847
+      },
+      "failedSpecs": [],
+      "marker": null,
+      "visualDetail": null
+    }
+  ],
+  "overall_verdict": "FAIL"
+}

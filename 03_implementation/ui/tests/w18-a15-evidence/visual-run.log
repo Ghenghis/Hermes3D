@@ -1,0 +1,534 @@
+[visual-proof globalSetup] mirrored 31 PNGs from Images-GUI/ to 03_implementation/ui/tests/visual/__refs__/ (copied=31 skipped=0 pruned=0) in 61ms
+
+Running 61 tests using 1 worker
+
+  x   1 [visual-chromium] › tests\visual\dashboard.visual.spec.ts:44:3 › Dashboard @ 1920×1080 › renders all panels and matches visual baseline (30.2s)
+  x   2 [visual-chromium] › tests\visual\dock.spec.ts:61:3 › Panel dock state machine @ 1920×1080 › every tab panel exposes required Phase 2 chrome (30.2s)
+  ok  3 [visual-chromium] › tests\visual\dock.spec.ts:86:3 › Panel dock state machine @ 1920×1080 › dock toggle: switches state via store (1.0s)
+  x   4 [visual-chromium] › tests\visual\dock.spec.ts:101:3 › Panel dock state machine @ 1920×1080 › fullscreen overlay renders fixed-position CSS (no native window) (768ms)
+  ok  5 [visual-chromium] › tests\visual\dock.spec.ts:119:3 › Panel dock state machine @ 1920×1080 › clicking the active dock mode returns to 'docked' (852ms)
+  ok  6 [visual-chromium] › tests\visual\dock.spec.ts:131:3 › Panel dock state machine @ 1920×1080 › collapse: hides panel body and flips chevron aria-label (849ms)
+  x   7 [visual-chromium] › tests\visual\dock.spec.ts:149:3 › Panel dock state machine @ 1920×1080 › no external window or network calls during dock interactions (941ms)
+  x   8 [visual-chromium] › tests\visual\dock.spec.ts:203:3 › Panel dock state machine @ 1920×1080 › source has no external window/process launch path (40ms)
+  ok  9 [visual-chromium] › tests\visual\dock.spec.ts:215:3 › Panel dock state machine @ 1920×1080 › aria contract: every dock-toggle button has label + title (808ms)
+  x  10 [visual-chromium] › tests\visual\fleet.live.spec.ts:81:1 › live mode reads local bridge and marks four fixture printers as live (30.1s)
+  x  11 [visual-chromium] › tests\visual\gen3d.plan_preview.spec.ts:28:1 › live mode previews a planner DAG without execution affordances (6.1s)
+  x  12 [visual-chromium] › tests\visual\gen3d.planner_mode.spec.ts:28:1 › live mode shows via-LLM badge when bridge response sets planner_mode=llm (6.1s)
+  x  13 [visual-chromium] › tests\visual\gen3d.planner_mode.spec.ts:78:1 › live mode shows template badge when bridge response sets planner_mode=template (6.0s)
+  x  14 [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:3:1 › live mode shows green and amber dots when bridge response provides them (5.9s)
+  x  15 [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:61:1 › live mode shows red dot when probe failed (5.9s)
+  x  16 [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:109:1 › live mode shows idle dots when no probes have been run (5.9s)
+  x  17 [visual-chromium] › tests\visual\health-page.spec.ts:18:1 › mock-mode renders a Service Health tab with cards (30.1s)
+  x  18 [visual-chromium] › tests\visual\health-page.spec.ts:33:1 › live-mode fetches /api/health/services and renders the response (30.1s)
+  x  19 [visual-chromium] › tests\visual\health-page.spec.ts:90:1 › re-probe now button triggers another fetch (30.1s)
+  x  20 [visual-chromium] › tests\visual\health-page.spec.ts:125:1 › pause auto-refresh toggles aria-pressed (30.1s)
+  ok 21 [visual-chromium] › tests\visual\palettes-preview.spec.ts:109:5 › W15-A17 named palette previews › renders the default palette (317ms)
+  ok 22 [visual-chromium] › tests\visual\palettes-preview.spec.ts:109:5 › W15-A17 named palette previews › renders the cyberpunk palette (237ms)
+  ok 23 [visual-chromium] › tests\visual\palettes-preview.spec.ts:109:5 › W15-A17 named palette previews › renders the matrix palette (173ms)
+  ok 24 [visual-chromium] › tests\visual\palettes-preview.spec.ts:109:5 › W15-A17 named palette previews › renders the tron palette (171ms)
+  ok 25 [visual-chromium] › tests\visual\palettes-preview.spec.ts:109:5 › W15-A17 named palette previews › renders the industrial-forge palette (238ms)
+  ok 26 [visual-chromium] › tests\visual\palettes-preview.spec.ts:109:5 › W15-A17 named palette previews › renders the aurora-operator palette (173ms)
+  ok 27 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 01_dashboard_advanced_a › matches reference within tolerance 0.1 (1.4s)
+  -  28 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 01_dashboard_advanced_b › 01_dashboard_advanced_b future-target — owned by another W15 lane (Advanced dashboard alt view B. Future target — owned by Wave 6 lane 3.)
+  -  29 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 01_dashboard_simple_a › 01_dashboard_simple_a future-target — owned by another W15 lane (Simple dashboard mode A. Mode switcher is being added by W6-3.)
+  -  30 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 01_dashboard_simple_b › 01_dashboard_simple_b future-target — owned by another W15 lane (Simple dashboard mode B. Future target — owned by Wave 6 lane 3.)
+  -  31 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 01_dashboard_custom_a › 01_dashboard_custom_a future-target — owned by another W15 lane (Custom dashboard with draggable widgets — not implemented yet. Future target — owned by Wave 6 lane 3 / 4.)
+  -  32 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 01_dashboard_custom_b › 01_dashboard_custom_b future-target — owned by another W15 lane (Custom dashboard alt B. Future target.)
+  ok 33 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 02_primary_autopilot_design_gen3d_jobs › matches reference within tolerance 0.12 (1.5s)
+  ok 34 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 02_primary_printers_observe_agents_learning › matches reference within tolerance 0.12 (1.5s)
+  ok 35 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 02_primary_artifacts_approvals_plugins_roadmap › matches reference within tolerance 0.12 (1.5s)
+  ok 36 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 03_settings_subtabs_all › matches reference within tolerance 0.12 (1.4s)
+  ok 37 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 03_voice_communication_subtabs › matches reference within tolerance 0.12 (1.5s)
+  ok 38 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 04_source_os_60_app_coverage_matrix › matches reference within tolerance 0.12 (1.6s)
+  ok 39 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 04_source_os_core_categories › matches reference within tolerance 0.12 (1.4s)
+  ok 40 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 04_source_os_remaining_categories › matches reference within tolerance 0.12 (1.5s)
+  -  41 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 05_action_window_core_apps › 05_action_window_core_apps future-target — owned by another W15 lane (Action Window core-apps template. Action Window is being added by W6-4.)
+  -  42 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 05_action_window_advanced_tools › 05_action_window_advanced_tools future-target — owned by another W15 lane (Action Window advanced-tools template. Future target — owned by W6-4.)
+  -  43 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 06_states_responsive_reference › 06_states_responsive_reference future-target — owned by another W15 lane (Loading/empty/blocked/recovering responsive states reference. Per-state specs are out of scope for this lane.)
+  ok 44 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 07_plugins_skills_mcp_app_connectors › matches reference within tolerance 0.12 (1.6s)
+  -  45 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 08_workflow_printqueue_files_logs › 08_workflow_printqueue_files_logs future-target — owned by another W15 lane (Composite of workflow + print queue + files + logs. No single route maps yet; uses Jobs as anchor. Future target — split by lane 3/4.)
+  -  46 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 08_proof_health_notifications_safety › 08_proof_health_notifications_safety future-target — owned by another W15 lane (Composite of proof + health + notifications + safety. Anchored to Observe. Future target.)
+  -  47 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 09_theme_variants_reference › 09_theme_variants_reference future-target — owned by another W15 lane (Theme palette reference (default/cyberpunk/matrix/tron/forge/aurora). Theme switcher not implemented; future target.)
+  ok 48 [visual-chromium] › tests\visual\visual-proof.spec.ts:224:5 › visual: 00_user_hermes3d › matches reference within tolerance 0.15 (1.7s)
+  -  49 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_1 › 00_user_generated_1 future-target — owned by another W15 lane (Generated reference 1 — direction PNG, not a 1:1 page snapshot. Skipped from strict comparison; tracked for visual direction only.)
+  -  50 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_2 › 00_user_generated_2 future-target — owned by another W15 lane (Generated reference 2.)
+  -  51 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_3 › 00_user_generated_3 future-target — owned by another W15 lane (Generated reference 3.)
+  -  52 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_4 › 00_user_generated_4 future-target — owned by another W15 lane (Generated reference 4.)
+  -  53 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_5 › 00_user_generated_5 future-target — owned by another W15 lane (Generated reference 5.)
+  -  54 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_6 › 00_user_generated_6 future-target — owned by another W15 lane (Generated reference 6.)
+  -  55 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_7 › 00_user_generated_7 future-target — owned by another W15 lane (Generated reference 7.)
+  -  56 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_8 › 00_user_generated_8 future-target — owned by another W15 lane (Generated reference 8.)
+  -  57 [visual-chromium] › tests\visual\visual-proof.spec.ts:174:12 › visual: 00_user_generated_9 › 00_user_generated_9 future-target — owned by another W15 lane (Generated reference 9.)
+  ok 58 [visual-chromium] › tests\visual\w15-a16-tabs-c.visual.spec.ts:60:5 › W15-A16 Primary Tabs C @ 1536x1024 › captures artifacts tab (912ms)
+  ok 59 [visual-chromium] › tests\visual\w15-a16-tabs-c.visual.spec.ts:60:5 › W15-A16 Primary Tabs C @ 1536x1024 › captures approvals tab (887ms)
+  ok 60 [visual-chromium] › tests\visual\w15-a16-tabs-c.visual.spec.ts:60:5 › W15-A16 Primary Tabs C @ 1536x1024 › captures plugins tab (1.2s)
+  ok 61 [visual-chromium] › tests\visual\w15-a16-tabs-c.visual.spec.ts:60:5 › W15-A16 Primary Tabs C @ 1536x1024 › captures roadmap tab (834ms)
+
+
+  1) [visual-chromium] › tests\visual\dashboard.visual.spec.ts:44:3 › Dashboard @ 1920×1080 › renders all panels and matches visual baseline 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: page.waitForLoadState: Test timeout of 30000ms exceeded.
+
+      46 |     await page.waitForSelector('[data-testid="dashboard-root"]', { timeout: 15_000 });
+      47 |     // Give recharts and the SVG previews one paint frame to settle.
+    > 48 |     await page.waitForLoadState("networkidle");
+         |                ^
+      49 |     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => r(null))));
+      50 |
+      51 |     // Always export the current screenshot artifact for human review,
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\dashboard.visual.spec.ts:48:16
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\dashboard.visual-Dashboard-182b7-and-matches-visual-baseline-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\dashboard.visual-Dashboard-182b7-and-matches-visual-baseline-visual-chromium\error-context.md
+
+  2) [visual-chromium] › tests\visual\dock.spec.ts:61:3 › Panel dock state machine @ 1920×1080 › every tab panel exposes required Phase 2 chrome 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for locator('aside[aria-label="Primary navigation"]').getByRole('button', { name: 'Dashboard', exact: true })[22m
+
+
+      64 |
+      65 |     for (const tab of TABS) {
+    > 66 |       await sidebar.getByRole("button", { name: tab, exact: true }).click();
+         |                                                                     ^
+      67 |
+      68 |       const panels = page.locator("[data-panel-id]");
+      69 |       await expect.poll(async () => panels.count(), `${tab} panels`).toBeGreaterThan(0);
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\dock.spec.ts:66:69
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\dock-Panel-dock-state-mach-7918a-ses-required-Phase-2-chrome-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\dock-Panel-dock-state-mach-7918a-ses-required-Phase-2-chrome-visual-chromium\error-context.md
+
+  3) [visual-chromium] › tests\visual\dock.spec.ts:101:3 › Panel dock state machine @ 1920×1080 › fullscreen overlay renders fixed-position CSS (no native window) 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: > [32m1880[39m
+    Received:   [31m1510[39m
+
+      112 |     if (box) {
+      113 |       // Viewport is 1920×1080 with inset-4 (16px). Allow ±2px tolerance.
+    > 114 |       expect(box.width).toBeGreaterThan(1880); // 1920 − 32 = 1888
+          |                         ^
+      115 |       expect(box.height).toBeGreaterThan(1040); // 1080 − 32 = 1048
+      116 |     }
+      117 |   });
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\dock.spec.ts:114:25
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\dock-Panel-dock-state-mach-476fa-ition-CSS-no-native-window--visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\dock-Panel-dock-state-mach-476fa-ition-CSS-no-native-window--visual-chromium\error-context.md
+
+  4) [visual-chromium] › tests\visual\dock.spec.ts:149:3 › Panel dock state machine @ 1920×1080 › no external window or network calls during dock interactions 
+
+    Error: unexpected external requests: http://127.0.0.1:8765/api/agents/update/status, http://127.0.0.1:8765/api/agents, http://127.0.0.1:8765/api/voice/agents, http://127.0.0.1:8765/api/system/snapshot, http://127.0.0.1:8765/api/notifications, http://127.0.0.1:8765/api/proof/bundles, http://127.0.0.1:8765/api/printers, http://127.0.0.1:8765/api/jobs?status=printing%2Crunning%2Cqueued%2Crunning, http://127.0.0.1:8765/api/agents, http://127.0.0.1:8765/api/workflows, http://127.0.0.1:8765/api/proof/bundles, http://127.0.0.1:8765/api/system/snapshot, http://127.0.0.1:8765/api/dimensional-reports, http://127.0.0.1:8765/api/logs, http://127.0.0.1:8765/api/notifications, http://127.0.0.1:8765/api/events/stream, http://127.0.0.1:8765/api/agents/print-safety-agent/history
+
+    [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  -  1[39m
+    [31m+ Received  + 19[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   "http://127.0.0.1:8765/api/agents/update/status",[39m
+    [31m+   "http://127.0.0.1:8765/api/agents",[39m
+    [31m+   "http://127.0.0.1:8765/api/voice/agents",[39m
+    [31m+   "http://127.0.0.1:8765/api/system/snapshot",[39m
+    [31m+   "http://127.0.0.1:8765/api/notifications",[39m
+    [31m+   "http://127.0.0.1:8765/api/proof/bundles",[39m
+    [31m+   "http://127.0.0.1:8765/api/printers",[39m
+    [31m+   "http://127.0.0.1:8765/api/jobs?status=printing%2Crunning%2Cqueued%2Crunning",[39m
+    [31m+   "http://127.0.0.1:8765/api/agents",[39m
+    [31m+   "http://127.0.0.1:8765/api/workflows",[39m
+    [31m+   "http://127.0.0.1:8765/api/proof/bundles",[39m
+    [31m+   "http://127.0.0.1:8765/api/system/snapshot",[39m
+    [31m+   "http://127.0.0.1:8765/api/dimensional-reports",[39m
+    [31m+   "http://127.0.0.1:8765/api/logs",[39m
+    [31m+   "http://127.0.0.1:8765/api/notifications",[39m
+    [31m+   "http://127.0.0.1:8765/api/events/stream",[39m
+    [31m+   "http://127.0.0.1:8765/api/agents/print-safety-agent/history",[39m
+    [31m+ ][39m
+
+      198 |         !u.startsWith("about:"),
+      199 |     );
+    > 200 |     expect(external, `unexpected external requests: ${external.join(", ")}`).toEqual([]);
+          |                                                                              ^
+      201 |   });
+      202 |
+      203 |   test("source has no external window/process launch path", () => {
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\dock.spec.ts:200:78
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\dock-Panel-dock-state-mach-0a0f1-ls-during-dock-interactions-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\dock-Panel-dock-state-mach-0a0f1-ls-during-dock-interactions-visual-chromium\error-context.md
+
+  5) [visual-chromium] › tests\visual\dock.spec.ts:203:3 › Panel dock state machine @ 1920×1080 › source has no external window/process launch path 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoEqual[2m([22m[32mexpected[39m[2m) // deep equality[22m
+
+    [32m- Expected  - 1[39m
+    [31m+ Received  + 7[39m
+
+    [32m- Array [][39m
+    [31m+ Array [[39m
+    [31m+   "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\src\\components\\ActionWindow\\ActionWindow.tsx: window.open",[39m
+    [31m+   "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\src\\components\\source-os\\AppDetailPanel.tsx: window.open",[39m
+    [31m+   "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\src\\tabs\\Artifacts.tsx: window.open",[39m
+    [31m+   "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\src\\tabs\\Jobs.tsx: window.open",[39m
+    [31m+   "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a15\\03_implementation\\ui\\src\\tabs\\Observe.tsx: window.open",[39m
+    [31m+ ][39m
+
+      210 |     });
+      211 |
+    > 212 |     expect(violations).toEqual([]);
+          |                        ^
+      213 |   });
+      214 |
+      215 |   test("aria contract: every dock-toggle button has label + title", async ({ page }) => {
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\dock.spec.ts:212:24
+
+    Error Context: test-results\visual\dock-Panel-dock-state-mach-b55f2--window-process-launch-path-visual-chromium\error-context.md
+
+  6) [visual-chromium] › tests\visual\fleet.live.spec.ts:81:1 › live mode reads local bridge and marks four fixture printers as live 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Printer Fleet', exact: true })[22m
+
+
+      89 |
+      90 |   await page.goto("/?adapter=live");
+    > 91 |   await page.getByRole("button", { name: "Printer Fleet", exact: true }).click();
+         |                                                                          ^
+      92 |   await page.waitForSelector('[data-testid="fleet-root"]');
+      93 |
+      94 |   const fleetRoot = page.locator('[data-testid="fleet-root"]');
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\fleet.live.spec.ts:91:74
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\fleet.live-live-mode-reads-4bfe8-ur-fixture-printers-as-live-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\fleet.live-live-mode-reads-4bfe8-ur-fixture-printers-as-live-visual-chromium\error-context.md
+
+  7) [visual-chromium] › tests\visual\gen3d.plan_preview.spec.ts:28:1 › live mode previews a planner DAG without execution affordances 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeDisabled[2m([22m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Generate', exact: true })
+    Expected: disabled
+    Received: enabled
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeDisabled" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Generate', exact: true })[22m
+    [2m    9 × locator resolved to <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface2/50 text-fg text-[11px] hover:border-accent-blue/50">Generate</button>[22m
+    [2m      - unexpected value "enabled"[22m
+
+
+      64 |     "gen3d.generate",
+      65 |   );
+    > 66 |   await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeDisabled();
+         |                                                                             ^
+      67 |   expect(planPreviewCalls).toBe(1);
+      68 |   expect(popupCount).toBe(0);
+      69 |
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\gen3d.plan_preview.spec.ts:66:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\gen3d.plan_preview-live-mo-2306f-thout-execution-affordances-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\gen3d.plan_preview-live-mo-2306f-thout-execution-affordances-visual-chromium\error-context.md
+
+  8) [visual-chromium] › tests\visual\gen3d.planner_mode.spec.ts:28:1 › live mode shows via-LLM badge when bridge response sets planner_mode=llm 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveAttribute[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Generate', exact: true })
+    Expected: [32m"true"[39m
+    Received: [31m""[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveAttribute" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Generate', exact: true })[22m
+    [2m    9 × locator resolved to <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface2/50 text-fg text-[11px] hover:border-accent-blue/50">Generate</button>[22m
+    [2m      - unexpected value "null"[22m
+
+
+      65 |   await expect(badge).toContainText("via LLM");
+      66 |   const generateButton = page.getByRole("button", { name: "Generate", exact: true });
+    > 67 |   await expect(generateButton).toHaveAttribute("aria-disabled", "true");
+         |                                ^
+      68 |   await expect(generateButton).toBeDisabled();
+      69 |   expect(popupCount).toBe(0);
+      70 |
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\gen3d.planner_mode.spec.ts:67:32
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\gen3d.planner_mode-live-mo-f1ce1-ponse-sets-planner-mode-llm-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\gen3d.planner_mode-live-mo-f1ce1-ponse-sets-planner-mode-llm-visual-chromium\error-context.md
+
+  9) [visual-chromium] › tests\visual\gen3d.planner_mode.spec.ts:78:1 › live mode shows template badge when bridge response sets planner_mode=template 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoHaveAttribute[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Generate', exact: true })
+    Expected: [32m"true"[39m
+    Received: [31m""[39m
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toHaveAttribute" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Generate', exact: true })[22m
+    [2m    9 × locator resolved to <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface2/50 text-fg text-[11px] hover:border-accent-blue/50">Generate</button>[22m
+    [2m      - unexpected value "null"[22m
+
+
+      115 |   await expect(badge).toContainText("template");
+      116 |   const generateButton = page.getByRole("button", { name: "Generate", exact: true });
+    > 117 |   await expect(generateButton).toHaveAttribute("aria-disabled", "true");
+          |                                ^
+      118 |   await expect(generateButton).toBeDisabled();
+      119 |   expect(popupCount).toBe(0);
+      120 |
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\gen3d.planner_mode.spec.ts:117:32
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\gen3d.planner_mode-live-mo-c9771--sets-planner-mode-template-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\gen3d.planner_mode-live-mo-c9771--sets-planner-mode-template-visual-chromium\error-context.md
+
+  10) [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:3:1 › live mode shows green and amber dots when bridge response provides them 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeDisabled[2m([22m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Generate', exact: true })
+    Expected: disabled
+    Received: enabled
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeDisabled" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Generate', exact: true })[22m
+    [2m    9 × locator resolved to <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface2/50 text-fg text-[11px] hover:border-accent-blue/50">Generate</button>[22m
+    [2m      - unexpected value "enabled"[22m
+
+
+      49 |   await expect(page.locator('[data-provider="minimax"][data-status="green"]')).toBeVisible();
+      50 |   await expect(page.locator('[data-provider="deepseek"][data-status="amber"]')).toBeVisible();
+    > 51 |   await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeDisabled();
+         |                                                                             ^
+      52 |   expect(popupCount).toBe(0);
+      53 |
+      54 |   const externalRequests = networkUrls.filter((url) => {
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\gen3d.provider_health.spec.ts:51:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\gen3d.provider_health-live-af77f-idge-response-provides-them-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\gen3d.provider_health-live-af77f-idge-response-provides-them-visual-chromium\error-context.md
+
+  11) [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:61:1 › live mode shows red dot when probe failed 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeDisabled[2m([22m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Generate', exact: true })
+    Expected: disabled
+    Received: enabled
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeDisabled" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Generate', exact: true })[22m
+    [2m    9 × locator resolved to <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface2/50 text-fg text-[11px] hover:border-accent-blue/50">Generate</button>[22m
+    [2m      - unexpected value "enabled"[22m
+
+
+       97 |   const dot = page.getByTestId("gen3d-provider-dot");
+       98 |   await expect(dot).toHaveAttribute("data-status", "red");
+    >  99 |   await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeDisabled();
+          |                                                                             ^
+      100 |   expect(popupCount).toBe(0);
+      101 |
+      102 |   const externalRequests = networkUrls.filter((url) => {
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\gen3d.provider_health.spec.ts:99:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\gen3d.provider_health-live-e125f-s-red-dot-when-probe-failed-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\gen3d.provider_health-live-e125f-s-red-dot-when-probe-failed-visual-chromium\error-context.md
+
+  12) [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:109:1 › live mode shows idle dots when no probes have been run 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeDisabled[2m([22m[2m)[22m failed
+
+    Locator:  getByRole('button', { name: 'Generate', exact: true })
+    Expected: disabled
+    Received: enabled
+    Timeout:  5000ms
+
+    Call log:
+    [2m  - Expect "toBeDisabled" with timeout 5000ms[22m
+    [2m  - waiting for getByRole('button', { name: 'Generate', exact: true })[22m
+    [2m    9 × locator resolved to <button type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-border bg-surface2/50 text-fg text-[11px] hover:border-accent-blue/50">Generate</button>[22m
+    [2m      - unexpected value "enabled"[22m
+
+
+      154 |   await expect(page.locator('[data-provider="minimax"][data-status="idle"]')).toBeVisible();
+      155 |   await expect(page.locator('[data-provider="deepseek"][data-status="idle"]')).toBeVisible();
+    > 156 |   await expect(page.getByRole("button", { name: "Generate", exact: true })).toBeDisabled();
+          |                                                                             ^
+      157 |   expect(popupCount).toBe(0);
+      158 |
+      159 |   const externalRequests = networkUrls.filter((url) => {
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\gen3d.provider_health.spec.ts:156:77
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\gen3d.provider_health-live-f0ecc-hen-no-probes-have-been-run-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\gen3d.provider_health-live-f0ecc-hen-no-probes-have-been-run-visual-chromium\error-context.md
+
+  13) [visual-chromium] › tests\visual\health-page.spec.ts:18:1 › mock-mode renders a Service Health tab with cards 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Service Health', exact: true })[22m
+
+
+      19 |   await page.goto("/");
+      20 |
+    > 21 |   await page.getByRole("button", { name: "Service Health", exact: true }).click();
+         |                                                                           ^
+      22 |
+      23 |   const root = page.getByTestId("service-health-root");
+      24 |   await expect(root).toBeVisible();
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\health-page.spec.ts:21:75
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\health-page-mock-mode-rend-41512-rvice-Health-tab-with-cards-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\health-page-mock-mode-rend-41512-rvice-Health-tab-with-cards-visual-chromium\error-context.md
+
+  14) [visual-chromium] › tests\visual\health-page.spec.ts:33:1 › live-mode fetches /api/health/services and renders the response 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Service Health', exact: true })[22m
+
+
+      74 |
+      75 |   await page.goto("/?adapter=live");
+    > 76 |   await page.getByRole("button", { name: "Service Health", exact: true }).click();
+         |                                                                           ^
+      77 |
+      78 |   await expect(page.getByTestId("service-health-root")).toBeVisible();
+      79 |   await expect(page.getByTestId("service-card")).toHaveCount(3);
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\health-page.spec.ts:76:75
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\health-page-live-mode-fetc-3a1b7-es-and-renders-the-response-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\health-page-live-mode-fetc-3a1b7-es-and-renders-the-response-visual-chromium\error-context.md
+
+  15) [visual-chromium] › tests\visual\health-page.spec.ts:90:1 › re-probe now button triggers another fetch 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Service Health', exact: true })[22m
+
+
+      113 |
+      114 |   await page.goto("/?adapter=live");
+    > 115 |   await page.getByRole("button", { name: "Service Health", exact: true }).click();
+          |                                                                           ^
+      116 |
+      117 |   // Wait for the initial fetch to land
+      118 |   await expect(page.getByTestId("service-card")).toHaveCount(1);
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\health-page.spec.ts:115:75
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\health-page-re-probe-now-button-triggers-another-fetch-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\health-page-re-probe-now-button-triggers-another-fetch-visual-chromium\error-context.md
+
+  16) [visual-chromium] › tests\visual\health-page.spec.ts:125:1 › pause auto-refresh toggles aria-pressed 
+
+    [31mTest timeout of 30000ms exceeded.[39m
+
+    Error: locator.click: Test timeout of 30000ms exceeded.
+    Call log:
+    [2m  - waiting for getByRole('button', { name: 'Service Health', exact: true })[22m
+
+
+      125 | test("pause auto-refresh toggles aria-pressed", async ({ page }) => {
+      126 |   await page.goto("/");
+    > 127 |   await page.getByRole("button", { name: "Service Health", exact: true }).click();
+          |                                                                           ^
+      128 |
+      129 |   const pauseBtn = page.getByTestId("service-health-pause");
+      130 |   await expect(pauseBtn).toHaveAttribute("aria-pressed", "false");
+        at G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\ui\tests\visual\health-page.spec.ts:127:75
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results\visual\health-page-pause-auto-refresh-toggles-aria-pressed-visual-chromium\test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results\visual\health-page-pause-auto-refresh-toggles-aria-pressed-visual-chromium\error-context.md
+
+  16 failed
+    [visual-chromium] › tests\visual\dashboard.visual.spec.ts:44:3 › Dashboard @ 1920×1080 › renders all panels and matches visual baseline 
+    [visual-chromium] › tests\visual\dock.spec.ts:61:3 › Panel dock state machine @ 1920×1080 › every tab panel exposes required Phase 2 chrome 
+    [visual-chromium] › tests\visual\dock.spec.ts:101:3 › Panel dock state machine @ 1920×1080 › fullscreen overlay renders fixed-position CSS (no native window) 
+    [visual-chromium] › tests\visual\dock.spec.ts:149:3 › Panel dock state machine @ 1920×1080 › no external window or network calls during dock interactions 
+    [visual-chromium] › tests\visual\dock.spec.ts:203:3 › Panel dock state machine @ 1920×1080 › source has no external window/process launch path 
+    [visual-chromium] › tests\visual\fleet.live.spec.ts:81:1 › live mode reads local bridge and marks four fixture printers as live 
+    [visual-chromium] › tests\visual\gen3d.plan_preview.spec.ts:28:1 › live mode previews a planner DAG without execution affordances 
+    [visual-chromium] › tests\visual\gen3d.planner_mode.spec.ts:28:1 › live mode shows via-LLM badge when bridge response sets planner_mode=llm 
+    [visual-chromium] › tests\visual\gen3d.planner_mode.spec.ts:78:1 › live mode shows template badge when bridge response sets planner_mode=template 
+    [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:3:1 › live mode shows green and amber dots when bridge response provides them 
+    [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:61:1 › live mode shows red dot when probe failed 
+    [visual-chromium] › tests\visual\gen3d.provider_health.spec.ts:109:1 › live mode shows idle dots when no probes have been run 
+    [visual-chromium] › tests\visual\health-page.spec.ts:18:1 › mock-mode renders a Service Health tab with cards 
+    [visual-chromium] › tests\visual\health-page.spec.ts:33:1 › live-mode fetches /api/health/services and renders the response 
+    [visual-chromium] › tests\visual\health-page.spec.ts:90:1 › re-probe now button triggers another fetch 
+    [visual-chromium] › tests\visual\health-page.spec.ts:125:1 › pause auto-refresh toggles aria-pressed 
+  20 skipped
+  25 passed (4.9m)
+[visual-proof] total=31 match=11 skipped-future=20
+[visual-proof] gate-fails: console=0 network=0 no-fake=0
+[visual-proof] summary written to G:\Github\Hermes3D\.claude\worktrees\w18-a15\03_implementation\docs\evidence\visual_proof_2026-05-09\summary.json

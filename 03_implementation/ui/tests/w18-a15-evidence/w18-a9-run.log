@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ok 1 [chromium-w18-a9] › tests\e2e\w18-a9-slicer-real-artifact.spec.ts:186:3 › W18-A9 modeler -> slicer real-artifact proof › Audit: GUI surface -> slicer -> real G-code on disk + no printer-control (32.1s)
+
+  1 passed (33.2s)
