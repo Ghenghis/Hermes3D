@@ -165,6 +165,18 @@ export function AgentChatMirror() {
     setSending(true);
     setDraft("");
     const sentAttachments = attachments;
+    // Optimistic update: user message always appears immediately, regardless of backend outcome.
+    const localUserMessage: AgentMessage = {
+      id: `local-${Date.now()}`,
+      persona_id: agentId,
+      role: "user",
+      message_type: "TEXT",
+      content: formatUserMessage(message, sentAttachments),
+      action_id: null,
+      created_at: new Date().toISOString(),
+    };
+    setHistory((current) => [...current, localUserMessage]);
+    setAttachments([]);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 10000);
     try {
@@ -193,17 +205,6 @@ export function AgentChatMirror() {
         setStatus(`Agent chat blocked: ${errReason}`);
         return;
       }
-      const localUserMessage: AgentMessage = {
-        id: `local-${Date.now()}`,
-        persona_id: agentId,
-        role: "user",
-        message_type: "TEXT",
-        content: formatUserMessage(message, sentAttachments),
-        action_id: null,
-        created_at: new Date().toISOString(),
-      };
-      setHistory((current) => [...current, localUserMessage]);
-      setAttachments([]);
       const reply = await readFirstAgentReply(response.body, controller);
       if (reply) {
         setHistory((current) => [...current, reply]);
