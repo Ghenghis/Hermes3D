@@ -4027,6 +4027,177 @@ def provider_assist(body: dict) -> dict:
     }
 
 
+_MODEL_ASSIST_EXTRACT_SYSTEM = """\
+You are a 3D design parameter extractor for the Hermes Proof-Gated Agentic Workbench.
+The user describes a 3D object they want to model. Extract design parameters as JSON.
+
+Output ONLY valid JSON with this exact schema — no markdown, no explanation:
+{
+  "title": "short object name (≤60 chars)",
+  "intent": "one sentence design goal (≤200 chars)",
+  "constraints": {"key": value}
+}
+
+Supported constraint keys (omit if unspecified):
+  size_mm (number), compartments (integer), wall_thickness_mm (number),
+  depth_mm (number), width_mm (number), height_mm (number)
+"""
+
+_MODEL_ASSIST_REVIEW_SYSTEM = """\
+You are DeepSeek, the reviewer agent for the Hermes Proof-Gated Agentic Workbench.
+Review 3D design parameters extracted by MiniMax (the builder agent).
+Respond ONLY with valid JSON — no markdown, no explanation:
+{"approved": true|false, "reason": "one sentence"}
+Approve if parameters are safe, reasonable, and implementable with parametric CAD.
+Reject if constraints are physically impossible (e.g. size_mm < 5 or > 500).
+"""
+
+
+@router.post("/api/agents/providers/model-assist")
+def model_assist(body: dict | None = None) -> dict:
+    """MiniMax (builder) extracts design parameters; DeepSeek (reviewer) approves them.
+
+    Body:
+      {
+        "prompt": "design a 5-compartment desk organizer",
+        "auto_submit": false,   # if true, also POST to /api/design/intake
+        "skip_review": false    # if true, skip DeepSeek review step
+      }
+
+    Returns:
+      {
+        "extracted": {"title", "intent", "constraints"},
+        "minimax": {provider result},
+        "deepseek_review": {"approved", "reason"} | null,
+        "intake_result": {...} | null,
+        "proof_event_id": "..."
+      }
+    """
+    b = body if isinstance(body, dict) else {}
+    prompt = str(b.get("prompt", "")).strip()
+    if not prompt:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "bad_request", "reason": "prompt is required"},
+        )
+    auto_submit = bool(b.get("auto_submit", False))
+    skip_review = bool(b.get("skip_review", False))
+
+    # Step 1: MiniMax extracts structured design parameters
+    extraction_prompt = f"{_MODEL_ASSIST_EXTRACT_SYSTEM}\n\nUser: {prompt}"
+    mm_result = _provider_call("minimax", prompt=extraction_prompt, max_tokens=300, timeout=45.0)
+    mm_completion = mm_result.pop("completion_text", None) or ""
+
+    extracted: dict[str, Any] = {}
+    parse_error: str | None = None
+    raw_json = mm_completion.strip()
+    # Strip markdown fences if present
+    if raw_json.startswith("```"):
+        raw_json = "\n".join(
+            line for line in raw_json.splitlines()
+            if not line.strip().startswith("```")
+        ).strip()
+    try:
+        parsed = json.loads(raw_json)
+        if isinstance(parsed, dict):
+            extracted = {
+                "title": str(parsed.get("title", prompt[:60])),
+                "intent": str(parsed.get("intent", prompt)),
+                "constraints": parsed.get("constraints") if isinstance(parsed.get("constraints"), dict) else {},
+            }
+        else:
+            parse_error = "MiniMax response was not a JSON object"
+    except (json.JSONDecodeError, TypeError) as exc:
+        parse_error = f"JSON parse failed: {exc}"
+        extracted = {"title": prompt[:60], "intent": prompt, "constraints": {}}
+
+    # Persist MiniMax exchange
+    mm_user_id = new_id()
+    mm_reply_id = new_id()
+    execute(
+        "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'user', ?, ?)",
+        (mm_user_id, "modeling-agent", "MODEL_ASSIST_REQ:minimax", prompt),
+    )
+    execute(
+        "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'assistant', ?, ?)",
+        (mm_reply_id, "modeling-agent", "MODEL_ASSIST_REPLY:minimax", mm_completion or ""),
+    )
+
+    # Step 2: DeepSeek reviews extracted parameters
+    ds_result: dict[str, Any] | None = None
+    ds_review: dict[str, Any] | None = None
+    if not skip_review and mm_result.get("status") == "PASS_LIVE":
+        review_prompt = (
+            f"{_MODEL_ASSIST_REVIEW_SYSTEM}\n\nParameters to review:\n{json.dumps(extracted)}"
+        )
+        ds_result_raw = _provider_call("deepseek", prompt=review_prompt, max_tokens=100, timeout=30.0)
+        ds_completion = ds_result_raw.pop("completion_text", None) or ""
+        ds_result = ds_result_raw
+        raw_ds = ds_completion.strip()
+        if raw_ds.startswith("```"):
+            raw_ds = "\n".join(
+                line for line in raw_ds.splitlines()
+                if not line.strip().startswith("```")
+            ).strip()
+        try:
+            rev = json.loads(raw_ds)
+            if isinstance(rev, dict):
+                ds_review = {
+                    "approved": bool(rev.get("approved", True)),
+                    "reason": str(rev.get("reason", "")),
+                }
+        except (json.JSONDecodeError, TypeError):
+            ds_review = {"approved": True, "reason": "DeepSeek response could not be parsed"}
+        # Persist DeepSeek exchange
+        ds_user_id = new_id()
+        ds_reply_id = new_id()
+        execute(
+            "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'user', ?, ?)",
+            (ds_user_id, "oliver-qa-agent", "MODEL_ASSIST_REVIEW_REQ:deepseek", json.dumps(extracted)),
+        )
+        execute(
+            "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'assistant', ?, ?)",
+            (ds_reply_id, "oliver-qa-agent", "MODEL_ASSIST_REVIEW_REPLY:deepseek", ds_completion or ""),
+        )
+
+    # Step 3: Optional auto-submit to design.intake
+    intake_result: dict[str, Any] | None = None
+    if auto_submit and extracted.get("title"):
+        approved = (ds_review or {}).get("approved", True) if ds_review else True
+        if approved:
+            from hermes3d.api.routes import design as design_route
+
+            intake_result = design_route.submit_intake(
+                design_route.DesignIntake(
+                    prompt=f"{extracted['title']}: {extracted['intent']}",
+                    constraints=extracted.get("constraints") or {},
+                )
+            )
+
+    proof_event_id = _append_provider_proof_event(
+        "model_assist",
+        "minimax",
+        {
+            **mm_result,
+            "prompt_head": prompt[:200],
+            "extracted": extracted,
+            "parse_error": parse_error,
+            "deepseek_approved": (ds_review or {}).get("approved"),
+            "auto_submitted": auto_submit and intake_result is not None,
+        },
+    )
+
+    return {
+        "status": "ready" if extracted.get("title") else "degraded",
+        "extracted": extracted,
+        "parse_error": parse_error,
+        "minimax": mm_result,
+        "deepseek_review": ds_review,
+        "intake_result": intake_result,
+        "proof_event_id": proof_event_id,
+    }
+
+
 def _append_provider_proof_event(
     event_type: str,
     provider_id: str,
