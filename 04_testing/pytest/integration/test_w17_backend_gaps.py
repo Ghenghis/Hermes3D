@@ -80,15 +80,20 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> TestClient:
 # ---------------------------------------------------------------------------
 
 
-def test_files_route_is_registered_and_returns_honest_blocked(client: TestClient) -> None:
+def test_files_route_is_registered_and_returns_ready(client: TestClient) -> None:
+    """W19: /api/files now scans var/ and returns a real response.
+
+    In CI the var/ directory does not exist, so items and total are both 0
+    but accepted is True and status is "ready" (the scanner ran successfully).
+    """
     resp = client.get("/api/files")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["accepted"] is False
-    assert body["status"] == "unknown"
-    assert body["reason"] == "file_store_not_yet_configured"
-    assert body["items"] == []
-    assert body["total"] == 0
+    assert body["accepted"] is True
+    assert body["status"] == "ready"
+    assert isinstance(body["items"], list)
+    assert isinstance(body["total"], int)
+    assert body["total"] == len(body["items"])
 
 
 def test_files_route_response_shape_matches_w15_a20_envelope(client: TestClient) -> None:
@@ -100,19 +105,25 @@ def test_files_route_response_shape_matches_w15_a20_envelope(client: TestClient)
 
 
 def test_files_route_does_not_fabricate_files(client: TestClient) -> None:
-    """Tight contract: no file rows. UI must not render fake names."""
+    """In CI var/ does not exist so the scanner returns zero rows.
+
+    The scanner must never invent file records; every item must be a real
+    file on disk.  In environments where var/ exists the count may be > 0,
+    but it must always equal total.
+    """
     body = client.get("/api/files").json()
-    assert body["items"] == []
-    assert body["total"] == 0
+    # total must match the item list length — no phantom count inflation.
+    assert body["total"] == len(body["items"])
 
 
-def test_files_get_by_id_returns_honest_envelope(client: TestClient) -> None:
-    resp = client.get("/api/files/some-arbitrary-id")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["accepted"] is False
-    assert body["reason"] == "file_store_not_yet_configured"
-    assert body["items"] == []
+def test_files_get_by_id_returns_404_for_unknown_id(client: TestClient) -> None:
+    """W19: unknown file IDs now return 404 (real scanner found no match).
+
+    The old stub returned 200+accepted=False for any ID; the real scanner
+    returns 404 when the SHA-1 ID does not match any file in var/.
+    """
+    resp = client.get("/api/files/some-arbitrary-id-that-does-not-exist")
+    assert resp.status_code == 404
 
 
 def test_files_get_by_id_rejects_empty_path_param(client: TestClient) -> None:
@@ -127,7 +138,7 @@ def test_files_post_is_501_not_implemented(client: TestClient) -> None:
     assert resp.status_code == 501, resp.text
     detail = resp.json()["detail"]
     assert detail["accepted"] is False
-    assert detail["reason"] == "file_store_not_yet_configured"
+    assert detail["reason"] == "write_not_implemented"
     assert detail["echo"]["name"] == "test.gcode"
     assert detail["echo"]["kind"] == "slice"
 

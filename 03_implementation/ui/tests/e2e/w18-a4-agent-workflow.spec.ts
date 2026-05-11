@@ -246,18 +246,13 @@ test.describe("W18-A4 Hermes Agent workflow proof", () => {
       .textContent()) ?? personaValue;
     expect(personaValue, "persona id must be non-empty").not.toBe("");
 
-    // Clear any prior history for this persona so the assertions only see
-    // messages produced by THIS test run. Uses the real backend endpoint.
-    const apiCtx = await pwRequest.newContext({ baseURL: LIVE_BRIDGE_URL });
-    try {
-      await apiCtx.delete(`/api/agents/${encodeURIComponent(personaValue)}/history`, {
-        timeout: 10_000,
-      }).catch(() => undefined);
-    } finally {
-      await apiCtx.dispose();
-    }
-    // Re-fetch history in the UI by re-selecting the persona.
-    await personaSelect.selectOption(personaValue);
+    // Do NOT delete history or re-select the persona here.
+    // The delete+selectOption pattern caused a race: the async loadHistory()
+    // triggered by the re-selection would overwrite the React history state
+    // AFTER the optimistic user-message update, wiping the chat before the
+    // STATUS_UPDATE reply could render.  In a fresh CI session history is
+    // always empty; on a dev machine any pre-existing STATUS_UPDATE rows are
+    // fine because the toPass block checks for the text marker, not count.
 
     // ---- Capture the proof_events count BEFORE the send so we can detect a
     // new hermes_agent_chat_runtime_request row in branch (a), or its
