@@ -1,0 +1,95 @@
+[
+  {
+    "name": "trimesh",
+    "kind": "python_library",
+    "version": "4.12.1",
+    "path": "C:\\Python314\\Lib\\site-packages\\trimesh\\__init__.py",
+    "available": true,
+    "gpu_capable": false,
+    "gpu_code_path_doc": null,
+    "capabilities": [
+      "mesh_validation",
+      "stl_import_export",
+      "watertight_check",
+      "boolean_via_manifold3d"
+    ],
+    "detail": "trimesh proper has no GPU code path; boolean ops are routed to manifold3d when the engine is selected explicitly."
+  },
+  {
+    "name": "manifold3d",
+    "kind": "python_library",
+    "version": "3.4.1",
+    "path": "C:\\Python314\\Lib\\site-packages\\manifold3d.cp314-win_amd64.pyd",
+    "available": true,
+    "gpu_capable": false,
+    "gpu_code_path_doc": null,
+    "capabilities": [
+      "boolean_csg",
+      "manifold_mesh",
+      "robust_union_difference"
+    ],
+    "detail": "manifold3d runs on CPU. There is no published CUDA build of the Python wheel as of this writing; mark gpu_capable=False."
+  },
+  {
+    "name": "openscad",
+    "kind": "cli_executable",
+    "version": null,
+    "path": null,
+    "available": false,
+    "gpu_capable": false,
+    "gpu_code_path_doc": null,
+    "capabilities": [
+      "solid_csg",
+      "parametric_scad",
+      "stl_export"
+    ],
+    "detail": "OpenSCAD runs single-threaded CPU CSG; no GPU code path."
+  },
+  {
+    "name": "blender",
+    "kind": "cli_executable",
+    "version": null,
+    "path": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+    "available": true,
+    "gpu_capable": true,
+    "gpu_code_path_doc": "Cycles render engine supports cycles_device=CUDA/OPTIX; exercised in W18-A20 by rendering a CUDA-backed thumbnail.",
+    "capabilities": [
+      "mesh_modeling",
+      "stl_export",
+      "python_scripting",
+      "cycles_render",
+      "cycles_cuda"
+    ],
+    "detail": "Blender 5.x ships Cycles with a CUDA backend on Windows."
+  },
+  {
+    "name": "cadquery",
+    "kind": "python_library",
+    "version": null,
+    "path": null,
+    "available": false,
+    "gpu_capable": false,
+    "gpu_code_path_doc": null,
+    "capabilities": [
+      "parametric_cad",
+      "brep_modeling",
+      "step_export"
+    ],
+    "detail": "CadQuery uses OpenCascade BRep; CPU only."
+  },
+  {
+    "name": "freecad",
+    "kind": "cli_executable",
+    "version": null,
+    "path": null,
+    "available": false,
+    "gpu_capable": false,
+    "gpu_code_path_doc": null,
+    "capabilities": [
+      "parametric_cad",
+      "step_export",
+      "stl_export"
+    ],
+    "detail": "FreeCAD core is CPU; viewport uses GPU but modeling does not."
+  }
+]

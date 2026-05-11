@@ -1,0 +1,119 @@
+{
+  "id": "d550d4dc4087420a926d727d1c56b4df",
+  "job_id": "d550d4dc4087420a926d727d1c56b4df",
+  "status": "completed",
+  "accepted": true,
+  "created": true,
+  "template": "desk_organizer",
+  "artifact": {
+    "id": "1dd55c1e806b48ac8f80e1b5c183fda6",
+    "label": "desk_organizer_4ee082d000.stl",
+    "file_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\desk_organizer_4ee082d000.stl",
+    "file_size": 31284,
+    "sha256": "ab77d326a32c1ba315f839a41bbcfed320591d662375fad5b0e0b94d1521df79"
+  },
+  "proof": {
+    "id": "4a820c5e0e0e4a18a7231494aae0d9f1",
+    "label": "desk_organizer_4ee082d000.proof.json",
+    "file_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\desk_organizer_4ee082d000.proof.json",
+    "file_size": 7504,
+    "sha256": "13df4d1f2960790bddffbffbfc2f3dcf2bf0d9c6788772d6b3b320dac6c531b2",
+    "event_id": "0558ca8288b048cf91dfc78f374ff000"
+  },
+  "truth_gate": {
+    "status": "pass",
+    "duration_s": 0.1288
+  },
+  "parameters": {
+    "width_mm": 180,
+    "depth_mm": 100,
+    "height_mm": 55,
+    "wall_mm": 2,
+    "floor_mm": 2,
+    "tray_count": 3,
+    "tray_depth_fraction": 0.55,
+    "pen_count": 4,
+    "pen_diameter_mm": 12,
+    "pen_depth_mm": 40,
+    "phone_slot": true,
+    "phone_slot_width_mm": 12,
+    "phone_slot_length_mm": 80,
+    "phone_slot_height_mm": 35,
+    "phone_slot_angle_deg": 8,
+    "cable_passthrough": true,
+    "cable_notch_width_mm": 14,
+    "cable_notch_height_mm": 8,
+    "chamfer_mm": 0.6
+  },
+  "modeling_backend": {
+    "name": "trimesh",
+    "kind": "python_library",
+    "version": "4.12.1",
+    "path": "C:\\Python314\\Lib\\site-packages\\trimesh\\__init__.py",
+    "available": true,
+    "gpu_capable": false,
+    "capabilities": [
+      "csg_boolean_difference",
+      "csg_boolean_union",
+      "stl_export",
+      "watertight_check",
+      "winding_consistent",
+      "manifold3d_engine"
+    ],
+    "detail": "desk_organizer: trimesh 4.12.1 routed to manifold3d 3.4.1 for boolean CSG. CPU pipeline.",
+    "engine": {
+      "name": "manifold3d",
+      "version": "3.4.1",
+      "path": "C:\\Python314\\Lib\\site-packages\\manifold3d.cp314-win_amd64.pyd",
+      "available": true
+    },
+    "gpu_operation": {
+      "used": true,
+      "backend": "blender_cycles",
+      "device": "CUDA",
+      "blender_path": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "render_seconds": 1.6182,
+      "wall_seconds_total": 2.731769300007727,
+      "samples": 16,
+      "resolution": [
+        640,
+        480
+      ],
+      "output_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\thumbnail_gpu.png",
+      "output_size_bytes": 120676,
+      "vram_used_mib_pre": 15821,
+      "vram_used_mib_peak": 15821,
+      "utilization_pct_peak": 12,
+      "cycles_devices_line": "W18A20-CYCLES-DEVICES: [('NVIDIA GeForce RTX 3090 Ti', 'CUDA')]",
+      "attempted_at": "2026-05-11T14:20:32Z"
+    }
+  },
+  "gpu_used": true,
+  "gpu": {
+    "vendor": "NVIDIA",
+    "model": "NVIDIA GeForce RTX 3090 Ti",
+    "driver": "591.86",
+    "cuda": "13.1",
+    "vram_total_mib": 24564,
+    "operation": {
+      "used": true,
+      "backend": "blender_cycles",
+      "device": "CUDA",
+      "blender_path": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "render_seconds": 1.6182,
+      "wall_seconds_total": 2.731769300007727,
+      "samples": 16,
+      "resolution": [
+        640,
+        480
+      ],
+      "output_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\thumbnail_gpu.png",
+      "output_size_bytes": 120676,
+      "vram_used_mib_pre": 15821,
+      "vram_used_mib_peak": 15821,
+      "utilization_pct_peak": 12,
+      "cycles_devices_line": "W18A20-CYCLES-DEVICES: [('NVIDIA GeForce RTX 3090 Ti', 'CUDA')]",
+      "attempted_at": "2026-05-11T14:20:32Z"
+    }
+  }
+}

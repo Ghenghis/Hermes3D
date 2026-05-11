@@ -11,7 +11,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from hermes3d.api.routes._common import as_json, execute, new_id, rows, utc_now
+from hermes3d.services.gpu_probe import probe_gpu
+from hermes3d.services.gpu_render import render_stl_thumbnail_gpu
 from hermes3d.services.local_state import implementation_path, source_modules
+from hermes3d.services.modeling_backend import backend_summary_for_proof, survey_backends
 
 router = APIRouter()
 
@@ -175,6 +178,25 @@ def list_providers() -> list[dict]:
 @router.get("/api/design/toolchain/status")
 def toolchain_status() -> dict:
     return _toolchain_status()
+
+
+@router.get("/api/design/backends")
+def list_backends() -> dict[str, Any]:
+    """Return the live modeling-backend survey + GPU probe.
+
+    Real probes only — every entry comes from importlib / shutil.which /
+    nvidia-smi. No cached stubs and no fabricated values. Used by the UI
+    Design tab to show which backend will produce the next artifact and
+    whether the local GPU is reachable.
+    """
+    survey = [backend.to_dict() for backend in survey_backends()]
+    gpu = probe_gpu()
+    return {
+        "backends": survey,
+        "default_template_backend": backend_summary_for_proof("desk_organizer"),
+        "gpu": gpu,
+        "probed_at": utc_now(),
+    }
 
 
 def _toolchain_status() -> dict:
@@ -373,12 +395,55 @@ def _execute_supported_design(
     mesh.export(mesh_path, file_type="stl")
     if not mesh_path.exists() or mesh_path.stat().st_size <= 0:
         raise RuntimeError(f"Mesh export produced no bytes at {mesh_path}")
+
+    # W18-A20: record which modeling backend produced the artifact + try the
+    # GPU code path (Blender Cycles CUDA thumbnail render). Honest fallback:
+    # if anything fails, ``gpu_used`` stays False with the reason recorded.
+    modeling_backend_payload: dict[str, Any] = backend_summary_for_proof(template_id)
+    gpu_probe_payload: dict[str, Any] = probe_gpu()
+    gpu_op_payload: dict[str, Any] = {"used": False, "reason": "Not attempted."}
+    visual_evidence: list[tuple[str, Any]] = []
+    thumbnail_path = output_dir / "thumbnail_gpu.png"
+    if gpu_probe_payload.get("available"):
+        gpu_op_payload = render_stl_thumbnail_gpu(
+            stl_path=mesh_path,
+            out_path=thumbnail_path,
+            samples=16,
+        )
+        if gpu_op_payload.get("used") and thumbnail_path.is_file():
+            visual_evidence.append(("thumbnail_gpu", thumbnail_path))
+    else:
+        gpu_op_payload = {
+            "used": False,
+            "reason": (
+                "GPU probe reported unavailable: "
+                + str(gpu_probe_payload.get("reason", "no reason recorded"))
+            ),
+        }
+
+    modeling_backend_payload["gpu_operation"] = gpu_op_payload
+
+    gpu_field: dict[str, Any] | None = None
+    if gpu_probe_payload.get("available"):
+        gpu_field = {
+            "vendor": gpu_probe_payload.get("vendor"),
+            "model": gpu_probe_payload.get("model"),
+            "driver": gpu_probe_payload.get("driver"),
+            "cuda": gpu_probe_payload.get("cuda"),
+            "vram_total_mib": gpu_probe_payload.get("vram_total_mib"),
+            "operation": gpu_op_payload,
+        }
+
     written_proof = write_proof(
         mesh_path=mesh_path,
         output_path=proof_path,
         generator_name="hermes3d.parametric.desk_organizer",
         generator_version="1.0.0",
         generator_signature=signature,
+        visual_evidence_paths=visual_evidence if visual_evidence else None,
+        modeling_backend=modeling_backend_payload,
+        gpu_used=bool(gpu_op_payload.get("used")),
+        gpu=gpu_field,
     )
     proof = json.loads(written_proof.read_text(encoding="utf-8"))
     truth_report = proof.get("truth_gate_report") if isinstance(proof, dict) else {}
@@ -463,6 +528,14 @@ def _execute_supported_design(
             "proof_sha256": proof_sha,
             "truth_gate_status": truth_status,
             "prompt_head": prompt[:300],
+            # W18-A20: backend identity in the durable proof event too.
+            "modeling_backend": {
+                "name": modeling_backend_payload.get("name"),
+                "engine": (modeling_backend_payload.get("engine") or {}).get("name"),
+                "version": modeling_backend_payload.get("version"),
+            },
+            "gpu_used": bool(gpu_op_payload.get("used")),
+            "gpu_model": (gpu_field or {}).get("model"),
         },
     )
     execute(
@@ -490,6 +563,11 @@ def _execute_supported_design(
         },
         "truth_gate": {"status": truth_status, "duration_s": _truth_duration(truth_report)},
         "parameters": dict(spec.__dict__),
+        # W18-A20: surface backend identity + GPU usage so the UI Design tab
+        # can render the proof badge directly from the intake response.
+        "modeling_backend": modeling_backend_payload,
+        "gpu_used": bool(gpu_op_payload.get("used")),
+        "gpu": gpu_field,
     }
 
 
