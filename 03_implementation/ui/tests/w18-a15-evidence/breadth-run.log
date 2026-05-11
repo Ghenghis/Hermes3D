@@ -1,0 +1,8 @@
+
+Running 3 tests using 1 worker
+
+  ok 1 [chromium-breadth] › tests\e2e\gui-breadth-pages.spec.ts:158:1 › Settings page exposes General and MCP subtabs (992ms)
+  ok 2 [chromium-breadth] › tests\e2e\gui-breadth-pages.spec.ts:184:1 › Approvals shows pending items with file scope and three actions (994ms)
+  ok 3 [chromium-breadth] › tests\e2e\gui-breadth-pages.spec.ts:212:1 › Apps registry navigates to per-app detail at #apps/<id> (922ms)
+
+  3 passed (11.5s)
