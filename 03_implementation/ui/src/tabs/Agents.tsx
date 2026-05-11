@@ -9,6 +9,7 @@ import { Panel } from "../components/layout/Panel";
 import { StatusBadge, type StatusTone } from "../components/badges/StatusBadge";
 import { AgentCommandCenter } from "../components/agents/AgentCommandCenter";
 import { HermesAgentBanner } from "../components/agents/HermesAgentBanner";
+import { TeamTasksPanel } from "../components/agents/TeamTasksPanel";
 import { NotificationCenter } from "../components/notifications/NotificationCenter";
 import { adapters } from "../api/adapters";
 import { useAgentUpdateStatus } from "../hooks/useAgents";
@@ -244,6 +245,9 @@ export function AgentsTab() {
       </div>
       <div className="col-span-12">
         <AgentCommandCenter agents={agents} />
+      </div>
+      <div className="col-span-12">
+        <TeamTasksPanel />
       </div>
       <div className="col-span-12">
         <Panel

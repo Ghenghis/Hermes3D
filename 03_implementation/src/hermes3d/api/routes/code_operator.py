@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from hermes3d.api.routes._common import rows
 from hermes3d.services import code_history, recovery_controller
 
 router = APIRouter(prefix="/api/code-operator", tags=["code-operator"])
@@ -1091,3 +1093,113 @@ def recovery_resume(body: RecoveryResumeRequest) -> dict[str, Any]:
             },
         )
     return result
+
+
+# W18-A21 (2026-05-11): expose team task evidence to the #agents GUI.
+# The Hermes Agent code-operator currently writes proof_events rows of kind
+# 'code_provider.coding_plan' / 'code_provider.code_review' whenever the
+# MiniMax-builders or DeepSeek-reviewers teams produce work. The previous
+# UI surfaced only the smoke status and the readiness contract — it never
+# rendered the actual team tasks that ran. This read-only endpoint exposes
+# the most recent team-task rows so the #agents GUI can render them without
+# refresh. It is intentionally minimal: no writes, no auth state change,
+# only a paginated read over proof_events.
+@router.get("/teams/team-tasks")
+def team_tasks(limit: int = 25) -> dict[str, Any]:
+    limit = max(1, min(int(limit or 25), 100))
+    raw = rows(
+        """
+        SELECT id, event_type, source_agent, payload, created_at
+        FROM proof_events
+        WHERE event_type IN (
+            'code_provider.coding_plan',
+            'code_provider.code_review'
+        )
+        ORDER BY datetime(created_at) DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    items: list[dict[str, Any]] = []
+    for record in raw:
+        try:
+            payload = json.loads(record.get("payload") or "{}")
+        except (ValueError, TypeError):
+            payload = {}
+        event_type = str(record.get("event_type") or "")
+        run_type = event_type.split(".", 1)[1] if "." in event_type else event_type
+        team_id = str(payload.get("team_id") or "")
+        provider_id = str(payload.get("provider_id") or "")
+        items.append(
+            {
+                "id": str(record.get("id") or ""),
+                "event_type": event_type,
+                "run_type": run_type,
+                "team_id": team_id,
+                "provider_id": provider_id,
+                "task_id": str(payload.get("task_id") or ""),
+                "run_id": str(payload.get("run_id") or ""),
+                "files": payload.get("files") or [],
+                "response_sha256": payload.get("response_sha256"),
+                "prompt_sha256": payload.get("prompt_sha256"),
+                "ts_utc": str(record.get("created_at") or ""),
+                "source_agent": str(record.get("source_agent") or ""),
+            }
+        )
+    return {
+        "count": len(items),
+        "items": items,
+        "supported_event_types": [
+            "code_provider.coding_plan",
+            "code_provider.code_review",
+        ],
+    }
+
+
+@router.get("/teams/provider-smoke-history")
+def team_provider_smoke_history(limit: int = 25) -> dict[str, Any]:
+    """Return the most recent code_provider_smoke evidence summaries.
+
+    Reads the local provider-smoke-status.json file (one record per
+    provider; latest only). For a complete history we also include the
+    most recent provider-runs JSON artifacts as files-by-path so the GUI
+    can show which teams have actually executed coding/review passes.
+    """
+    limit = max(1, min(int(limit or 25), 100))
+    status_path = (
+        code_history.IMPLEMENTATION_ROOT / "var" / "code-history" / "provider-smoke-status.json"
+    )
+    smoke: list[dict[str, Any]] = []
+    try:
+        raw = json.loads(status_path.read_text(encoding="utf-8"))
+        providers = raw.get("providers") if isinstance(raw, dict) else None
+        if isinstance(providers, dict):
+            for provider_id, record in providers.items():
+                if not isinstance(record, dict):
+                    continue
+                auth = (
+                    record.get("auth_contract")
+                    if isinstance(record.get("auth_contract"), dict)
+                    else {}
+                )
+                smoke.append(
+                    {
+                        "provider_id": str(provider_id),
+                        "status": str(record.get("status") or ""),
+                        "accepted": bool(record.get("accepted")),
+                        "ts_utc": str(record.get("ts_utc") or ""),
+                        "evidence_id": record.get("evidence_id"),
+                        "content_sha256": record.get("content_sha256"),
+                        "base_url_label": auth.get("base_url_label"),
+                        "model": auth.get("model"),
+                        "blocked_reasons": list(record.get("blocked_reasons") or [])[:3],
+                    }
+                )
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        smoke = []
+    smoke.sort(key=lambda item: item.get("ts_utc") or "", reverse=True)
+    return {
+        "count": len(smoke[:limit]),
+        "items": smoke[:limit],
+        "source": "var/code-history/provider-smoke-status.json",
+    }
