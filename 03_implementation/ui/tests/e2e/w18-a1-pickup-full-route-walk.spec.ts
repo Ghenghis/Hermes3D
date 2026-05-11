@@ -248,6 +248,25 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   const allApiCalls: NetworkRecord[] = [];
   const allApiFailures: NetworkRecord[] = [];
 
+  // Track in-flight `/api/*` requests so the per-route settle window can wait
+  // for them to drain BEFORE navigating to the next route. Without this, a
+  // slow first-time backend call (e.g. cold `_sync_apps_once()` in CI which
+  // seeds 60 apps from JSON on first `/api/apps` hit) can still be pending
+  // when the spec clicks the next sidebar tab. The component's `useEffect`
+  // cleanup then aborts the fetch via its AbortController, producing a
+  // `net::ERR_ABORTED` that this spec attributes to the route that started
+  // the call. This is a spec-side timing race, not a backend regression —
+  // local repro: `/api/apps` returns 60 apps in 200 OK, the same backend in
+  // CI returns 60 apps in 200 OK, only the spec's settle window was too
+  // short for cold CI starts.
+  //
+  // Excludes long-lived SSE channels (the EventSource on
+  // `/api/events/stream`) which never "complete" in a request sense — those
+  // remain in the benign-failure allowlist below.
+  const SSE_PATH_FRAGMENTS = ["/api/events/stream"] as const;
+  const inflightApi = new Set<Request>();
+  const isSse = (url: string) => SSE_PATH_FRAGMENTS.some((f) => url.includes(f));
+
   // Raw observers. No filtering applied here — filtering happens at the
   // per-route scoring step so we still record every raw signal in the
   // global audit.
@@ -257,9 +276,16 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   page.on("pageerror", (err) => {
     allPageErrors.push(err.message);
   });
+  page.on("request", (req: Request) => {
+    const url = req.url();
+    if (!/\/api\//.test(url)) return;
+    if (isSse(url)) return;
+    inflightApi.add(req);
+  });
   page.on("response", async (res: Response) => {
     const url = res.url();
     if (!/\/api\//.test(url)) return;
+    if (!isSse(url)) inflightApi.delete(res.request());
     const status = res.status();
     const rec: NetworkRecord = {
       url,
@@ -275,6 +301,7 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   page.on("requestfailed", (req: Request) => {
     const url = req.url();
     if (!/\/api\//.test(url)) return;
+    if (!isSse(url)) inflightApi.delete(req);
     const rec: NetworkRecord = {
       url,
       method: req.method(),
@@ -284,6 +311,24 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
     allApiCalls.push(rec);
     allApiFailures.push(rec);
   });
+  page.on("requestfinished", (req: Request) => {
+    const url = req.url();
+    if (!/\/api\//.test(url)) return;
+    if (!isSse(url)) inflightApi.delete(req);
+  });
+
+  /**
+   * Wait until all in-flight non-SSE `/api/*` requests on this page have
+   * either responded, failed, or been finished. Bounded by `timeoutMs`; on
+   * timeout we proceed anyway (records will surface a failure if the route
+   * actually broke). Uses a 50ms poll — cheap and deterministic.
+   */
+  const waitForApiQuiesce = async (timeoutMs = 8_000): Promise<void> => {
+    const deadline = Date.now() + timeoutMs;
+    while (inflightApi.size > 0 && Date.now() < deadline) {
+      await page.waitForTimeout(50);
+    }
+  };
 
   await page.goto("/", { waitUntil: "domcontentloaded", timeout: 30_000 });
   // First-paint guard — the SPA mounts the dashboard root on load.
@@ -327,9 +372,19 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
     }
 
     // Settle window — give live data fetches a chance to complete so we
-    // catch their 4xx/5xx in this route's slice.
+    // catch their 4xx/5xx in this route's slice. CI fix (2026-05-11,
+    // PR #242 Layer D2): the original 1.5s fixed wait was too short for
+    // cold backend starts on CI runners — the first `/api/apps` call
+    // triggers `_sync_apps_once()` which seeds 60 apps from JSON on first
+    // hit and takes longer than 1.5s on a fresh runner. The next sidebar
+    // click then aborted the in-flight fetch via the component's
+    // AbortController, producing a `net::ERR_ABORTED` mis-attributed to
+    // this route. We now wait for the page to drain non-SSE `/api/*`
+    // requests up to 8s before moving on — bounded so a runaway never
+    // hangs the suite.
     if (rootMounted) {
       await page.waitForTimeout(1_500);
+      await waitForApiQuiesce(8_000);
     }
 
     // Per-route screenshot for the evidence pack.

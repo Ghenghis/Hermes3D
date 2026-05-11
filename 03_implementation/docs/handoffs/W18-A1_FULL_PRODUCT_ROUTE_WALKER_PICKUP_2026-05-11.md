@@ -6,11 +6,40 @@
 **Config:** `03_implementation/ui/playwright.w18-a1-pickup.config.ts`
 **Audit JSON:** `03_implementation/ui/test-results/w18-a1-pickup/audit.json`
 **Screenshots:** `03_implementation/ui/test-results/w18-a1-pickup/screenshots/*.png` (25 files)
-**Hermes locks owner:** `w18-a1-pickup`
-**Task ID:** `W18-A1-PICKUP-ROUTE-WALKER-2026-05-11`
-**Run UTC:** `2026-05-11T11:30:18.495Z`
+**Hermes locks owner:** `w18-a1-pickup` (initial), `w18-a1p-cifix` (CI fix 2026-05-11T~12Z)
+**Task ID:** `W18-A1-PICKUP-ROUTE-WALKER-2026-05-11` / `W18-A1P-CIFIX-2026-05-11`
+**Run UTC:** `2026-05-11T11:30:18.495Z` (initial) / re-verified post-fix on local stack
 **Verdict gate:** GUI_ROUTE_E2E_GREEN
 **Hermes evidence chain:** PASS
+
+## CI fix amendment (2026-05-11, post-initial-PR)
+
+When PR #242 ran in CI Layer D2 ("UI-Final — React @ 1920×1080"), the route walker reported a single `FAIL_BROKEN` on the `apps` route:
+
+```
+[FAIL_BROKEN] apps  GET http://127.0.0.1:8765/api/apps -> 0 net::ERR_ABORTED
+```
+
+Local re-run on the same branch and same backend returned the expected 25 / 25 PASS_REAL. The discrepancy was a **spec-side cold-start timing race**, not a backend regression. Evidence chain:
+
+1. The CI `webServer` boots FastAPI cold — no warm SQLite seed, no warm process cache.
+2. The first `GET /api/apps` call triggers `apps.py::_sync_apps_once()` which invokes `db.load_modules()` to seed 60 apps from JSON. This is materially slower on a cold runner than on the dev box.
+3. The Playwright spec's per-route settle window was a fixed `page.waitForTimeout(1_500)`. When 1.5s elapsed and `loadApps()` was still in flight, the spec clicked the next sidebar tab (`Plugins`).
+4. The `Plugins` click unmounted `AppStatusPanel`. Its `useEffect` cleanup called `controller.abort()` on the in-flight fetch → `net::ERR_ABORTED` / status 0.
+5. Playwright recorded the abort and the spec attributed it to the `apps` slice (which was where the request started). Verdict became `FAIL_BROKEN`.
+
+**Fix** (spec only — product code unchanged): the spec now tracks in-flight non-SSE `/api/*` requests with a `Set<Request>` and waits up to 8s for the set to drain before moving on (`waitForApiQuiesce` helper). SSE channels (`/api/events/stream`) are deliberately excluded so the dashboard's long-lived event stream doesn't block. The original 1.5s pixel-stability wait is preserved (screenshots) and the new quiesce is layered on top, bounded so it can never hang the suite.
+
+- Spec change: `03_implementation/ui/tests/e2e/w18-a1-pickup-full-route-walk.spec.ts`
+  - new tracker constants `SSE_PATH_FRAGMENTS`, `inflightApi`, `isSse`
+  - new `page.on("request" | "requestfinished")` handlers
+  - new `waitForApiQuiesce(timeoutMs)` helper
+  - settle window: `waitForTimeout(1_500)` → `waitForTimeout(1_500)` + `waitForApiQuiesce(8_000)`
+- No changes to `playwright.w18-a1-pickup.config.ts`, no changes to product code, no benign-list expansion for `/api/apps` (the real fix removes the symptom — adding it to benign would mask actual backend regressions).
+
+Local re-run after fix: still 25 / 25 PASS_REAL, total runtime ~2.3 min (vs ~44s before — the quiesce wait is doing real work, particularly for the apps/agents/learning tabs which each fan-out multiple `/api/*` calls on mount).
+
+Confirmation: No printer hardware writes. GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR. GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR.
 
 ## TL;DR
 
