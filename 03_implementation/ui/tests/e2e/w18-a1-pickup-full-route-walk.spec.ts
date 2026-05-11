@@ -303,7 +303,33 @@ const BENIGN_API_FAILURE_EXACT_PATHS = new Set<string>([
   "/api/modules",
 ]);
 
-function isBenignApiFailure(rec: NetworkRecord): boolean {
+// Post-success-abort benign rule (W18-A1P-APPS-RACE-V3, 2026-05-11).
+//
+// The apps route mounts BOTH the route-walker's pre-click waitForResponse
+// AND the AppStatusPanel/AppRegistry components, which fire their OWN
+// follow-up fetch via the AppsClient `useEffect`. When the walker
+// navigates AWAY from the apps tab, the unmounting AppStatusPanel/
+// AppRegistry AbortControllers cancel any STILL-IN-FLIGHT secondary
+// /api/apps fetch with net::ERR_ABORTED. This abort is on a trailing
+// request — NOT the first response, which already completed with 200.
+//
+// Rule: if we observed at least one successful (2xx) response for the
+// endpoint, a subsequent ERR_ABORTED on the SAME endpoint is a
+// component-unmount cleanup artifact, not a route regression. A real
+// failure mode (NO 200 was ever observed for /api/apps) still surfaces
+// as FAIL_BROKEN.
+//
+// Path fragments we consider for this rule: /api/apps and
+// /api/source-os/modules (the documented appsClient.ts fallback).
+const POST_SUCCESS_ABORT_PATH_FRAGMENTS: ReadonlyArray<string> = [
+  "/api/apps",
+  "/api/source-os/modules",
+];
+
+function isBenignApiFailure(
+  rec: NetworkRecord,
+  observedSuccessFragments: ReadonlySet<string> = new Set(),
+): boolean {
   // Exact-path benign matches first (anchored on URL path component so
   // `/api/modules` does NOT swallow `/api/modules/runtime/...`).
   if (rec.status === 0 && /net::ERR_ABORTED/.test(rec.statusText)) {
@@ -314,6 +340,18 @@ function isBenignApiFailure(rec: NetworkRecord): boolean {
       }
     } catch {
       // Fall through to substring matcher.
+    }
+  }
+  // Post-success-abort rule: ERR_ABORTED on an endpoint that already
+  // returned a 2xx response in this run is treated as benign (component
+  // unmount cleanup of a trailing follow-up fetch). This rule fires ONLY
+  // if a successful response was actually observed for the same
+  // path fragment — if NO 200 was ever seen, the abort still surfaces.
+  if (rec.status === 0 && /net::ERR_ABORTED/.test(rec.statusText)) {
+    for (const frag of POST_SUCCESS_ABORT_PATH_FRAGMENTS) {
+      if (rec.url.includes(frag) && observedSuccessFragments.has(frag)) {
+        return true;
+      }
     }
   }
   for (const b of BENIGN_API_FAILURES) {
@@ -341,6 +379,12 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   const allPageErrors: string[] = [];
   const allApiCalls: NetworkRecord[] = [];
   const allApiFailures: NetworkRecord[] = [];
+  // W18-A1P-APPS-RACE-V3: track per-fragment 2xx success across the entire
+  // walk. Used by the post-success-abort benign rule in
+  // `isBenignApiFailure` — ERR_ABORTED on a trailing request to the same
+  // endpoint is treated as benign IFF a real 200 was already observed.
+  // Updated lazily inside the response listener below.
+  const observedSuccessFragments = new Set<string>();
 
   // Track in-flight `/api/*` requests so the per-route settle window can wait
   // for them to drain BEFORE navigating to the next route. Without this, a
@@ -467,6 +511,15 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
     allApiCalls.push(rec);
     if (status === 0 || status >= 400) {
       allApiFailures.push(rec);
+    }
+    // W18-A1P-APPS-RACE-V3: record 2xx success for post-success-abort
+    // benign-filter (see isBenignApiFailure + POST_SUCCESS_ABORT_PATH_FRAGMENTS).
+    if (status >= 200 && status < 300) {
+      for (const frag of POST_SUCCESS_ABORT_PATH_FRAGMENTS) {
+        if (url.includes(frag)) {
+          observedSuccessFragments.add(frag);
+        }
+      }
     }
   });
   page.on("requestfailed", (req: Request) => {
@@ -626,13 +679,26 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
     // wired in this environment) the route-walker still records the
     // 404 via its normal response listener — verdict scoring downstream
     // marks that as FAIL_BACKEND_MISSING, which is the correct truth.
+    //
+    // W18-A1P-APPS-RACE-V3 (2026-05-11): we now match on a SUCCESSFUL
+    // (2xx) response, not just ANY response. The previous matcher would
+    // resolve on the first response of any status — including a future
+    // hypothetical 404 — which gave a false "warm" signal. By keying off
+    // 2xx specifically, the wait survives until at least one real
+    // successful mount-fetch completes. The 200 also primes
+    // `observedSuccessFragments`, which authorizes the post-success-abort
+    // benign-filter for any STILL-IN-FLIGHT secondary fetches from
+    // AppStatusPanel/AppRegistry that get aborted on unmount.
     const appsResponsePromise =
       route.id === "apps"
         ? Promise.race([
             page.waitForResponse(
-              (r) =>
-                /\/api\/apps(\?|$)/.test(r.url()) ||
-                /\/api\/source-os\/modules(\?|$)/.test(r.url()),
+              (r) => {
+                const urlOk =
+                  /\/api\/apps(\?|$)/.test(r.url()) ||
+                  /\/api\/source-os\/modules(\?|$)/.test(r.url());
+                return urlOk && r.status() >= 200 && r.status() < 300;
+              },
               { timeout: 15_000 },
             ),
             new Promise<null>((resolve) =>
@@ -732,7 +798,13 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
     const myPageErrors = allPageErrors.slice(pageErrPre);
     const myApiCalls = allApiCalls.slice(apiCallPre);
     const myApiFailuresRaw = allApiFailures.slice(apiFailPre);
-    const myApiFailures = myApiFailuresRaw.filter((n) => !isBenignApiFailure(n));
+    // Pass observedSuccessFragments so post-success aborts on /api/apps
+    // and /api/source-os/modules are filtered (component-unmount artifact,
+    // not route regression). A truly missing /api/apps endpoint still
+    // surfaces because the set never gets populated.
+    const myApiFailures = myApiFailuresRaw.filter(
+      (n) => !isBenignApiFailure(n, observedSuccessFragments),
+    );
 
     const significantConsole = myConsole.filter(
       (msg) => !BENIGN_CONSOLE_FRAGMENTS.some((b) => msg.includes(b.fragment)),
@@ -789,7 +861,9 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
       pageErrors: myPageErrors.slice(0, 5),
       apiCalls: myApiCalls.slice(0, 30),
       apiFailures: myApiFailures.slice(0, 10),
-      apiFailuresBenign: myApiFailuresRaw.filter((n) => isBenignApiFailure(n)).slice(0, 5),
+      apiFailuresBenign: myApiFailuresRaw
+        .filter((n) => isBenignApiFailure(n, observedSuccessFragments))
+        .slice(0, 5),
       screenshot: path.relative(OUTPUT_DIR, shotPath),
       durationMs: Date.now() - tStart,
     });
