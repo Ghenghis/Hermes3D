@@ -310,12 +310,10 @@ test.describe("W18-A9 modeler -> slicer real-artifact proof", () => {
     });
 
     const toolchainResp = await request.get(`${BACKEND_URL}/api/design/toolchain/status`);
-    let slicerCliReady = false;
     let toolchainStatus: ToolchainStatus | null = null;
     if (toolchainResp.ok()) {
       toolchainStatus = (await toolchainResp.json()) as ToolchainStatus;
       const slicerStage = (toolchainStatus.stages ?? []).find((s) => s.id === "slicer_cli");
-      slicerCliReady = (slicerStage?.status ?? "").toLowerCase() === "ready";
       fs.writeFileSync(
         path.join(ARTIFACT_DIR, "01c-toolchain-status.json"),
         JSON.stringify(
@@ -339,15 +337,56 @@ test.describe("W18-A9 modeler -> slicer real-artifact proof", () => {
         ),
       );
     }
+
+    // The backend's /api/design/toolchain/status reads the committed
+    // LOCAL_TOOLING_AUDIT.json which contains the workstation host paths.
+    // That makes it report `slicer_cli: ready` on CI runners even though no
+    // slicer binary is actually installed. To honestly decide whether to run
+    // the Step-9 control-proof, we probe `find_slicer()` directly via a
+    // Python subprocess on THIS host. This is the exact code path that
+    // slice_mesh() uses, so it cannot lie.
+    const slicerProbe = spawnSync(
+      "python",
+      [
+        "-c",
+        "import sys; sys.path.insert(0, r\"" +
+          path.resolve(REPO_ROOT, "03_implementation/src").replace(/\\/g, "/") +
+          "\"); from hermes3d.core.slicer import find_slicer; b=find_slicer(); print(str(b) if b else \"\"); sys.exit(0 if b else 1)",
+      ],
+      {
+        env: {
+          ...process.env,
+          PYTHONPATH: path.resolve(REPO_ROOT, "03_implementation/src"),
+        },
+        encoding: "utf-8",
+        timeout: 30_000,
+      },
+    );
+    const slicerCliReady = slicerProbe.status === 0 && (slicerProbe.stdout ?? "").trim().length > 0;
+    const slicerBinaryDetected = (slicerProbe.stdout ?? "").trim();
+    fs.writeFileSync(
+      path.join(ARTIFACT_DIR, "01d-find-slicer-probe.json"),
+      JSON.stringify(
+        {
+          rc: slicerProbe.status,
+          slicer_binary_detected: slicerBinaryDetected || null,
+          stderr_head: (slicerProbe.stderr ?? "").slice(0, 500),
+        },
+        null,
+        2,
+      ),
+    );
     auditSteps.push({
       id: "slicer_cli_availability_probe",
       result: slicerCliReady ? "slicer_cli_ready" : "slicer_cli_unavailable",
       detail: {
         toolchain_overall: toolchainStatus?.overall ?? null,
         slicer_cli_stage_present: Boolean((toolchainStatus?.stages ?? []).find((s) => s.id === "slicer_cli")),
+        find_slicer_probe_rc: slicerProbe.status,
+        find_slicer_binary_path: slicerBinaryDetected || null,
         note: slicerCliReady
-          ? "Slicer binary detected by local_tooling_audit; control-proof CLI step will run."
-          : "Slicer not installed in this environment (typical for CI). Control-proof CLI step will be skipped honestly with a recorded audit step; verdict will reflect this.",
+          ? `find_slicer() detected a real binary on this host: ${slicerBinaryDetected}. Control-proof CLI step will run.`
+          : "find_slicer() returned None — no slicer binary on this host (typical for CI). Control-proof CLI step will be honestly skipped with a recorded audit step; verdict reflects this.",
       },
     });
 

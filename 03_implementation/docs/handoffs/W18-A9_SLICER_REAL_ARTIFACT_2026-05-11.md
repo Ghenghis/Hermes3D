@@ -330,3 +330,45 @@ endpoint is touched.
 - PR #238
 - PR #241
 - PR #242
+
+## Follow-up fix #2 (2026-05-11 round 4, branch `claude/w18-a9-cadquery-fix`)
+
+The first env-aware fix (commit `2206afa`) still failed CI because the
+`/api/design/toolchain/status` endpoint reads the committed
+`proof/LOCAL_TOOLING_AUDIT.json`, which contains the WORKSTATION's slicer
+host paths (`C:\Program Files\Prusa3D\PrusaSlicer\prusa-slicer.exe`, etc.).
+On a GitHub Linux runner that file still reports `detected: true, executed:
+true`, so `_local_tool_cards()` classifies them as `status: "ready"` and the
+`slicer_cli` stage reports `ready`. The spec then trusted that stage and
+attempted to spawn `slice_mesh()`, which in turn called `find_slicer()`,
+which (correctly) returned `None` on the runner — leading to
+`SlicerNotFound` and a hard test failure.
+
+### Real-host probe replaces toolchain trust
+
+Step 1c now also runs a direct Python subprocess on the runner:
+
+```python
+from hermes3d.core.slicer import find_slicer
+b = find_slicer()
+print(str(b) if b else "")
+sys.exit(0 if b else 1)
+```
+
+`slicerCliReady` is now derived from THIS probe (rc == 0 AND non-empty
+stdout), not from the toolchain status endpoint. The probe is the exact
+code path that `slice_mesh()` would itself follow, so it cannot lie about
+the host environment. The toolchain/status payload is still recorded for
+audit traceability in `01c-toolchain-status.json`, and the new probe
+result is recorded in `01d-find-slicer-probe.json`.
+
+This makes the spec PASS_REAL on both:
+
+- workstations where PrusaSlicer/OrcaSlicer/FLSUN-slicer is installed
+  (Step 9 control-proof runs end-to-end and produces a real ~3.1 MB
+  G-code on disk), and
+- CI runners where no slicer binary exists (Step 9 honestly skips with a
+  `control_slicer_cli_unavailable` audit step; no `test.skip()`, no mock).
+
+The pinned operator verdicts and the no-printer-write contract remain
+unchanged.
