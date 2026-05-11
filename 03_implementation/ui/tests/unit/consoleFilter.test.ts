@@ -16,6 +16,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   installConsoleFilter,
+  isHermesOfflineMessage,
   uninstallConsoleFilter,
   __testing,
 } from "../../src/api/consoleFilter";
@@ -180,5 +181,111 @@ describe("consoleFilter — predicates", () => {
     expect(
       __testing.isGenericNetworkRefusal("net::ERR_CONNECTION_REFUSED somecdn.com"),
     ).toBe(false);
+  });
+});
+
+/**
+ * W16-B — tests for the harness-side predicate. Chromium emits "Failed to
+ * load resource" with the path ONLY in `msg.location().url`, not in the
+ * message body. The new `isHermesOfflineMessage(text, locationUrl)` API
+ * lets the Playwright sink classify those messages the same way the in-
+ * page wrapper does for code-emitted console.error calls.
+ */
+describe("consoleFilter — isHermesOfflineMessage (W16-B harness layer)", () => {
+  it("returns true when path is in locationUrl and text has 5xx pattern", () => {
+    // This is the exact failure mode the W15-A21 harness observed: Chromium
+    // emits the body without the path, and the path lives in location.url.
+    expect(
+      isHermesOfflineMessage(
+        "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+        "http://127.0.0.1:8765/api/agents/update/status",
+      ),
+    ).toBe(true);
+  });
+
+  it("returns true for every W16-B-added offline path that 502'd in A21", () => {
+    // All 12 paths the W15-A21 harness confirmed were emitting 502 on the
+    // local v0.13 canary stub. Every path must classify as offline so the
+    // strict visual-proof gate does not trip.
+    const paths = [
+      "/api/system/snapshot",
+      "/api/proof/bundles",
+      "/api/notifications",
+      "/api/workflows",
+      "/api/voice/agents",
+      "/api/printers",
+      "/api/logs",
+      "/api/jobs",
+      "/api/events/stream",
+      "/api/dimensional-reports",
+      "/api/agents/print-safety-agent/history",
+    ];
+    for (const path of paths) {
+      expect(
+        isHermesOfflineMessage(
+          "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+          `http://127.0.0.1:8765${path}`,
+        ),
+        `path ${path} must classify as offline-5xx`,
+      ).toBe(true);
+    }
+  });
+
+  it("returns true when path is empty locationUrl and text has path", () => {
+    // Backward compatible: when Chromium does inline the path in the text
+    // (as PR #220's in-page wrapper expected), classification still works.
+    expect(
+      isHermesOfflineMessage(
+        "Failed to load resource: the server responded with a status of 502 (Bad Gateway) http://127.0.0.1:8765/api/agents/update/status",
+        "",
+      ),
+    ).toBe(true);
+  });
+
+  it("returns false for 4xx — a real client error must surface", () => {
+    expect(
+      isHermesOfflineMessage(
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "http://127.0.0.1:8765/api/agents/update/status",
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false for 5xx on an unrelated origin (path guard)", () => {
+    expect(
+      isHermesOfflineMessage(
+        "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+        "https://cdn.example.com/sprite.svg",
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false for 5xx without a path anywhere", () => {
+    // Defensive: when neither the text nor the URL mentions a hermes path,
+    // we cannot prove transience — surface as error.
+    expect(
+      isHermesOfflineMessage(
+        "Failed to load resource: the server responded with a status of 502 (Bad Gateway)",
+        "",
+      ),
+    ).toBe(false);
+  });
+
+  it("returns false for a render error (no offline pattern)", () => {
+    expect(
+      isHermesOfflineMessage(
+        "TypeError: Cannot read properties of undefined (reading 'foo')",
+        "http://127.0.0.1:5173/static/js/main.tsx",
+      ),
+    ).toBe(false);
+  });
+
+  it("returns true for net::ERR_CONNECTION_REFUSED with a bridge-port URL", () => {
+    expect(
+      isHermesOfflineMessage(
+        "GET http://127.0.0.1:8765/api/agents net::ERR_CONNECTION_REFUSED",
+        "http://127.0.0.1:8765/api/agents",
+      ),
+    ).toBe(true);
   });
 });
