@@ -346,7 +346,14 @@ test.describe("W18-A17 Hermes Agents operational + assistive proof", () => {
 
     // Capture proof_events count BEFORE so we can verify in the
     // RUNTIME_STREAM branch that a hermes_agent_chat_runtime_request row
-    // was added, and in the STATUS_UPDATE branch that none was added.
+    // was added. /api/proof/bundles does not expose event_type, so this
+    // count is used only as a coarse signal in the RUNTIME_STREAM branch
+    // where the LLM round-trip dominates. For the STATUS_UPDATE branch
+    // we rely on a kind-specific check (count of RUNTIME_STREAM rows in
+    // this persona's history) which is 1:1 with the proof_events row
+    // hermes_agent_chat_runtime_request — the backend only emits that
+    // proof_event from _runtime_chat_stream, which is the same path that
+    // inserts the RUNTIME_STREAM agent_conversations row.
     let beforeRuntimeProofCount = 0;
     {
       const resp = await apiCtx.get("/api/proof/bundles?limit=500", {
@@ -355,6 +362,31 @@ test.describe("W18-A17 Hermes Agents operational + assistive proof", () => {
       if (resp.ok()) {
         const items = (await resp.json()) as unknown[];
         beforeRuntimeProofCount = Array.isArray(items) ? items.length : 0;
+      }
+    }
+
+    // Kind-specific snapshot: count of RUNTIME_STREAM assistant rows for
+    // THIS persona before chat. In STATUS_UPDATE branch (no LLM runtime),
+    // this count MUST NOT grow. This is resilient to unrelated proof_events
+    // (heartbeats, lock acquisitions, recovery events) growing in CI.
+    let beforeRuntimeStreamRows = 0;
+    {
+      const resp = await apiCtx.get(
+        `/api/agents/${encodeURIComponent(personaValue)}/history`,
+        { timeout: 10_000 },
+      );
+      if (resp.ok()) {
+        const rows = (await resp.json()) as Array<{
+          role: string;
+          message_type: string;
+        }>;
+        beforeRuntimeStreamRows = Array.isArray(rows)
+          ? rows.filter(
+              (row) =>
+                row.role === "assistant" &&
+                row.message_type === "RUNTIME_STREAM",
+            ).length
+          : 0;
       }
     }
 
@@ -541,21 +573,23 @@ test.describe("W18-A17 Hermes Agents operational + assistive proof", () => {
         "STATUS_UPDATE: most recent assistant row must be STATUS_UPDATE (no LLM ran)",
       ).toBe("STATUS_UPDATE");
 
-      // Verify proof_events did NOT grow (no LLM round-trip => no
-      // hermes_agent_chat_runtime_request row). proof_events may grow from
-      // unrelated activity in tightly-coupled CI environments, but in the
-      // sealed lane (single-worker w18-a17 config) this is exact.
-      const afterProof = await apiCtx.get("/api/proof/bundles?limit=500", {
-        timeout: 10_000,
-      });
-      if (afterProof.ok()) {
-        const items = (await afterProof.json()) as unknown[];
-        const afterCount = Array.isArray(items) ? items.length : 0;
-        expect(
-          afterCount,
-          `STATUS_UPDATE: proof_events count must NOT grow (no LLM ran). before=${beforeRuntimeProofCount} after=${afterCount}`,
-        ).toBeLessThanOrEqual(beforeRuntimeProofCount);
-      }
+      // Kind-specific check: no NEW RUNTIME_STREAM assistant row for this
+      // persona must have been inserted by this run. This is the spec
+      // equivalent of "no proof_events row with kind=hermes_agent_chat_runtime_request
+      // was created" because the backend only emits that proof_event from
+      // the same _runtime_chat_stream code path that writes the
+      // RUNTIME_STREAM agent_conversations row. The total proof_events
+      // count is intentionally NOT checked here — unrelated proof kinds
+      // (heartbeats, lock acquisitions, recovery controller events) may
+      // legitimately grow during the run and must not fail this branch.
+      const afterRuntimeStreamRows = hist.filter(
+        (row) =>
+          row.role === "assistant" && row.message_type === "RUNTIME_STREAM",
+      ).length;
+      expect(
+        afterRuntimeStreamRows - beforeRuntimeStreamRows,
+        `STATUS_UPDATE: zero NEW RUNTIME_STREAM rows must exist for this persona (no LLM ran). before=${beforeRuntimeStreamRows} after=${afterRuntimeStreamRows} — equivalent to delta==0 for proof_events kind="hermes_agent_chat_runtime_request"`,
+      ).toBe(0);
     }
 
     await page.screenshot({
