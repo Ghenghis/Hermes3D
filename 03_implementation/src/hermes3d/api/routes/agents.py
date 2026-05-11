@@ -4125,7 +4125,6 @@ def model_assist(body: dict | None = None) -> dict:
     )
 
     # Step 2: DeepSeek reviews extracted parameters
-    ds_result: dict[str, Any] | None = None
     ds_review: dict[str, Any] | None = None
     if not skip_review and mm_result.get("status") == "PASS_LIVE":
         review_prompt = (
@@ -4135,7 +4134,6 @@ def model_assist(body: dict | None = None) -> dict:
             "deepseek", prompt=review_prompt, max_tokens=100, timeout=30.0
         )
         ds_completion = ds_result_raw.pop("completion_text", None) or ""
-        ds_result = ds_result_raw
         raw_ds = ds_completion.strip()
         if raw_ds.startswith("```"):
             raw_ds = "\n".join(
