@@ -136,13 +136,18 @@ async function waitForRouteSettled(
   page: Page,
   waitTestId: string | null,
   quietMs = 750,
+  // Per-selector budget. Live targets use the default (30s). The
+  // informational variants pass a much shorter budget so a missing
+  // route anchor cannot consume the whole test timeout.
+  primaryTimeoutMs = 30_000,
+  fallbackTimeoutMs = 5_000,
 ): Promise<void> {
   await page.waitForLoadState("domcontentloaded");
   if (waitTestId) {
     try {
       await page.waitForSelector(`[data-testid="${waitTestId}"]`, {
         state: "visible",
-        timeout: 30_000,
+        timeout: primaryTimeoutMs,
       });
     } catch (err) {
       // Fall back to the global dashboard-root anchor so the page settles
@@ -150,7 +155,7 @@ async function waitForRouteSettled(
       // signal — never recapture the baseline).
       await page.waitForSelector(`[data-testid="dashboard-root"]`, {
         state: "visible",
-        timeout: 5_000,
+        timeout: fallbackTimeoutMs,
       }).catch(() => {
         throw err;
       });
@@ -160,6 +165,35 @@ async function waitForRouteSettled(
     if (document.fonts?.ready) await document.fonts.ready;
   });
   await page.waitForTimeout(quietMs);
+}
+
+/**
+ * Bound any async step so its worst-case duration is capped. This is the
+ * W18-A10P-CIFIX2 fix for PR #241: a Playwright test-level timeout fires
+ * OUTSIDE user code's try/catch (it is dispatched by the Playwright
+ * runner against the worker), so even when every step is wrapped in
+ * try/catch the test can still be killed by the test-level timeout. By
+ * racing each step against a small bounded timeout we keep total time
+ * predictable, the test stays well inside the per-test budget, and the
+ * try/catch wrapper in runInformationalVariant always gets to run the
+ * reporter PARTIAL emit on the way out.
+ */
+async function withBudget<T>(
+  promise: Promise<T>,
+  budgetMs: number,
+  label: string,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`step-budget-exceeded: ${label} > ${budgetMs}ms`));
+    }, budgetMs);
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 function attachConsoleErrors(page: Page): { errors: string[] } {
@@ -201,10 +235,19 @@ async function runInformationalVariant(
   // closed-page / nav crash records a PARTIAL annotation instead of
   // failing Playwright. The PR-#241 CI failure was exactly this:
   // for `08_workflow_printqueue_files_logs` and
-  // `08_proof_health_notifications_safety`, `page.screenshot` threw
-  // `Target page, context or browser has been closed` (Playwright wraps
-  // navigation crashes by tearing down the page context). The fix here
-  // is to keep capturing what we can but never let the failure escape.
+  // `08_proof_health_notifications_safety`, the test budget (30s in
+  // the default playwright.config.ts) was being consumed entirely by
+  // `waitForSelector` for a non-existent route anchor (`workflows-root`,
+  // `proof-root`). The test-level timeout fires OUTSIDE this try/catch
+  // (Playwright kills the worker for the test), so even the catch+emit
+  // path never runs and the test is recorded as failed.
+  //
+  // The W18-A10P-CIFIX2 fix bounds each step with `withBudget` so the
+  // total worst case is well below the per-test budget. We also extend
+  // the test timeout for informational variants so the reporter PARTIAL
+  // emit always gets to run on the way out (Layer D2's default is 30s;
+  // we lift this single test to 120s).
+  test.setTimeout(120_000);
   const refAbs = path.join(REPO_ROOT, target.reference);
   if (!fs.existsSync(refAbs)) {
     annotate({
@@ -231,33 +274,84 @@ async function runInformationalVariant(
   let navError: Error | null = null;
   let cmp: PickupPixelCompareResult | null = null;
 
+  // Bounded per-step budgets keep worst case well below the per-test
+  // timeout so the catch + PARTIAL annotate path always runs.
+  const PIN_BUDGET_MS = 5_000;
+  const VIEWPORT_BUDGET_MS = 3_000;
+  const GOTO_BUDGET_MS = 15_000;
+  const SETTLE_BUDGET_MS = 12_000;
+  const SETTLE_PRIMARY_MS = 6_000;
+  const SETTLE_FALLBACK_MS = 3_000;
+  const SCREENSHOT_BUDGET_MS = 15_000;
+
   try {
-    await pinTheme(page, target.theme ?? MANIFEST.default_theme);
-    await pinClock(page, DETERMINISTIC_TIME);
-    await page.setViewportSize(target.viewport);
+    try {
+      await withBudget(
+        pinTheme(page, target.theme ?? MANIFEST.default_theme),
+        PIN_BUDGET_MS,
+        "pin-theme",
+      );
+      await withBudget(pinClock(page, DETERMINISTIC_TIME), PIN_BUDGET_MS, "pin-clock");
+      await withBudget(
+        page.setViewportSize(target.viewport),
+        VIEWPORT_BUDGET_MS,
+        "set-viewport",
+      );
+    } catch (err) {
+      crashPhase = "setup";
+      crashMessage = (err as Error).message;
+    }
 
     const url = resolveRoute(target.route);
-    try {
-      await page.goto(url, { waitUntil: "domcontentloaded" });
-      await waitForRouteSettled(page, target.wait_test_id);
-    } catch (err) {
-      navError = err as Error;
+    if (!crashPhase) {
+      try {
+        await withBudget(
+          page.goto(url, { waitUntil: "domcontentloaded", timeout: GOTO_BUDGET_MS }),
+          GOTO_BUDGET_MS + 1_000,
+          "goto",
+        );
+      } catch (err) {
+        navError = err as Error;
+      }
+      try {
+        await withBudget(
+          waitForRouteSettled(
+            page,
+            target.wait_test_id,
+            500, // shorter quiet for informational
+            SETTLE_PRIMARY_MS,
+            SETTLE_FALLBACK_MS,
+          ),
+          SETTLE_BUDGET_MS,
+          "wait-for-route-settled",
+        );
+      } catch (err) {
+        // Don't overwrite a real navError. Record as a settle-fail.
+        if (!navError) navError = err as Error;
+      }
     }
 
     // Screenshot may legitimately throw if the page context was torn
-    // down by the navigation (this is what the 2 PR-#241 CI failures
-    // hit). Record the crash phase and stop — never let it bubble.
+    // down by the navigation (one of the original PR-#241 failure
+    // shapes). Record the crash phase and stop — never let it bubble.
     let observedBuffer: Buffer | null = null;
-    try {
-      observedBuffer = await page.screenshot({
-        fullPage: false,
-        animations: "disabled",
-        caret: "hide",
-        scale: "css",
-      });
-    } catch (err) {
-      crashPhase = "screenshot";
-      crashMessage = (err as Error).message;
+    if (!crashPhase) {
+      try {
+        observedBuffer = await withBudget(
+          page.screenshot({
+            fullPage: false,
+            animations: "disabled",
+            caret: "hide",
+            scale: "css",
+            timeout: SCREENSHOT_BUDGET_MS,
+          }),
+          SCREENSHOT_BUDGET_MS + 1_000,
+          "screenshot",
+        );
+      } catch (err) {
+        crashPhase = "screenshot";
+        crashMessage = (err as Error).message;
+      }
     }
 
     if (observedBuffer) {

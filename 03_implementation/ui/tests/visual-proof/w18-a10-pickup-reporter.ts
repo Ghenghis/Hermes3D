@@ -16,6 +16,10 @@
  *                   a crash (PR-#241 fix mode); the row still falls in
  *                   the informational bucket because it did not fail
  *                   Playwright. See the spec for the catch sites.
+ *                   Under W18-A10P-CIFIX2, `crash_phase` may also report
+ *                   step-budget-exceeded events (`setup`, `screenshot`,
+ *                   `pixel-compare`) when a sub-step blew past its
+ *                   bounded budget — the wrapper still records the row.
  *  - error:         test threw before recording a comparison. For
  *                   informational variants this should NEVER happen
  *                   after the W18-A10P-CIFIX try/catch wrapping; if it

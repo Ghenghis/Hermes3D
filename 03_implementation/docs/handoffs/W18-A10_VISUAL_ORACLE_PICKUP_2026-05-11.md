@@ -85,6 +85,55 @@ Constraints honoured:
 - **No baseline recapture.** `updateSnapshots: "none"` still pinned.
 - **No printer hardware writes.** No spec-level changes to printer paths.
 
+## W18-A10P-CIFIX2 — bounded steps so try/catch always catches (2026-05-11)
+
+The CIFIX project split landed in `07878e9` but CI cold-runner still hit
+the same 2 informational variants as **Test timeout of 30000ms exceeded**
+(not a screenshot crash, but a Playwright test-level timeout). The
+`ui-ci.yml` Layer D2 job runs `npx playwright test` against the **main**
+`playwright.config.ts`, which has no per-project `grep` and the default
+30s per-test timeout. So the W18-A10P-CIFIX project split was never
+exercised in CI — every informational test ran under the 30s budget
+along with the live ones.
+
+The two failing targets navigate to non-existent route anchors:
+
+| Target                                  | Route          | wait_test_id     | Outcome           |
+| --------------------------------------- | -------------- | ---------------- | ----------------- |
+| `08_workflow_printqueue_files_logs`     | `/#workflows`  | `workflows-root` | anchor missing    |
+| `08_proof_health_notifications_safety`  | `/#proof`      | `proof-root`     | anchor missing    |
+
+`waitForSelector` for `workflows-root` / `proof-root` was budgeted at
+30 seconds (the spec's old default), so it would consume the whole
+per-test timeout before the try/catch wrap could record the PARTIAL row.
+A Playwright test-level timeout is dispatched OUTSIDE user code's
+try/catch — it kills the worker for the test — so even with full
+try/catch coverage the test is still recorded as failed.
+
+The CIFIX2 fix:
+
+1. **Add `test.setTimeout(120_000)` at the start of `runInformationalVariant`.**
+   Lifts the per-test budget for informational variants only. Live tests
+   stay on the default budget.
+2. **Add a `withBudget(promise, ms, label)` helper.** Each step (`pinTheme`,
+   `pinClock`, `setViewportSize`, `page.goto`, `waitForRouteSettled`,
+   `page.screenshot`) is raced against an explicit bounded timeout, so
+   no single step can run longer than its budget. If a step hits its
+   budget the helper throws a catchable error, which the wrapping
+   try/catch records as `crash_phase` + `crash_message` and continues
+   to the PARTIAL annotate path.
+3. **Shorten the route-settle anchor budgets for informational variants:**
+   primary selector 6s, fallback selector 3s, total settle 12s. The total
+   informational worst case is now well under 60s, leaving plenty of
+   headroom inside the 120s test budget for the reporter emit.
+
+Live variants still use the original 30s/5s anchor budgets and the
+spec-config 90s per-test timeout. Their hard-assert behaviour is
+unchanged. GUI_PIXEL_E2E_GREEN computation in the reporter is unchanged.
+
+No `test.skip()`, no `test.fixme()`. Every manifest entry still runs in
+exactly one test. No baseline recapture. No printer hardware writes.
+
 ### Local re-verify (2026-05-11)
 
 Full run against the live dev stack (`http://localhost:5173`):
