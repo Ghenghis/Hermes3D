@@ -502,6 +502,22 @@ def _execute_supported_design(
             as_json(proof_notes),
         ),
     )
+    # Register thumbnail if GPU render produced one
+    if thumbnail_path.is_file():
+        execute(
+            """
+            INSERT OR IGNORE INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+            VALUES (?, ?, 'thumbnail', 'design-executor', 'MODELING', 'MODEL_APPROVAL', ?, ?, ?, ?)
+            """,
+            (
+                new_id(),
+                job_id,
+                thumbnail_path.name,
+                str(thumbnail_path),
+                thumbnail_path.stat().st_size,
+                as_json({"mesh_artifact_id": mesh_artifact_id}),
+            ),
+        )
     execute(
         """
         INSERT INTO job_steps (id, job_id, step_number, name, status, started_at, ended_at, duration_s)
