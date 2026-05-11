@@ -9,7 +9,23 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from hermes3d.api.routes import (
+# W21-A4 MVP-1: hydrate operator-managed .env files BEFORE route imports.
+# Several routes (agents, system, code_history) read MINIMAX_API_KEY /
+# DEEPSEEK_API_KEY at module import time; if we deferred this until
+# create_gui_app() those reads would see missing values. The loader is
+# idempotent (override=False) so it is safe across multiple imports.
+# See docs/handoffs/W21_A4_HERMES_AGENTS_ACTIVATION_AUDIT_2026-05-11.md
+# for the audit that justifies this wiring.
+from hermes3d.config.env_loader import load_at_startup as _hydrate_env
+
+_hydrate_env()
+
+# E402 is suppressed for the next two imports BECAUSE the hydration call
+# above is intentionally ordered before the route imports. Several routes
+# read MINIMAX_API_KEY / DEEPSEEK_API_KEY at module-import time, so any
+# reorganization that moves these imports above _hydrate_env() will
+# silently regress the env-loader contract.
+from hermes3d.api.routes import (  # noqa: E402
     agent_updates,
     agents,
     approvals,
@@ -47,7 +63,7 @@ from hermes3d.api.routes import (
     update_center,
     voice,
 )
-from hermes3d.db.init import init_db
+from hermes3d.db.init import init_db  # noqa: E402
 
 
 def create_gui_app() -> FastAPI:
