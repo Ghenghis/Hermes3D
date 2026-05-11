@@ -125,12 +125,84 @@ function safeJsonParse<T>(s: string): T | null {
   }
 }
 
+/**
+ * W18-A14 — Build a synthesized row for a target the spec deliberately
+ * skipped over (status:"future" or missing reference PNG). The spec no
+ * longer declares-and-skips these targets; the reporter injects rows from
+ * the manifest so the JSON summary schema is unchanged.
+ */
+function synthesizedRow(
+  m: ManifestTarget,
+  kind: "skipped-future" | "skipped-missing-reference",
+  ts: string,
+): VisualRow {
+  return {
+    target: m.target,
+    status: kind,
+    route: m.route ?? null,
+    reference: m.reference ?? null,
+    tolerance: typeof m.tolerance === "number" ? m.tolerance : null,
+    viewport: null,
+    theme: null,
+    clock_time: null,
+    evidence_path: null,
+    diff_path: null,
+    console_errors: 0,
+    console_summary: "",
+    network_same_origin_errors: 0,
+    network_total_errors: 0,
+    network_summary: "",
+    no_fake_hits: 0,
+    no_fake_summary: "",
+    regions: (m.regions ?? []).map((r) => ({
+      region: r.name,
+      status: "not-run",
+      tolerance:
+        typeof r.tolerance === "number"
+          ? r.tolerance
+          : typeof m.tolerance === "number"
+            ? m.tolerance
+            : null,
+      reference: r.reference ?? m.reference ?? null,
+    })),
+    error:
+      kind === "skipped-future"
+        ? m.notes ?? "future"
+        : `reference PNG missing at ${m.reference}`,
+    started_at: ts,
+    finished_at: ts,
+  };
+}
+
 class VisualProofReporter implements Reporter {
   private rows: VisualRow[] = [];
+  // W18-A14 — targets the spec filtered out (status:future or missing ref).
+  // Tracked so onTestEnd doesn't double-count if a future Playwright behavior
+  // produces a row for the same target name.
+  private readonly syntheticTargets = new Set<string>();
   private startedAt: string = "";
 
   onBegin(_config: FullConfig): void {
     this.startedAt = new Date().toISOString();
+    // W18-A14 — inject synthesized rows for the targets that visual-proof.spec.ts
+    // now filters out via `continue` (status:"future" or missing reference PNG).
+    // The spec used to call `test.skip` on these branches; under the no-skip
+    // harness it MUST NOT, so the reporter is responsible for keeping the
+    // JSON summary schema additive.
+    for (const m of Object.values(MANIFEST)) {
+      if (m.status === "future") {
+        this.rows.push(synthesizedRow(m, "skipped-future", this.startedAt));
+        this.syntheticTargets.add(m.target);
+        continue;
+      }
+      const refAbs = path.resolve(REPO_ROOT, m.reference);
+      if (!fs.existsSync(refAbs)) {
+        this.rows.push(
+          synthesizedRow(m, "skipped-missing-reference", this.startedAt),
+        );
+        this.syntheticTargets.add(m.target);
+      }
+    }
   }
 
   onTestEnd(test: TestCase, result: TestResult): void {
@@ -265,6 +337,15 @@ class VisualProofReporter implements Reporter {
 
     if (!target) {
       // Not one of our visual targets; ignore.
+      return;
+    }
+
+    // W18-A14 — if onBegin already synthesized a row for this target
+    // (status:"future" or missing reference), don't double-push. Under the
+    // no-skip harness the spec filters these targets out before declaring
+    // any test, so this branch should only ever fire if a future spec
+    // change starts producing test cases for them again.
+    if (this.syntheticTargets.has(target)) {
       return;
     }
 

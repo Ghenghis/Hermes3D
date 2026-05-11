@@ -18,6 +18,9 @@ export default defineConfig({
   reporter: [
     ["list"],
     ["json", { outputFile: "test-results/e2e-breadth/results.json" }],
+    // W18-A14 — no-skip harness: fail the run if any test is skipped without
+    // the `@hardware-not-authorized` marker. See tests/_reporters/w18-no-skip-reporter.ts.
+    ["./tests/_reporters/w18-no-skip-reporter.ts"],
   ],
   outputDir: "test-results/e2e-breadth/artifacts",
   use: {
