@@ -15,8 +15,10 @@ from hermes3d.services.local_state import implementation_path, port_reachable, s
 from hermes3d.services.local_state import set_service_url as save_service_url
 
 # Path to Lane 04 (H3D-CLAUDE-SOURCE-GEN3D) proof file — read-only
+# File is at: src/hermes3d/api/routes/generation.py
+# parents[0]=routes, [1]=api, [2]=hermes3d, [3]=src, [4]=03_implementation, [5]=Hermes3D
 _LANE04_PROOF_PATH = (
-    Path(__file__).resolve().parents[6]
+    Path(__file__).resolve().parents[5]
     / "03_implementation"
     / "proof"
     / "GEN3D_VERIFY_2026-05-06.json"
@@ -24,7 +26,7 @@ _LANE04_PROOF_PATH = (
 
 # Adapter registry schemas dir for template discovery
 _SCHEMAS_DIR = (
-    Path(__file__).resolve().parents[6] / "03_implementation" / "adapter_registry" / "schemas"
+    Path(__file__).resolve().parents[5] / "03_implementation" / "adapter_registry" / "schemas"
 )
 
 router = APIRouter()
