@@ -108,7 +108,7 @@ def get_file(file_id: str) -> FilesResponse:
 
 @router.post("/api/files", status_code=501)
 def create_file(body: FileCreate) -> dict[str, Any]:
-    """Honest 501 stub for file creation.
+    """Honest 501 Not-Implemented response for file creation.
 
     We accept and validate the body so OpenAPI documents the future
     contract, then return 501 Not Implemented with the W15-A20 reason
