@@ -50,6 +50,12 @@ class GcodeAnalysis:
     extrusion_moves_sampled: int = 0
     travel_moves_sampled: int = 0
     retraction_count_sampled: int = 0
+    # Full-file streaming counts (added W18-A12 fix). motion_lines is the
+    # total G0/G1 motion line count across the entire file. layer_change_markers
+    # is the count of bare `;LAYER_CHANGE` lines emitted by PrusaSlicer 2.9.5
+    # / OrcaSlicer / SuperSlicer.
+    motion_lines: int = 0
+    layer_change_markers: int = 0
 
     risk_flags: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -91,8 +97,16 @@ _RE_FIL_MM = re.compile(
 )
 _RE_FIL_G = re.compile(r";\s*filament\s+used\s*\[?g\]?\s*=\s*([\d.]+)", re.IGNORECASE)
 _RE_LAYER_HEIGHT = re.compile(r";\s*(?:layer_height|layer height)\s*=\s*([\d.]+)", re.IGNORECASE)
-_RE_LAYER_COUNT = re.compile(r";\s*total\s+layer\s+count\s*=\s*(\d+)", re.IGNORECASE)
+# Header-form layer counts. Accept both "total layer count" (older PrusaSlicer)
+# and "total layer number" (some forks / Orca variants).
+_RE_LAYER_COUNT = re.compile(r";\s*total\s+layer\s+(?:count|number)\s*[=:]\s*(\d+)", re.IGNORECASE)
+# Cura emits ";LAYER:N" annotations between layers — count the highest index.
 _RE_LAYER_NUM = re.compile(r";\s*LAYER:(\d+)", re.IGNORECASE)
+# Modern PrusaSlicer (~2.5+) / OrcaSlicer / SuperSlicer write ";LAYER_CHANGE"
+# between layers. ";BEFORE_LAYER_CHANGE" and ";AFTER_LAYER_CHANGE" surround it
+# and MUST NOT be counted (they would double / triple count). We match the
+# bare token only — see _count_moves_in_sample below.
+_LAYER_CHANGE_TOKEN = ";LAYER_CHANGE"
 _RE_NOZZLE = re.compile(
     r";\s*(?:nozzle_temperature|nozzle temperature|temperature)\s*=\s*([\d.]+)", re.IGNORECASE
 )
@@ -191,6 +205,40 @@ def _count_moves_in_sample(sample: str) -> tuple[int, int, int, int | None]:
     return extrusion, travel, retractions, (layer_max + 1 if layer_max >= 0 else None)
 
 
+def _count_layer_change_markers(path: Path) -> tuple[int, int]:
+    """Stream the whole file and count modern slicer LAYER_CHANGE markers.
+
+    Returns ``(layer_change_count, motion_line_count)``.
+
+    PrusaSlicer 2.9.5 / OrcaSlicer / SuperSlicer emit ``;LAYER_CHANGE`` between
+    every layer. ``;BEFORE_LAYER_CHANGE`` and ``;AFTER_LAYER_CHANGE`` MUST NOT
+    be counted (they wrap the real marker). Also tally G0/G1 motion lines so
+    callers can persist a faithful motion_lines metric for proof envelopes.
+    """
+    layer_changes = 0
+    motion_lines = 0
+    with path.open("r", encoding="utf-8", errors="ignore") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            if stripped == _LAYER_CHANGE_TOKEN:
+                layer_changes += 1
+                continue
+            # Skip wrapping markers explicitly so future readers see the intent.
+            if stripped in (";BEFORE_LAYER_CHANGE", ";AFTER_LAYER_CHANGE"):
+                continue
+            if stripped.startswith(";"):
+                continue
+            # Strip inline comments before looking at the G-code itself.
+            code = stripped.split(";", 1)[0].strip()
+            if not code:
+                continue
+            if code.startswith("G0 ") or code == "G0" or code.startswith("G1 ") or code == "G1":
+                motion_lines += 1
+    return layer_changes, motion_lines
+
+
 def _build_risk_flags(a: GcodeAnalysis) -> list[str]:
     flags: list[str] = []
     if a.estimated_print_time_min and a.estimated_print_time_min > 720:
@@ -243,6 +291,28 @@ def analyze_gcode(path: str | Path) -> GcodeAnalysis:
     parsed = _parse_header(head + "\n" + tail)
     extr, trav, retr, layer_fallback = _count_moves_in_sample(body_sample)
 
+    # Stream the entire file to count modern (PrusaSlicer 2.9.5+ / Orca /
+    # SuperSlicer) ";LAYER_CHANGE" markers and the global G0/G1 motion-line
+    # total. This fixes the W18-A9 / W18-A6 audit finding where
+    # ``layer_count`` was None despite the file containing ~116 real layers,
+    # because the head/tail/sample windows never landed on the per-layer
+    # markers and the slicer no longer writes a "total layer count" header.
+    try:
+        layer_change_total, motion_total = _count_layer_change_markers(p)
+    except OSError:
+        layer_change_total = 0
+        motion_total = 0
+
+    # Layer-count resolution order:
+    #   1) Header-form "total layer count/number" (most authoritative).
+    #   2) Modern ;LAYER_CHANGE marker count (PrusaSlicer 2.9.5).
+    #   3) Cura ;LAYER:N fallback from the sample window.
+    layer_count_resolved = (
+        parsed.get("layer_count")
+        or (layer_change_total if layer_change_total > 0 else None)
+        or layer_fallback
+    )
+
     a = GcodeAnalysis(
         path=str(p.resolve()),
         file_size_bytes=size,
@@ -251,7 +321,7 @@ def analyze_gcode(path: str | Path) -> GcodeAnalysis:
         estimated_print_time_min=parsed.get("estimated_print_time_min"),  # type: ignore[arg-type]
         filament_used_mm=parsed.get("filament_used_mm"),  # type: ignore[arg-type]
         filament_used_g=parsed.get("filament_used_g"),  # type: ignore[arg-type]
-        layer_count=(parsed.get("layer_count") or layer_fallback),  # type: ignore[arg-type]
+        layer_count=layer_count_resolved,  # type: ignore[arg-type]
         layer_height_mm=parsed.get("layer_height_mm"),  # type: ignore[arg-type]
         nozzle_temp_c=parsed.get("nozzle_temp_c"),  # type: ignore[arg-type]
         bed_temp_c=parsed.get("bed_temp_c"),  # type: ignore[arg-type]
@@ -262,6 +332,8 @@ def analyze_gcode(path: str | Path) -> GcodeAnalysis:
         extrusion_moves_sampled=extr,
         travel_moves_sampled=trav,
         retraction_count_sampled=retr,
+        motion_lines=motion_total,
+        layer_change_markers=layer_change_total,
     )
     a.risk_flags = _build_risk_flags(a)
     return a

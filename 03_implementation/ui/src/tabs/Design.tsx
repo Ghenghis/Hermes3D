@@ -1,7 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { adapters } from "../api/adapters";
 import type { Printer } from "../types/printer";
 import type { ToolchainEvidence, ToolchainStage, ToolchainStatus } from "../types/toolchain";
+import {
+  gcodeDownloadUrl,
+  getSlice,
+  pollSliceUntilTerminal,
+  startSlice,
+  type SliceState,
+} from "../api/slicer";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -74,6 +81,13 @@ export function DesignTab() {
   const [cadTemplates, setCadTemplates] = useState<CadTemplate[]>([]);
   const [providersLoading, setProvidersLoading] = useState(true);
   const [templatesLoading, setTemplatesLoading] = useState(true);
+  // W18-A12 — STL artifacts produced by recent design-intake calls and the
+  // current state of the slicer job spawned via "Slice this STL".
+  const [producedStls, setProducedStls] = useState<ProducedStl[]>([]);
+  const [sliceState, setSliceState] = useState<SliceState | null>(null);
+  const [sliceMessage, setSliceMessage] = useState<string | null>(null);
+  const [slicing, setSlicing] = useState(false);
+  const sliceAbortRef = useRef<AbortController | null>(null);
   const unlockedPrinters = useMemo(
     () => printers.filter((printer) => !printer.maintenance_flag && printer.status !== "maintenance"),
     [printers],
@@ -182,11 +196,66 @@ export function DesignTab() {
       const payload: unknown = await response.json().catch(() => null);
       const accepted = actionAccepted(response.ok, payload);
       setSubmitMessage(accepted ? `Design intake accepted: ${designSummary(payload, response.statusText)}` : `Blocked: ${designSummary(payload, response.statusText)}`);
+      if (accepted) {
+        const stl = extractStlArtifact(payload);
+        if (stl) {
+          setProducedStls((prev) => [stl, ...prev.filter((s) => s.file_path !== stl.file_path)].slice(0, 5));
+        }
+      }
       await adapters.emitProofEvent("design.intake.submitted", { title, target_printer_id: targetPrinterId, accepted, response: payload });
     } catch {
       setSubmitMessage(`Design intake failed: backend API is unreachable at ${LIVE_BASE_URL}.`);
       await adapters.emitProofEvent("design.intake.submitted", { title, target_printer_id: targetPrinterId, accepted: false });
     }
+  };
+
+  const sliceStl = async (stl: ProducedStl) => {
+    setSliceMessage(`Starting slice of ${stl.label}…`);
+    setSliceState(null);
+    setSlicing(true);
+    sliceAbortRef.current?.abort("new-slice");
+    const controller = new AbortController();
+    sliceAbortRef.current = controller;
+    try {
+      const accepted = await startSlice(
+        { stl_path: stl.file_path },
+        { signal: controller.signal, timeoutMs: 30_000 },
+      );
+      setSliceMessage(`Slice job ${accepted.job_id.slice(0, 12)} accepted; polling…`);
+      const terminal = await pollSliceUntilTerminal(accepted.job_id, {
+        intervalMs: 2000,
+        maxMs: 25 * 60_000,
+        signal: controller.signal,
+        onProgress: (s) => setSliceState(s),
+      });
+      setSliceState(terminal);
+      if (terminal.status === "completed") {
+        const layers = terminal.layer_count ?? "?";
+        const motion = terminal.motion_lines ?? "?";
+        setSliceMessage(`Slice complete — ${layers} layers, ${motion} motion lines, sha256 ${(terminal.sha256 ?? "").slice(0, 12)}…`);
+      } else {
+        setSliceMessage(`Slice ${terminal.status}: ${terminal.error ?? "see backend logs"}`);
+      }
+      await adapters.emitProofEvent("design.slice.completed", {
+        job_id: terminal.job_id,
+        status: terminal.status,
+        gcode_path: terminal.gcode_path,
+        sha256: terminal.sha256,
+        layer_count: terminal.layer_count,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setSliceMessage(`Slice failed: ${message}`);
+      await adapters.emitProofEvent("design.slice.failed", { stl_path: stl.file_path, error: message });
+    } finally {
+      setSlicing(false);
+    }
+  };
+
+  const refreshSlice = async () => {
+    if (!sliceState?.job_id) return;
+    const fresh = await getSlice(sliceState.job_id).catch(() => null);
+    if (fresh) setSliceState(fresh);
   };
 
   const viewLogs = async (stageId: string) => {
@@ -355,8 +424,204 @@ export function DesignTab() {
           ))}
         </div>
       </section>
+
+      {/* W18-A12 — Slicer wire-up. Lists STLs produced by recent design intakes
+          and exposes "Slice this STL" -> POST /api/slice -> poll -> show
+          gcode_path + size + sha256 + layer_count + download link. The slicer
+          NEVER dispatches G-code to a printer (operator freeze 2026-05-11). */}
+      <section
+        id="design.slicer"
+        data-testid="design-slicer-root"
+        className="flex min-h-0 flex-col rounded border border-border bg-surface p-4 lg:col-span-12"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 className="text-base font-semibold text-fg">Slicer</h2>
+            <p className="text-xs text-muted">
+              Run PrusaSlicer/OrcaSlicer CLI on a produced STL. The result is a real G-code file on disk; nothing is sent to a printer.
+            </p>
+          </div>
+          <span
+            data-testid="design-slicer-freeze-badge"
+            className="rounded bg-surface2 px-2 py-1 text-[11px] uppercase tracking-wide text-muted"
+            title="Operator freeze 2026-05-11 — slicer does not dispatch G-code"
+          >
+            no-printer-writes
+          </span>
+        </div>
+
+        <div className="mt-4 grid min-h-0 flex-1 content-start gap-3 lg:grid-cols-2">
+          {/* Left column: list of STLs available to slice. */}
+          <div className="rounded border border-border bg-bg/40 p-3">
+            <div className="text-sm font-semibold uppercase tracking-wide text-fg">
+              Produced STLs
+            </div>
+            <p className="text-xs text-muted">
+              STLs returned by recent design-intake calls in this session.
+            </p>
+            <div className="mt-3 grid gap-2" data-testid="design-slicer-stl-list">
+              {producedStls.length === 0 && (
+                <div className="rounded border border-border bg-bg/30 p-3 text-xs text-muted">
+                  No STLs yet. Submit a Design Intake first and a "Slice this STL" button will appear here.
+                </div>
+              )}
+              {producedStls.map((stl) => (
+                <div
+                  key={stl.file_path}
+                  className="grid grid-cols-[1fr_auto] items-start gap-2 rounded border border-border bg-bg/50 p-3 text-xs"
+                  data-testid="design-slicer-stl-row"
+                >
+                  <div className="min-w-0">
+                    <div className="truncate font-semibold text-fg">{stl.label}</div>
+                    <div className="mt-0.5 truncate font-mono text-[11px] text-muted">{stl.file_path}</div>
+                    <div className="mt-0.5 text-[11px] text-muted">{stl.file_size?.toLocaleString() ?? "?"} bytes — sha256 {(stl.sha256 ?? "").slice(0, 16) || "?"}…</div>
+                  </div>
+                  <button
+                    type="button"
+                    data-testid={`design-slicer-slice-button-${stl.label}`}
+                    aria-label={`Slice ${stl.label}`}
+                    disabled={slicing}
+                    onClick={() => void sliceStl(stl)}
+                    className="shrink-0 rounded bg-accent-blue px-3 py-1.5 text-xs font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Slice this STL
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right column: current slice-job state. */}
+          <div
+            className="rounded border border-border bg-bg/40 p-3"
+            data-testid="design-slicer-state-panel"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold uppercase tracking-wide text-fg">Slice Job</div>
+              {slicing && (
+                <span
+                  data-testid="design-slicer-spinner"
+                  className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-accent-blue border-t-transparent"
+                />
+              )}
+              {!slicing && sliceState && (
+                <button
+                  type="button"
+                  data-testid="design-slicer-refresh"
+                  onClick={() => void refreshSlice()}
+                  className="rounded border border-border px-2 py-1 text-[11px] text-fg"
+                >
+                  Refresh
+                </button>
+              )}
+            </div>
+            {!sliceState && !slicing && (
+              <div className="mt-3 rounded border border-border bg-bg/30 p-3 text-xs text-muted">
+                Click "Slice this STL" on the left to start a job.
+              </div>
+            )}
+            {sliceState && (
+              <div className="mt-3 grid gap-2 text-xs">
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                  <span className="text-muted">job_id</span>
+                  <span className="truncate font-mono text-fg" data-testid="design-slicer-job-id">{sliceState.job_id}</span>
+                  <span className="text-muted">status</span>
+                  <span data-testid="design-slicer-status">
+                    <span className={["rounded px-2 py-0.5 text-[11px] uppercase", statusTone(sliceState.status)].join(" ")}>{sliceState.status}</span>
+                  </span>
+                  {sliceState.gcode_path && (
+                    <>
+                      <span className="text-muted">gcode_path</span>
+                      <span className="truncate font-mono text-fg" data-testid="design-slicer-gcode-path" title={sliceState.gcode_path}>{sliceState.gcode_path}</span>
+                    </>
+                  )}
+                  {typeof sliceState.size_bytes === "number" && (
+                    <>
+                      <span className="text-muted">size_bytes</span>
+                      <span className="font-mono text-fg" data-testid="design-slicer-size">{sliceState.size_bytes.toLocaleString()}</span>
+                    </>
+                  )}
+                  {sliceState.sha256 && (
+                    <>
+                      <span className="text-muted">sha256</span>
+                      <span className="truncate font-mono text-fg" data-testid="design-slicer-sha256">{sliceState.sha256}</span>
+                    </>
+                  )}
+                  {typeof sliceState.layer_count === "number" && (
+                    <>
+                      <span className="text-muted">layer_count</span>
+                      <span className="font-mono text-fg" data-testid="design-slicer-layer-count">{sliceState.layer_count}</span>
+                    </>
+                  )}
+                  {typeof sliceState.motion_lines === "number" && (
+                    <>
+                      <span className="text-muted">motion_lines</span>
+                      <span className="font-mono text-fg" data-testid="design-slicer-motion-lines">{sliceState.motion_lines}</span>
+                    </>
+                  )}
+                  {typeof sliceState.estimated_print_time_min === "number" && (
+                    <>
+                      <span className="text-muted">est. print time</span>
+                      <span className="font-mono text-fg">{sliceState.estimated_print_time_min} min</span>
+                    </>
+                  )}
+                  {sliceState.proof_event_id && (
+                    <>
+                      <span className="text-muted">proof_event_id</span>
+                      <span className="truncate font-mono text-fg" data-testid="design-slicer-proof-event">{sliceState.proof_event_id}</span>
+                    </>
+                  )}
+                </div>
+                {sliceState.status === "completed" && gcodeDownloadUrl(sliceState) && (
+                  <a
+                    href={gcodeDownloadUrl(sliceState) ?? "#"}
+                    data-testid="design-slicer-download"
+                    className="mt-1 inline-block w-fit rounded border border-accent-green/40 bg-accent-green/10 px-3 py-1.5 text-xs font-semibold text-accent-green"
+                    download
+                  >
+                    Download G-code
+                  </a>
+                )}
+                {sliceState.status === "failed" && (
+                  <div className="rounded border border-accent-red/40 bg-accent-red/10 p-2 text-xs text-accent-red" data-testid="design-slicer-error">
+                    {sliceState.error ?? "Slice failed (no error message returned)."}
+                  </div>
+                )}
+              </div>
+            )}
+            {sliceMessage && (
+              <div className="mt-3 rounded border border-border bg-bg/40 p-2 text-[11px] text-muted" data-testid="design-slicer-message">
+                {sliceMessage}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
     </div>
   );
+}
+
+interface ProducedStl {
+  file_path: string;
+  label: string;
+  file_size: number | null;
+  sha256: string | null;
+  job_id: string | null;
+}
+
+function extractStlArtifact(payload: unknown): ProducedStl | null {
+  if (!isRecord(payload)) return null;
+  const artifact = payload.artifact;
+  if (!isRecord(artifact)) return null;
+  const file_path = typeof artifact.file_path === "string" ? artifact.file_path : null;
+  if (!file_path) return null;
+  return {
+    file_path,
+    label: typeof artifact.label === "string" ? artifact.label : file_path.split(/[\\/]/).pop() || file_path,
+    file_size: typeof artifact.file_size === "number" ? artifact.file_size : null,
+    sha256: typeof artifact.sha256 === "string" ? artifact.sha256 : null,
+    job_id: typeof payload.job_id === "string" ? payload.job_id : null,
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,68 @@
+{
+  "schema": "hermes3d.slicer.proof.v1",
+  "job_id": "5f0f40dbb6674eb2b0bee3475d7f042e",
+  "request": {
+    "stl_path": "04_testing/fixtures/tiny_cube_10mm.stl",
+    "printer_profile": null,
+    "options": {}
+  },
+  "slicer": {
+    "slicer_binary": "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe",
+    "stl_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\04_testing\\fixtures\\tiny_cube_10mm.stl",
+    "gcode_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5f0f40dbb6674eb2b0bee3475d7f042e\\tiny_cube_10mm.gcode",
+    "return_code": 0,
+    "duration_seconds": 0.35519862174987793,
+    "estimated_minutes": null,
+    "estimated_filament_mm": null,
+    "estimated_filament_g": null,
+    "layer_count": null,
+    "extra": {
+      "stdout_tail": "10 => Processing triangulated mesh\n20 => Generating perimeters\n30 => Preparing infill\n45 => Making infill\n65 => Searching support spots\n69 => Alert if supports needed\n89 => Calculating overhanging perimeters\n88 => Generating skirt and brim\n90 => Exporting G-code to G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5f0f40dbb6674eb2b0bee3475d7f042e\\tiny_cube_10mm.gcode\nSlicing result exported to G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5f0f40dbb6674eb2b0bee3475d7f042e\\tiny_cube_10mm.gcode\n",
+      "stderr_tail": "",
+      "argv": [
+        "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe",
+        "--export-gcode",
+        "--output",
+        "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5f0f40dbb6674eb2b0bee3475d7f042e\\tiny_cube_10mm.gcode",
+        "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\04_testing\\fixtures\\tiny_cube_10mm.stl"
+      ]
+    }
+  },
+  "analyzer": {
+    "path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5f0f40dbb6674eb2b0bee3475d7f042e\\tiny_cube_10mm.gcode",
+    "file_size_bytes": 109737,
+    "slicer_name": "PrusaSlicer",
+    "slicer_version": "2.9.5-beta2",
+    "estimated_print_time_min": 8.8,
+    "filament_used_mm": 427.39,
+    "filament_used_g": null,
+    "layer_count": 33,
+    "layer_height_mm": 0.3,
+    "nozzle_temp_c": 200.0,
+    "bed_temp_c": 0.0,
+    "support_used": false,
+    "infill_density_pct": 20.0,
+    "bed_mesh_loaded": false,
+    "pressure_advance_set": false,
+    "extrusion_moves_sampled": 2913,
+    "travel_moves_sampled": 460,
+    "retraction_count_sampled": 1,
+    "motion_lines": 3371,
+    "layer_change_markers": 33,
+    "risk_flags": [],
+    "notes": [],
+    "estimated_print_time_h": 0.15
+  },
+  "gcode": {
+    "path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5f0f40dbb6674eb2b0bee3475d7f042e\\tiny_cube_10mm.gcode",
+    "size_bytes": 109737,
+    "sha256": "584d66e264a7ed48f066b6b6b64bc99e38853f8e1a687ec08e40456bac7e0b8f"
+  },
+  "proof_event_id": "4a42b90af5414ea9aead6de615058da4",
+  "freeze_assertions": {
+    "no_printer_writes": true,
+    "no_moonraker_upload": true,
+    "no_klipper_dispatch": true,
+    "no_octoprint_upload": true
+  }
+}
