@@ -259,23 +259,57 @@ test("W18-A8 — real artifact / proof endpoints are wired end-to-end", async ({
   let pageCalledList = false;
   let pageCalledArtifacts = false;
   try {
+    // ROOT CAUSE NOTE (W18-A8 CI fix 2026-05-11):
+    //   Earlier revision of this audit used `await page.waitForTimeout(1500)`
+    //   then polled `observed[]` for the artifacts requests. That works locally
+    //   (warm Vite dev server, instant React mount + useEffect dispatch) but
+    //   FAILED deterministically in CI Layer D2: GitHub-Actions Ubuntu runners
+    //   have a cold Vite dev-server that compiles on-demand the first time the
+    //   `/` route is requested, so `domcontentloaded` returns ~immediately but
+    //   the bundled React app + ArtifactsTab.useEffect's loadProofManifest /
+    //   loadArtifacts fetches arrive WELL outside the 1.5s polling window.
+    //   The Artifacts component absolutely does fetch on mount — `useEffect`
+    //   in 03_implementation/ui/src/tabs/Artifacts.tsx lines 54-71 fire the
+    //   two GETs unconditionally — so this was a spec-timing false positive
+    //   (FAIL_NOT_WIRED against a correctly wired UI), not a real bug.
+    //
+    //   Fix: race `page.waitForResponse(...)` with the hash navigation so we
+    //   actively wait for the actual network response (up to 30s in CI),
+    //   instead of guessing how long Vite needs to compile.
     await page.goto(FRONTEND, { waitUntil: "domcontentloaded", timeout: 30_000 });
     await page.waitForSelector('[data-testid$="-root"]', { timeout: 20_000 });
+
+    const listResponsePromise = page
+      .waitForResponse(
+        (resp) =>
+          /\/api\/artifacts\/list(\?|$)/.test(resp.url()) &&
+          resp.request().method() === "GET",
+        { timeout: 30_000 },
+      )
+      .catch(() => null);
+    const rowsResponsePromise = page
+      .waitForResponse(
+        (resp) =>
+          /\/api\/artifacts($|\?)/.test(resp.url()) &&
+          resp.request().method() === "GET",
+        { timeout: 30_000 },
+      )
+      .catch(() => null);
+
     await page.evaluate(() => {
       window.location.hash = "#artifacts";
     });
     await expect(page.getByTestId("artifacts-root")).toBeVisible({ timeout: 10_000 });
     // The proof-bundles section is rendered inside the same tab.
     await expect(page.getByTestId("proof-bundles")).toBeVisible({ timeout: 10_000 });
-    // Give the tab a beat to issue its loadProofManifest + loadArtifacts calls.
-    await page.waitForTimeout(1500);
 
-    pageCalledList = observed.some(
-      (r) => /\/api\/artifacts\/list(\?|$)/.test(r.url) && r.method === "GET" && r.status === 200,
-    );
-    pageCalledArtifacts = observed.some(
-      (r) => /\/api\/artifacts($|\?)/.test(r.url) && r.method === "GET" && r.status === 200,
-    );
+    const [listResp, rowsResp] = await Promise.all([
+      listResponsePromise,
+      rowsResponsePromise,
+    ]);
+
+    pageCalledList = listResp !== null && listResp.status() === 200;
+    pageCalledArtifacts = rowsResp !== null && rowsResp.status() === 200;
 
     if (!pageCalledList) {
       steps.push({
@@ -283,6 +317,7 @@ test("W18-A8 — real artifact / proof endpoints are wired end-to-end", async ({
         status: "FAIL_NOT_WIRED",
         reason: "GUI did not issue GET /api/artifacts/list while on #artifacts",
         detail: {
+          list_response_status: listResp?.status() ?? null,
           observed_artifact_calls: observed
             .filter((r) => /\/api\/artifacts/.test(r.url))
             .map((r) => ({ url: r.url, method: r.method, status: r.status })),
@@ -292,7 +327,7 @@ test("W18-A8 — real artifact / proof endpoints are wired end-to-end", async ({
       steps.push({
         name: "ui_calls_artifacts_list",
         status: "PASS_REAL",
-        reason: "GUI issued GET /api/artifacts/list -> 200",
+        reason: `GUI issued GET /api/artifacts/list -> ${listResp!.status()}`,
       });
     }
     if (!pageCalledArtifacts) {
@@ -300,12 +335,15 @@ test("W18-A8 — real artifact / proof endpoints are wired end-to-end", async ({
         name: "ui_calls_artifacts_rows",
         status: "FAIL_NOT_WIRED",
         reason: "GUI did not issue GET /api/artifacts while on #artifacts",
+        detail: {
+          rows_response_status: rowsResp?.status() ?? null,
+        },
       });
     } else {
       steps.push({
         name: "ui_calls_artifacts_rows",
         status: "PASS_REAL",
-        reason: "GUI issued GET /api/artifacts -> 200",
+        reason: `GUI issued GET /api/artifacts -> ${rowsResp!.status()}`,
       });
     }
 
@@ -622,29 +660,39 @@ test("W18-A8 — real artifact / proof endpoints are wired end-to-end", async ({
   }
 
   try {
+    // Same CI-cold-Vite consideration as the artifacts-list assertion above:
+    // race waitForResponse against the hash navigation instead of a fixed
+    // 1.5s sleep, so CI's slower mount path can still satisfy the assertion.
+    const bundlesResponsePromise = page
+      .waitForResponse(
+        (resp) =>
+          /\/api\/proof\/bundles($|\?)/.test(resp.url()) &&
+          resp.request().method() === "GET",
+        { timeout: 30_000 },
+      )
+      .catch(() => null);
+
     await page.evaluate(() => {
       window.location.hash = "#proof";
     });
     await expect(page.getByTestId("proof-root")).toBeVisible({ timeout: 10_000 });
-    await page.waitForTimeout(1500);
 
-    const pageCalledBundles = observed.some(
-      (r) =>
-        /\/api\/proof\/bundles($|\?)/.test(r.url) &&
-        r.method === "GET" &&
-        r.status === 200,
-    );
+    const bundlesResp = await bundlesResponsePromise;
+    const pageCalledBundles = bundlesResp !== null && bundlesResp.status() === 200;
     if (!pageCalledBundles) {
       steps.push({
         name: "ui_calls_proof_bundles",
         status: "FAIL_NOT_WIRED",
         reason: "GUI did not issue GET /api/proof/bundles while on #proof",
+        detail: {
+          bundles_response_status: bundlesResp?.status() ?? null,
+        },
       });
     } else {
       steps.push({
         name: "ui_calls_proof_bundles",
         status: "PASS_REAL",
-        reason: "GUI issued GET /api/proof/bundles -> 200",
+        reason: `GUI issued GET /api/proof/bundles -> ${bundlesResp!.status()}`,
       });
     }
 
