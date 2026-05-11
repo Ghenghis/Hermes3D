@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -248,14 +249,109 @@ def _http_readiness_check(spec: ServiceSpec, timeout_s: float) -> tuple[Status, 
     return None  # 2xx, no service-specific verdict to add — fall through to ONLINE
 
 
+# W18-A18 — parallel probe execution.
+#
+# Audit (2026-05-11): operator reproduced /api/health/services hanging
+# >60s on cold backend even after PR #244 added the honest-blocked
+# banner for the 404 case. Real root cause: ``probe_all`` was a list
+# comprehension running ``probe_one`` sequentially across every entry
+# in :data:`KNOWN_SERVICES` plus every per-printer Moonraker spec from
+# ``moonraker_specs_from_config()``. With 6 enabled known services +
+# 12 printer specs and each ``probe_one`` carrying a 2 s TCP timeout
+# (plus an optional 2 s HTTP follow-up), worst-case sequential latency
+# is ``18 × 4 s = 72 s`` when nothing on the lab network is reachable.
+# DNS resolution for ``*.local`` hostnames is not bounded by
+# ``socket.settimeout()`` and can stall an entire probe up to the
+# platform resolver default (~10 s on Windows).
+#
+# Fix: parallelize via ``ThreadPoolExecutor`` with an overall budget
+# (``PROBE_ALL_DEADLINE_S``). Probes that don't finish before the
+# budget expires are downgraded to :class:`Status.UNREACHABLE` —
+# honest blocked, never faked online. The honest-empty path is
+# preserved by ``api/routes/health_services.py`` when no probes are
+# registered at all.
+PROBE_ALL_DEADLINE_S: float = 3.5
+PROBE_PER_TASK_TIMEOUT_S: float = 1.5
+
+
+def _placeholder_result(spec: ServiceSpec, reason: str) -> ProbeResult:
+    """Return a ``Status.UNREACHABLE`` ``ProbeResult`` for a probe that
+    did not complete inside the parallel-probe budget. The honest-blocked
+    contract requires we tell the UI *why* we are unreachable without
+    inventing an "online" verdict.
+    """
+    return ProbeResult(spec, Status.UNREACHABLE, reason, 0.0)
+
+
 def probe_all(extra: tuple[ServiceSpec, ...] = ()) -> list[ProbeResult]:
-    """Probe :data:`KNOWN_SERVICES` plus any caller-supplied extras.
+    """Probe :data:`KNOWN_SERVICES` plus any caller-supplied extras in parallel.
 
     The caller typically supplies per-printer Moonraker specs derived
-    from :func:`moonraker_specs_from_config`. The order is preserved:
-    KNOWN_SERVICES first, extras last.
+    from :func:`moonraker_specs_from_config`. The output order matches
+    the input order: KNOWN_SERVICES first, extras last — so the React
+    Service Health table layout stays stable across reloads.
+
+    Parallelization details:
+
+    * One :class:`~concurrent.futures.ThreadPoolExecutor` thread per
+      probe (capped at 32) — TCP + HTTP probes are I/O bound, so threads
+      are the right unit; we are not CPU-constrained.
+    * Overall budget ``PROBE_ALL_DEADLINE_S`` (4.5 s) applied via
+      :func:`~concurrent.futures.as_completed`. Probes that don't
+      finish in time return :class:`Status.UNREACHABLE` with reason
+      ``"probe timeout exceeded backend budget"`` — never faked.
+    * Each :func:`probe_one` already carries its own 2 s TCP timeout
+      and 2 s HTTP timeout; the outer budget is the safety net for
+      DNS stalls on ``*.local`` hostnames where stdlib timeouts don't
+      bound the resolver.
     """
-    return [probe_one(s) for s in (*KNOWN_SERVICES, *extra)]
+    specs: tuple[ServiceSpec, ...] = (*KNOWN_SERVICES, *extra)
+    if not specs:
+        return []
+    results: list[ProbeResult | None] = [None] * len(specs)
+    deadline = time.monotonic() + PROBE_ALL_DEADLINE_S
+    max_workers = min(len(specs), 32) or 1
+    # Do NOT use ``with ThreadPoolExecutor(...)`` here: ``__exit__`` calls
+    # ``shutdown(wait=True)`` which blocks on stuck worker threads (e.g.
+    # a DNS resolver call that won't return within the parallel-probe
+    # budget). We call ``shutdown(wait=False, cancel_futures=True)``
+    # manually so the outer budget really does bound wall-clock latency.
+    pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="hermes-health-probe")
+    try:
+        future_to_index = {
+            pool.submit(probe_one, spec, PROBE_PER_TASK_TIMEOUT_S): idx
+            for idx, spec in enumerate(specs)
+        }
+        try:
+            for future in as_completed(future_to_index, timeout=PROBE_ALL_DEADLINE_S):
+                idx = future_to_index[future]
+                try:
+                    results[idx] = future.result(timeout=0)
+                except Exception as exc:  # noqa: BLE001 — bound every probe
+                    results[idx] = _placeholder_result(
+                        specs[idx], f"probe raised: {exc.__class__.__name__}"
+                    )
+        except TimeoutError:
+            # Outer budget exhausted; remaining None slots become honest-unreachable.
+            pass
+    finally:
+        # ``cancel_futures=True`` (Python 3.9+) prevents pending submissions
+        # from running; ``wait=False`` returns immediately rather than
+        # blocking on stuck ``socket.getaddrinfo`` threads. The leaked
+        # worker threads will resolve on their own and discard their
+        # results; the next request gets a fresh pool. Slightly wasteful,
+        # but deterministically bounded — which is the whole point.
+        pool.shutdown(wait=False, cancel_futures=True)
+    now = time.monotonic()
+    timed_out_reason = (
+        "probe timeout exceeded backend budget"
+        if now >= deadline
+        else "probe did not return a result"
+    )
+    return [
+        result if result is not None else _placeholder_result(specs[idx], timed_out_reason)
+        for idx, result in enumerate(results)
+    ]
 
 
 # -----------------------------------------------------------------------------

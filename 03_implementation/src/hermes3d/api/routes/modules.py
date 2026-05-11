@@ -9,6 +9,7 @@ import time
 import zipfile
 from collections import Counter
 from collections.abc import AsyncIterator
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -161,6 +162,139 @@ def _invalidate_runtime_response_cache() -> None:
     instead of a stale snapshot.
     """
     _RUNTIME_RESPONSE_CACHE.clear()
+    _MODULE_LIST_CACHE.clear()
+    _MODULE_RUNTIME_PROBE_CACHE.clear()
+
+
+# W18-A18 — modules-list response cache + parallel per-module probe.
+#
+# Audit (operator, 2026-05-11): /api/source-os/modules and the
+# canonical /api/modules endpoint took ~19 s on a warm backend, and
+# the cold first-call could exceed the FE 15s AbortSignal timeout.
+# Profile: ``list_modules`` iterates ~60 module rows and calls
+# ``_module_response`` for each. ``_module_response`` invokes
+# ``module_runtime_probe(mod, live=False)`` per module; for kinds
+# ``python_import`` / ``python_source_import`` / ``python_module_cli``
+# / ``node_package`` / ``moonraker_fleet`` / ``local_http_health`` the
+# probe runs a subprocess (or HTTP call) regardless of ``live``. With
+# 60 modules × ~0.3 s subprocess wrapping, sequential cost is ~18 s
+# wall-clock. The list endpoint is not a hot mutation point — every
+# GET re-paying that cost is wasted work, and the FE polls it.
+#
+# Fix is two-pronged:
+#   1. Short TTL response cache (``MODULE_LIST_CACHE_TTL_S``) so a
+#      second GET inside the window returns the previous payload
+#      instantly — the same pattern W18-A13 already uses for the
+#      ``/api/modules/runtime/verifiers`` endpoint.
+#   2. Build the first-call payload with a ``ThreadPoolExecutor`` so
+#      the 60 per-module probes run in parallel (~8 threads on a
+#      typical workstation), driving cold-start under 5 s.
+#
+# Honest data preserved: we still call the real ``_module_response``;
+# we just stop running it sequentially. The cache is invalidated by
+# any write path (``set_module_provider``, ``verify_all_module_runtimes``,
+# install/update/rollback) via ``_invalidate_runtime_response_cache()``.
+MODULE_LIST_CACHE_TTL_S = 12.0
+# Concurrency budget for cold-list builds. Audit (2026-05-11): profiled
+# 60-module cold-list with p50 per-module probe = 91 ms and p100 ~ 1.5 s.
+# 32 workers is a sweet spot: enough to amortize the slowest single-probe
+# wall-time, but bounded so Windows ``CreateProcess`` contention does not
+# inflate startup latency.
+MODULE_LIST_PARALLELISM = 32
+# Per-future timeout MUST exceed the slowest per-module probe seen in
+# profiling (1.5 s) with comfortable headroom; otherwise an honest
+# probe spike degrades the row to an "unreachable" fallback envelope.
+MODULE_LIST_PER_FUTURE_TIMEOUT_S = 4.0
+_MODULE_LIST_CACHE: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+
+# W18-A18 — per-module runtime-probe cache, keyed by ``module_id``.
+#
+# The 60-module list calls ``_module_runtime_probe(mod, live=False)``
+# for each row, and several probe kinds (``python_import``,
+# ``moonraker_fleet``, ``local_http_health``, ``node_package``,
+# ``python_module_cli``, ``python_source_import``) execute subprocess
+# or network calls regardless of the ``live`` flag — each costing
+# ~100–1500 ms. Caching the dict result by module_id with the same
+# TTL as the list response means a re-request inside the cache window
+# avoids re-spawning those subprocesses entirely.
+#
+# Honest data: cache values are exactly what ``module_runtime_probe``
+# computed last call — no fabrication. The TTL plus write-path
+# invalidation (``_invalidate_runtime_response_cache``) keeps results
+# fresh enough for the FE polling cadence.
+MODULE_RUNTIME_PROBE_CACHE_TTL_S = 12.0
+_MODULE_RUNTIME_PROBE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _cached_module_list(cache_key: str, builder: Any) -> list[dict[str, Any]]:
+    cached = _MODULE_LIST_CACHE.get(cache_key)
+    if cached is not None:
+        cached_at, payload = cached
+        if (time.monotonic() - cached_at) < MODULE_LIST_CACHE_TTL_S:
+            return payload
+    fresh = builder()
+    _MODULE_LIST_CACHE[cache_key] = (time.monotonic(), fresh)
+    return fresh
+
+
+def _build_module_responses_parallel(module_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Run ``_module_response`` for each row in parallel and preserve order.
+
+    Per-module work is I/O bound (subprocess + filesystem stat), so a
+    thread pool is the appropriate parallelism unit. We cap workers at
+    ``MODULE_LIST_PARALLELISM`` to avoid overwhelming the OS process
+    table when the registry grows.
+    """
+    if not module_rows:
+        return []
+    max_workers = min(len(module_rows), MODULE_LIST_PARALLELISM) or 1
+    results: list[dict[str, Any] | None] = [None] * len(module_rows)
+    with ThreadPoolExecutor(
+        max_workers=max_workers, thread_name_prefix="hermes-module-list"
+    ) as pool:
+        future_to_index = {
+            pool.submit(_module_response, mod): idx for idx, mod in enumerate(module_rows)
+        }
+        for future, idx in future_to_index.items():
+            try:
+                results[idx] = future.result(timeout=MODULE_LIST_PER_FUTURE_TIMEOUT_S)
+            except Exception:  # noqa: BLE001 — degrade per-module, never the whole list
+                # Fall back to the raw DB row + a minimal envelope so the
+                # response still surfaces the module honestly. We do NOT
+                # invent a runtime "ready" verdict — the runtime field
+                # carries an explicit ``blocked`` status with the reason.
+                mod = module_rows[idx]
+                results[idx] = {
+                    **mod,
+                    "display": mod.get("display_name"),
+                    "repo": mod.get("repo_url"),
+                    "localPath": mod.get("local_path"),
+                    "installState": mod.get("install_state"),
+                    "installProgress": mod.get("install_progress") or 0,
+                    "detectedVersion": mod.get("detected_version"),
+                    "launchKind": mod.get("launch_kind"),
+                    "bridgeTasks": [],
+                    "proofs": [],
+                    "dispatchGates": [],
+                    "providers": [],
+                    "activeProvider": None,
+                    "runtime": {
+                        "status": "blocked",
+                        "label": "Runtime probe did not return in time",
+                        "kind": mod.get("launch_kind"),
+                        "verifier": None,
+                        "path": mod.get("local_path") or "",
+                        "detected": False,
+                        "executed": False,
+                        "return_code": None,
+                        "capabilities": [],
+                        "reason": "Per-module runtime probe exceeded the parallel-list budget; rerun Verify from Source OS.",
+                        "setup_steps": [],
+                        "proof_source": None,
+                        "output_head": [],
+                    },
+                }
+    return [item if item is not None else {} for item in results]
 
 
 def _module_or_404(module_id: str) -> dict[str, Any]:
@@ -276,7 +410,33 @@ def _provider_response(provider: dict[str, Any]) -> dict[str, Any]:
 
 
 def _module_runtime_probe(mod: dict[str, Any], *, live: bool = False) -> dict[str, Any]:
-    return module_runtime_probe(mod, live=live)
+    """W18-A18 — TTL-cached when ``live=False``.
+
+    The non-live path is the one called from list/aggregation endpoints
+    (e.g. ``/api/modules``, ``/api/source-os/modules``). Several probe
+    kinds subprocess regardless of ``live`` (see audit note on
+    :data:`_MODULE_RUNTIME_PROBE_CACHE` above), so we cache by
+    ``module_id`` for :data:`MODULE_RUNTIME_PROBE_CACHE_TTL_S`. The
+    ``live=True`` path (operator-initiated Verify, etc.) always
+    bypasses the cache and re-executes the probe.
+    """
+    if live:
+        result = module_runtime_probe(mod, live=True)
+        # Refresh the cache so a follow-up non-live list sees the
+        # verified state instead of the previous stale snapshot.
+        _MODULE_RUNTIME_PROBE_CACHE[str(mod.get("id") or "")] = (time.monotonic(), result)
+        return result
+    module_id = str(mod.get("id") or "")
+    if module_id:
+        cached = _MODULE_RUNTIME_PROBE_CACHE.get(module_id)
+        if cached is not None:
+            cached_at, payload = cached
+            if (time.monotonic() - cached_at) < MODULE_RUNTIME_PROBE_CACHE_TTL_S:
+                return payload
+    fresh = module_runtime_probe(mod, live=False)
+    if module_id:
+        _MODULE_RUNTIME_PROBE_CACHE[module_id] = (time.monotonic(), fresh)
+    return fresh
 
 
 def _module_setup_steps(mod: dict[str, Any]) -> list[str]:
@@ -536,6 +696,29 @@ def _redact_url(value: str | None) -> str | None:
 
 @router.get("/api/modules")
 def list_modules(section: str | None = None) -> list[dict[str, Any]]:
+    """W18-A18 — cached + parallelized.
+
+    Operator reproduced 19 s wall-clock per call because
+    ``_module_response`` was called sequentially across ~60 module rows
+    and each call dispatched a subprocess via
+    ``module_runtime_probe(mod, live=False)``. We now:
+
+    * Cache the response by section key for
+      :data:`MODULE_LIST_CACHE_TTL_S` (12 s) so the FE polling cadence
+      (typically <5 s) sees instant warm responses.
+    * Build the cold response with a thread-pool fan-out so
+      first-call latency is bounded by the slowest single per-module
+      probe (~0.3 s), not their sum.
+
+    Write paths call :func:`_invalidate_runtime_response_cache` which
+    also clears :data:`_MODULE_LIST_CACHE`, so cache freshness is
+    coupled to real state changes.
+    """
+    cache_key = f"section={section or ''}"
+    return _cached_module_list(cache_key, lambda: _build_list_modules_payload(section))
+
+
+def _build_list_modules_payload(section: str | None) -> list[dict[str, Any]]:
     _sync_registry_once()
     result = rows(
         "SELECT * FROM modules WHERE (? IS NULL OR section = ?) ORDER BY section, display_name",
@@ -547,7 +730,7 @@ def list_modules(section: str | None = None) -> list[dict[str, Any]]:
             "SELECT * FROM modules WHERE (? IS NULL OR section = ?) ORDER BY section, display_name",
             (section, section),
         )
-    return [_module_response(mod) for mod in result]
+    return _build_module_responses_parallel(result)
 
 
 @router.get("/api/modules/update/readiness")
