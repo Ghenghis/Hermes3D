@@ -375,6 +375,34 @@ export interface AppEntry {
   [k: string]: unknown;
 }
 
+/**
+ * Print Queue submit-job payload — wired by the W17-NEW-A5 fix.
+ *
+ * Maps 1:1 to the `JobCreate` Pydantic model accepted by
+ * `POST /api/jobs` in `hermes3d.api.routes.jobs.create_job`.
+ * The backend persists the row to SQLite with `status='queued'`.
+ * `dry_run` defaults to true so the call never commands a printer
+ * unless the operator opts in explicitly.
+ */
+export interface JobsEnqueueRequest {
+  name?: string | null;
+  job_type?: string;
+  printer_id?: string | null;
+  dry_run?: boolean;
+}
+
+export interface JobsEnqueueResult {
+  id: string;
+  name: string;
+  job_type: string;
+  status: string;
+  printer_id: string | null;
+  dry_run: number | boolean;
+  created_at?: string;
+  updated_at?: string;
+  [k: string]: unknown;
+}
+
 /* ------------------------------------------------------------------ */
 /* Domain clients                                                     */
 /* ------------------------------------------------------------------ */
@@ -604,6 +632,30 @@ export const recoveryClient = {
   },
 };
 
+/**
+ * Print Queue submit-job client (W17-NEW-A5 fix).
+ *
+ * Reuses the existing `POST /api/jobs` route — no new backend endpoint
+ * needed. The route is policy-gated by `_check_printer_policy` in
+ * `hermes3d.api.routes.jobs`, so a 423/503 response is honest and
+ * propagates to the operator as the dialog error.
+ */
+export const jobsClient = {
+  /** POST /api/jobs — enqueue a print queue row. */
+  enqueue(request: JobsEnqueueRequest, opts?: FetchOptions) {
+    return postJson<JobsEnqueueResult>(
+      "/api/jobs",
+      {
+        name: request.name?.trim() || null,
+        job_type: request.job_type?.trim() || "print",
+        printer_id: request.printer_id?.trim() || null,
+        dry_run: request.dry_run ?? true,
+      },
+      opts,
+    );
+  },
+};
+
 /** Aggregated default export for convenience. */
 export const hermes3dClient = {
   agents: agentsClient,
@@ -613,6 +665,7 @@ export const hermes3dClient = {
   mcp: mcpClient,
   apps: appsClient,
   recovery: recoveryClient,
+  jobs: jobsClient,
 };
 
 export type Hermes3dClient = typeof hermes3dClient;
