@@ -7,8 +7,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pause, Play, Printer as PrinterIcon, RefreshCw } from "lucide-react";
+import { Pause, Play, Plus, Printer as PrinterIcon, RefreshCw } from "lucide-react";
 import { adapters } from "../api/adapters";
+import { SubmitJobDialog } from "../components/print-queue/SubmitJobDialog";
 import type { Job, JobStatus } from "../types/job";
 import type { Printer } from "../types/printer";
 
@@ -29,6 +30,8 @@ export function PrintQueueTab() {
   const [loading, setLoading] = useState(false);
   const [paused, setPaused] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // W17-NEW-A5 fix: dialog state for the "Submit Job" control.
+  const [submitOpen, setSubmitOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -83,6 +86,15 @@ export function PrintQueueTab() {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
+            onClick={() => setSubmitOpen(true)}
+            data-testid="print-queue-submit"
+            className="flex items-center gap-1.5 rounded border border-accent-cyan/40 bg-accent-cyan/10 px-2 py-1 text-[11px] text-accent-cyan hover:bg-accent-cyan/20"
+          >
+            <Plus size={11} />
+            Submit Job
+          </button>
+          <button
+            type="button"
             onClick={() => void refresh()}
             disabled={loading}
             data-testid="print-queue-refresh"
@@ -119,6 +131,17 @@ export function PrintQueueTab() {
         <Lane title="Printing now" jobs={printing} printerName={printerName} testId="print-queue-lane-printing" />
         <Lane title="Queued" jobs={queued} printerName={printerName} testId="print-queue-lane-queued" />
       </div>
+
+      {submitOpen && (
+        <SubmitJobDialog
+          printers={printers}
+          onSubmitted={() => {
+            setSubmitOpen(false);
+            void refresh();
+          }}
+          onClose={() => setSubmitOpen(false)}
+        />
+      )}
     </div>
   );
 }
