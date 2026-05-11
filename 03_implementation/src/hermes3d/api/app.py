@@ -24,7 +24,9 @@ from hermes3d.api.routes import (
     desktop_compat,
     desktop_updates,
     events,
+    files,
     generation,
+    health_services,
     jobs,
     learning,
     mcp_locks,
@@ -144,6 +146,11 @@ def create_gui_app() -> FastAPI:
         # Reads real lock state from the orchestrator's .hermes3d_orchestrator/
         # locks/ directory and returns mcp_server_unreachable when absent.
         mcp_locks,
+        # W17 backend gaps: honest-blocked file store surface + GUI
+        # bridge service-health probe results (FilesTab + ServiceHealth
+        # consumers were 404ing in W17-A1 audit).
+        files,
+        health_services,
     ]:
         app.include_router(route_module.router)
 
