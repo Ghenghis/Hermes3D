@@ -27,6 +27,7 @@ from hermes3d.api.routes import (
     generation,
     jobs,
     learning,
+    mcp_locks,
     modules,
     notifications,
     observe,
@@ -139,6 +140,10 @@ def create_gui_app() -> FastAPI:
         connectors,
         settings_themes,
         dashboard_layouts,
+        # W17 — honest-blocked /api/mcp/locks (W17-NEW-A6 finding).
+        # Reads real lock state from the orchestrator's .hermes3d_orchestrator/
+        # locks/ directory and returns mcp_server_unreachable when absent.
+        mcp_locks,
     ]:
         app.include_router(route_module.router)
 
