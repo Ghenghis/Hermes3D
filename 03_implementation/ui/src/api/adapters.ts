@@ -10,6 +10,7 @@ import {
   getActiveWorkflowsLive,
   getAgentActionCatalogLive,
   getAgentE2EReadinessLive,
+  getAgentTasksLive,
   getAgentsLive,
   getApprovalHistoryLive,
   getArtifactsLive,
@@ -101,6 +102,7 @@ import type {
   AgentE2EJobRequest,
   AgentE2EJobResult,
   AgentE2EReadiness,
+  AgentTasksFeed,
   CodeCliRunnerPreflightResult,
   CodeCliRunnerReadiness,
   CodeCliRunnerRunRequest,
@@ -174,6 +176,8 @@ export interface AdapterAPI {
   getPrinters(): Promise<Printer[]>;
   getAgents(): Promise<Agent[]>;
   getAgentActionCatalog(): Promise<AgentActionCatalog>;
+  /** W18-A25 — recent code-team / provider-smoke / E2E tasks for the #agents tab. */
+  getAgentTasks(limit?: number): Promise<AgentTasksFeed>;
   runAgentCatalogAction(actionId: string, reason?: string, payload?: Record<string, unknown>): Promise<AgentActionRunResult>;
   getAgentE2EReadiness(): Promise<AgentE2EReadiness>;
   runAgentE2EJob(request: AgentE2EJobRequest): Promise<AgentE2EJobResult>;
@@ -272,6 +276,7 @@ export const adapters: AdapterAPI = {
   getPrinters: getLivePrinters,
   getAgents: getAgentsLive,
   getAgentActionCatalog: getAgentActionCatalogLive,
+  getAgentTasks: getAgentTasksLive,
   runAgentCatalogAction: runAgentCatalogActionLive,
   getAgentE2EReadiness: getAgentE2EReadinessLive,
   runAgentE2EJob: runAgentE2EJobLive,

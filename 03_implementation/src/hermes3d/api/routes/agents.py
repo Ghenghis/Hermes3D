@@ -14,7 +14,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -35,8 +35,20 @@ PROOF_DIR = IMPLEMENTATION_ROOT / "proof"
 SOURCE_COMPLETION_PATH = PROOF_DIR / "SOURCE_APP_60_COMPLETION_AUDIT.json"
 SOURCE_CLI_READINESS_PATH = PROOF_DIR / "SOURCE_APP_CLI_AGENT_READINESS_AUDIT.json"
 SOURCE_CLI_SURFACE_PATH = PROOF_DIR / "SOURCE_APP_CLI_SURFACE_AUDIT.json"
-ACTION_CONTRACT_CACHE_TTL_S = 8.0
+ACTION_CONTRACT_CACHE_TTL_S = 60.0  # W18-A25: bumped 8s→60s; cold call did 4 sequential
+# probes (mcp_locks, provider_team_readiness, agent_e2e_readiness, code_cli_runners)
+# whose underlying subprocesses (docker version 5s, docker image inspect 8s,
+# opencode --version 8s, openhands version 8s) summed to ~41s wall time on a
+# verified operator-local replay. 60s warm cache holds for the GUI 10s poll
+# loop and keeps stale-config drift bounded; first cold call still does the
+# real probes so a new docker/cli install is detected the next minute.
 _ACTION_CONTRACT_CACHE: dict[str, Any] = {"ts": 0.0, "contracts": None}
+
+# W18-A25: separate cache for /api/agents/tasks proof_events scan so the
+# 10s GUI poll does not re-query SQLite on every tick when nothing has
+# changed. 10s TTL matches the panel's planned refresh cadence.
+_AGENT_TASKS_CACHE_TTL_S = 10.0
+_AGENT_TASKS_CACHE: dict[str, Any] = {"ts": 0.0, "payload": None}
 
 PERSONAS = [
     "factory-operator",
@@ -612,8 +624,8 @@ def fleet_action(action_id: str, body: AgentActionRequest | None = None) -> dict
     return _run_catalog_action(action_id, "hermes-agent", body)
 
 
-@router.get("/api/agents/action-catalog")
 def action_catalog() -> dict:
+    """Return the action catalog payload.  Unit-testable with no HTTP context."""
     contracts = _agent_action_contracts()
     counts = Counter(contract["status"] for contract in contracts)
     public_contracts = [_public_action_contract(contract) for contract in contracts]
@@ -633,11 +645,273 @@ def action_catalog() -> dict:
     }
 
 
+@router.get("/api/agents/action-catalog")
+def _action_catalog_route(response: Response) -> dict:
+    # W18-A25: 60s Cache-Control so well-behaved GUI/proxy callers can avoid a
+    # re-fetch storm; the backend's own _ACTION_CONTRACT_CACHE TTL is 60s so
+    # this stays consistent with what the server will actually return.
+    response.headers["Cache-Control"] = "max-age=60"
+    return action_catalog()
+
+
+# W18-A25: alias for callers that use the plural/slashed form.
+# Operator-verified that some GUI callers had a 405 on
+# ``GET /api/agents/actions/catalog`` because ``/api/agents/actions/{action_id}``
+# is registered as POST only. We register the plural form as a *separate* GET
+# that returns the exact same payload as the canonical singular form. We do
+# not 308-redirect because:
+#   1) browsers retain the POST method on 307/308 only for the same method,
+#      and a 308 from GET to GET is correct, but adapters/tests sometimes
+#      treat a redirect as failure; returning the body directly is simpler.
+#   2) anything that already mounted Cache-Control on the canonical path will
+#      still see it because the same response object is mutated.
+@router.get("/api/agents/actions/catalog")
+def action_catalog_alias(response: Response) -> dict:
+    response.headers["Cache-Control"] = "max-age=60"
+    return action_catalog()
+
+
+# W18-A25 — GUI-friendly active code-team / provider-smoke task feed.
+#
+# Operator verified locally that the #agents GUI showed
+# "0 active · 0 tasks · 0/8 roster" because there was no endpoint
+# returning the live team-task work the providers had just done.
+# This endpoint scans ``proof_events`` for the executed/blocked/failed
+# Hermes-agent catalog actions whose ``action_id`` matches the
+# ``code.teams.*`` or ``code.providers.smoke`` patterns and returns the
+# last 50 within the last 7 days plus an ``active_count``.
+#
+# Important constraints:
+#   - No printer-control endpoints touched.
+#   - No mocks: rows come from real proof_events written by
+#     ``_run_catalog_action`` (which calls ``_append_agent_proof``).
+#   - Secrets stay redacted because we read only the structured fields we
+#     wrote ourselves; provider/team/title/task_id are already user
+#     bounded text validated upstream.
+_AGENT_TASK_EVENT_TYPES: tuple[str, ...] = (
+    "hermes_agent.action.executed",
+    "hermes_agent.action.blocked",
+    "hermes_agent.action.failed",
+)
+_AGENT_TASK_ACTION_PREFIXES: tuple[str, ...] = (
+    "code.teams.",
+    "code.providers.smoke",
+    "code.e2e.",
+)
+_AGENT_TASK_STATUS_MAP: dict[str, str] = {
+    "hermes_agent.action.executed": "completed",
+    "hermes_agent.action.blocked": "blocked",
+    "hermes_agent.action.failed": "failed",
+}
+# Active = anything still in flight from the GUI's point of view.
+# We keep "completed" out of active because the work has produced its
+# evidence and is now "recent" — but the panel still shows it.
+_AGENT_TASK_ACTIVE_STATUSES: frozenset[str] = frozenset(
+    {
+        "claimed",
+        "coding_plan_recorded",
+        "review_recorded",
+        "assigned",
+        "in_progress",
+    }
+)
+
+
+def _agent_task_kind_for(action_id: str) -> str:
+    """Map action_id to the GUI task ``kind`` enum."""
+    if action_id.startswith("code.teams.") or action_id.startswith("code.e2e."):
+        return "code_team"
+    if action_id == "code.providers.smoke":
+        return "code_provider_smoke"
+    return "code_action"
+
+
+def _agent_task_title_from(payload: dict[str, Any], action_id: str) -> str:
+    raw = (
+        payload.get("title")
+        or payload.get("requested_reason")
+        or payload.get("reason")
+        or action_id
+    )
+    text = str(raw).strip()
+    return text[:200] if text else action_id
+
+
+def _agent_task_status_from(payload: dict[str, Any], event_type: str) -> str:
+    # Prefer the enriched result_status (set by _run_catalog_action when the
+    # downstream handler returned ``status``); fall back to the event type.
+    explicit = payload.get("result_status") or payload.get("status")
+    if explicit:
+        return str(explicit).strip()
+    return _AGENT_TASK_STATUS_MAP.get(event_type, event_type)
+
+
+@router.get("/api/agents/tasks")
+def agent_tasks(response: Response, limit: int = 50) -> dict[str, Any]:
+    """Recent Hermes code-team / provider-smoke / E2E tasks for the #agents tab.
+
+    Reads from the local ``proof_events`` SQLite table (NOT the MCP evidence
+    ledger — that data is on a different store) where ``event_type`` is one of
+    the catalog-action events and the payload's ``action_id`` matches a
+    ``code.teams.*`` / ``code.providers.smoke`` / ``code.e2e.*`` prefix.
+
+    Window: 7 days. Default limit: 50. Hard upper bound: 200.
+    """
+    safe_limit = max(1, min(int(limit or 50), 200))
+    now_mono = time.monotonic()
+    cached = _AGENT_TASKS_CACHE.get("payload")
+    cached_at = float(_AGENT_TASKS_CACHE.get("ts") or 0.0)
+    cached_limit = int(_AGENT_TASKS_CACHE.get("limit") or 0)
+    if (
+        isinstance(cached, dict)
+        and cached_limit == safe_limit
+        and (now_mono - cached_at) < _AGENT_TASKS_CACHE_TTL_S
+    ):
+        response.headers["Cache-Control"] = "max-age=10"
+        response.headers["X-Hermes-Cache"] = "hit"
+        return cached
+
+    # Use SQLite's strftime to filter to the last 7 days. ``created_at`` is
+    # stored as a ``datetime('now')`` UTC string, so a lexicographic compare
+    # against ``datetime('now', '-7 days')`` is correct.
+    placeholders = ",".join("?" for _ in _AGENT_TASK_EVENT_TYPES)
+    records = rows(
+        f"""
+        SELECT id, event_type, source_agent, payload, created_at
+        FROM proof_events
+        WHERE event_type IN ({placeholders})
+          AND created_at >= datetime('now', '-7 days')
+        ORDER BY created_at DESC
+        LIMIT ?
+        """,
+        (*_AGENT_TASK_EVENT_TYPES, safe_limit * 4),  # over-fetch then filter
+    )
+
+    tasks: list[dict[str, Any]] = []
+    provider_latest: dict[str, dict[str, Any]] = {}
+    for record in records:
+        raw_payload = record.get("payload") or "{}"
+        try:
+            payload = (
+                json.loads(raw_payload) if isinstance(raw_payload, str) else (raw_payload or {})
+            )
+        except json.JSONDecodeError:
+            payload = {}
+        if not isinstance(payload, dict):
+            continue
+        action_id = str(payload.get("action_id") or "").strip()
+        if not action_id:
+            continue
+        if not any(action_id.startswith(prefix) for prefix in _AGENT_TASK_ACTION_PREFIXES):
+            continue
+        kind = _agent_task_kind_for(action_id)
+        status = _agent_task_status_from(payload, str(record["event_type"]))
+        task_id = str(payload.get("task_id") or "").strip() or None
+        team_id = str(payload.get("team_id") or "").strip() or None
+        provider_id = str(payload.get("provider_id") or "").strip() or None
+        # Pull provider_id from the action_id for the smoke action when
+        # not otherwise present.
+        if not provider_id and action_id == "code.providers.smoke":
+            provider_id = str(payload.get("requested_provider_id") or "") or None
+        title = _agent_task_title_from(payload, action_id)
+        entry: dict[str, Any] = {
+            "task_id": task_id,
+            "team_id": team_id,
+            "provider_id": provider_id,
+            "title": title,
+            "kind": kind,
+            "action_id": action_id,
+            "status": status,
+            "event_type": record["event_type"],
+            "created_utc": record["created_at"],
+            "evidence_id": record["id"],
+            "source_agent": record["source_agent"],
+        }
+        tasks.append(entry)
+        if (
+            action_id == "code.providers.smoke"
+            and provider_id
+            and provider_id not in provider_latest
+        ):
+            provider_latest[provider_id] = {
+                "provider_id": provider_id,
+                "status": status,
+                "task_id": task_id,
+                "created_utc": record["created_at"],
+                "evidence_id": record["id"],
+            }
+        if len(tasks) >= safe_limit:
+            break
+
+    active_count = sum(1 for task in tasks if str(task["status"]) in _AGENT_TASK_ACTIVE_STATUSES)
+    payload = {
+        "tasks": tasks,
+        "active_count": active_count,
+        "total_count": len(tasks),
+        "limit": safe_limit,
+        "window_days": 7,
+        "provider_smoke_latest": list(provider_latest.values()),
+        "schema_version": "agent-tasks-v1",
+    }
+    _AGENT_TASKS_CACHE["payload"] = payload
+    _AGENT_TASKS_CACHE["ts"] = now_mono
+    _AGENT_TASKS_CACHE["limit"] = safe_limit
+    response.headers["Cache-Control"] = "max-age=10"
+    response.headers["X-Hermes-Cache"] = "miss"
+    return payload
+
+
+def _agent_task_fields(
+    action_id: str,
+    request_payload: dict[str, Any] | None,
+    result: Any = None,
+) -> dict[str, Any]:
+    """W18-A25: extract task_id / team_id / provider_id / title from
+    catalog-action request/result so they survive in the proof_events row
+    in cleartext.
+
+    The /api/agents/tasks endpoint reads only what we put here — no secrets
+    pass through because the upstream code_history validators bound these
+    values (task_id, team_id, title) before they ever reach this layer.
+    """
+    extracted: dict[str, Any] = {}
+    request_payload = request_payload or {}
+    # Pull from the request payload first (operator's intent).
+    for key in ("task_id", "team_id", "provider_id", "title"):
+        value = request_payload.get(key)
+        if isinstance(value, str) and value.strip():
+            extracted[key] = value.strip()[:200]
+    # The smoke action carries provider_id in its top-level payload.
+    if action_id == "code.providers.smoke" and "provider_id" not in extracted:
+        provider = request_payload.get("provider_id") or request_payload.get("provider")
+        if isinstance(provider, str) and provider.strip():
+            extracted["provider_id"] = provider.strip()[:60]
+    # Backfill from result if upstream service echoes them (assign_provider_team_task does).
+    if isinstance(result, dict):
+        for key in ("task_id", "team_id", "provider_id", "title"):
+            if key in extracted:
+                continue
+            value = result.get(key)
+            if isinstance(value, str) and value.strip():
+                extracted[key] = value.strip()[:200]
+        # Provider smoke result has the provider id under provider.id.
+        if "provider_id" not in extracted:
+            nested = result.get("provider")
+            if isinstance(nested, dict):
+                value = nested.get("id")
+                if isinstance(value, str) and value.strip():
+                    extracted["provider_id"] = value.strip()[:60]
+    return extracted
+
+
 def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | None = None) -> dict:
     contracts = {contract["id"]: contract for contract in _agent_action_contracts()}
     contract = contracts.get(action_id)
     requested_reason = body.reason if body else None
     payload = body.payload if body else {}
+    # W18-A25: pre-extract cleartext task fields so blocked/failed paths still
+    # land in /api/agents/tasks with a useful title.
+    task_fields = _agent_task_fields(action_id, payload, None)
     if contract is None:
         proof_event_id = _append_agent_proof(
             "hermes_agent.action.blocked",
@@ -647,6 +921,7 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
                 "status": "blocked",
                 "reason": "action_not_registered",
                 "requested_reason": requested_reason,
+                **task_fields,
             },
         )
         return {
@@ -666,6 +941,7 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
                 "status": contract["status"],
                 "reason": contract.get("blocked_reason") or "action_has_no_executor",
                 "requested_reason": requested_reason,
+                **task_fields,
             },
         )
         return {
@@ -689,6 +965,7 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
                 "handler": handler,
                 "status": "failed",
                 "reason": _redact(str(exc))[:500],
+                **task_fields,
             },
         )
         return {
@@ -699,6 +976,8 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
             "proof_event_id": proof_event_id,
             "contract": _public_action_contract(contract),
         }
+    # W18-A25: refresh task fields with anything the handler result added.
+    task_fields = _agent_task_fields(action_id, payload, result)
     proof_event_id = _append_agent_proof(
         "hermes_agent.action.executed",
         actor,
@@ -711,8 +990,13 @@ def _run_catalog_action(action_id: str, actor: str, body: AgentActionRequest | N
                 json.dumps(_proof_safe_result(result), sort_keys=True, default=str).encode("utf-8")
             ).hexdigest(),
             "requested_reason": requested_reason,
+            **task_fields,
         },
     )
+    # W18-A25: bust the /api/agents/tasks cache so the next GUI poll sees
+    # this new row immediately instead of waiting up to 10s.
+    _AGENT_TASKS_CACHE["ts"] = 0.0
+    _AGENT_TASKS_CACHE["payload"] = None
     return {
         "action_id": action_id,
         "accepted": True,
@@ -1509,13 +1793,166 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
     python_import_repairs = int(source_counts.get("python_import_repair_available") or 0)
     cli_install_configs = int(source_counts.get("cli_install_config_available") or 0)
     npm_package_preflights = int(source_counts.get("npm_package_preflight_available") or 0)
+    # W18-A25: parallelize the four independent readiness probes and
+    # cap the slowest one (cli_runners) with a 4s deadline.
+    #
+    # The W18-A3 audit measured 41s wall on cold-start because these
+    # probes ran sequentially and each launched subprocesses. Profiling
+    # showed the dominant cost is ``code_cli_runners()`` (~18s on a host
+    # where opencode/openhands binaries are absent: each shell-out probes
+    # ``--version`` then falls through to ``version`` with 8s timeouts,
+    # plus ``code_sandbox_readiness()`` runs ``docker version`` 5s +
+    # ``docker image inspect`` 8s).
+    #
+    # The contract-catalog only needs the "is the runner present?" answer
+    # — it never blocks on a write run. So we run cli_runners with a 4s
+    # budget and fall back to a deferred entry that the catalog
+    # surfaces as `status: setup_required` if it doesn't finish in time.
+    # The next 60s-TTL warm hit returns the cached full payload, and the
+    # operator can hit ``/api/code-operator/cli-runners`` directly for
+    # the un-bounded answer when they actually need to launch a runner.
+    #
+    # Operator-freeze contract: no printer-control endpoints invoked.
+    _CLI_RUNNERS_BUDGET_S = 2.5
+    _CLI_RUNNERS_DEFERRED: dict[str, Any] = {
+        "status": "setup_required",
+        "count": 2,
+        "detected": 0,
+        "runners": [
+            {
+                "id": "opencode",
+                "label": "OpenCode CLI",
+                "detected": False,
+                "executable": None,
+                "version": None,
+                "version_status": "deferred",
+                "write_allowed": False,
+                "blocked_reason": (
+                    "Catalog cold-path deferred CLI subprocess probe; "
+                    "GET /api/code-operator/cli-runners for the un-bounded check."
+                ),
+                "policy": "version_preflight",
+            },
+            {
+                "id": "openhands",
+                "label": "OpenHands CLI",
+                "detected": False,
+                "executable": None,
+                "version": None,
+                "version_status": "deferred",
+                "write_allowed": False,
+                "blocked_reason": (
+                    "Catalog cold-path deferred CLI subprocess probe; "
+                    "GET /api/code-operator/cli-runners for the un-bounded check."
+                ),
+                "policy": "version_preflight",
+            },
+        ],
+        "sandbox": {
+            "status": "deferred",
+            "ready": False,
+            "mode": "docker",
+            "docker_executable": None,
+            "docker_version": None,
+            "image_configured": False,
+            "image": None,
+            "network_mode": "none",
+            "workspace_mount": "",
+            "denied_paths": [],
+            "blocked_reasons": [
+                "Sandbox probe deferred from catalog cold path; the catalog cache "
+                "will return the full payload within 60s once probes settle."
+            ],
+        },
+        "policy": {
+            "write_runs_allowed": False,
+            "reason": "Deferred from catalog cold path; CLI runner write runs always require explicit /api/code-operator/cli-runners/run.",
+            "allowed_now": ["detect_deferred"],
+        },
+    }
     try:
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as _FutureTimeout
+
         from hermes3d.services import code_history
 
-        mcp_locks = code_history.mcp_lock_readiness()
-        provider_teams = code_history.provider_team_readiness()
-        e2e_readiness = code_history.agent_e2e_readiness()
-        cli_runners = code_history.code_cli_runners()
+        # NOTE: we manage the pool manually so we can `shutdown(wait=False)`
+        # when cli_runners exceeds its budget. A `with` block would wait
+        # for the stuck CLI subprocess thread on exit.
+        pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="agents-catalog")
+        try:
+            mcp_future = pool.submit(code_history.mcp_lock_readiness)
+            teams_future = pool.submit(code_history.provider_team_readiness)
+            cli_future = pool.submit(code_history.code_cli_runners)
+            programming_future = pool.submit(code_history.programming_readiness)
+            mcp_locks = mcp_future.result(timeout=30)
+            provider_teams = teams_future.result(timeout=30)
+            programming = programming_future.result(timeout=30)
+            try:
+                cli_runners = cli_future.result(timeout=_CLI_RUNNERS_BUDGET_S)
+                # If a real result came back this fast, drop any cached deferred fallback.
+                _ACTION_CONTRACT_CACHE["cli_runners_deferred"] = cli_runners
+            except _FutureTimeout:
+                # Prefer last-known full payload if we have it; otherwise
+                # the static deferred envelope is the GUI-honest answer.
+                deferred_payload = _ACTION_CONTRACT_CACHE.get("cli_runners_deferred")
+                cli_runners = (
+                    deferred_payload
+                    if isinstance(deferred_payload, dict)
+                    else _CLI_RUNNERS_DEFERRED
+                )
+
+                def _capture_deferred(future: Any) -> None:
+                    if future.cancelled() or future.exception() is not None:
+                        return
+                    try:
+                        payload = future.result(timeout=0)
+                    except Exception:
+                        return
+                    _ACTION_CONTRACT_CACHE["cli_runners_deferred"] = payload
+
+                cli_future.add_done_callback(_capture_deferred)
+        finally:
+            # wait=False detaches the still-running cli thread so we don't
+            # block the response. Subprocess timeouts inside that thread
+            # cap its eventual termination.
+            pool.shutdown(wait=False)
+
+        # Build the e2e readiness summary from the cached parallel results
+        # instead of calling ``agent_e2e_readiness()`` which would re-spawn
+        # all the subprocess probes. We mirror the exact same shape and
+        # ``blocked_reasons`` aggregation as the canonical helper so the
+        # rest of the contract list keeps the same status semantics.
+        folder_index = code_history.folder_index_context([])
+        blocked_reasons: list[str] = []
+        if not programming.get("ready"):
+            blocked_reasons.extend(str(item) for item in programming.get("blocked_reasons", []))
+        if not provider_teams.get("ready"):
+            blocked_reasons.extend(str(item) for item in provider_teams.get("blocked_reasons", []))
+        if folder_index.get("missing"):
+            blocked_reasons.append(
+                "Folder index is incomplete: " + ", ".join(folder_index["missing"])
+            )
+        e2e_readiness = {
+            "status": "ready" if not blocked_reasons else "blocked",
+            "ready": not blocked_reasons,
+            "summary": "MiniMax builder + DeepSeek reviewer coding loop readiness.",
+            "blocked_reasons": blocked_reasons,
+            "programming": programming,
+            "provider_teams": provider_teams,
+            "folder_index": folder_index,
+            "cli_runners": cli_runners,
+            "next_required_steps": [
+                "submit task through Agent Code Workbench",
+                "load folder index",
+                "claim task and lock files",
+                "snapshot files",
+                "run MiniMax coding pass",
+                "run DeepSeek review pass",
+                "apply only reviewed bounded patch proposals",
+                "run gates and ship PR with proof",
+            ],
+        }
     except Exception:
         mcp_locks = {
             "ready": False,
