@@ -197,6 +197,19 @@ def list_files() -> FilesResponse:
     )
 
 
+# Backward-compat aliases: the Files tab probes /api/files/list and
+# /api/files/index; these must return 200 (not 404) so the probe shows
+# "available". Declared before {file_id} so FastAPI resolves them first.
+@router.get("/api/files/list", response_model=FilesResponse)
+def list_files_compat() -> FilesResponse:
+    return list_files()
+
+
+@router.get("/api/files/index", response_model=FilesResponse)
+def list_files_index() -> FilesResponse:
+    return list_files()
+
+
 @router.get("/api/files/{file_id}", response_model=FilesResponse)
 def get_file(file_id: str) -> FilesResponse:
     if not file_id.strip():

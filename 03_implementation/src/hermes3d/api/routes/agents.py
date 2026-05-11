@@ -4094,8 +4094,7 @@ def model_assist(body: dict | None = None) -> dict:
     # Strip markdown fences if present
     if raw_json.startswith("```"):
         raw_json = "\n".join(
-            line for line in raw_json.splitlines()
-            if not line.strip().startswith("```")
+            line for line in raw_json.splitlines() if not line.strip().startswith("```")
         ).strip()
     try:
         parsed = json.loads(raw_json)
@@ -4103,7 +4102,9 @@ def model_assist(body: dict | None = None) -> dict:
             extracted = {
                 "title": str(parsed.get("title", prompt[:60])),
                 "intent": str(parsed.get("intent", prompt)),
-                "constraints": parsed.get("constraints") if isinstance(parsed.get("constraints"), dict) else {},
+                "constraints": parsed.get("constraints")
+                if isinstance(parsed.get("constraints"), dict)
+                else {},
             }
         else:
             parse_error = "MiniMax response was not a JSON object"
@@ -4130,14 +4131,15 @@ def model_assist(body: dict | None = None) -> dict:
         review_prompt = (
             f"{_MODEL_ASSIST_REVIEW_SYSTEM}\n\nParameters to review:\n{json.dumps(extracted)}"
         )
-        ds_result_raw = _provider_call("deepseek", prompt=review_prompt, max_tokens=100, timeout=30.0)
+        ds_result_raw = _provider_call(
+            "deepseek", prompt=review_prompt, max_tokens=100, timeout=30.0
+        )
         ds_completion = ds_result_raw.pop("completion_text", None) or ""
         ds_result = ds_result_raw
         raw_ds = ds_completion.strip()
         if raw_ds.startswith("```"):
             raw_ds = "\n".join(
-                line for line in raw_ds.splitlines()
-                if not line.strip().startswith("```")
+                line for line in raw_ds.splitlines() if not line.strip().startswith("```")
             ).strip()
         try:
             rev = json.loads(raw_ds)
@@ -4153,11 +4155,21 @@ def model_assist(body: dict | None = None) -> dict:
         ds_reply_id = new_id()
         execute(
             "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'user', ?, ?)",
-            (ds_user_id, "oliver-qa-agent", "MODEL_ASSIST_REVIEW_REQ:deepseek", json.dumps(extracted)),
+            (
+                ds_user_id,
+                "oliver-qa-agent",
+                "MODEL_ASSIST_REVIEW_REQ:deepseek",
+                json.dumps(extracted),
+            ),
         )
         execute(
             "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'assistant', ?, ?)",
-            (ds_reply_id, "oliver-qa-agent", "MODEL_ASSIST_REVIEW_REPLY:deepseek", ds_completion or ""),
+            (
+                ds_reply_id,
+                "oliver-qa-agent",
+                "MODEL_ASSIST_REVIEW_REPLY:deepseek",
+                ds_completion or "",
+            ),
         )
 
     # Step 3: Optional auto-submit to design.intake
