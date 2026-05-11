@@ -1,0 +1,19 @@
+{
+  "base_url": "https://api.deepseek.com",
+  "http_status": 200,
+  "key_present": true,
+  "latency_ms": 1075,
+  "model": "deepseek-v4-pro",
+  "proof_id": "smoke-deepseek-ad7429aa980f",
+  "provider_id": "deepseek",
+  "response_meta": {
+    "body_sha256": "3a20467bf5ecb60cf717a542fc9632eea149427c4d61069ac601812bdf5b8692",
+    "body_size_bytes": 539,
+    "model": "deepseek-v4-pro",
+    "tokens_in": 5,
+    "tokens_out": 1
+  },
+  "smoke_max_tokens": 1,
+  "status": "PASS_LIVE",
+  "timestamp_utc": "2026-05-11T14:03:02.320899Z"
+}

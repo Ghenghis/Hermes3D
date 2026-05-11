@@ -1,0 +1,15 @@
+{
+  "status": "PASS_LIVE",
+  "provider": "deepseek",
+  "role": "reviewer",
+  "persona": "oliver-qa-agent",
+  "model": "deepseek-v4-pro",
+  "http_status": 200,
+  "latency_ms": 22142,
+  "tokens_in": 47,
+  "tokens_out": 600,
+  "user_msg_id": "eec5d9a11ec649abbc510af8236d09b3",
+  "assistant_msg_id": "e7349c90447d4c0d86f2e2f9437adc8b",
+  "proof_event_id": "0ff0a748e8ce4eae95fe1bc4d43ed504",
+  "completion": null
+}

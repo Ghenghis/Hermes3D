@@ -1,0 +1,61 @@
+{
+  "healthy": true,
+  "status": "bridge_ready",
+  "agents": {
+    "factory-operator": "idle",
+    "modeling-agent": "idle",
+    "print-safety-agent": "idle",
+    "mesh-go-agent": "idle",
+    "mesh-repair-agent": "idle",
+    "oliver-qa-agent": "idle",
+    "print-monitor-agent": "idle",
+    "privacy-agent": "idle"
+  },
+  "setup": {
+    "env": "HERMES3D_AGENT_RUNTIME_URL",
+    "model_env": "HERMES3D_AGENT_RUNTIME_MODEL",
+    "model": "qwen3.5-9b-glm5.1-distill-v1",
+    "reason": "Configured local/private agent runtime responded HTTP 200 with model qwen3.5-9b-glm5.1-distill-v1.",
+    "latency_ms": 2
+  },
+  "providers": {
+    "minimax": {
+      "role": "builder",
+      "role_description": "Implementation / refactor proposals (MiniMax).",
+      "key_present": true,
+      "model": "MiniMax-M2.7-highspeed",
+      "base_url": "https://api.minimax.io/v1",
+      "smoke_endpoint": "/api/agents/providers/smoke",
+      "kind": "live_remote"
+    },
+    "deepseek": {
+      "role": "reviewer",
+      "role_description": "Verification / regression review (DeepSeek).",
+      "key_present": true,
+      "model": "deepseek-v4-pro",
+      "base_url": "https://api.deepseek.com",
+      "smoke_endpoint": "/api/agents/providers/smoke",
+      "kind": "live_remote"
+    },
+    "lm_studio": {
+      "role": "fallback",
+      "role_description": "Local dev fallback only (LM Studio / Ollama).",
+      "key_present": true,
+      "kind": "local_fallback"
+    },
+    "ollama": {
+      "role": "fallback",
+      "role_description": "Local dev fallback only (LM Studio / Ollama).",
+      "key_present": true,
+      "kind": "local_fallback"
+    }
+  },
+  "provider_roles": {
+    "builder": "minimax",
+    "reviewer": "deepseek",
+    "fallback": [
+      "lm_studio",
+      "ollama"
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "base_url": "https://api.minimax.io/v1",
+  "http_status": 200,
+  "key_present": true,
+  "latency_ms": 1165,
+  "model": "MiniMax-M2.7-highspeed",
+  "proof_id": "smoke-minimax-d3d5d09a9f71",
+  "provider_id": "minimax",
+  "response_meta": {
+    "body_sha256": "f893371f7dd478e35e1910e2f137d031321cc29dae4e2a2ea34dd70be242d1cb",
+    "body_size_bytes": 591,
+    "model": "MiniMax-M2.7-highspeed",
+    "tokens_in": 42,
+    "tokens_out": 3
+  },
+  "smoke_max_tokens": 1,
+  "status": "PASS_LIVE",
+  "timestamp_utc": "2026-05-11T14:03:01.154472Z"
+}
