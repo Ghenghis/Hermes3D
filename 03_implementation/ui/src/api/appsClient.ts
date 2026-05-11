@@ -162,6 +162,8 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
     rollback_supported: readBool(record, "rollback_supported") || readBool(record, "rollback"),
     description: readString(record, "description"),
     upstream_url: readString(record, "upstream_url") ?? readString(record, "repo_url"),
+    truthful_status: (readString(record, "truthful_status") as import("../types/app-registry").TruthfulStatus | null) ?? "UNKNOWN",
+    proof_command: readString(record, "proof_command"),
   };
 }
 

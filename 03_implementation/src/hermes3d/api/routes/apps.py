@@ -60,6 +60,26 @@ def _decode_tested_versions(raw: Any) -> list[str]:
     return [str(item) for item in decoded] if isinstance(decoded, list) else []
 
 
+def _truthful_status(record: dict[str, Any]) -> str:
+    """Honest install status based on proof evidence, not just git-dir check."""
+    install_state = record.get("install_state") or ""
+    last_proof = record.get("last_proof_status")
+    has_proof_cmd = bool((record.get("proof_command") or "").strip())
+
+    if install_state not in ("installed", "source_available"):
+        return "NOT_INSTALLED"
+    if install_state == "source_available":
+        return "SOURCE_AVAILABLE"
+    # install_state == "installed"
+    if last_proof == "pass":
+        return "INSTALLED_PROVEN"
+    if last_proof == "fail":
+        return "FAILED_PROOF"
+    if not has_proof_cmd:
+        return "NO_PROOF_COMMAND"
+    return "INSTALLED_UNPROVEN"
+
+
 def _app_response(record: dict[str, Any]) -> dict[str, Any]:
     return {
         "id": record["id"],
@@ -85,6 +105,7 @@ def _app_response(record: dict[str, Any]) -> dict[str, Any]:
         "last_proof_at": record.get("last_proof_at"),
         "last_sync_at": record.get("last_sync_at"),
         "updated_at": record.get("updated_at"),
+        "truthful_status": _truthful_status(record),
     }
 
 
