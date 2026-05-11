@@ -182,6 +182,24 @@ def run_app_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str,
     }
 
 
+@router.post("/api/source-os/modules/{app_id}/run-proof")
+def run_source_os_module_proof(
+    app_id: str, body: ProofRunRequest | None = None
+) -> dict[str, Any]:
+    """W18-A13 — Source-OS alias of :func:`run_app_proof`.
+
+    Matches the existing alias pattern (:func:`hermes3d.api.routes.modules.
+    get_source_os_module` is an alias of :func:`get_module`). Audit
+    W18-A3 flagged this path as ``FAIL_BACKEND_MISSING``: the
+    ``appsClient`` singleton's primary URL is
+    ``/api/source-os/modules/{id}/run-proof`` even though the canonical
+    handler lives at ``/api/apps/{id}/run-proof``. Both paths now
+    delegate to the same implementation so the FE behaves identically
+    regardless of which it calls.
+    """
+    return run_app_proof(app_id, body)
+
+
 class RollbackRequest(BaseModel):
     actor: str = "operator"
     target_version: str | None = None

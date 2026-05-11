@@ -41,6 +41,7 @@ import {
   getRecentJobsLive,
   getRoadmapItemsLive,
   getRoadmapTabCompletionLive,
+  getServiceHealthEnvelopeLive,
   getServiceHealthLive,
   getSettingsLive,
   getSourceOSModuleLive,
@@ -131,7 +132,7 @@ import type { GcodeUploadResult, PrinterLock, TestResult } from "../types/printe
 import type { ProofBundle } from "../types/proof";
 import type { ProviderHealth } from "../types/provider";
 import type { RoadmapItem, RoadmapTabCompletion } from "../types/roadmap";
-import type { ServiceHealthEntry } from "../types/serviceHealth";
+import type { ServiceHealthEntry, ServiceHealthEnvelope } from "../types/serviceHealth";
 import type { AppSettings } from "../types/settings";
 import type { SourceModuleRuntimeSetupQueue, SourceModuleUpdateReadiness, SourceOSModule } from "../types/source-os";
 import type { RuntimeIdentity, RuntimeReadiness, SystemSnapshot } from "../types/system";
@@ -200,6 +201,8 @@ export interface AdapterAPI {
   planPreview(prompt: string): Promise<TaskDAG>;
   getProviderHealth(): Promise<ProviderHealth[]>;
   getServiceHealth(): Promise<ServiceHealthEntry[]>;
+  /** W18-A13 — honest-blocked envelope variant for ServiceHealthPage banners. */
+  getServiceHealthEnvelope(): Promise<ServiceHealthEnvelope>;
   getAutopilotReadiness(): Promise<AutopilotCheck[]>;
   getAutopilotGuardrails(): Promise<GuardrailPolicy[]>;
   getDesignToolchainStatus(): Promise<ToolchainStatus>;
@@ -296,6 +299,7 @@ export const adapters: AdapterAPI = {
   planPreview: planPreviewLive,
   getProviderHealth: getProviderHealthLive,
   getServiceHealth: getServiceHealthLive,
+  getServiceHealthEnvelope: getServiceHealthEnvelopeLive,
   getAutopilotReadiness: getAutopilotReadinessLive,
   getAutopilotGuardrails: getAutopilotGuardrailsLive,
   getDesignToolchainStatus: getDesignToolchainStatusLive,

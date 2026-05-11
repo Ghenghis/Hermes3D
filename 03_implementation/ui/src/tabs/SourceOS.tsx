@@ -217,11 +217,19 @@ export function SourceOSTab() {
   }, [view]);
 
   const loadVerifierSummary = async () => {
+    // W18-A13 (audit W18-A3): cold-start can exceed 20s on this
+    // endpoint. Add an AbortSignal timeout so the SourceOS panel never
+    // hangs waiting for the verifier summary — fall back to "null"
+    // (which renders the "Waiting for verifier summary" placeholder)
+    // and let the user refresh manually.
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15_000);
     try {
       const response = await fetch(`${LIVE_BASE_URL}/api/modules/runtime/verifiers`, {
         method: "GET",
         headers: { Accept: "application/json" },
         cache: "no-store",
+        signal: controller.signal,
       });
       if (!response.ok) {
         setVerifierSummary(null);
@@ -230,6 +238,8 @@ export function SourceOSTab() {
       setVerifierSummary(normalizeVerifierSummary(await response.json()));
     } catch {
       setVerifierSummary(null);
+    } finally {
+      window.clearTimeout(timeoutId);
     }
   };
 

@@ -56,6 +56,7 @@ export function AutopilotTab() {
       return;
     }
     let accepted = false;
+    let honestBlocked = false;
     let responsePayload: unknown = null;
     try {
       const response = await fetch(`${LIVE_BASE_URL}${path}`, {
@@ -66,7 +67,15 @@ export function AutopilotTab() {
       });
       responsePayload = await response.json().catch(() => null);
       accepted = response.ok && actionAccepted(responsePayload);
-      setActionMessage(`${accepted ? "Accepted" : "Blocked"}: ${actionSummary(responsePayload, response.statusText)}`);
+      // W18-A13: 409 from /api/autopilot/next-gate is an honest-blocked
+      // verdict (backend returns {detail:{next:{ready:false,message,...}}}
+      // when a readiness gate is not green). Previously the FE treated
+      // this as a generic failure ("Blocked: <status text>") and the
+      // truthful gate name + message were lost. Mark it as honest-blocked
+      // so the UI prefix is explicit and the message is surfaced.
+      honestBlocked = response.status === 409 && isHonestNextGate(responsePayload);
+      const prefix = accepted ? "Accepted" : honestBlocked ? "Honest-blocked" : "Blocked";
+      setActionMessage(`${prefix}: ${actionSummary(responsePayload, response.statusText)}`);
     } catch {
       setActionMessage(`Blocked: backend API is unreachable at ${LIVE_BASE_URL}.`);
     }
@@ -121,7 +130,14 @@ export function AutopilotTab() {
           <ActionButton onClick={() => postAction("/api/autopilot/write-report", "autopilot.report.written")}>Write Setup Report</ActionButton>
           <ActionButton onClick={() => postAction("/api/jobs", "autopilot.local_pilot_job.created", { type: "pilot_calibration_cube", dry_run: true })}>Create Local Pilot Job</ActionButton>
         </div>
-        {actionMessage && <div className="mt-3 rounded border border-border bg-bg/50 p-2 text-xs text-muted">{actionMessage}</div>}
+        {actionMessage && (
+          <div
+            data-testid="autopilot-action-message"
+            className="mt-3 rounded border border-border bg-bg/50 p-2 text-xs text-muted"
+          >
+            {actionMessage}
+          </div>
+        )}
       </section>
 
       <section id="autopilot.guardrails" className="flex min-h-0 flex-col rounded border border-border bg-surface p-4">
@@ -205,12 +221,48 @@ function actionSummary(payload: unknown, fallback: string): string {
   }
   if (isRecord(payload.detail)) {
     const next = payload.detail.next;
-    if (isRecord(next) && typeof next.name === "string") {
-      return `Next failing check: ${next.name}`;
+    if (isRecord(next)) {
+      // W18-A13: /api/autopilot/next-gate 409 returns
+      //   {detail: {next: {id, name, ready: false, message: "<truthful reason>"}}}
+      // Previously only `next.name` was rendered, losing the operator-
+      // actionable message. Now we include the name AND the message
+      // when present.
+      const name = typeof next.name === "string" ? next.name : null;
+      const message = typeof next.message === "string" && next.message.length > 0
+        ? next.message
+        : null;
+      if (name && message) {
+        return `Next failing check: ${name} — ${message}`;
+      }
+      if (name) {
+        return `Next failing check: ${name}`;
+      }
+      if (message) {
+        return `Next failing check: ${message}`;
+      }
     }
     return JSON.stringify(payload.detail);
   }
   return fallback || JSON.stringify(payload);
+}
+
+/**
+ * W18-A13 — detect the honest-blocked next-gate envelope.
+ *
+ * Returns true when the response body matches the FastAPI 409 shape
+ * raised by :func:`hermes3d.api.routes.autopilot.next_gate` — i.e.
+ * `{detail: {next: {ready: false, ...}}}`. Used to switch the action
+ * message prefix from "Blocked" to "Honest-blocked" so the operator
+ * understands the verdict is the backend telling truth (a readiness
+ * gate is not green) rather than a server / network failure.
+ */
+function isHonestNextGate(payload: unknown): boolean {
+  if (!isRecord(payload)) return false;
+  const detail = payload.detail;
+  if (!isRecord(detail)) return false;
+  const next = detail.next;
+  if (!isRecord(next)) return false;
+  return next.ready === false;
 }
 
 function isPresent<T>(value: T | null | undefined): value is T {

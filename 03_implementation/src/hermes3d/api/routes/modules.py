@@ -5,6 +5,7 @@ import hashlib
 import json
 import re
 import subprocess
+import time
 import zipfile
 from collections import Counter
 from collections.abc import AsyncIterator
@@ -127,6 +128,41 @@ def _sync_registry_once() -> None:
         return
     load_modules()
     _MODULES_SYNCED = True
+
+
+# W18-A13 — small response cache for the two cold-slow runtime probes
+# (``/api/modules/runtime/verifiers`` and
+# ``/api/modules/runtime/agent-cli-readiness``). Audit W18-A3 measured
+# cold-start latency >20s on both because each iterates 60 modules and
+# probes the runtime status of each. Subsequent calls within the cache
+# window return the previously computed payload instantly, keeping the
+# Hermes Agent action catalog (which calls these probes transitively)
+# under its 8s FE timeout.
+RUNTIME_RESPONSE_CACHE_TTL_S = 8.0
+_RUNTIME_RESPONSE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+
+
+def _cached_runtime_response(
+    key: str, builder: Any
+) -> dict[str, Any]:
+    cached = _RUNTIME_RESPONSE_CACHE.get(key)
+    if cached is not None:
+        cached_at, cached_payload = cached
+        if (time.monotonic() - cached_at) < RUNTIME_RESPONSE_CACHE_TTL_S:
+            return cached_payload
+    fresh = builder()
+    _RUNTIME_RESPONSE_CACHE[key] = (time.monotonic(), fresh)
+    return fresh
+
+
+def _invalidate_runtime_response_cache() -> None:
+    """Clear the runtime-response cache.
+
+    Called from write-path handlers (``/verify-all``, runner-contract
+    edits, etc.) so the next GET returns the freshly computed state
+    instead of a stale snapshot.
+    """
+    _RUNTIME_RESPONSE_CACHE.clear()
 
 
 def _module_or_404(module_id: str) -> dict[str, Any]:
@@ -551,6 +587,26 @@ def list_source_os_modules(section: str | None = None) -> list[dict[str, Any]]:
     return list_modules(section)
 
 
+@router.get("/api/source-os/modules/update-readiness")
+def get_source_os_modules_update_readiness(
+    section: str | None = None, deep: bool = False
+) -> dict[str, Any]:
+    """W18-A13 — Source-OS alias of :func:`module_update_readiness`.
+
+    Mirrors the canonical ``/api/modules/update/readiness`` handler so
+    the FE ``hermes3dClient.sourceOsClient.updateReadiness()`` (which
+    GETs ``/api/source-os/modules/update-readiness``) no longer 404s.
+    Audit W18-A3 flagged the FE path as ``FAIL_BACKEND_MISSING``;
+    aliasing keeps both FE and BE call sites stable.
+
+    NOTE: This route must be declared **before** the more general
+    ``/api/source-os/modules/{module_id}`` path operation below so
+    FastAPI's path matcher does not bind ``update-readiness`` as a
+    ``module_id``.
+    """
+    return module_update_readiness(section=section, deep=deep)
+
+
 @router.get("/api/modules/{module_id}")
 def get_module(module_id: str) -> dict[str, Any]:
     return _module_response(_module_or_404(module_id))
@@ -751,6 +807,17 @@ def module_runtime_runner_contracts(section: str | None = None) -> dict[str, Any
 
 @router.get("/api/modules/runtime/verifiers")
 def module_runtime_verifiers() -> dict[str, Any]:
+    """W18-A13 — response cached for ``RUNTIME_RESPONSE_CACHE_TTL_S``.
+
+    Audit W18-A3 measured cold-start >20s here because the underlying
+    ``_runtime_setup_queue_payload`` traverses 60 modules and probes
+    each runtime status. The response cache keeps the FE side under
+    the 15s AbortSignal timeout and the action-catalog under 8s.
+    """
+    return _cached_runtime_response("verifiers", _build_module_runtime_verifiers)
+
+
+def _build_module_runtime_verifiers() -> dict[str, Any]:
     _sync_registry_once()
     verifier_rows = rows(
         """
@@ -795,6 +862,19 @@ def module_runtime_verifiers() -> dict[str, Any]:
 
 @router.get("/api/modules/runtime/agent-cli-readiness")
 def module_agent_cli_readiness() -> dict[str, Any]:
+    """W18-A13 — response cached for ``RUNTIME_RESPONSE_CACHE_TTL_S``.
+
+    Audit W18-A3 measured cold-start >20s because the handler probes
+    runtime status for every module via ``_sync_module_status`` +
+    ``_agent_cli_readiness_record``. The cache turns subsequent calls
+    into a constant-time dictionary lookup.
+    """
+    return _cached_runtime_response(
+        "agent_cli_readiness", _build_module_agent_cli_readiness
+    )
+
+
+def _build_module_agent_cli_readiness() -> dict[str, Any]:
     _sync_registry_once()
     module_rows = rows(
         """

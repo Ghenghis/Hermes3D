@@ -32,6 +32,7 @@ import type { ProviderHealth } from "../types/provider";
 import type {
   ServiceCategory,
   ServiceHealthEntry,
+  ServiceHealthEnvelope,
   ServiceStatus,
 } from "../types/serviceHealth";
 import type { Approval } from "../types/approval";
@@ -338,20 +339,79 @@ export async function getProviderHealthLive(): Promise<ProviderHealth[]> {
 }
 
 export async function getServiceHealthLive(): Promise<ServiceHealthEntry[]> {
+  const envelope = await getServiceHealthEnvelopeLive();
+  return envelope.results;
+}
+
+/**
+ * W18-A13 — Honest-blocked-aware variant of {@link getServiceHealthLive}.
+ *
+ * Returns a {@link ServiceHealthEnvelope} so the consumer (Service Health
+ * page) can render a banner with the real reason instead of silently
+ * showing an empty grid. The audit (W18-A3) flagged the bare-array
+ * adapter as ``FAIL_NOT_WIRED`` — a 404 (route not registered) or
+ * `{accepted:false}` envelope both went through the `return []`
+ * fallback with no signal to the user.
+ *
+ * Honest reason tokens (stable across versions):
+ * - `http_<code>`: backend returned an unexpected HTTP status (e.g. `http_404`).
+ * - `network_error: <message>`: fetch failed before any response.
+ * - `invalid_payload`: 200 OK but body was not a recognised shape.
+ * - any backend-supplied `reason` string is passed through unchanged.
+ */
+export async function getServiceHealthEnvelopeLive(): Promise<ServiceHealthEnvelope> {
+  let response: Response;
   try {
-    const response = await fetch(LIVE_SERVICE_HEALTH_URL, {
+    response = await fetch(LIVE_SERVICE_HEALTH_URL, {
       method: "GET",
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
-    if (!response.ok) {
-      return [];
-    }
-    const payload: unknown = await response.json();
-    return parseServiceHealthArray(payload) ?? [];
-  } catch {
-    return [];
+  } catch (error) {
+    return {
+      status: "unavailable",
+      accepted: false,
+      reason: `network_error: ${errorMessage(error)}`,
+      results: [],
+    };
   }
+  const payload: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    return {
+      status: "unavailable",
+      accepted: false,
+      reason: `http_${response.status}`,
+      results: [],
+    };
+  }
+  const results = parseServiceHealthArray(payload) ?? null;
+  // Backend envelope (PR #228): { accepted, status, reason, results }.
+  const envelope = isRecord(payload) ? payload : {};
+  const backendAccepted = envelope.accepted === undefined ? true : envelope.accepted === true;
+  const backendStatusRaw = isString(envelope.status) ? envelope.status : null;
+  const backendReason = isString(envelope.reason) ? envelope.reason : null;
+  if (results === null) {
+    return {
+      status: "unavailable",
+      accepted: false,
+      reason: backendReason ?? "invalid_payload",
+      results: [],
+    };
+  }
+  if (!backendAccepted) {
+    return {
+      status: backendStatusRaw === "ready" ? "blocked" : (backendStatusRaw === "blocked" ? "blocked" : "unavailable"),
+      accepted: false,
+      reason: backendReason,
+      results,
+    };
+  }
+  return {
+    status: "ready",
+    accepted: true,
+    reason: backendReason,
+    results,
+  };
 }
 
 export function getAgentsLive(): Promise<Agent[]> {
@@ -774,8 +834,23 @@ export async function rollbackHermesAgentLive(backupId?: string): Promise<Hermes
   });
 }
 
+/**
+ * W18-A13 — Bounded fetch of the Hermes Agent action catalog.
+ *
+ * Audit W18-A3 reported that this endpoint could hang >20s in cold
+ * starts, freezing the Agents tab indefinitely. We now bound the call
+ * at 8s (matches ``ACTION_CONTRACT_CACHE_TTL_S`` on the backend — the
+ * cached path returns sub-second after the first warm call). On
+ * timeout we fall back to the same honest-blocked envelope used on
+ * 404 / parse failure.
+ */
+export const AGENT_ACTION_CATALOG_TIMEOUT_MS = 8_000;
+
 export function getAgentActionCatalogLive(): Promise<AgentActionCatalog> {
-  return fetchJson<AgentActionCatalog>("/api/agents/action-catalog").then((payload) => payload ?? {
+  return fetchJsonWithTimeout<AgentActionCatalog>(
+    "/api/agents/action-catalog",
+    AGENT_ACTION_CATALOG_TIMEOUT_MS,
+  ).then((payload) => payload ?? {
     status: "blocked",
     summary: "Hermes Agent action catalog API is unavailable from the local backend.",
     contract_version: "unavailable",
@@ -1367,6 +1442,56 @@ async function fetchJson<T>(path: string): Promise<T | null> {
     return (await response.json()) as T;
   } catch {
     return null;
+  }
+}
+
+/**
+ * W18-A13 — Bounded variant of {@link fetchJson} that aborts after
+ * ``timeoutMs`` so a backend that hangs (audit W18-A3 found
+ * ``/api/agents/action-catalog``, ``/api/modules/runtime/verifiers`` and
+ * ``/api/modules/runtime/agent-cli-readiness`` could each hang >20s
+ * cold) does not freeze the calling React panel indefinitely.
+ *
+ * Returns ``null`` on timeout or any other error (same contract as
+ * {@link fetchJson}). The caller is expected to render a graceful
+ * fallback / honest-blocked banner in that case.
+ *
+ * Caller-supplied ``signal`` is wired alongside the timeout signal so
+ * unmount-triggered cancellations still propagate.
+ */
+async function fetchJsonWithTimeout<T>(
+  path: string,
+  timeoutMs: number,
+  signal?: AbortSignal,
+): Promise<T | null> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const onExternalAbort = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timeoutId);
+      return null;
+    }
+    signal.addEventListener("abort", onExternalAbort);
+  }
+  try {
+    const response = await fetchApiResponse(path, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+    if (signal) {
+      signal.removeEventListener("abort", onExternalAbort);
+    }
   }
 }
 

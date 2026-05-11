@@ -45,21 +45,38 @@ const STATUS_TONE: Record<ServiceStatus, StatusTone> = {
   unknown: "muted",
 };
 
+type HonestBlockedState = {
+  status: "blocked" | "unavailable";
+  reason: string | null;
+};
+
 export function ServiceHealthPage() {
   const [entries, setEntries] = useState<ServiceHealthEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [paused, setPaused] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
+  // W18-A13: explicit honest-blocked state separate from `lastError`. The
+  // audit (W18-A3) found that 404 / network-error / `{accepted:false}`
+  // responses were swallowed into an empty array with no UI signal.
+  // We now read the envelope from `adapters.getServiceHealthEnvelope`
+  // and render a dedicated banner with the backend's reason token.
+  const [honestBlocked, setHonestBlocked] = useState<HonestBlockedState | null>(null);
   const [now, setNow] = useState<Date>(() => new Date());
   const mounted = useRef(true);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await adapters.getServiceHealth();
+      const envelope = await adapters.getServiceHealthEnvelope();
       if (!mounted.current) return;
-      setEntries(next);
-      setLastError(null);
+      setEntries(envelope.results);
+      if (envelope.status === "ready") {
+        setHonestBlocked(null);
+        setLastError(null);
+      } else {
+        setHonestBlocked({ status: envelope.status, reason: envelope.reason });
+        setLastError(null);
+      }
       setNow(new Date());
     } catch (err) {
       if (!mounted.current) return;
@@ -173,6 +190,26 @@ export function ServiceHealthPage() {
                 className="text-accent-red text-[11px] font-mono"
               >
                 {lastError}
+              </div>
+            )}
+            {honestBlocked && (
+              <div
+                role="alert"
+                data-testid="service-health-blocked-banner"
+                className="rounded border border-amber-700/50 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-200"
+              >
+                <span className="font-semibold uppercase tracking-wide">
+                  {honestBlocked.status === "blocked"
+                    ? "Service health blocked"
+                    : "Service health unavailable"}
+                </span>
+                {": "}
+                <span
+                  className="font-mono"
+                  data-testid="service-health-blocked-reason"
+                >
+                  {honestBlocked.reason ?? "no reason supplied by backend"}
+                </span>
               </div>
             )}
           </div>

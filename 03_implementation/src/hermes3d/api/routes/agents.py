@@ -3264,6 +3264,47 @@ def health() -> dict:
     }
 
 
+@router.get("/api/agents/config")
+def get_config() -> dict:
+    """W18-A13 — return the current Hermes Agent operator config.
+
+    The audit (W18-A3) classified ``GET /api/agents/config`` as
+    ``FAIL_BROKEN`` because the only handler was PUT-only (405 on GET).
+    The Settings → AgentConfigSection in the FE GETs first to populate
+    the form, then PUTs on save. With no GET handler the form silently
+    rendered empty.
+
+    Shape mirrors :class:`AgentConfigUpdate.config` so the existing PUT
+    round-trips: ``{"config": {key: value, ...}, "redacted": ["api_key"]}``.
+    The ``api_key`` entry is **never** echoed back; instead we surface a
+    boolean ``api_key_configured`` flag plus the redacted marker so the
+    UI can render the masked state without ever holding the secret.
+    """
+    records = rows("SELECT key, value FROM agent_config")
+    config: dict[str, Any] = {}
+    api_key_configured = False
+    for record in records:
+        key = record.get("key")
+        if not isinstance(key, str) or not key:
+            continue
+        raw = record.get("value")
+        try:
+            decoded = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, json.JSONDecodeError):
+            decoded = raw
+        if key == "api_key":
+            api_key_configured = bool(decoded)
+            continue
+        config[key] = decoded
+    return {
+        "accepted": True,
+        "status": "ready",
+        "config": config,
+        "api_key_configured": api_key_configured,
+        "redacted": ["api_key"],
+    }
+
+
 @router.put("/api/agents/config")
 def put_config(body: AgentConfigUpdate) -> dict:
     for key, value in body.config.items():
