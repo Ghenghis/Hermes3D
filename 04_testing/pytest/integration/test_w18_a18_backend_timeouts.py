@@ -246,9 +246,7 @@ def test_probe_all_runs_in_parallel() -> None:
         probe_all,
     )
 
-    fake_specs = tuple(
-        ServiceSpec(f"slow_{i}", "127.0.0.1", 65000 + i, "api") for i in range(5)
-    )
+    fake_specs = tuple(ServiceSpec(f"slow_{i}", "127.0.0.1", 65000 + i, "api") for i in range(5))
 
     def _slow_probe(spec: ServiceSpec, timeout_s: float = 2.0) -> ProbeResult:
         time.sleep(1.0)
@@ -270,9 +268,7 @@ def test_probe_all_runs_in_parallel() -> None:
     assert len(results) == 5
     assert all(r.status == Status.ONLINE for r in results)
     # Sequential would be ~5 s; parallel must be ~1 s + overhead.
-    assert elapsed < 2.5, (
-        f"probe_all took {elapsed:.3f}s for 5 × 1 s probes — parallelism broken?"
-    )
+    assert elapsed < 2.5, f"probe_all took {elapsed:.3f}s for 5 × 1 s probes — parallelism broken?"
 
 
 def test_probe_all_overall_budget_downgrades_stuck_probes() -> None:

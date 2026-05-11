@@ -316,9 +316,7 @@ def probe_all(extra: tuple[ServiceSpec, ...] = ()) -> list[ProbeResult]:
     # a DNS resolver call that won't return within the parallel-probe
     # budget). We call ``shutdown(wait=False, cancel_futures=True)``
     # manually so the outer budget really does bound wall-clock latency.
-    pool = ThreadPoolExecutor(
-        max_workers=max_workers, thread_name_prefix="hermes-health-probe"
-    )
+    pool = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="hermes-health-probe")
     try:
         future_to_index = {
             pool.submit(probe_one, spec, PROBE_PER_TASK_TIMEOUT_S): idx

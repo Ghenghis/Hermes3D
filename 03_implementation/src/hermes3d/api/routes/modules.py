@@ -226,9 +226,7 @@ MODULE_RUNTIME_PROBE_CACHE_TTL_S = 12.0
 _MODULE_RUNTIME_PROBE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
-def _cached_module_list(
-    cache_key: str, builder: Any
-) -> list[dict[str, Any]]:
+def _cached_module_list(cache_key: str, builder: Any) -> list[dict[str, Any]]:
     cached = _MODULE_LIST_CACHE.get(cache_key)
     if cached is not None:
         cached_at, payload = cached
