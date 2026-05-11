@@ -1,14 +1,12 @@
 /**
- * W18-A14 PICKUP — No-Skip Test Harness reporter (recovery edition).
+ * W18-A14 — No-Skip Test Harness reporter (canonical).
  *
  * Origin: The original `w18-a14` subagent died silently at 2026-05-11T10:37Z
- * before producing a PR. Its draft reporter (`w18-no-skip-reporter.ts`) is
- * still held by stale Hermes locks that expire at 12:07Z. This pickup
- * reporter is a clean, self-contained re-implementation under a new name
- * (`w18-no-skip-pickup-reporter.ts`) so the pickup PR does not collide
- * with the dead subagent's locks and can land independently.
+ * before producing a PR. Its file locks expired at 12:07Z and were recovered
+ * by `w18-a14-pickup`, which then claimed the canonical filenames and
+ * landed this reporter under its original intended name.
  *
- * Contract (per W18-A14-PICKUP mission, 2026-05-11):
+ * Contract (per W18-A14 no-skip mission, 2026-05-11):
  *   1. Any Playwright test whose final status is `skipped` MUST fail the run,
  *      unless that test is explicitly tagged or annotated as hardware-blocked.
  *   2. Hardware-blocked tests carry the marker `@hardware-not-authorized`
@@ -16,17 +14,17 @@
  *      substring `@hardware-not-authorized` inside the test title). When that
  *      marker is present, the reporter emits a machine-readable line:
  *
- *          [W18-PICKUP][HARDWARE_NOT_AUTHORIZED] <test title>
+ *          [W18][HARDWARE_NOT_AUTHORIZED] <test title>
  *
  *      and the run continues without penalty.
  *   3. Skipped tests without that marker emit a machine-readable failure line:
  *
- *          [W18-PICKUP][SKIPPED_PASS_FORBIDDEN] <test title>
+ *          [W18][SKIPPED_PASS_FORBIDDEN] <test title>
  *
  *      The reporter forces the FullResult status to `failed` in `onEnd` so
  *      skipped runs cannot pass CI silently.
  *
- * Hard constraints from W18-A14-PICKUP:
+ * Hard constraints from W18-A14:
  *   - Zero-config: no env-var toggles, no constructor options, no opt-out.
  *   - Deterministic: same inputs -> same outputs. We only inspect static
  *     metadata (`test.tags`, `test.annotations`, `result.annotations`) plus
@@ -90,7 +88,7 @@ function fullTitle(test: TestCase): string {
   return segments.join(" > ");
 }
 
-export default class W18NoSkipPickupReporter implements Reporter {
+export default class W18NoSkipReporter implements Reporter {
   private readonly forbiddenSkips: string[] = [];
   private readonly authorizedSkips: string[] = [];
 
@@ -103,13 +101,13 @@ export default class W18NoSkipPickupReporter implements Reporter {
       this.authorizedSkips.push(title);
       // Machine-readable line for CI tooling.
       // eslint-disable-next-line no-console
-      console.log(`[W18-PICKUP][HARDWARE_NOT_AUTHORIZED] ${title}`);
+      console.log(`[W18][HARDWARE_NOT_AUTHORIZED] ${title}`);
       return;
     }
     this.forbiddenSkips.push(title);
     // Machine-readable line for CI tooling.
     // eslint-disable-next-line no-console
-    console.error(`[W18-PICKUP][SKIPPED_PASS_FORBIDDEN] ${title}`);
+    console.error(`[W18][SKIPPED_PASS_FORBIDDEN] ${title}`);
   }
 
   async onEnd(
@@ -119,18 +117,18 @@ export default class W18NoSkipPickupReporter implements Reporter {
       if (this.authorizedSkips.length > 0) {
         // eslint-disable-next-line no-console
         console.log(
-          `[W18-PICKUP][NO_SKIP_REPORT] forbidden_skips=0 authorized_hardware_skips=${this.authorizedSkips.length}`,
+          `[W18][NO_SKIP_REPORT] forbidden_skips=0 authorized_hardware_skips=${this.authorizedSkips.length}`,
         );
       }
       return undefined;
     }
     // eslint-disable-next-line no-console
     console.error(
-      `[W18-PICKUP][NO_SKIP_REPORT] forbidden_skips=${this.forbiddenSkips.length} authorized_hardware_skips=${this.authorizedSkips.length}`,
+      `[W18][NO_SKIP_REPORT] forbidden_skips=${this.forbiddenSkips.length} authorized_hardware_skips=${this.authorizedSkips.length}`,
     );
     for (const title of this.forbiddenSkips) {
       // eslint-disable-next-line no-console
-      console.error(`[W18-PICKUP][SKIPPED_PASS_FORBIDDEN] ${title}`);
+      console.error(`[W18][SKIPPED_PASS_FORBIDDEN] ${title}`);
     }
     // The contract says: "a skipped test is a fail". We can't throw out of
     // onTestEnd without aborting the rest of the run, so we mark the run

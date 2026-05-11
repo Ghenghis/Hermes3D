@@ -105,6 +105,9 @@ export default defineConfig({
   reporter: [
     ["list"],
     ["./tests/visual/visual-proof-reporter.ts"],
+    // W18-A14 — no-skip harness: fail the run if any test is skipped without
+    // the `@hardware-not-authorized` marker. See tests/_reporters/w18-no-skip-reporter.ts.
+    ["./tests/_reporters/w18-no-skip-reporter.ts"],
   ],
   outputDir: "test-results/visual",
   expect: {

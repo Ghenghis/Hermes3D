@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * W18-A14-PICKUP — No-Skip Audit (CI gate)
+ * W18-A14 — No-Skip Audit (CI gate, canonical).
  *
  * Scans every Playwright spec under `03_implementation/ui/tests/**\/*.spec.ts`
  * for skip tokens. Exits non-zero if any are found, so CI cannot pass while
@@ -111,7 +111,7 @@ function scanFile(file) {
 
 function main() {
   if (!fs.existsSync(TESTS_ROOT)) {
-    console.error(`[W18-PICKUP][NO_SKIP_AUDIT] tests root missing: ${TESTS_ROOT}`);
+    console.error(`[W18][NO_SKIP_AUDIT] tests root missing: ${TESTS_ROOT}`);
     process.exit(2);
   }
   // Playwright specs live anywhere under tests/, but unit specs use .test.ts.
@@ -128,12 +128,12 @@ function main() {
   }
   if (totalHits === 0) {
     console.log(
-      `[W18-PICKUP][NO_SKIP_AUDIT] OK — scanned ${files.length} spec(s), 0 forbidden skips`,
+      `[W18][NO_SKIP_AUDIT] OK — scanned ${files.length} spec(s), 0 forbidden skips`,
     );
     process.exit(0);
   }
   console.error(
-    `[W18-PICKUP][NO_SKIP_AUDIT] FAIL — ${totalHits} forbidden skip(s) across ${files.length} spec(s)`,
+    `[W18][NO_SKIP_AUDIT] FAIL — ${totalHits} forbidden skip(s) across ${files.length} spec(s)`,
   );
   for (const o of offenders) {
     console.error(
