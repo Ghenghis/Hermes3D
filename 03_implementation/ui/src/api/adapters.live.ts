@@ -5,6 +5,9 @@ import type {
   AgentE2EJobRequest,
   AgentE2EJobResult,
   AgentE2EReadiness,
+  AgentTasksFeed,
+  AgentTaskEntry,
+  AgentTasksProviderSmokeLatest,
   CodeCliRunnerPreflightResult,
   CodeCliRunnerReadiness,
   CodeCliRunnerRunRequest,
@@ -868,6 +871,76 @@ export async function runAgentCatalogActionLive(actionId: string, reason = "oper
     throw new Error("Hermes Agent action result was not in the expected shape.");
   }
   return result as unknown as AgentActionRunResult;
+}
+
+/**
+ * W18-A25 — fetch the recent code-team / provider-smoke task feed for the
+ * #agents tab active-tasks panel.
+ *
+ * Backend: ``GET /api/agents/tasks`` (FastAPI in
+ * ``03_implementation/src/hermes3d/api/routes/agents.py``).
+ * Operator-verified prior to this PR: that endpoint returned 404.
+ * After this PR the panel below "AGENT COMMAND CENTER" calls this on mount
+ * and every 10s and honestly renders "No recent tasks" when the env has
+ * none.
+ *
+ * 5s timeout aligns with the action-catalog timeout pattern and is well
+ * within the operator-verified backend wall time (cached path returns
+ * sub-100ms; cold path returns under 500ms because the new endpoint only
+ * scans a small SQLite table — no docker / cli probes).
+ */
+export const AGENT_TASKS_TIMEOUT_MS = 5_000;
+
+export function getAgentTasksLive(limit = 50): Promise<AgentTasksFeed> {
+  const fallback: AgentTasksFeed = {
+    tasks: [],
+    active_count: 0,
+    total_count: 0,
+    limit,
+    window_days: 7,
+    provider_smoke_latest: [],
+    schema_version: "agent-tasks-unavailable",
+  };
+  const url = `/api/agents/tasks?limit=${Math.max(1, Math.min(limit, 200))}`;
+  return fetchJsonWithTimeout<AgentTasksFeed>(url, AGENT_TASKS_TIMEOUT_MS)
+    .then((payload) => {
+      if (!isRecord(payload) || !Array.isArray((payload as Record<string, unknown>).tasks)) {
+        return fallback;
+      }
+      const raw = payload as Record<string, unknown>;
+      const tasks: AgentTaskEntry[] = (raw.tasks as unknown[]).filter(isRecord).map((row) => ({
+        task_id: typeof row.task_id === "string" ? row.task_id : null,
+        team_id: typeof row.team_id === "string" ? row.team_id : null,
+        provider_id: typeof row.provider_id === "string" ? row.provider_id : null,
+        title: typeof row.title === "string" ? row.title : String(row.action_id ?? "Hermes task"),
+        kind: typeof row.kind === "string" ? row.kind : "code_action",
+        action_id: typeof row.action_id === "string" ? row.action_id : "",
+        status: typeof row.status === "string" ? row.status : "unknown",
+        event_type: typeof row.event_type === "string" ? row.event_type : "",
+        created_utc: typeof row.created_utc === "string" ? row.created_utc : "",
+        evidence_id: typeof row.evidence_id === "string" ? row.evidence_id : "",
+        source_agent: typeof row.source_agent === "string" ? row.source_agent : null,
+      }));
+      const smokes: AgentTasksProviderSmokeLatest[] = Array.isArray(raw.provider_smoke_latest)
+        ? (raw.provider_smoke_latest as unknown[]).filter(isRecord).map((row) => ({
+            provider_id: typeof row.provider_id === "string" ? row.provider_id : "",
+            status: typeof row.status === "string" ? row.status : "",
+            task_id: typeof row.task_id === "string" ? row.task_id : null,
+            created_utc: typeof row.created_utc === "string" ? row.created_utc : "",
+            evidence_id: typeof row.evidence_id === "string" ? row.evidence_id : "",
+          })).filter((entry) => entry.provider_id)
+        : [];
+      return {
+        tasks,
+        active_count: typeof raw.active_count === "number" ? raw.active_count : 0,
+        total_count: typeof raw.total_count === "number" ? raw.total_count : tasks.length,
+        limit: typeof raw.limit === "number" ? raw.limit : limit,
+        window_days: typeof raw.window_days === "number" ? raw.window_days : 7,
+        provider_smoke_latest: smokes,
+        schema_version: typeof raw.schema_version === "string" ? raw.schema_version : "agent-tasks-unknown",
+      };
+    })
+    .catch(() => fallback);
 }
 
 export function getAgentE2EReadinessLive(): Promise<AgentE2EReadiness> {

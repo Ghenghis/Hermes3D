@@ -263,3 +263,42 @@ export interface GitPullRequestRequest {
   body?: string;
   draft?: boolean;
 }
+
+/**
+ * W18-A25 — single Hermes Agent code/team/smoke task row returned by
+ * ``GET /api/agents/tasks``. The shape matches what the FastAPI route
+ * extracts from ``proof_events`` (see _agent_tasks endpoint in
+ * ``agents.py``). Every field is plain text — no secrets, no
+ * provider response bodies.
+ */
+export interface AgentTaskEntry {
+  task_id: string | null;
+  team_id: string | null;
+  provider_id: string | null;
+  title: string;
+  kind: "code_team" | "code_provider_smoke" | "code_action" | string;
+  action_id: string;
+  status: string;
+  event_type: string;
+  created_utc: string;
+  evidence_id: string;
+  source_agent: string | null;
+}
+
+export interface AgentTasksProviderSmokeLatest {
+  provider_id: string;
+  status: string;
+  task_id: string | null;
+  created_utc: string;
+  evidence_id: string;
+}
+
+export interface AgentTasksFeed {
+  tasks: AgentTaskEntry[];
+  active_count: number;
+  total_count: number;
+  limit: number;
+  window_days: number;
+  provider_smoke_latest: AgentTasksProviderSmokeLatest[];
+  schema_version: string;
+}

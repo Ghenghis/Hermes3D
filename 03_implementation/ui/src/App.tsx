@@ -19,7 +19,12 @@ import { JobsTab } from "./tabs/Jobs";
 import { PrintersTab } from "./tabs/Printers";
 import { ObserveTab } from "./tabs/Observe";
 import { VoiceTab } from "./tabs/Voice";
-import { AgentsTab } from "./tabs/Agents";
+// W18-A25: wrap the #agents tab with the active-tasks panel so the
+// operator sees live code-team / provider-smoke rows above the existing
+// AGENT COMMAND CENTER. Agents.tsx itself stays unchanged (it is locked
+// by w18-a21); the wrapper composes the new panel + the old tab. The
+// legacy ``AgentsTab`` symbol is re-exported through the wrapper file.
+import { AgentsTabWithActiveTasks } from "./components/agents/AgentsTabActiveTasksWrapper";
 import { LearningTab } from "./tabs/Learning";
 import { ArtifactsTab } from "./tabs/Artifacts";
 import { ApprovalsTab } from "./tabs/Approvals";
@@ -115,7 +120,9 @@ const TAB_COMPONENTS: Record<string, () => JSX.Element> = {
   printers: PrintersTab,
   observe: ObserveTab,
   voice: VoiceTab,
-  agents: AgentsTab,
+  // W18-A25: agents tab now routes through the wrapper so the
+  // ActiveTasksPanel sits above the legacy command center.
+  agents: AgentsTabWithActiveTasks,
   learning: LearningTab,
   artifacts: ArtifactsTab,
   approvals: ApprovalsTab,
