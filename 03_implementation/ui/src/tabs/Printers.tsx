@@ -3,6 +3,7 @@ import { adapters } from "../api/adapters";
 import type { CameraValidateResult, PrinterProbeResult } from "../api/adapters";
 import type { Printer, PrinterOnboardRequest } from "../types/printer";
 import type { GcodeUploadResult, PrinterLock, TestResult } from "../types/printer-lock";
+import { usePrinters } from "../hooks/usePrinters";
 
 const PRINTER_ORDER = ["t1-1", "t1-2", "s1", "v400"];
 const S1_POLICY_STATUS_OPTIONS: Printer["status"][] = ["online", "active", "offline", "maintenance", "error"];
@@ -444,6 +445,13 @@ function stepLabel(step: WizardStep): string {
 // ---------------------------------------------------------------------------
 
 export function PrintersTab() {
+  // W17-FIX-PRINTERS-API: switched from `adapters.getPrinters()` (which
+  // swallowed all errors and returned `[]`) to `usePrinters`, which exposes
+  // the error so the operator can see why the list is empty. The local
+  // `printers` state is now derived from the hook's `data` after applying
+  // the operator-canonical normalization (S1 lock + IP overrides). Saving
+  // a printer status is still optimistic via `setPrinters`.
+  const printersQuery = usePrinters();
   const [printers, setPrinters] = useState<Printer[]>([]);
   const [locks, setLocks] = useState<Record<string, PrinterLock>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult | null>>({});
@@ -464,26 +472,40 @@ export function PrintersTab() {
     [printers],
   );
 
-  const refresh = async () => {
-    const next = (await adapters.getPrinters()).map(normalizeOperatorPrinter);
-    setPrinters(next);
-    await Promise.all(next.map(async (printer) => {
-      const printerId = canonicalPrinterId(printer);
-      if (printerId === "s1") {
-        const lock = await adapters.getPrinterLockState("s1");
-        setLocks((current) => ({ ...current, [printerId]: lock }));
-        await adapters.emitProofEvent("printers.lock.displayed", { printer_id: "s1", lock_reason: lock.reason });
-      } else {
-        await adapters.emitProofEvent("printers.status.refreshed", { printer_id: printerId });
-      }
-    }));
-  };
-
+  // Sync the locally-mutable printer state with the hook's latest snapshot
+  // after applying operator normalization. We keep a local `printers` state
+  // so `updateStatus` can optimistically patch a row before the next poll.
   useEffect(() => {
-    void refresh();
-    const timer = window.setInterval(() => void refresh(), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
+    if (!printersQuery.data) return;
+    const normalized = printersQuery.data.map(normalizeOperatorPrinter);
+    setPrinters(normalized);
+    // Side-effects that previously lived in refresh(): fetch S1 lock state
+    // and emit refresh proof events. Run as fire-and-forget; failures here
+    // do NOT clear the printer list.
+    void Promise.all(
+      normalized.map(async (printer) => {
+        const printerId = canonicalPrinterId(printer);
+        if (printerId === "s1") {
+          try {
+            const lock = await adapters.getPrinterLockState("s1");
+            setLocks((current) => ({ ...current, [printerId]: lock }));
+            await adapters.emitProofEvent("printers.lock.displayed", {
+              printer_id: "s1",
+              lock_reason: lock.reason,
+            });
+          } catch {
+            // Lock state is supplementary; keep the printer card visible.
+          }
+        } else {
+          await adapters.emitProofEvent("printers.status.refreshed", { printer_id: printerId }).catch(() => undefined);
+        }
+      }),
+    );
+  }, [printersQuery.data]);
+
+  const refresh = async () => {
+    await printersQuery.refetch();
+  };
 
   const runTest = async (printer: Printer) => {
     if (isS1(printer)) {
@@ -582,9 +604,31 @@ export function PrintersTab() {
         </div>
       </header>
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2 lg:auto-rows-fr">
-        {orderedPrinters.length === 0 && (
-          <section className="flex h-full items-center justify-center rounded border border-border bg-surface p-4 text-sm text-muted lg:col-span-2">
-            No printer inventory returned from the live printer API.
+        {/* W17-FIX-PRINTERS-API: distinguish loading / error / empty so the
+            operator can see what's actually wrong instead of a generic
+            "no inventory" message. */}
+        {orderedPrinters.length === 0 && printersQuery.isLoading && (
+          <section
+            data-testid="printers-loading"
+            className="flex h-full items-center justify-center rounded border border-border bg-surface p-4 text-sm text-muted lg:col-span-2"
+          >
+            Loading printer inventory from the live printer API.
+          </section>
+        )}
+        {orderedPrinters.length === 0 && !printersQuery.isLoading && printersQuery.error && (
+          <section
+            data-testid="printers-error"
+            className="flex h-full items-center justify-center rounded border border-red-700/60 bg-red-950/30 p-4 text-sm text-red-200 lg:col-span-2"
+          >
+            Printer API error: {printersQuery.error.message}
+          </section>
+        )}
+        {orderedPrinters.length === 0 && !printersQuery.isLoading && !printersQuery.error && (
+          <section
+            data-testid="printers-empty"
+            className="flex h-full items-center justify-center rounded border border-border bg-surface p-4 text-sm text-muted lg:col-span-2"
+          >
+            No printers configured. Use Add Printer to onboard a Moonraker/Klipper target.
           </section>
         )}
         {orderedPrinters.map((printer) => {
