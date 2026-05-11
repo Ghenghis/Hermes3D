@@ -79,18 +79,151 @@ class RollbackRequest(BaseModel):
     actor: str = "hermes-agent"
 
 
+def _honest_blocked_status(
+    repo: Path,
+    state: dict[str, Any],
+    *,
+    reason: str,
+    upstream_error: str | None = None,
+) -> dict[str, Any]:
+    """Return the agreed honest-blocked envelope for /api/agents/update/status.
+
+    Wave 17 root-cause fix (2026-05-11): the status endpoint must NEVER 5xx.
+    Pre-fix, any failure inside ``_remote_release_tags`` or ``_latest_release``
+    (GitHub Releases API 403 rate-limit / 5xx / DNS / timeout) propagated as
+    HTTPException(502), which surfaced to the browser as a hard 502 banner.
+
+    Per the W17 contract the route returns:
+      - ``accepted=True`` + ``status="ready"`` when canary configured + reachable
+      - ``accepted=False`` + ``status="unknown"`` when env unset / repo missing
+      - ``accepted=False`` + ``status="offline"`` when env set but upstream down
+
+    Keeping the legacy keys (``repo_url``, ``checkout_path``, ``current``,
+    ``backup_available``, ``latest_backup``, ``strategy``, ``rollback``,
+    ``auto_repair``) for back-compat with existing UI consumers that already
+    parse the success envelope.
+    """
+    backup = _latest_backup()
+    is_offline = upstream_error is not None
+    return {
+        # Wave 17 W17-A1 honest-blocked contract fields.
+        "accepted": False,
+        "status": "offline" if is_offline else "unknown",
+        "reason": reason,
+        "version": "v0.13.0",
+        "upstream_error": upstream_error,
+        # Back-compat keys (subset that does not require remote tag listing).
+        "repo_url": UPSTREAM_URL,
+        "checkout_path": str(repo),
+        "repo_ready": state.get("repo_ready", False),
+        "current": state,
+        "latest_release": {
+            "tag": None,
+            "name": None,
+            "source": "github_releases_api",
+            "api_warning": upstream_error,
+        },
+        "outdated": False,
+        "outdated_by": 0,
+        "pending_tags": [],
+        "backup_available": backup is not None,
+        "latest_backup": backup,
+        "strategy": "staged_backup_then_tag_checkout",
+        "rollback": "Rollback checks out the recorded backup tag/commit after a backup exists; local bundle/dirty zip are retained under var/hermes_agent_backups.",
+        "auto_repair": "Failed staged update gates automatically attempt rollback to the pre-update backup target.",
+    }
+
+
 @router.get("/api/agents/update/status")
 def update_status() -> dict[str, Any]:
+    """GET /api/agents/update/status — Hermes Agent v0.13 update gateway status.
+
+    Wave 17 root-cause fix (2026-05-11): the handler now NEVER raises a 5xx.
+    All exceptions from the upstream-querying helpers (``_remote_release_tags``
+    raising HTTPException(502) on GitHub 403/5xx, ``_latest_release`` raising
+    on non-404 HTTP errors, ``_repo_state`` raising on git failures via
+    ``_run_git``) are caught and converted to a 200 honest-blocked payload.
+
+    The contract (W17-A1, see ``_honest_blocked_status``):
+      - ``200 + accepted=True, status="ready"`` when canary reachable + state ok
+      - ``200 + accepted=False, status="unknown"`` when env unset / repo missing
+      - ``200 + accepted=False, status="offline"`` when upstream API down
+
+    Per the standing rule "endpoint should NEVER 5xx", no caught exception is
+    re-raised. The original error is preserved in ``upstream_error`` for
+    operator triage, redacted via ``redact_text`` to strip any leaked secrets.
+
+    References:
+    - FastAPI exception handler patterns:
+      https://fastapi.tiangolo.com/tutorial/handling-errors/
+    - W17-A1 honest-blocked contract handoff:
+      03_implementation/docs/handoffs/W17_A5_BACKEND_API_WIRING_2026-05-11.md
+    """
     repo = _repo_path()
-    state = _repo_state(repo)
-    tags = _remote_release_tags(repo)
-    latest = _latest_release(tags)
+    # First gate: is the canary checkout even present? If not, status="unknown".
+    try:
+        state = _repo_state(repo)
+    except HTTPException as exc:
+        # _run_git inside _repo_state can raise 502; surface as offline+unknown.
+        return _honest_blocked_status(
+            repo,
+            {
+                "repo_ready": False,
+                "reason": f"git probe failed: {redact_text(str(exc.detail))[:200]}",
+            },
+            reason="repo_state_unreachable",
+            upstream_error=redact_text(str(exc.detail))[:200],
+        )
+    except Exception as exc:  # noqa: BLE001 — defense-in-depth catch-all
+        return _honest_blocked_status(
+            repo,
+            {"repo_ready": False, "reason": f"git probe raised: {redact_text(type(exc).__name__)}"},
+            reason="repo_state_unreachable",
+            upstream_error=redact_text(f"{type(exc).__name__}: {exc}")[:200],
+        )
+
+    if not state.get("repo_ready"):
+        # Canary path unset or invalid — honest blocked with status="unknown".
+        return _honest_blocked_status(
+            repo,
+            state,
+            reason="canary_not_configured",
+        )
+
+    # Second gate: GitHub Releases API. Either raises HTTPException(502) on
+    # network/rate-limit/5xx or returns a tags list. Honest-blocked path here
+    # is status="offline" — repo is fine but upstream is unreachable.
+    try:
+        tags = _remote_release_tags(repo)
+        latest = _latest_release(tags)
+    except HTTPException as exc:
+        return _honest_blocked_status(
+            repo,
+            state,
+            reason="canary_unreachable",
+            upstream_error=redact_text(str(exc.detail))[:200],
+        )
+    except Exception as exc:  # noqa: BLE001 — defense-in-depth catch-all
+        return _honest_blocked_status(
+            repo,
+            state,
+            reason="canary_unreachable",
+            upstream_error=redact_text(f"{type(exc).__name__}: {exc}")[:200],
+        )
+
     if isinstance(latest.get("tag"), str) and latest["tag"] not in tags:
         tags = sorted([*tags, latest["tag"]], key=_tag_key)
     current_tag = state.get("exact_tag") or state.get("nearest_tag")
     pending = _pending_tags(tags, current_tag, latest.get("tag"))
     backup = _latest_backup()
     payload = {
+        # W17-A1 honest-blocked contract — ready path (canary reachable).
+        "accepted": True,
+        "status": "ready",
+        "reason": None,
+        "version": "v0.13.0",
+        "upstream_error": None,
+        # Legacy keys preserved verbatim for back-compat.
         "repo_url": UPSTREAM_URL,
         "checkout_path": str(repo),
         "repo_ready": state["repo_ready"],
@@ -105,7 +238,13 @@ def update_status() -> dict[str, Any]:
         "rollback": "Rollback checks out the recorded backup tag/commit after a backup exists; local bundle/dirty zip are retained under var/hermes_agent_backups.",
         "auto_repair": "Failed staged update gates automatically attempt rollback to the pre-update backup target.",
     }
-    _append_proof_event("hermes_agent_update_status", "hermes3d-updater", _proof_summary(payload))
+    try:
+        _append_proof_event(
+            "hermes_agent_update_status", "hermes3d-updater", _proof_summary(payload)
+        )
+    except Exception:  # noqa: BLE001 — never let proof persistence 5xx the route
+        # Proof persistence is best-effort; failing here must not turn into 502.
+        pass
     return payload
 
 
