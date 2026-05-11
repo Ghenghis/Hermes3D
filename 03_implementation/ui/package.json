@@ -13,7 +13,8 @@
     "test:unit": "vitest run",
     "test:visual": "playwright test --config=playwright.e2e.config.ts",
     "test:visual:update": "playwright test --config=playwright.e2e.config.ts",
-    "test:breadth": "playwright test --config=playwright.breadth.config.ts"
+    "test:breadth": "playwright test --config=playwright.breadth.config.ts",
+    "no-skip-audit": "node scripts/w18-no-skip-audit.mjs"
   },
   "dependencies": {
     "lucide-react": "0.451.0",
