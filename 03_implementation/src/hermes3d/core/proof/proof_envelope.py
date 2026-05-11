@@ -82,6 +82,13 @@ class ProofEnvelope:
     slicer_report: dict[str, Any] | None = None
     visual_evidence: list[VisualEvidence] = field(default_factory=list)
     signature: dict[str, str] | None = None
+    # W18-A20: record which modeling/mesh/CAD backend produced this artifact
+    # and whether a GPU code path was exercised. Both fields are optional so
+    # legacy envelopes without them still parse, but the writer always
+    # populates them when the data is available.
+    modeling_backend: dict[str, Any] | None = None
+    gpu_used: bool | None = None
+    gpu: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -94,6 +101,12 @@ class ProofEnvelope:
         }
         if self.slicer_report is not None:
             d["slicer_report"] = self.slicer_report
+        if self.modeling_backend is not None:
+            d["modeling_backend"] = self.modeling_backend
+        if self.gpu_used is not None:
+            d["gpu_used"] = self.gpu_used
+        if self.gpu is not None:
+            d["gpu"] = self.gpu
         if self.signature is not None:
             d["signature"] = self.signature
         return d
@@ -109,6 +122,9 @@ class ProofEnvelope:
             slicer_report=d.get("slicer_report"),
             visual_evidence=[VisualEvidence.from_dict(v) for v in d.get("visual_evidence", [])],
             signature=d.get("signature"),
+            modeling_backend=d.get("modeling_backend"),
+            gpu_used=d.get("gpu_used"),
+            gpu=d.get("gpu"),
         )
 
 
@@ -186,6 +202,12 @@ def write_proof(
     slicer_report: dict[str, Any] | None = None,
     visual_evidence_paths: (list[tuple[str, str | Path]] | list[Path] | list[str] | None) = None,
     timestamp_unix: float | None = None,
+    # W18-A20: optional modeling-backend + GPU usage to bake into the proof.
+    # All three are passed through verbatim — the writer does not invent or
+    # fabricate values when they are absent.
+    modeling_backend: dict[str, Any] | None = None,
+    gpu_used: bool | None = None,
+    gpu: dict[str, Any] | None = None,
 ) -> Path:
     """Build, sign, and write a proof envelope JSON file.
 
@@ -270,6 +292,9 @@ def write_proof(
         truth_gate_report=truth_gate_dict,
         slicer_report=slicer_report,
         visual_evidence=visual_evidence,
+        modeling_backend=modeling_backend,
+        gpu_used=gpu_used,
+        gpu=gpu,
     )
     envelope.signature = _sign(envelope)
 

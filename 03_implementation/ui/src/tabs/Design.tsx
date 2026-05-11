@@ -61,6 +61,46 @@ interface CadTemplate {
   preview_note?: string;
 }
 
+// W18-A20: modeling backend + GPU usage from the live intake response
+// and from the live /api/design/backends probe.
+interface IntakeBackendInfo {
+  name?: string | null;
+  version?: string | null;
+  kind?: string | null;
+  detail?: string | null;
+  engine?: { name?: string | null; version?: string | null } | null;
+  gpu_used: boolean;
+  gpu_model?: string | null;
+  gpu_cuda?: string | null;
+  gpu_render_seconds?: number | null;
+}
+
+interface BackendProbeResponse {
+  backends: Array<{
+    name: string;
+    kind: string;
+    version: string | null;
+    path: string | null;
+    available: boolean;
+    gpu_capable: boolean;
+    detail?: string | null;
+  }>;
+  default_template_backend: {
+    name?: string;
+    version?: string | null;
+    engine?: { name?: string; version?: string | null } | null;
+    detail?: string | null;
+  };
+  gpu: {
+    available: boolean;
+    model?: string;
+    driver?: string;
+    cuda?: string;
+    vram_total_mib?: number;
+    reason?: string;
+  };
+}
+
 export function DesignTab() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -88,6 +128,10 @@ export function DesignTab() {
   const [sliceMessage, setSliceMessage] = useState<string | null>(null);
   const [slicing, setSlicing] = useState(false);
   const sliceAbortRef = useRef<AbortController | null>(null);
+  // W18-A20: surface the modeling backend + GPU usage of the last intake
+  // so the proof badge is visible in the Design tab.
+  const [lastIntakeBackend, setLastIntakeBackend] = useState<IntakeBackendInfo | null>(null);
+  const [backendProbe, setBackendProbe] = useState<BackendProbeResponse | null>(null);
   const unlockedPrinters = useMemo(
     () => printers.filter((printer) => !printer.maintenance_flag && printer.status !== "maintenance"),
     [printers],
@@ -149,6 +193,24 @@ export function DesignTab() {
     return () => { mounted = false; window.clearInterval(timer); };
   }, []);
 
+  // W18-A20: Fetch real modeling backend survey + GPU probe
+  useEffect(() => {
+    let mounted = true;
+    const load = () => {
+      fetch(`${LIVE_BASE_URL}/api/design/backends`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data: unknown) => {
+          if (mounted && data && typeof data === "object") {
+            setBackendProbe(data as BackendProbeResponse);
+          }
+        })
+        .catch(() => { /* backend unreachable — probe stays null */ });
+    };
+    load();
+    const timer = window.setInterval(load, 30_000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, []);
+
   // Fetch real CAD template list from backend
   useEffect(() => {
     let mounted = true;
@@ -201,6 +263,28 @@ export function DesignTab() {
         if (stl) {
           setProducedStls((prev) => [stl, ...prev.filter((s) => s.file_path !== stl.file_path)].slice(0, 5));
         }
+      }
+      // W18-A20: capture the backend + GPU usage the intake response reports.
+      if (accepted && isRecord(payload)) {
+        const backend = isRecord(payload.modeling_backend) ? payload.modeling_backend : null;
+        const gpu = isRecord(payload.gpu) ? payload.gpu : null;
+        const op = gpu && isRecord(gpu.operation) ? gpu.operation : null;
+        setLastIntakeBackend({
+          name: backend && typeof backend.name === "string" ? backend.name : null,
+          version: backend && typeof backend.version === "string" ? backend.version : null,
+          kind: backend && typeof backend.kind === "string" ? backend.kind : null,
+          detail: backend && typeof backend.detail === "string" ? backend.detail : null,
+          engine: backend && isRecord(backend.engine)
+            ? {
+                name: typeof backend.engine.name === "string" ? backend.engine.name : null,
+                version: typeof backend.engine.version === "string" ? backend.engine.version : null,
+              }
+            : null,
+          gpu_used: payload.gpu_used === true,
+          gpu_model: gpu && typeof gpu.model === "string" ? gpu.model : null,
+          gpu_cuda: gpu && typeof gpu.cuda === "string" ? gpu.cuda : null,
+          gpu_render_seconds: op && typeof op.render_seconds === "number" ? op.render_seconds : null,
+        });
       }
       await adapters.emitProofEvent("design.intake.submitted", { title, target_printer_id: targetPrinterId, accepted, response: payload });
     } catch {
@@ -323,6 +407,7 @@ export function DesignTab() {
           </button>
           {!toolchainReady && <div className="rounded border border-amber-700/60 bg-amber-950/30 p-2 text-xs text-amber-200">{toolchainReason}</div>}
           {submitMessage && <div className="rounded border border-border bg-bg/40 p-2 text-xs text-muted">{submitMessage}</div>}
+          <ModelingBackendPanel probe={backendProbe} lastIntake={lastIntakeBackend} />
         </div>
       </section>
 
@@ -622,6 +707,123 @@ function extractStlArtifact(payload: unknown): ProducedStl | null {
     sha256: typeof artifact.sha256 === "string" ? artifact.sha256 : null,
     job_id: typeof payload.job_id === "string" ? payload.job_id : null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// W18-A20: Modeling Backend + GPU panel — shows the real backend that will
+// produce the next artifact and whether the local GPU is reachable. After
+// an intake, also surfaces the per-job backend identifier the response
+// returned. Never displays "unknown" — only real probe data.
+// ---------------------------------------------------------------------------
+
+function ModelingBackendPanel({
+  probe,
+  lastIntake,
+}: {
+  probe: BackendProbeResponse | null;
+  lastIntake: IntakeBackendInfo | null;
+}) {
+  const defaultBackend = probe?.default_template_backend;
+  const gpu = probe?.gpu;
+  return (
+    <div
+      data-testid="modeling-backend-panel"
+      className="rounded border border-border bg-bg/40 p-2 text-xs"
+    >
+      <div className="font-semibold uppercase tracking-wide text-fg">Modeling Backend</div>
+      {probe ? (
+        <div className="mt-1 grid gap-1">
+          <div data-testid="backend-name" className="text-muted">
+            <span className="text-accent-cyan">backend:</span>{" "}
+            <span className="font-mono text-fg">
+              {defaultBackend?.name ?? "(not reported)"}
+            </span>
+            {defaultBackend?.version && (
+              <span className="text-muted"> v{defaultBackend.version}</span>
+            )}
+            {defaultBackend?.engine?.name && (
+              <span className="text-muted">
+                {" "}
+                + engine{" "}
+                <span className="font-mono text-fg">
+                  {defaultBackend.engine.name}
+                </span>
+                {defaultBackend.engine.version && (
+                  <span> v{defaultBackend.engine.version}</span>
+                )}
+              </span>
+            )}
+          </div>
+          {defaultBackend?.detail && (
+            <div className="text-muted">{defaultBackend.detail}</div>
+          )}
+          <div data-testid="gpu-status" className="text-muted">
+            <span className="text-accent-cyan">gpu:</span>{" "}
+            {gpu?.available ? (
+              <span className="font-mono text-fg">
+                {gpu.model} (driver {gpu.driver}, CUDA {gpu.cuda})
+              </span>
+            ) : (
+              <span className="font-mono text-amber-300">
+                unavailable — {gpu?.reason ?? "no reason returned"}
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="mt-1 text-muted">
+          Backend probe pending — start the Hermes3D backend.
+        </div>
+      )}
+      {lastIntake && (
+        <div
+          data-testid="last-intake-backend"
+          className="mt-2 grid gap-1 rounded border border-border bg-surface/40 p-2"
+        >
+          <div className="font-semibold uppercase tracking-wide text-fg">
+            Last Intake
+          </div>
+          <div className="text-muted">
+            <span className="text-accent-cyan">backend:</span>{" "}
+            <span className="font-mono text-fg">
+              {lastIntake.name ?? "(not reported)"}
+            </span>
+            {lastIntake.version && <span> v{lastIntake.version}</span>}
+            {lastIntake.engine?.name && (
+              <span>
+                {" + engine "}
+                <span className="font-mono text-fg">{lastIntake.engine.name}</span>
+                {lastIntake.engine.version && <span> v{lastIntake.engine.version}</span>}
+              </span>
+            )}
+          </div>
+          <div className="text-muted">
+            <span className="text-accent-cyan">gpu_used:</span>{" "}
+            <span
+              data-testid="last-intake-gpu-used"
+              className={
+                lastIntake.gpu_used
+                  ? "font-mono text-accent-green"
+                  : "font-mono text-amber-300"
+              }
+            >
+              {lastIntake.gpu_used ? "true" : "false"}
+            </span>
+            {lastIntake.gpu_used && lastIntake.gpu_model && (
+              <span className="text-muted">
+                {" on "}
+                <span className="font-mono text-fg">{lastIntake.gpu_model}</span>
+                {lastIntake.gpu_cuda && <span> (CUDA {lastIntake.gpu_cuda})</span>}
+                {typeof lastIntake.gpu_render_seconds === "number" && (
+                  <span>; {lastIntake.gpu_render_seconds.toFixed(2)}s render</span>
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------

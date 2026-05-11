@@ -1,0 +1,13 @@
+{
+  "available": true,
+  "vendor": "NVIDIA",
+  "model": "NVIDIA GeForce RTX 3090 Ti",
+  "driver": "591.86",
+  "cuda": "13.1",
+  "vram_total_mib": 24564,
+  "vram_used_mib": 15543,
+  "vram_free_mib": 8767,
+  "utilization_pct": 0,
+  "nvidia_smi_path": "C:\\Windows\\system32\\nvidia-smi.EXE",
+  "probed_at": "2026-05-11T14:04:44Z"
+}

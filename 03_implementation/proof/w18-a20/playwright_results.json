@@ -1,0 +1,202 @@
+{
+  "config": {
+    "configFile": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\ui\\playwright.w18-a20.config.ts",
+    "rootDir": "G:/Github/Hermes3D/.claude/worktrees/w18-a20/03_implementation/ui/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "G:/Github/Hermes3D/.claude/worktrees/w18-a20/03_implementation/ui/test-results/w18-a20/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-w18-a20",
+        "name": "chromium-w18-a20",
+        "testDir": "G:/Github/Hermes3D/.claude/worktrees/w18-a20/03_implementation/ui/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/w18-a20-modeling-backend\\.spec\\.ts$/"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/w18-a20/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.59.1",
+    "workers": 1,
+    "webServer": {
+      "command": "node scripts/start-e2e-stack.mjs",
+      "url": "http://127.0.0.1:15173",
+      "reuseExistingServer": false,
+      "timeout": 180000,
+      "env": {
+        "HERMES3D_GUI_API_PORT": "18765",
+        "HERMES3D_UI_PORT": "15173",
+        "HERMES3D_START_DESKTOP_COMPAT": "0",
+        "VITE_HERMES3D_BRIDGE_PORT": "18765",
+        "HERMES3D_STRICT_PORTS": "1"
+      }
+    }
+  },
+  "suites": [
+    {
+      "title": "w18-a20-modeling-backend.spec.ts",
+      "file": "w18-a20-modeling-backend.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "W18-A20 modeling backend + GPU proof",
+          "file": "w18-a20-modeling-backend.spec.ts",
+          "line": 97,
+          "column": 6,
+          "specs": [
+            {
+              "title": "/api/design/backends returns a live survey with real version strings",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-w18-a20",
+                  "projectName": "chromium-w18-a20",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 638,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-05-11T14:20:28.796Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6cbffeb75d71698bfadf-75ce3de301b8bf4a8a5f",
+              "file": "w18-a20-modeling-backend.spec.ts",
+              "line": 102,
+              "column": 3
+            },
+            {
+              "title": "Design intake records modeling_backend + gpu_used in the API response and on-disk proof",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-w18-a20",
+                  "projectName": "chromium-w18-a20",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 3585,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-05-11T14:20:29.498Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6cbffeb75d71698bfadf-789bc3474ea599270394",
+              "file": "w18-a20-modeling-backend.spec.ts",
+              "line": 136,
+              "column": 3
+            },
+            {
+              "title": "Design tab UI surfaces the modeling backend + GPU status",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-w18-a20",
+                  "projectName": "chromium-w18-a20",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2291,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-05-11T14:20:33.103Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "6cbffeb75d71698bfadf-a1b4d638cca949dfb8c3",
+              "file": "w18-a20-modeling-backend.spec.ts",
+              "line": 208,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-05-11T14:20:23.628Z",
+    "duration": 12609.534,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

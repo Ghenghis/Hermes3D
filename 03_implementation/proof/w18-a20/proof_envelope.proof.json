@@ -1,0 +1,251 @@
+{
+  "generator": {
+    "name": "hermes3d.parametric.desk_organizer",
+    "signature": "4ee082d000",
+    "version": "1.0.0"
+  },
+  "gpu": {
+    "cuda": "13.1",
+    "driver": "591.86",
+    "model": "NVIDIA GeForce RTX 3090 Ti",
+    "operation": {
+      "attempted_at": "2026-05-11T14:20:32Z",
+      "backend": "blender_cycles",
+      "blender_path": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "cycles_devices_line": "W18A20-CYCLES-DEVICES: [('NVIDIA GeForce RTX 3090 Ti', 'CUDA')]",
+      "device": "CUDA",
+      "output_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\thumbnail_gpu.png",
+      "output_size_bytes": 120676,
+      "render_seconds": 1.6182,
+      "resolution": [
+        640,
+        480
+      ],
+      "samples": 16,
+      "used": true,
+      "utilization_pct_peak": 12,
+      "vram_used_mib_peak": 15821,
+      "vram_used_mib_pre": 15821,
+      "wall_seconds_total": 2.731769300007727
+    },
+    "vendor": "NVIDIA",
+    "vram_total_mib": 24564
+  },
+  "gpu_used": true,
+  "mesh": {
+    "bbox_mm": [
+      [
+        -90.0,
+        -50.0,
+        0.0
+      ],
+      [
+        90.0,
+        50.0,
+        90.0
+      ]
+    ],
+    "extents_mm": [
+      180.0,
+      100.0,
+      90.0
+    ],
+    "face_count": 624,
+    "is_watertight": true,
+    "path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\desk_organizer_4ee082d000.stl",
+    "sha256": "ab77d326a32c1ba315f839a41bbcfed320591d662375fad5b0e0b94d1521df79",
+    "vertex_count": 314,
+    "volume_mm3": 541411.4223979464
+  },
+  "modeling_backend": {
+    "available": true,
+    "capabilities": [
+      "csg_boolean_difference",
+      "csg_boolean_union",
+      "stl_export",
+      "watertight_check",
+      "winding_consistent",
+      "manifold3d_engine"
+    ],
+    "detail": "desk_organizer: trimesh 4.12.1 routed to manifold3d 3.4.1 for boolean CSG. CPU pipeline.",
+    "engine": {
+      "available": true,
+      "name": "manifold3d",
+      "path": "C:\\Python314\\Lib\\site-packages\\manifold3d.cp314-win_amd64.pyd",
+      "version": "3.4.1"
+    },
+    "gpu_capable": false,
+    "gpu_operation": {
+      "attempted_at": "2026-05-11T14:20:32Z",
+      "backend": "blender_cycles",
+      "blender_path": "C:\\Program Files\\Blender Foundation\\Blender 5.1\\blender.exe",
+      "cycles_devices_line": "W18A20-CYCLES-DEVICES: [('NVIDIA GeForce RTX 3090 Ti', 'CUDA')]",
+      "device": "CUDA",
+      "output_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\thumbnail_gpu.png",
+      "output_size_bytes": 120676,
+      "render_seconds": 1.6182,
+      "resolution": [
+        640,
+        480
+      ],
+      "samples": 16,
+      "used": true,
+      "utilization_pct_peak": 12,
+      "vram_used_mib_peak": 15821,
+      "vram_used_mib_pre": 15821,
+      "wall_seconds_total": 2.731769300007727
+    },
+    "kind": "python_library",
+    "name": "trimesh",
+    "path": "C:\\Python314\\Lib\\site-packages\\trimesh\\__init__.py",
+    "version": "4.12.1"
+  },
+  "schema_version": "1.0.0",
+  "signature": {
+    "algorithm": "HMAC-SHA256",
+    "value": "95d05ec7ac7dfa75c45144c4d5f925ddfef574158c8a525755c93c8b0b92dc5e"
+  },
+  "timestamp_unix": 1778509232.9975975,
+  "truth_gate_report": {
+    "checks": [
+      {
+        "measured": {
+          "open_edges": 166,
+          "watertight": true
+        },
+        "message": "Mesh is watertight.",
+        "name": "watertight",
+        "status": "pass",
+        "threshold": {
+          "required": true
+        }
+      },
+      {
+        "measured": {
+          "euler_number": 2,
+          "is_watertight": true,
+          "is_winding_consistent": true
+        },
+        "message": "Mesh is 2-manifold.",
+        "name": "manifold",
+        "status": "pass",
+        "threshold": {
+          "is_watertight": true,
+          "is_winding_consistent": true
+        }
+      },
+      {
+        "measured": {
+          "is_winding_consistent": true,
+          "volume_mm3": 541411.4223979464
+        },
+        "message": "Face normals are consistent and outward-facing.",
+        "name": "normals",
+        "status": "pass",
+        "threshold": {
+          "is_winding_consistent": true,
+          "volume_sign": "positive"
+        }
+      },
+      {
+        "measured": {
+          "extents_mm": [
+            180.0,
+            100.0,
+            90.0
+          ]
+        },
+        "message": "Mesh fits within 220.0x220.0x250.0 mm build volume.",
+        "name": "bed_fit",
+        "status": "pass",
+        "threshold": {
+          "bed_size_mm": [
+            220.0,
+            220.0,
+            250.0
+          ]
+        }
+      },
+      {
+        "measured": {},
+        "message": "No printer_profile_id set; check skipped.",
+        "name": "printer_fit",
+        "status": "skip",
+        "threshold": {
+          "required": false
+        }
+      },
+      {
+        "measured": {
+          "volume_mm3": 541411.4223979464
+        },
+        "message": "Volume 541411.4 mm\u00b3 meets minimum.",
+        "name": "minimum_volume",
+        "status": "pass",
+        "threshold": {
+          "min_volume_mm3": 100.0
+        }
+      },
+      {
+        "measured": {
+          "min_mm": 1.928654213425709,
+          "samples_hit": 1715
+        },
+        "message": "Min wall thickness 1.929 mm.",
+        "name": "wall_thickness",
+        "status": "pass",
+        "threshold": {
+          "min_mm": 1.2
+        }
+      },
+      {
+        "measured": {
+          "broken_face_count": 0,
+          "ratio": 0.0,
+          "total_faces": 624
+        },
+        "message": "Broken faces 0/624 within tolerance.",
+        "name": "self_intersection",
+        "status": "pass",
+        "threshold": {
+          "max_ratio": 0.001
+        }
+      }
+    ],
+    "config": {
+      "bed_size_mm": [
+        220.0,
+        220.0,
+        250.0
+      ],
+      "max_overhang_ratio": 0.35,
+      "max_print_minutes": 480,
+      "max_self_intersection_ratio": 0.001,
+      "min_volume_mm3": 100.0,
+      "min_wall_thickness_mm": 1.2,
+      "printer_profile_id": null,
+      "require_bed_fit": true,
+      "require_consistent_normals": true,
+      "require_manifold": true,
+      "require_minimum_volume": true,
+      "require_no_self_intersection": true,
+      "require_printer_fit": true,
+      "require_thickness": true,
+      "require_watertight": true,
+      "thickness_sample_count": 2000
+    },
+    "duration_seconds": 0.1288,
+    "mesh_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\desk_organizer_4ee082d000.stl",
+    "mesh_sha256": "ab77d326a32c1ba315f839a41bbcfed320591d662375fad5b0e0b94d1521df79",
+    "overall_status": "pass",
+    "schema_version": "1.0.0",
+    "timestamp_unix": 1778509232.9940853
+  },
+  "visual_evidence": [
+    {
+      "path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a20\\03_implementation\\var\\designs\\d550d4dc4087420a926d727d1c56b4df\\thumbnail_gpu.png",
+      "sha256": "f606f17a784cb9d417d6e11fca55988efd39c16a74f23000e5dac4582e7b8f03",
+      "view_name": "thumbnail_gpu"
+    }
+  ]
+}
