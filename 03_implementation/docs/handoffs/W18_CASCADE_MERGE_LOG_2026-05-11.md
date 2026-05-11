@@ -418,3 +418,55 @@ Zero merges. All five MERGEABLE-marked PRs have real CI failures (post-fix). Wat
 4. **#242** — author: cold-runner `/api/apps` race remains; increase quiesce window or add explicit pre-warm retry for `apps` route.
 5. **#241** — re-run Layer D job (transient `actions/checkout@v4` exit 128).
 
+---
+
+## Round 8 — 2026-05-11 14:57 UTC
+
+**Operator priority**: queue-reduction mode. Tight focus on three "green/clean" target PRs (#248, #249, #250); explicit skip list for #251 (ruff format failing), #252 (static + matrix + UI-Final failing), #241/#242/#243 (still re-running after prior round 7 fixes), and #245 (must wait).
+
+### Target PR evaluation
+
+| PR | Title | Pre-merge state | Action |
+|---|---|---|---|
+| #248 | W18-A17 Hermes Agents operational | MERGEABLE + CLEAN; 15 layer checks SUCCESS, Layer E SKIPPED (release-dry-run, by design), CodeRabbit SUCCESS | MERGED |
+| #249 | W18-A18 backend timeouts | MERGEABLE + CLEAN; 13 layer checks SUCCESS, Layer E SKIPPED, CodeRabbit SUCCESS | MERGED |
+| #250 | W18-A19 provider live smoke | MERGEABLE + CLEAN but NO workflow runs on head `df4edc5` (only CodeRabbit "Review skipped"); zero Layer A/B/C/D/F/M/T proof | SKIPPED — operator guard "ensure CI/checks are actually complete before merge" not satisfied |
+
+### Merges this round
+
+| PR | Title | Merge SHA | Time UTC |
+|---|---|---|---|
+| #248 | W18-A17 Hermes Agents operational | `75f97348f8de9629d6a951b46383038ecc2a5321` | 2026-05-11T14:56:24Z |
+| #249 | W18-A18 backend timeouts | `5b7a21f36fc759e32d19c498bf76dbf475f5c6e1` | 2026-05-11T14:57:03Z |
+
+Two merges. Auto-merge was rejected by repo policy (`enablePullRequestAutoMerge` disabled) so direct `gh pr merge --squash` was used; both PRs satisfied all branch-protection requirements at the moment of merge.
+
+### Scope-safety scan (printer hardware writes)
+
+- **#248** diff scan: zero printer-write surfaces. Only Playwright spec (`w18-a17-agents-operational.spec.ts`), Playwright config, handoff doc, and four SSE proof artifacts. The two `print` regex matches are documentation-only re-affirmations of `GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR` (no behavior change).
+- **#249** diff scan: zero printer-write surfaces. Touches only `modules.py`, `health/probe.py`, and a new pytest integration file. Nothing in the diff approaches G-code, serial, or printer hardware paths.
+- **#250** (not merged) — diff scope reviewed defensively: agents.py + new smoke script + Playwright spec + 6 proof JSONs. No printer-write surfaces, but skipped on CI-completeness grounds (independent of scope safety).
+
+### Standing safety re-affirmation
+
+- No printer-hardware-enabling diff merged in round 8.
+- `GUI_PHYSICAL_PRINT_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- `GUI_PRINTER_DRY_RUN_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- PR #235 (CANCELLED W18-A8 printer safety) NOT reopened.
+
+### Cumulative cascade tally (rounds 1-8)
+
+| Total in-scope PRs | Merged so far | Remaining |
+|---|---|---|
+| 17 (excl. #245 skipped, #235 cancelled) | 14 (rounds 1-6 = 12; round 8 = +2 [#248, #249]) | 5 (#250 CI-empty; #251 ruff; #252 multi-fail; #241/#242/#243 re-running; #245 waiting) |
+
+### Recommended next action (round 9 / authors)
+
+1. **#250** — author/CI: head `df4edc5` produced no workflow runs. Push an empty commit or run `gh workflow run` against the head ref to fire the full check-suite, then queue for merge.
+2. **#251** — author: ruff format pending (operator already noted fix in flight).
+3. **#252** — author: address static + matrix + UI-Final failures (operator already noted separate fix).
+4. **#241** — wait for transient checkout 500 re-run.
+5. **#242** — wait for race v3 fix `1945ac5` CI to settle.
+6. **#243** — wait for transient checkout 500 re-run.
+7. **#245** — still hold (must wait for others).
+
