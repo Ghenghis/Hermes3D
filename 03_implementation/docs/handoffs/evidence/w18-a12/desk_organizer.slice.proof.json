@@ -1,0 +1,70 @@
+{
+  "schema": "hermes3d.slicer.proof.v1",
+  "job_id": "5642235bfc5f4da0b808654f5c2fe6c6",
+  "request": {
+    "stl_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\designs\\c2563dc2559c4505b0fa88e7a06c69d0\\desk_organizer_4ee082d000.stl",
+    "printer_profile": null,
+    "options": {}
+  },
+  "slicer": {
+    "slicer_binary": "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe",
+    "stl_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\designs\\c2563dc2559c4505b0fa88e7a06c69d0\\desk_organizer_4ee082d000.stl",
+    "gcode_path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5642235bfc5f4da0b808654f5c2fe6c6\\desk_organizer_4ee082d000.gcode",
+    "return_code": 0,
+    "duration_seconds": 1.086008071899414,
+    "estimated_minutes": 761.8333333333334,
+    "estimated_filament_mm": 88770.72,
+    "estimated_filament_g": null,
+    "layer_count": null,
+    "extra": {
+      "stdout_tail": "10 => Processing triangulated mesh\n20 => Generating perimeters\n30 => Preparing infill\n45 => Making infill\n65 => Searching support spots\n69 => Alert if supports needed\n89 => Calculating overhanging perimeters\n88 => Generating skirt and brim\n90 => Exporting G-code to G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5642235bfc5f4da0b808654f5c2fe6c6\\desk_organizer_4ee082d000.gcode\nSlicing result exported to G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5642235bfc5f4da0b808654f5c2fe6c6\\desk_organizer_4ee082d000.gcode\n",
+      "stderr_tail": "",
+      "argv": [
+        "C:\\Program Files\\Prusa3D\\PrusaSlicer\\prusa-slicer-console.exe",
+        "--export-gcode",
+        "--output",
+        "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5642235bfc5f4da0b808654f5c2fe6c6\\desk_organizer_4ee082d000.gcode",
+        "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\designs\\c2563dc2559c4505b0fa88e7a06c69d0\\desk_organizer_4ee082d000.stl"
+      ]
+    }
+  },
+  "analyzer": {
+    "path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5642235bfc5f4da0b808654f5c2fe6c6\\desk_organizer_4ee082d000.gcode",
+    "file_size_bytes": 6019909,
+    "slicer_name": "PrusaSlicer",
+    "slicer_version": "2.9.5-beta2",
+    "estimated_print_time_min": 761.8333333333334,
+    "filament_used_mm": 88770.72,
+    "filament_used_g": null,
+    "layer_count": 300,
+    "layer_height_mm": 0.3,
+    "nozzle_temp_c": 200.0,
+    "bed_temp_c": 0.0,
+    "support_used": false,
+    "infill_density_pct": 20.0,
+    "bed_mesh_loaded": false,
+    "pressure_advance_set": false,
+    "extrusion_moves_sampled": 8293,
+    "travel_moves_sampled": 652,
+    "retraction_count_sampled": 0,
+    "motion_lines": 211443,
+    "layer_change_markers": 300,
+    "risk_flags": [
+      "long-print: 12.7h estimated"
+    ],
+    "notes": [],
+    "estimated_print_time_h": 12.7
+  },
+  "gcode": {
+    "path": "G:\\Github\\Hermes3D\\.claude\\worktrees\\w18-a12\\03_implementation\\var\\slicer\\5642235bfc5f4da0b808654f5c2fe6c6\\desk_organizer_4ee082d000.gcode",
+    "size_bytes": 6019909,
+    "sha256": "d38505b3418087e816f4ab3b2df8d3282f74e3247e33dd10c975774c2005ddc0"
+  },
+  "proof_event_id": "0f980016fa634f41914f782ad1cab30a",
+  "freeze_assertions": {
+    "no_printer_writes": true,
+    "no_moonraker_upload": true,
+    "no_klipper_dispatch": true,
+    "no_octoprint_upload": true
+  }
+}

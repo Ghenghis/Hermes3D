@@ -41,6 +41,7 @@ from hermes3d.api.routes import (
     settings,
     settings_themes,
     skills,
+    slicer,
     source_os,
     system,
     update_center,
@@ -151,6 +152,10 @@ def create_gui_app() -> FastAPI:
         # consumers were 404ing in W17-A1 audit).
         files,
         health_services,
+        # W18-A12 — wire the slicer through HTTP so the Design tab can drive
+        # PrusaSlicer end-to-end. POST /api/slice + GET /api/slice/{job_id}.
+        # NEVER dispatches the resulting G-code (operator freeze 2026-05-11).
+        slicer,
     ]:
         app.include_router(route_module.router)
 
