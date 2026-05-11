@@ -15,8 +15,10 @@ from hermes3d.services.local_state import implementation_path, port_reachable, s
 from hermes3d.services.local_state import set_service_url as save_service_url
 
 # Path to Lane 04 (H3D-CLAUDE-SOURCE-GEN3D) proof file — read-only
+# File is at: src/hermes3d/api/routes/generation.py
+# parents[0]=routes, [1]=api, [2]=hermes3d, [3]=src, [4]=03_implementation, [5]=Hermes3D
 _LANE04_PROOF_PATH = (
-    Path(__file__).resolve().parents[6]
+    Path(__file__).resolve().parents[5]
     / "03_implementation"
     / "proof"
     / "GEN3D_VERIFY_2026-05-06.json"
@@ -24,7 +26,7 @@ _LANE04_PROOF_PATH = (
 
 # Adapter registry schemas dir for template discovery
 _SCHEMAS_DIR = (
-    Path(__file__).resolve().parents[6] / "03_implementation" / "adapter_registry" / "schemas"
+    Path(__file__).resolve().parents[5] / "03_implementation" / "adapter_registry" / "schemas"
 )
 
 router = APIRouter()
@@ -45,6 +47,7 @@ class GenerationRun(BaseModel):
     seed: int = 3201
     reference_artifact_id: str | None = None
     constraints: dict[str, Any] = Field(default_factory=dict)
+    template_id: str | None = None
 
 
 @router.get("/api/generation/services")
@@ -214,7 +217,11 @@ def gen3d_templates() -> list[dict[str, Any]]:
 def run_generation(body: GenerationRun | None = None) -> dict:
     request = body or GenerationRun()
     try:
-        template_id = _resolve_generation_template(request.prompt)
+        # Explicit template_id from the UI takes priority over prompt keyword matching
+        if request.template_id:
+            template_id = request.template_id
+        else:
+            template_id = _resolve_generation_template(request.prompt)
     except ValueError as exc:
         raise HTTPException(
             status_code=409,

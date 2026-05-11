@@ -174,6 +174,36 @@ test.describe("W18-A4 Hermes Agent workflow proof", () => {
     const candidates = await candidateBridgeUrls();
     const { baseURL: LIVE_BRIDGE_URL, probe: runtime } = await probeRuntime(candidates);
 
+    // ---- Clear agent histories BEFORE navigating to the page ----
+    // w18-a17 (which runs earlier in the same CI suite) writes voice-note
+    // proof records into agent_conversations.  Without clearing first, those
+    // records show up as pre-existing `div.bg-surface2` assistant blocks when
+    // this test's page mounts.  The STATUS_UPDATE reply for the new message
+    // then gets overwritten by a subsequent loadHistory() call that returns
+    // only the old records, so the STATUS_UPDATE text never stably appears.
+    //
+    // Clearing via API BEFORE page.goto() avoids the selectOption→loadHistory
+    // race from the old delete+re-select approach: loadHistory fires once at
+    // mount time (returns []), and no subsequent reload can clobber the reply.
+    const clearCtx = await pwRequest.newContext({ baseURL: LIVE_BRIDGE_URL });
+    try {
+      const agentsResp = await clearCtx.get("/api/agents", { timeout: 10_000 });
+      if (agentsResp.ok()) {
+        const agents = (await agentsResp.json()) as Array<{ name?: string }>;
+        await Promise.all(
+          agents.map((a) =>
+            clearCtx
+              .delete(`/api/agents/${encodeURIComponent(a.name ?? "")}/history`, {
+                timeout: 10_000,
+              })
+              .catch(() => undefined),
+          ),
+        );
+      }
+    } finally {
+      await clearCtx.dispose();
+    }
+
     // ---- HAR recording (record mode, NOT replay) ----
     const harPath = path.join(ARTIFACT_DIR, "hermes-agent.har");
     await context.routeFromHAR(harPath, {
@@ -246,18 +276,13 @@ test.describe("W18-A4 Hermes Agent workflow proof", () => {
       .textContent()) ?? personaValue;
     expect(personaValue, "persona id must be non-empty").not.toBe("");
 
-    // Clear any prior history for this persona so the assertions only see
-    // messages produced by THIS test run. Uses the real backend endpoint.
-    const apiCtx = await pwRequest.newContext({ baseURL: LIVE_BRIDGE_URL });
-    try {
-      await apiCtx.delete(`/api/agents/${encodeURIComponent(personaValue)}/history`, {
-        timeout: 10_000,
-      }).catch(() => undefined);
-    } finally {
-      await apiCtx.dispose();
-    }
-    // Re-fetch history in the UI by re-selecting the persona.
-    await personaSelect.selectOption(personaValue);
+    // Do NOT delete history or re-select the persona here.
+    // The delete+selectOption pattern caused a race: the async loadHistory()
+    // triggered by the re-selection would overwrite the React history state
+    // AFTER the optimistic user-message update, wiping the chat before the
+    // STATUS_UPDATE reply could render.  In a fresh CI session history is
+    // always empty; on a dev machine any pre-existing STATUS_UPDATE rows are
+    // fine because the toPass block checks for the text marker, not count.
 
     // ---- Capture the proof_events count BEFORE the send so we can detect a
     // new hermes_agent_chat_runtime_request row in branch (a), or its

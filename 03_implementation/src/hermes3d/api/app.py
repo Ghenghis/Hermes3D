@@ -81,6 +81,13 @@ def create_gui_app() -> FastAPI:
         # parent process and the worker forked without inheriting the
         # _initialized flag (e.g. multiprocessing spawn on Windows).
         init_db()
+        # W19-5: idempotent backfill of var/ files not yet in artifacts DB
+        try:
+            from hermes3d.api.routes.files import reconcile_var_artifacts
+
+            reconcile_var_artifacts()
+        except Exception:
+            pass  # reconcile is best-effort; never block startup
 
     @app.middleware("http")
     async def _optional_api_auth(request: Request, call_next):

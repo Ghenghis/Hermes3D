@@ -167,7 +167,7 @@ export function Gen3DTab() {
       const response = await fetch(`${LIVE_BASE_URL}/api/generation/run`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, constraints: { size_mm: sizeMm } }),
+        body: JSON.stringify({ prompt, template_id: selectedTemplate, constraints: { size_mm: sizeMm } }),
         cache: "no-store",
       });
       const payload: unknown = await response.json().catch(() => null);

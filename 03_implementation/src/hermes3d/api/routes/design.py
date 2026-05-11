@@ -5,6 +5,7 @@ import importlib.util
 import json
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -502,6 +503,22 @@ def _execute_supported_design(
             as_json(proof_notes),
         ),
     )
+    # Register thumbnail if GPU render produced one
+    if thumbnail_path.is_file():
+        execute(
+            """
+            INSERT OR IGNORE INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+            VALUES (?, ?, 'thumbnail', 'design-executor', 'MODELING', 'MODEL_APPROVAL', ?, ?, ?, ?)
+            """,
+            (
+                new_id(),
+                job_id,
+                thumbnail_path.name,
+                str(thumbnail_path),
+                thumbnail_path.stat().st_size,
+                as_json({"mesh_artifact_id": mesh_artifact_id}),
+            ),
+        )
     execute(
         """
         INSERT INTO job_steps (id, job_id, step_number, name, status, started_at, ended_at, duration_s)
@@ -912,6 +929,10 @@ def _probe_providers() -> list[dict[str, Any]]:
             version_args=["--version"],
             capabilities=["solid_csg", "parametric_scad", "stl_export"],
             docs_url="https://openscad.org/",
+            fallback_paths=[
+                r"C:\Program Files\OpenSCAD\openscad.exe",
+                r"C:\Program Files (x86)\OpenSCAD\openscad.exe",
+            ],
         )
     )
 
@@ -925,6 +946,11 @@ def _probe_providers() -> list[dict[str, Any]]:
             version_args=["--version"],
             capabilities=["mesh_modeling", "stl_export", "python_scripting", "mcp_support"],
             docs_url="https://www.blender.org/",
+            fallback_paths=[
+                r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe",
+                r"C:\Program Files\Blender Foundation\Blender 4.3\blender.exe",
+                r"C:\Program Files\Blender Foundation\Blender 4.2\blender.exe",
+            ],
         )
     )
 
@@ -994,14 +1020,23 @@ def _probe_cli_provider(
     version_args: list[str],
     capabilities: list[str],
     docs_url: str,
+    fallback_paths: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Probe a CLI executable with shutil.which — real result only."""
+    """Probe a CLI executable via shutil.which then known install paths."""
     detected_path: str | None = None
     for exe in exe_names:
         found = shutil.which(exe)
         if found:
             detected_path = found
             break
+
+    # Fall back to known Windows install paths when shutil.which misses them
+    if not detected_path and fallback_paths:
+        for candidate in fallback_paths:
+            p = Path(candidate)
+            if p.is_file():
+                detected_path = str(p)
+                break
 
     if not detected_path:
         return {

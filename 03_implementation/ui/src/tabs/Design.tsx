@@ -138,7 +138,8 @@ export function DesignTab() {
   );
   const toolchainReady = toolchain.overall === "ready" && toolchain.execution_ready !== false;
   const toolchainReason = designBlockReason(toolchain);
-  const canSubmit = title.trim().length > 0 && description.trim().length > 0 && targetPrinterId.length > 0 && toolchainReady;
+  // target_printer_id is optional on the backend — do not gate on printer selection
+  const canSubmit = title.trim().length > 0 && description.trim().length > 0 && toolchainReady;
   const localTools = toolchain.tools ?? [];
   const sourceTools = toolchain.sources ?? [];
 
@@ -399,7 +400,7 @@ export function DesignTab() {
           <button
             type="button"
             disabled={!canSubmit}
-            title={canSubmit ? "Create a real parametric design artifact and proof." : toolchainReady ? "Complete the required design fields." : toolchainReason}
+            title={canSubmit ? "Create a real parametric design artifact and proof." : toolchainReady ? "Fill in the design name and intent fields." : toolchainReason}
             onClick={submit}
             className="rounded bg-accent-blue px-3 py-2 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-50"
           >

@@ -379,7 +379,8 @@ function Row({
             <button
               type="button"
               onClick={onRunProof}
-              disabled={busy}
+              disabled={busy || !app.proof_command}
+              title={!app.proof_command ? "No proof command configured for this app" : undefined}
               data-testid={`app-row-${app.id}-run-proof`}
               className="rounded border border-border px-2 py-1 text-[11px] text-fg hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50"
             >

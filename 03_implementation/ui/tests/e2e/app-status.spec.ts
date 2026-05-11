@@ -40,6 +40,7 @@ const SAMPLE_APPS = [
     },
     rollback_supported: true,
     description: "Local agent runtime.",
+    proof_command: "python -m hermes_cli.main --help",
   },
   {
     id: "hermes-desktop",

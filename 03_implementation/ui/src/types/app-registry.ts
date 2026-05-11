@@ -13,6 +13,15 @@
 export type AppLifecycleStatus = "stable" | "canary" | "frozen" | "unknown";
 export type AppUpdateLane = "core" | "stable" | "canary" | "frozen" | "experimental" | "unknown";
 export type ProofStatus = "pass" | "fail" | "pending" | "unknown";
+export type TruthfulStatus =
+  | "INSTALLED_PROVEN"
+  | "INSTALLED_UNPROVEN"
+  | "FAILED_PROOF"
+  | "NO_PROOF_COMMAND"
+  | "NOT_INSTALLED"
+  | "SOURCE_AVAILABLE"
+  | "CONFIG_REQUIRED"
+  | "UNKNOWN";
 
 export interface AppLicense {
   /** SPDX expression where known, e.g. "MIT", "Apache-2.0", or "Unknown". */
@@ -58,6 +67,10 @@ export interface RegistryApp {
   description?: string | null;
   /** Optional source repo / docs URL. */
   upstream_url?: string | null;
+  /** Honest install status derived from proof evidence (W19-7). */
+  truthful_status?: TruthfulStatus | null;
+  /** Idempotent shell command to verify install (null = no proof available). */
+  proof_command?: string | null;
 }
 
 /** Wrapper for GET /api/apps. */

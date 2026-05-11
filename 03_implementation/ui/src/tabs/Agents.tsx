@@ -151,6 +151,9 @@ export function AgentsTab() {
   const [providerSmokeBusy, setProviderSmokeBusy] = useState<"minimax" | "deepseek" | null>(null);
   const [providerSmokeResult, setProviderSmokeResult] = useState<ProviderSmokeResult | null>(null);
   const [providerSmokeMessage, setProviderSmokeMessage] = useState("Provider smoke calls use private env on the backend and store MCP evidence.");
+  const [modelAssistPrompt, setModelAssistPrompt] = useState("design a 5-compartment desk organizer");
+  const [modelAssistBusy, setModelAssistBusy] = useState(false);
+  const [modelAssistResult, setModelAssistResult] = useState<Record<string, unknown> | null>(null);
   const [runtimeIdentity, setRuntimeIdentity] = useState<RuntimeIdentity | null>(null);
   const [shipTaskId, setShipTaskId] = useState("H3D-AGENT-SHIP");
   const [shipProposalId, setShipProposalId] = useState("");
@@ -440,6 +443,54 @@ export function AgentsTab() {
                   {e2eReadiness?.blocked_reasons.slice(0, 5).map((reason) => <div key={reason}>- {reason}</div>)}
                 </div>
               )}
+              {/* W19-8: Agent-Assisted Design panel */}
+              <div className="grid gap-2 rounded border border-border bg-bg/40 p-2">
+                <div className="text-[10px] uppercase text-muted">Agent-Assisted Design (MiniMax → DeepSeek)</div>
+                <div className="flex gap-2">
+                  <input
+                    value={modelAssistPrompt}
+                    onChange={(e) => setModelAssistPrompt(e.target.value)}
+                    placeholder="Describe the object to design…"
+                    className="flex-1 rounded border border-border bg-surface2 px-2 py-1 text-[11px] text-fg outline-none"
+                  />
+                  <button
+                    type="button"
+                    disabled={modelAssistBusy || !modelAssistPrompt.trim()}
+                    onClick={() => {
+                      setModelAssistBusy(true);
+                      fetch(`${LIVE_BASE_URL}/api/agents/providers/model-assist`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ prompt: modelAssistPrompt.trim(), skip_review: false }),
+                      })
+                        .then((r) => r.json())
+                        .then((data) => { setModelAssistResult(data as Record<string, unknown>); })
+                        .catch(() => { setModelAssistResult({ status: "error", extracted: null }); })
+                        .finally(() => { setModelAssistBusy(false); });
+                    }}
+                    className="rounded border border-border px-2 py-1 text-[11px] text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {modelAssistBusy ? "Extracting…" : "Extract params"}
+                  </button>
+                </div>
+                {modelAssistResult && (
+                  <div className="space-y-1">
+                    <div className={`text-[11px] ${(modelAssistResult.status as string) === "ready" ? "text-accent-green" : "text-accent-amber"}`}>
+                      MiniMax: {(modelAssistResult.minimax as Record<string, unknown>)?.status as string}
+                      {modelAssistResult.deepseek_review ? ` · DeepSeek: ${(modelAssistResult.deepseek_review as Record<string, unknown>)?.approved ? "approved" : "rejected"}` : ""}
+                    </div>
+                    {Boolean(modelAssistResult.extracted) && (
+                      <div className="rounded border border-border bg-surface p-2 font-mono text-[10px] text-muted">
+                        <div>title: {String((modelAssistResult.extracted as Record<string, unknown>)?.title ?? "")}</div>
+                        <div>intent: {String((modelAssistResult.extracted as Record<string, unknown>)?.intent ?? "")}</div>
+                      </div>
+                    )}
+                    {Boolean(modelAssistResult.parse_error) && (
+                      <div className="text-[11px] text-accent-amber">parse error: {String(modelAssistResult.parse_error)}</div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="grid gap-2 rounded border border-border bg-bg/40 p-2">
               <div className="grid gap-2 md:grid-cols-[1fr_0.72fr_0.48fr]">

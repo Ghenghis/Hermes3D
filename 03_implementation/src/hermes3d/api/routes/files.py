@@ -1,35 +1,21 @@
-"""W17 — /api/files honest-blocked surface.
+"""W19-4/5 — /api/files real var/ scanner + orphan reconciliation.
 
-The Files tab (``03_implementation/ui/src/tabs/Files.tsx``) probes a
-small set of candidate ``/api/files*`` paths and renders an honest
-empty state when none of them answer. W17 audit (A1 + Codex) confirmed
-that the bridge FastAPI app at port 8765 returns 404 for these paths,
-which produces a noisy console + a permanently-degraded UI even though
-the tab itself already knows how to render the "blocked" state.
+Supersedes the honest-blocked interim implementation with a scanner that walks
+var/generation/, var/designs/, and var/slicer/ and returns FileItem
+rows for every file found.  POST write semantics remain 501 until a
+real upload path is wired.
 
-This module ships the *minimum* honest surface so the Files tab can:
-
-1. Stop seeing 404s in the console (W16-B no-allow-list contract).
-2. Render the same deterministic empty state from a 200 envelope,
-   keeping the UI behaviour identical until a real file store ships.
-3. Discover the contract via OpenAPI once a future PR wires a real
-   storage backend; the response model is the W15-A20 envelope so the
-   shape is forward-compatible.
-
-We deliberately do NOT fabricate file rows. ``items=[]`` + ``accepted=False``
-+ ``reason="file_store_not_yet_configured"`` is the honest state. ``POST``
-is gated identically with HTTP 501 so callers cannot accidentally rely on
-write semantics that don't exist.
-
-References:
-- FastAPI bigger applications / routers pattern:
-  https://fastapi.tiangolo.com/tutorial/bigger-applications/
-- W15-A20 honest-blocked envelope contract (see ``skills.py``,
-  ``connectors.py``).
+W19-5: reconcile_var_artifacts() backfills any var/ file not yet
+registered in the artifacts DB (idempotent — INSERT OR IGNORE).
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
@@ -37,22 +23,124 @@ from pydantic import BaseModel, Field
 
 router = APIRouter()
 
+# parents[0]=routes [1]=api [2]=hermes3d [3]=src [4]=03_implementation
+_VAR_DIR = Path(__file__).resolve().parents[4] / "var"
 
-_REASON_NOT_CONFIGURED = "file_store_not_yet_configured"
+_BUCKETS = ("generation", "designs", "slicer")
+
+_EXT_KIND: dict[str, Literal["model", "slice", "image", "log", "other"]] = {
+    ".stl": "model",
+    ".obj": "model",
+    ".3mf": "model",
+    ".gcode": "slice",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".svg": "image",
+    ".json": "log",
+    ".txt": "log",
+}
+
+
+def _file_id(path: Path) -> str:
+    rel = path.relative_to(_VAR_DIR)
+    return hashlib.sha1(str(rel).encode()).hexdigest()[:16]
+
+
+_EXT_EVIDENCE: dict[str, str] = {
+    ".stl": "mesh",
+    ".obj": "mesh",
+    ".3mf": "mesh",
+    ".gcode": "gcode",
+    ".png": "thumbnail",
+    ".jpg": "thumbnail",
+    ".svg": "thumbnail",
+    ".json": "proof_report",
+}
+
+
+def reconcile_var_artifacts() -> dict[str, int]:
+    """Backfill any var/ file not yet in the artifacts table.
+
+    Idempotent — uses INSERT OR IGNORE keyed on file_path.
+    Returns counts of inserted rows per bucket.
+    """
+    from hermes3d.db.init import connect, init_db
+
+    init_db()
+    inserted: dict[str, int] = {}
+
+    if not _VAR_DIR.exists():
+        return inserted
+
+    conn = connect()
+    try:
+        existing = {
+            row[0]
+            for row in conn.execute(
+                "SELECT file_path FROM artifacts WHERE file_path LIKE ?",
+                (str(_VAR_DIR) + "%",),
+            ).fetchall()
+        }
+        for bucket in _BUCKETS:
+            bucket_dir = _VAR_DIR / bucket
+            if not bucket_dir.exists():
+                continue
+            count = 0
+            for run_dir in sorted(bucket_dir.iterdir()):
+                if not run_dir.is_dir():
+                    continue
+                job_id = _resolve_job_id(conn, run_dir.name)
+                for f in sorted(run_dir.iterdir()):
+                    if not f.is_file():
+                        continue
+                    fp = str(f)
+                    if fp in existing:
+                        continue
+                    evidence_type = _EXT_EVIDENCE.get(f.suffix.lower(), "other")
+                    notes = json.dumps({"reconciled": True, "run_dir": run_dir.name})
+                    conn.execute(
+                        """
+                        INSERT OR IGNORE INTO artifacts
+                          (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+                        VALUES (?, ?, ?, 'reconcile', 'MODELING', 'MODEL_APPROVAL', ?, ?, ?, ?)
+                        """,
+                        (
+                            uuid.uuid4().hex,
+                            job_id,
+                            evidence_type,
+                            f.name,
+                            fp,
+                            f.stat().st_size,
+                            notes,
+                        ),
+                    )
+                    count += 1
+            conn.commit()
+            inserted[bucket] = count
+    finally:
+        conn.close()
+
+    return inserted
+
+
+def _resolve_job_id(conn: Any, run_dir_name: str) -> str | None:
+    """Look up the job_id matching a run directory name, or None."""
+    row = conn.execute(
+        "SELECT job_id FROM artifacts WHERE job_id = ? LIMIT 1",
+        (run_dir_name,),
+    ).fetchone()
+    return row[0] if row else None
 
 
 class FileItem(BaseModel):
-    """Forward-compatible file row.
-
-    Mirrors the artifact-style fields the UI already renders so the
-    eventual implementation can drop in without breaking the consumer.
-    """
-
     id: str
     name: str
     size_bytes: int = 0
     kind: Literal["model", "slice", "image", "log", "other"] = "other"
     modified_utc: str | None = None
+    bucket: str = "other"
+    run_id: str | None = None
 
 
 class FilesResponse(BaseModel):
@@ -68,59 +156,95 @@ class FileCreate(BaseModel):
     kind: Literal["model", "slice", "image", "log", "other"] = "other"
 
 
+def _scan_var() -> list[FileItem]:
+    if not _VAR_DIR.exists():
+        return []
+    items: list[FileItem] = []
+    for bucket in _BUCKETS:
+        bucket_dir = _VAR_DIR / bucket
+        if not bucket_dir.exists():
+            continue
+        for run_dir in sorted(bucket_dir.iterdir()):
+            if not run_dir.is_dir():
+                continue
+            for f in sorted(run_dir.iterdir()):
+                if not f.is_file():
+                    continue
+                stat = f.stat()
+                mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+                items.append(
+                    FileItem(
+                        id=_file_id(f),
+                        name=f.name,
+                        size_bytes=stat.st_size,
+                        kind=_EXT_KIND.get(f.suffix.lower(), "other"),
+                        modified_utc=mtime,
+                        bucket=bucket,
+                        run_id=run_dir.name,
+                    )
+                )
+    return items
+
+
 @router.get("/api/files", response_model=FilesResponse)
 def list_files() -> FilesResponse:
-    """Return the configured file store contents.
-
-    No file store is wired in this build. Per the W15-A20 honest-blocked
-    contract, return ``accepted=False`` + a stable ``reason`` token and
-    an empty ``items`` list. The Files tab consumes this and renders the
-    same deterministic empty state it currently shows for 404, without
-    polluting the browser console.
-    """
+    items = _scan_var()
     return FilesResponse(
-        accepted=False,
-        status="unknown",
-        reason=_REASON_NOT_CONFIGURED,
-        items=[],
-        total=0,
+        accepted=True,
+        status="ready",
+        items=items,
+        total=len(items),
     )
+
+
+# Backward-compat aliases: the Files tab probes /api/files/list and
+# /api/files/index; these must return 200 (not 404) so the probe shows
+# "available". Declared before {file_id} so FastAPI resolves them first.
+@router.get("/api/files/list", response_model=FilesResponse)
+def list_files_compat() -> FilesResponse:
+    return list_files()
+
+
+@router.get("/api/files/index", response_model=FilesResponse)
+def list_files_index() -> FilesResponse:
+    return list_files()
 
 
 @router.get("/api/files/{file_id}", response_model=FilesResponse)
 def get_file(file_id: str) -> FilesResponse:
-    """Return metadata for a single file id.
-
-    Honest envelope: no store ⇒ no items ⇒ a deterministic 200 response
-    rather than a 404. The ``reason`` token tells the UI exactly why the
-    item is absent so it does not retry on a timer.
-    """
     if not file_id.strip():
         raise HTTPException(status_code=400, detail="file_id must not be empty")
+    items = _scan_var()
+    match = [i for i in items if i.id == file_id]
+    if not match:
+        raise HTTPException(status_code=404, detail=f"file {file_id!r} not found in var/")
     return FilesResponse(
-        accepted=False,
-        status="unknown",
-        reason=_REASON_NOT_CONFIGURED,
-        items=[],
-        total=0,
+        accepted=True,
+        status="ready",
+        items=match,
+        total=len(match),
     )
 
 
 @router.post("/api/files", status_code=501)
 def create_file(body: FileCreate) -> dict[str, Any]:
-    """Honest 501 Not-Implemented response for file creation.
-
-    We accept and validate the body so OpenAPI documents the future
-    contract, then return 501 Not Implemented with the W15-A20 reason
-    token. This is preferable to returning 200 with a fabricated id —
-    callers must not rely on writes that don't persist.
-    """
     raise HTTPException(
         status_code=501,
         detail={
             "accepted": False,
             "status": "blocked",
-            "reason": _REASON_NOT_CONFIGURED,
+            "reason": "write_not_implemented",
             "echo": {"name": body.name, "kind": body.kind},
         },
     )
+
+
+@router.post("/api/files/reconcile")
+def reconcile_files() -> dict[str, Any]:
+    """Backfill orphan var/ files into the artifacts DB.
+
+    Safe to call multiple times — INSERT OR IGNORE keeps it idempotent.
+    """
+    inserted = reconcile_var_artifacts()
+    total = sum(inserted.values())
+    return {"inserted": total, "by_bucket": inserted}

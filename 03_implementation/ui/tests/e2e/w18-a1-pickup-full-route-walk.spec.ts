@@ -201,6 +201,11 @@ const BENIGN_CONSOLE_FRAGMENTS: Array<{ fragment: string; reason: string }> = [
   // mid-restart — surfaces as a console.error with no impact on the active
   // route. The /api/events/stream channel itself is verified live elsewhere.
   { fragment: "EventSource", reason: "SSE reconnect noise — channel is verified by /api/events/stream gate" },
+  // hermes3dClient.ts probes a list of API_BASE_URLS that includes port 8766
+  // (a secondary local dev port). When no process listens on 8766, Chromium
+  // can surface a CORS policy error instead of NET_ERR_CONNECTION_REFUSED —
+  // both are offline-port artifacts, not route regressions.
+  { fragment: "127.0.0.1:8766", reason: "Dead fallback port in API_BASE_URLS — CORS/refused from offline port is not a route regression" },
 ];
 
 /**
