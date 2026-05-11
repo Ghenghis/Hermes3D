@@ -57,6 +57,7 @@ id_rsa*
 *.gcode
 *.3mf
 !04_testing/acceptance/golden/*.gcode
+!04_testing/fixtures/w18_a7_cube_10mm.gcode
 *.bgcode
 
 ## Vendor (only fork-mode)
