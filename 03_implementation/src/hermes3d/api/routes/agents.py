@@ -700,13 +700,15 @@ _AGENT_TASK_STATUS_MAP: dict[str, str] = {
 # Active = anything still in flight from the GUI's point of view.
 # We keep "completed" out of active because the work has produced its
 # evidence and is now "recent" — but the panel still shows it.
-_AGENT_TASK_ACTIVE_STATUSES: frozenset[str] = frozenset({
-    "claimed",
-    "coding_plan_recorded",
-    "review_recorded",
-    "assigned",
-    "in_progress",
-})
+_AGENT_TASK_ACTIVE_STATUSES: frozenset[str] = frozenset(
+    {
+        "claimed",
+        "coding_plan_recorded",
+        "review_recorded",
+        "assigned",
+        "in_progress",
+    }
+)
 
 
 def _agent_task_kind_for(action_id: str) -> str:
@@ -1863,7 +1865,9 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
         },
     }
     try:
-        from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FutureTimeout
+        from concurrent.futures import ThreadPoolExecutor
+        from concurrent.futures import TimeoutError as _FutureTimeout
+
         from hermes3d.services import code_history
 
         # NOTE: we manage the pool manually so we can `shutdown(wait=False)`

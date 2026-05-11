@@ -32,7 +32,6 @@ Operator-freeze contract:
 
 from __future__ import annotations
 
-import json
 import sys
 import tempfile
 import time
@@ -111,7 +110,9 @@ def _insert_proof_event(event_type: str, source_agent: str, payload: dict) -> st
 def test_agents_tasks_returns_200_with_empty_feed_when_no_proof_events(client: TestClient) -> None:
     """Before this PR the endpoint was 404; now it returns a 200 honest-empty."""
     response = client.get("/api/agents/tasks")
-    assert response.status_code == 200, f"expected 200, got {response.status_code}: {response.text[:300]}"
+    assert response.status_code == 200, (
+        f"expected 200, got {response.status_code}: {response.text[:300]}"
+    )
     body = response.json()
     assert body["schema_version"] == "agent-tasks-v1"
     assert body["tasks"] == []
