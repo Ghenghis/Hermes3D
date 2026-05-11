@@ -1,0 +1,175 @@
+{
+  "generated_utc": "2026-05-11T11:18:51.339Z",
+  "repo": "Ghenghis/Hermes3D",
+  "workspace": "G:\\Github\\Hermes3D",
+  "gui_complete": false,
+  "in_scope_pass_real": false,
+  "a15_runner_merged": false,
+  "a15_runner": {
+    "gate": "W18-A15",
+    "lane": "W18-A15-regression-runner",
+    "pr_number": null,
+    "pr_state": null,
+    "pr_url": null,
+    "pr_merged_at": null,
+    "handoff_path": null,
+    "handoff_source": null,
+    "handoff_sha256": null,
+    "handoff_verdict": null,
+    "expected_verdicts": [
+      "PASS_REAL",
+      "GREEN",
+      "PASS_REAL_PARAMETRIC"
+    ],
+    "status": "NO_PR"
+  },
+  "gates": [
+    {
+      "gate": "GUI_ROUTE_E2E_GREEN",
+      "lane": "W18-A1-pickup",
+      "pr_number": null,
+      "pr_state": null,
+      "pr_url": null,
+      "pr_merged_at": null,
+      "handoff_path": null,
+      "handoff_source": null,
+      "handoff_sha256": null,
+      "handoff_verdict": null,
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "NO_PR"
+    },
+    {
+      "gate": "GUI_BACKEND_WIRING_GREEN",
+      "lane": "W18-A13",
+      "pr_number": null,
+      "pr_state": null,
+      "pr_url": null,
+      "pr_merged_at": null,
+      "handoff_path": null,
+      "handoff_source": null,
+      "handoff_sha256": null,
+      "handoff_verdict": null,
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "NO_PR"
+    },
+    {
+      "gate": "GUI_AGENT_WORKFLOW_GREEN",
+      "lane": "W18-A4",
+      "pr_number": 232,
+      "pr_state": "OPEN",
+      "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/232",
+      "pr_merged_at": null,
+      "handoff_path": "03_implementation/docs/handoffs/W18-A4_HERMES_AGENT_WORKFLOW_2026-05-11.md",
+      "handoff_source": "workspace",
+      "handoff_sha256": "5a9935580a0e6a2201ae44973014c290c44fa3042064da52565889c71cb08c0d",
+      "handoff_verdict": "PASS_REAL",
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "PR_OPEN"
+    },
+    {
+      "gate": "GUI_60_APPS_GREEN",
+      "lane": "W18-A11",
+      "pr_number": 240,
+      "pr_state": "OPEN",
+      "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/240",
+      "pr_merged_at": null,
+      "handoff_path": "03_implementation/docs/handoffs/W18-A11_APP_REGISTRY_REAL_DATA_2026-05-11.md",
+      "handoff_source": "pr#240@claude/w18-a11-app-registry-real-data",
+      "handoff_sha256": "99173bbc1fed74cd04683774b3c77f1a7945516efdc4609a45040398b5e65fc4",
+      "handoff_verdict": "PASS",
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "PR_OPEN"
+    },
+    {
+      "gate": "GUI_MODELER_GREEN",
+      "lane": "W18-A5",
+      "pr_number": 237,
+      "pr_state": "OPEN",
+      "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/237",
+      "pr_merged_at": null,
+      "handoff_path": "03_implementation/docs/handoffs/W18-A5_MODELER_WORKFLOW_2026-05-11.md",
+      "handoff_source": "workspace",
+      "handoff_sha256": "caa4b84225675ebb6fdbeb513a4ec040c413970aab9e964089b33d4ee44ca9a5",
+      "handoff_verdict": "PASS_REAL_PARAMETRIC",
+      "expected_verdicts": [
+        "PASS_REAL",
+        "PASS_REAL_PARAMETRIC"
+      ],
+      "status": "PR_OPEN"
+    },
+    {
+      "gate": "GUI_SLICER_GREEN",
+      "lane": "W18-A9",
+      "pr_number": 239,
+      "pr_state": "OPEN",
+      "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/239",
+      "pr_merged_at": null,
+      "handoff_path": "03_implementation/docs/handoffs/W18-A9_SLICER_REAL_ARTIFACT_2026-05-11.md",
+      "handoff_source": "pr#239@claude/w18-a9-slicer-real-artifact",
+      "handoff_sha256": "9618ff5256c8847a44e3b91b73c138c65b0e85886fec3002696e448feabb4d82",
+      "handoff_verdict": "FAIL_NOT_WIRED",
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "PR_OPEN"
+    },
+    {
+      "gate": "GUI_ARTIFACT_PROOF_GREEN",
+      "lane": "W18-A8",
+      "pr_number": 238,
+      "pr_state": "OPEN",
+      "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/238",
+      "pr_merged_at": null,
+      "handoff_path": "03_implementation/docs/handoffs/W18-A8_ARTIFACT_FILE_PROOF_2026-05-11.md",
+      "handoff_source": "pr#238@claude/w18-a8-artifact-file-proof",
+      "handoff_sha256": "0e4dd3d62475cac58c557fe05e1be8cd923e0b8f3f5714145e40877170373dbf",
+      "handoff_verdict": "PASS_REAL",
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "PR_OPEN"
+    },
+    {
+      "gate": "GUI_PIXEL_E2E_GREEN",
+      "lane": "W18-A10-pickup",
+      "pr_number": null,
+      "pr_state": null,
+      "pr_url": null,
+      "pr_merged_at": null,
+      "handoff_path": null,
+      "handoff_source": null,
+      "handoff_sha256": null,
+      "handoff_verdict": null,
+      "expected_verdicts": [
+        "PASS_REAL"
+      ],
+      "status": "NO_PR"
+    },
+    {
+      "gate": "GUI_PHYSICAL_PRINT_GREEN",
+      "lane": "(operator freeze)",
+      "verdict": "OUT_OF_SCOPE_BY_OPERATOR",
+      "justification": "STRICT operator freeze 2026-05-11: no printer hardware writes; heater-on freeze respected.",
+      "pr": null,
+      "handoff": null,
+      "handoff_sha256": null
+    },
+    {
+      "gate": "GUI_PRINTER_DRY_RUN_GREEN",
+      "lane": "(operator freeze)",
+      "verdict": "OUT_OF_SCOPE_BY_OPERATOR",
+      "justification": "STRICT operator freeze 2026-05-11: dry-run also forbidden until operator lifts freeze (PR #235 closed without merge).",
+      "pr": null,
+      "handoff": null,
+      "handoff_sha256": null
+    }
+  ]
+}
