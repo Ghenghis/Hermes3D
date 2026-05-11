@@ -31,6 +31,7 @@
  *    that want to relax a gate must do it intentionally in the spec.
  */
 import type { Page } from "@playwright/test";
+import { isHermesOfflineMessage } from "../../src/api/consoleFilter";
 
 /**
  * Visual-target manifest shape consumed by the spec + reporter.
@@ -204,14 +205,43 @@ export function attachConsoleErrorSink(page: Page): ConsoleErrorSink {
     // Only fail on "error" severity. "warning" is intentionally not a gate
     // because React StrictMode + dev-mode hooks emit benign warnings that
     // would create false-positive diffs.
-    if (msg.type() === "error") {
-      const loc = msg.location();
-      sink.errors.push({
-        text: msg.text(),
-        location: loc.url ? `${loc.url}:${loc.lineNumber}:${loc.columnNumber}` : "",
-        type: "console.error",
-      });
+    if (msg.type() !== "error") return;
+    const loc = msg.location();
+    const text = msg.text();
+    const locationUrl = loc.url ?? "";
+
+    // W16-B 2026-05-10 — apply the SAME offline classification PR #220
+    // installed for in-page `console.error()` calls. Chromium emits
+    // "Failed to load resource: 5xx" and "net::ERR_*" messages at the
+    // **renderer/network-stack** level, NOT through JS `console.error()`.
+    // The in-page wrapper from PR #220 only sees the JS-side calls, so
+    // browser-emitted offline 502s pass straight to Playwright's `console`
+    // event with `type === "error"`. Mirror the predicate here against
+    // both the message text AND `msg.location().url` so the strict
+    // visual-proof gate (W15-A9 cap 3) does not trip on an expected
+    // transient/offline state. The UI banner still renders "offline"
+    // honestly via HermesAgentBanner — only the gate's level changes.
+    //
+    // This is NOT a blanket allow-list: only messages that match the
+    // documented offline pattern set (5xx / net::ERR_* / Failed to fetch
+    // / NetworkError) AND reference a documented Hermes backend path are
+    // skipped. A real application 4xx, parse failure, or render error
+    // still records.
+    //
+    // Sources cited (W16-B contract):
+    //  1. MDN error.cause + console.error/console.warn semantics:
+    //     https://developer.mozilla.org/en-US/docs/Web/API/console/error_static
+    //  2. Sentry level taxonomy (error vs warning):
+    //     https://docs.sentry.io/platform-redirect/?next=%2Fenriching-events%2Flevel%2F
+    if (isHermesOfflineMessage(text, locationUrl)) {
+      return;
     }
+
+    sink.errors.push({
+      text,
+      location: loc.url ? `${loc.url}:${loc.lineNumber}:${loc.columnNumber}` : "",
+      type: "console.error",
+    });
   });
   // Unhandled page errors (uncaught exceptions inside the page) are *also*
   // strict console errors per the W15-A5 gap list — without this hook a

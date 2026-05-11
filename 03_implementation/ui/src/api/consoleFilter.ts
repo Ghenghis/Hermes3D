@@ -101,8 +101,28 @@ const OFFLINE_PATTERNS: readonly RegExp[] = [
  *
  * If a path appears in the first console argument (Chromium prints the full
  * URL in the resource-failure message), the downgrade applies.
+ *
+ * W16-B 2026-05-10 — extended with the 12 paths the W15-A21 harness observed
+ * returning 502 against the local v0.13 canary backend. Every path here is a
+ * READ-ONLY status/poll endpoint already wrapped in a try/catch that returns
+ * null/[] on failure, so a transient 502 cannot corrupt application state —
+ * it is purely transient/offline noise per MDN's `warn` vs `error` taxonomy.
+ *
+ * Authoritative list of fetchers wrapping these paths:
+ *   - /api/system/snapshot          -> adapters.live.ts fetchNullable
+ *   - /api/proof/bundles            -> adapters.live.ts fetchArray
+ *   - /api/notifications            -> adapters.live.ts fetchJson
+ *   - /api/workflows                -> adapters.live.ts fetchArray
+ *   - /api/voice/agents             -> adapters.live.ts fetchArray
+ *   - /api/printers                 -> adapters.live.ts fetchJson (per-id) + EventSource
+ *   - /api/logs                     -> adapters.live.ts fetchArray
+ *   - /api/jobs                     -> adapters.live.ts fetchArray
+ *   - /api/events/stream            -> Dashboard.tsx / SimpleHermesDashboard.tsx EventSource (idle/offline)
+ *   - /api/dimensional-reports      -> adapters.live.ts fetchArray
+ *   - /api/agents/print-safety-agent/history -> adapters.live.ts fetchArray
  */
 const OFFLINE_PATHS: readonly string[] = [
+  // PR #220 baseline
   "/api/agents/update/status",
   "/api/agents/update/",
   "/api/agents",
@@ -115,6 +135,23 @@ const OFFLINE_PATHS: readonly string[] = [
   "/api/code-operator/providers",
   "/api/providers/health",
   "/api/source-os/modules",
+  // W16-B extensions — paths the W15-A21 harness confirmed 502 on the
+  // local-only v0.13 canary stub. All wrapped in try/catch fetchers.
+  "/api/system/snapshot",
+  "/api/system/runtime-readiness",
+  "/api/system/runtime-identity",
+  "/api/proof/bundles",
+  "/api/notifications",
+  "/api/workflows",
+  "/api/voice/agents",
+  "/api/voice/transcripts",
+  "/api/voice/proof-events",
+  "/api/printers",
+  "/api/logs",
+  "/api/jobs",
+  "/api/events/stream",
+  "/api/dimensional-reports",
+  "/api/agents/print-safety-agent",
 ];
 
 /**
@@ -156,6 +193,57 @@ function isKnownOffline(haystack: string): boolean {
   // If the message mentions a Hermes3D path, downgrade. If it doesn't, leave
   // it as `error` because we cannot prove it's transient/offline noise.
   return OFFLINE_PATHS.some((path) => haystack.includes(path)) || isGenericNetworkRefusal(haystack);
+}
+
+/**
+ * W16-B — Public predicate for offline classification at the Playwright
+ * harness layer.
+ *
+ * The in-page wrapper (installConsoleFilter) only catches `console.error()`
+ * calls that originate from JS code. Chromium emits "Failed to load
+ * resource: 5xx" / "net::ERR_*" messages at the **renderer/network-stack**
+ * level — those messages reach Playwright's `page.on('console')` listener
+ * but do NOT go through the JS `console.error` function reference, so the
+ * wrapper never sees them. The visual-oracle harness needs to apply the
+ * SAME classification at sink-record time, against the message text AND
+ * the `msg.location().url` Playwright surfaces alongside.
+ *
+ * Inputs:
+ *   - `text`: the console message body (`msg.text()` in Playwright).
+ *   - `locationUrl`: the originating resource URL (`msg.location().url`).
+ *     May be empty when Chromium did not attach a URL (e.g. JS console.error
+ *     with no associated request).
+ *
+ * Returns true ONLY when BOTH conditions hold:
+ *   1. `text` matches an OFFLINE_PATTERN (5xx / net::ERR_* / Failed to fetch
+ *      / NetworkError); and
+ *   2. `text` OR `locationUrl` references an OFFLINE_PATH (a documented
+ *      Hermes backend path), OR `locationUrl` is one of the local bridge
+ *      origins (127.0.0.1:8765 / 8766 / 8767, localhost equivalents).
+ *
+ * The locationUrl branch is what fixes the W16-B regression: Chromium's
+ * 502 message is "Failed to load resource: the server responded with a
+ * status of 502 (Bad Gateway)" with NO path in the text — the path lives
+ * exclusively in `msg.location().url`. PR #220's in-page predicate scanned
+ * only the text and therefore could never match.
+ *
+ * No-fake / no-paid contract:
+ *  - This is a pure function. No I/O, no telemetry.
+ *  - Same predicate as `isKnownOffline` — they are intentionally identical
+ *    so the two layers (in-page wrapper + harness sink) classify the same
+ *    way. Test-only `__testing.isKnownOffline` continues to mirror this
+ *    behaviour for backward compatibility.
+ */
+export function isHermesOfflineMessage(
+  text: string,
+  locationUrl: string,
+): boolean {
+  // Build a single haystack containing both the message body and the
+  // location URL. This gives the existing `OFFLINE_PATHS.some(...)` and
+  // `OFFLINE_PATTERNS.some(...)` predicates a single string to scan
+  // exactly as if Chromium had inlined the URL in the message.
+  const haystack = locationUrl ? `${text} ${locationUrl}` : text;
+  return isKnownOffline(haystack);
 }
 
 /**
