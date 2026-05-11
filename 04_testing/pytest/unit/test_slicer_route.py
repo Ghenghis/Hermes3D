@@ -117,9 +117,7 @@ def test_slice_endpoint_returns_real_gcode(isolated_app: tuple) -> None:
             break
         time.sleep(1.0)
 
-    assert final.get("status") == "completed", (
-        f"slice did not complete in 240s: {final}"
-    )
+    assert final.get("status") == "completed", f"slice did not complete in 240s: {final}"
 
     # ----- Assertions on the real G-code FILE -----
     gcode_path = Path(final["gcode_path"])
@@ -228,8 +226,10 @@ def test_slicer_does_not_dispatch(isolated_app: tuple) -> None:
             f"HARD FREEZE VIOLATION: slicer route attempted requests.{method} -> {url}"
         )
 
-    with mock.patch.object(_ur, "urlopen", _urlopen_spy), \
-         mock.patch.object(_req.api, "request", _req_spy):
+    with (
+        mock.patch.object(_ur, "urlopen", _urlopen_spy),
+        mock.patch.object(_req.api, "request", _req_spy),
+    ):
         resp = client.post("/api/slice", json={"stl_path": str(stl)})
         assert resp.status_code == 202
         job_id = resp.json()["job_id"]
@@ -260,9 +260,7 @@ def test_slicer_does_not_dispatch(isolated_app: tuple) -> None:
 
 def test_slice_unknown_stl_returns_404(isolated_app: tuple) -> None:
     client, _ = isolated_app
-    resp = client.post(
-        "/api/slice", json={"stl_path": "this_does_not_exist_anywhere.stl"}
-    )
+    resp = client.post("/api/slice", json={"stl_path": "this_does_not_exist_anywhere.stl"})
     assert resp.status_code == 404
     body = resp.json()
     assert body.get("detail", {}).get("status") == "blocked"

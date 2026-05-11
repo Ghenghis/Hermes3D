@@ -99,9 +99,7 @@ _RE_FIL_G = re.compile(r";\s*filament\s+used\s*\[?g\]?\s*=\s*([\d.]+)", re.IGNOR
 _RE_LAYER_HEIGHT = re.compile(r";\s*(?:layer_height|layer height)\s*=\s*([\d.]+)", re.IGNORECASE)
 # Header-form layer counts. Accept both "total layer count" (older PrusaSlicer)
 # and "total layer number" (some forks / Orca variants).
-_RE_LAYER_COUNT = re.compile(
-    r";\s*total\s+layer\s+(?:count|number)\s*[=:]\s*(\d+)", re.IGNORECASE
-)
+_RE_LAYER_COUNT = re.compile(r";\s*total\s+layer\s+(?:count|number)\s*[=:]\s*(\d+)", re.IGNORECASE)
 # Cura emits ";LAYER:N" annotations between layers — count the highest index.
 _RE_LAYER_NUM = re.compile(r";\s*LAYER:(\d+)", re.IGNORECASE)
 # Modern PrusaSlicer (~2.5+) / OrcaSlicer / SuperSlicer write ";LAYER_CHANGE"
@@ -236,12 +234,7 @@ def _count_layer_change_markers(path: Path) -> tuple[int, int]:
             code = stripped.split(";", 1)[0].strip()
             if not code:
                 continue
-            if (
-                code.startswith("G0 ")
-                or code == "G0"
-                or code.startswith("G1 ")
-                or code == "G1"
-            ):
+            if code.startswith("G0 ") or code == "G0" or code.startswith("G1 ") or code == "G1":
                 motion_lines += 1
     return layer_changes, motion_lines
 
