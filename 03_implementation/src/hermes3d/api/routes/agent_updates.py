@@ -167,7 +167,10 @@ def update_status() -> dict[str, Any]:
         # _run_git inside _repo_state can raise 502; surface as offline+unknown.
         return _honest_blocked_status(
             repo,
-            {"repo_ready": False, "reason": f"git probe failed: {redact_text(str(exc.detail))[:200]}"},
+            {
+                "repo_ready": False,
+                "reason": f"git probe failed: {redact_text(str(exc.detail))[:200]}",
+            },
             reason="repo_state_unreachable",
             upstream_error=redact_text(str(exc.detail))[:200],
         )
