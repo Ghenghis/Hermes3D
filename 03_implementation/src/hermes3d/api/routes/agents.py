@@ -624,15 +624,11 @@ def fleet_action(action_id: str, body: AgentActionRequest | None = None) -> dict
     return _run_catalog_action(action_id, "hermes-agent", body)
 
 
-@router.get("/api/agents/action-catalog")
-def action_catalog(response: Response) -> dict:
+def action_catalog() -> dict:
+    """Return the action catalog payload.  Unit-testable with no HTTP context."""
     contracts = _agent_action_contracts()
     counts = Counter(contract["status"] for contract in contracts)
     public_contracts = [_public_action_contract(contract) for contract in contracts]
-    # W18-A25: 60s Cache-Control so well-behaved GUI/proxy callers can avoid a
-    # re-fetch storm; the backend's own _ACTION_CONTRACT_CACHE TTL is 60s so
-    # this stays consistent with what the server will actually return.
-    response.headers["Cache-Control"] = "max-age=60"
     return {
         "status": "in_progress"
         if counts.get("blocked", 0) or counts.get("partial", 0)
@@ -649,6 +645,15 @@ def action_catalog(response: Response) -> dict:
     }
 
 
+@router.get("/api/agents/action-catalog")
+def _action_catalog_route(response: Response) -> dict:
+    # W18-A25: 60s Cache-Control so well-behaved GUI/proxy callers can avoid a
+    # re-fetch storm; the backend's own _ACTION_CONTRACT_CACHE TTL is 60s so
+    # this stays consistent with what the server will actually return.
+    response.headers["Cache-Control"] = "max-age=60"
+    return action_catalog()
+
+
 # W18-A25: alias for callers that use the plural/slashed form.
 # Operator-verified that some GUI callers had a 405 on
 # ``GET /api/agents/actions/catalog`` because ``/api/agents/actions/{action_id}``
@@ -662,7 +667,8 @@ def action_catalog(response: Response) -> dict:
 #      still see it because the same response object is mutated.
 @router.get("/api/agents/actions/catalog")
 def action_catalog_alias(response: Response) -> dict:
-    return action_catalog(response)
+    response.headers["Cache-Control"] = "max-age=60"
+    return action_catalog()
 
 
 # W18-A25 — GUI-friendly active code-team / provider-smoke task feed.
