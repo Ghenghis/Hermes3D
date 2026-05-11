@@ -49,3 +49,21 @@ def approve(approval_id: str, body: ApprovalNotes) -> dict:
 @router.post("/api/approvals/{approval_id}/reject")
 def reject(approval_id: str, body: ApprovalNotes) -> dict:
     return _decide(approval_id, "rejected", "operator", None, body.reason)
+
+
+@router.post("/api/approvals/{approval_id}/defer")
+def defer(approval_id: str, body: ApprovalNotes) -> dict:
+    """W18-A13 — defer a pending approval (move to ``deferred`` status).
+
+    Deferred is a non-terminal verdict: the approval is taken out of the
+    pending queue without being rejected so an operator/agent can revisit
+    later. The audit (W18-A3) flagged this as ``FAIL_BACKEND_MISSING``
+    — the FE ``adapters.live.ts:deferApprovalLive`` was POSTing to a
+    404. This handler mirrors :func:`reject` but stores ``deferred`` as
+    the status and the operator-supplied note as the reason.
+
+    Pending → deferred is the only legal transition; once deferred the
+    approval is re-enqueued by callers through the standard POST to a
+    fresh approval, not by mutating this row.
+    """
+    return _decide(approval_id, "deferred", "operator", None, body.reason)

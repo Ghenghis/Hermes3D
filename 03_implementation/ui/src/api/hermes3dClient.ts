@@ -577,10 +577,21 @@ export const appsClient = {
       opts,
     );
   },
-  /** GET /api/source-os/modules/update-readiness — module update readiness summary. */
+  /**
+   * GET /api/modules/update/readiness — module update readiness summary.
+   *
+   * W18-A13 (audit W18-A3): the original path
+   * `/api/source-os/modules/update-readiness` was a 404 (BE only
+   * registered `/api/modules/update/readiness`). The backend has also
+   * been updated in W18-A13 to expose
+   * `/api/source-os/modules/update-readiness` as an alias for
+   * compatibility with any external caller that hardcoded the old
+   * path, but this client now points at the canonical path directly
+   * so the FE does not depend on the alias.
+   */
   updateReadiness(opts?: FetchOptions) {
     return safeGetJson<{ ready: boolean; reason?: string; modules?: unknown[] }>(
-      "/api/source-os/modules/update-readiness",
+      "/api/modules/update/readiness",
       opts,
     );
   },

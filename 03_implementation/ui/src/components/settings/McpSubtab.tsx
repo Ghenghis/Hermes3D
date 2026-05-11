@@ -46,21 +46,42 @@ function readBool(record: Record<string, unknown>, key: string): boolean {
   return Boolean(record[key]);
 }
 
-function normalize(entry: unknown): McpLockEntry | null {
-  if (!entry || typeof entry !== "object") return null;
+function normalize(entry: unknown): McpLockEntry[] {
+  // W18-A13: backend `/api/mcp/locks` returns each item with `files: string[]`
+  // (one lock can guard multiple files). Older shape used `file: string`. We
+  // accept both and emit one McpLockEntry per file so the table stays
+  // file-keyed (the audit W18-A3 found the FE was silently rendering zero
+  // rows because it read `data.locks` and per-row `file` (singular)).
+  if (!entry || typeof entry !== "object") return [];
   const r = entry as Record<string, unknown>;
-  const file = readString(r, "file") ?? readString(r, "path");
   const owner = readString(r, "owner");
-  if (!file || !owner) return null;
-  return {
+  if (!owner) return [];
+  const filesArray = Array.isArray(r.files)
+    ? (r.files as unknown[]).filter((f): f is string => typeof f === "string" && f.length > 0)
+    : [];
+  const singleFile = readString(r, "file") ?? readString(r, "path");
+  const files = filesArray.length > 0
+    ? filesArray
+    : singleFile
+      ? [singleFile]
+      : [];
+  if (files.length === 0) return [];
+  // The W18-A13 backend marks staleness via `is_stale`; legacy callers used
+  // `stale`. Both are accepted.
+  const stale = readBool(r, "is_stale") || readBool(r, "stale");
+  const role = readString(r, "role") ?? "agent";
+  const taskId = readString(r, "taskId") ?? readString(r, "task_id");
+  const acquiredAt = readString(r, "acquiredAt") ?? readString(r, "acquired_at");
+  const expiresAt = readString(r, "expiresAt") ?? readString(r, "expires_at");
+  return files.map((file) => ({
     file,
     owner,
-    role: readString(r, "role") ?? "agent",
-    taskId: readString(r, "taskId") ?? readString(r, "task_id"),
-    acquiredAt: readString(r, "acquiredAt") ?? readString(r, "acquired_at"),
-    expiresAt: readString(r, "expiresAt") ?? readString(r, "expires_at"),
-    stale: readBool(r, "stale"),
-  };
+    role,
+    taskId,
+    acquiredAt,
+    expiresAt,
+    stale,
+  }));
 }
 
 async function fetchLocks(signal?: AbortSignal): Promise<McpLockEntry[]> {
@@ -74,14 +95,26 @@ async function fetchLocks(signal?: AbortSignal): Promise<McpLockEntry[]> {
     throw new Error(`bridge returned ${response.status}`);
   }
   const data = (await response.json()) as
-    | { locks?: unknown[] }
+    | { items?: unknown[]; locks?: unknown[]; accepted?: boolean; status?: string; reason?: string }
     | unknown[]
     | null;
   if (!data) return [];
-  const raw = Array.isArray(data) ? data : Array.isArray(data.locks) ? data.locks : [];
+  // W18-A13: backend envelope is { accepted, status, items, total } per
+  // mcp_locks.McpLocksResponse. Older code returned a bare array or
+  // { locks: [...] }. Accept all three shapes so the FE stays honest if
+  // the BE evolves.
+  let raw: unknown[];
+  if (Array.isArray(data)) {
+    raw = data;
+  } else if (Array.isArray(data.items)) {
+    raw = data.items;
+  } else if (Array.isArray(data.locks)) {
+    raw = data.locks;
+  } else {
+    raw = [];
+  }
   return raw
-    .map(normalize)
-    .filter((e): e is McpLockEntry => e !== null)
+    .flatMap(normalize)
     .sort((a, b) => a.file.localeCompare(b.file));
 }
 
