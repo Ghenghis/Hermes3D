@@ -246,9 +246,8 @@ def backend_for_template(template_id: str) -> ModelingBackend:
             if not manifold.available:
                 missing.append("manifold3d")
             trimesh.available = False
-            trimesh.detail = (
-                "desk_organizer requires trimesh + manifold3d; missing: "
-                + ", ".join(missing)
+            trimesh.detail = "desk_organizer requires trimesh + manifold3d; missing: " + ", ".join(
+                missing
             )
             return trimesh
         trimesh.detail = (

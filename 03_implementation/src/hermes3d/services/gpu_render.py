@@ -81,11 +81,7 @@ def render_stl_thumbnail_gpu(
             "attempted_at": _utc_now(),
         }
 
-    script_path = (
-        Path(__file__).resolve().parents[3]
-        / "scripts"
-        / "w18_a20_blender_gpu_render.py"
-    )
+    script_path = Path(__file__).resolve().parents[3] / "scripts" / "w18_a20_blender_gpu_render.py"
     if not script_path.is_file():
         return {
             "used": False,
@@ -125,9 +121,7 @@ def render_stl_thumbnail_gpu(
 
     t0 = time.perf_counter()
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout_s, check=False
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_s, check=False)
     except subprocess.TimeoutExpired as exc:
         return {
             "used": False,
@@ -145,10 +139,7 @@ def render_stl_thumbnail_gpu(
         tail = combined.strip().splitlines()[-30:]
         return {
             "used": False,
-            "reason": (
-                f"Blender exit code {result.returncode}. Tail:\n"
-                + "\n".join(tail)
-            ),
+            "reason": (f"Blender exit code {result.returncode}. Tail:\n" + "\n".join(tail)),
             "attempted_at": _utc_now(),
         }
 

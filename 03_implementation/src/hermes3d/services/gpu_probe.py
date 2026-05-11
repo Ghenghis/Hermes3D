@@ -34,10 +34,7 @@ from typing import Any
 
 LOG = logging.getLogger(__name__)
 
-NVIDIA_SMI_QUERY = (
-    "name,driver_version,memory.total,memory.used,memory.free,"
-    "utilization.gpu"
-)
+NVIDIA_SMI_QUERY = "name,driver_version,memory.total,memory.used,memory.free,utilization.gpu"
 
 
 def _utc_now() -> str:
@@ -108,10 +105,7 @@ def probe_gpu() -> dict[str, Any]:
     if len(parts) < 6:
         return {
             "available": False,
-            "reason": (
-                f"nvidia-smi row had {len(parts)} columns; expected 6. "
-                f"Raw: {first_line!r}"
-            ),
+            "reason": (f"nvidia-smi row had {len(parts)} columns; expected 6. Raw: {first_line!r}"),
             "probed_at": _utc_now(),
         }
 
