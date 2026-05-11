@@ -89,3 +89,54 @@
 
 W18-A13, W18-A14-pickup, W18-A15, W18-A16 — will be picked up by next re-dispatch.
 
+## Round 3 — 2026-05-11T12:00..12:10Z
+
+### Merged this round
+
+(none — see blocking root cause below)
+
+### Pre-existing develop branch test pollution detected
+
+After round 2's merge of #239 (W18-A9 slicer-real-artifact), the develop branch ui-ci run `25667636164` (head `9d303cd`) failed at Layer D2 on `03_implementation/ui/tests/e2e/w18-a9-slicer-real-artifact.spec.ts:186:3` (`CadQuery` text not visible within 5000ms at line 264). This W18-A9 spec was added by PR #239 (round 2 merge) and is now in develop.
+
+Every open PR rebased on develop inherits this failing test in Layer D2, regardless of its own diff. The 4 round-3 CI-fix PRs (#238, #241, #242, #232) all push spec-only / audit-only changes that pass their own assertions but Layer D2 still reports FAILURE because of the pre-existing W18-A9 row.
+
+Evidence ledger entry: `ev_4ea83b1da14191a8` (kind=note, owner=w18-merger).
+
+### Round 3 PR-by-PR state
+
+| PR | Lane | Fix-pushed SHA | Round-3 CI verdict | Layer-D2 failing test | Scope-safe |
+|---|---|---|---|---|---|
+| #238 | W18-A8 artifact-file-proof | `1534903` (waitForResponse for cold-Vite) | UNSTABLE; own spec PASSES; only `w18-a9-slicer-real-artifact.spec.ts:186` (pre-existing) fails | inherited W18-A9 | YES — only adds 3 audit-only files |
+| #242 | W18-A1-pickup route-walker | `5ab95d1` (api-quiesce race) | UNSTABLE; own spec also FAILS (#242 spec line 240:1 1.3min — likely api-quiesce timeout in cold CI). Also inherits W18-A9 fail | own (#242) + inherited W18-A9 | YES — only adds 3 spec/config/doc files |
+| #243 | W18-A12 slicer wire-up | `2a1fe75` (ruff format) | UNSTABLE; ruff format applied but `ruff check` still fails on `test_slicer_route.py` (unused `import sqlite3` + unsorted imports). Touches product code. | own (ruff lint) | NEEDS_RECHECK — adds `POST /api/slice` + `GET /api/slice/{id}` only (no printer writes) but is a code-touch PR; deferred to subagent re-fix |
+| #244 | W18-A13 backend wiring fixes | none pushed (only initial commit `5c0c419`) | UNSTABLE; `ruff format --check` finds 3 files (`apps.py`, `modules.py`, `test_w18_a13_backend_wiring.py`) still need reformatting. Fix subagent has NOT pushed yet. | own (ruff format) | NEEDS_RECHECK — adds 4 new endpoints + frontend banners (no printer writes) but ruff-format subagent still in flight |
+| #232 | W18-A4 agent-workflow | `ca682b9` (env-aware spec) | UNSTABLE; own spec PASSES (line 164 "honest runtime branch" green); only `w18-a9-slicer-real-artifact.spec.ts:186` (pre-existing) fails | inherited W18-A9 | YES — only adds 2 audit-only files |
+| #241 | W18-A10-pickup visual-oracle | `07878e9` (variant split) | UNSTABLE; own spec PASSES; only `w18-a9-slicer-real-artifact.spec.ts:186` (pre-existing) fails | inherited W18-A9 | YES — only adds 8 spec/manifest/reporter files |
+| #245 | W18-A15 full regression runner | n/a | UNSTABLE (known-fail per brief; SKIP) | n/a | SKIP per brief |
+
+### Diff scope-safety verification (Round 3 candidates)
+
+Verified via `gh pr diff <N>` for #232, #238, #241, #242:
+- Zero new `/api/printers/{id}/heat-*`, `/start-print`, `/upload-gcode` endpoints.
+- Zero new Moonraker / Octoprint dispatch (`moonraker_client.send_gcode`, `octoprint_client.start_print`).
+- Zero flips of pinned `GUI_PHYSICAL_PRINT_GREEN` / `GUI_PRINTER_DRY_RUN_GREEN` verdicts.
+- All four PRs touch only `03_implementation/docs/handoffs/*.md`, `03_implementation/ui/tests/e2e/*.spec.ts`, `03_implementation/ui/playwright.*.config.ts`, `03_implementation/ui/tests/visual-proof/*`, `03_implementation/ui/.gitignore`.
+
+### Decision
+
+Merger declines to merge any round-3 PR. Per brief stop-criterion "≥3 PRs stuck in unresolvable conflict": 6 open W18 PRs are blocked, exceeding threshold by 3x. Root cause is upstream test pollution on develop, not scope safety or per-PR diffs. Re-dispatch needed:
+
+1. Fix-PR against develop branch repairing `w18-a9-slicer-real-artifact.spec.ts:186` (line 264 `CadQuery` text visibility timeout — needs spec-side wait/skip logic OR developer-tooling install in CI). This is out of merger scope and needs a fresh subagent.
+2. Once develop's W18-A9 test is fixed, #232, #238, #241, #242 should auto-pass and become mergeable.
+3. #244 needs ruff-format push from its still-in-flight subagent.
+4. #243 needs ruff-check fix (unused import + import sort) from its subagent.
+5. #242 also has its OWN spec failure (api-quiesce 1.3-minute walk exceeds CI patience); needs second fix push from #242 subagent.
+
+### Round 3 final invariant confirmation
+
+- **No printer-hardware-enabling diff merged this round.**
+- Pinned `GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR` intact.
+- Pinned `GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR` intact.
+- PR #235 (CANCELLED W18-A8 printer safety) not reopened.
+
