@@ -224,6 +224,8 @@ def test_w17_routes_are_registered_on_gui_app() -> None:
 
     app = create_gui_app()
     paths = {route.path for route in app.routes}
-    assert "/api/files" in paths, f"missing /api/files (registered: {sorted(p for p in paths if p.startswith('/api/files'))})"
+    assert "/api/files" in paths, (
+        f"missing /api/files (registered: {sorted(p for p in paths if p.startswith('/api/files'))})"
+    )
     assert "/api/files/{file_id}" in paths, "missing /api/files/{file_id}"
     assert "/api/health/services" in paths, "missing /api/health/services"
