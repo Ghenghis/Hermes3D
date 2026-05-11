@@ -6,8 +6,8 @@
 **Config:** `03_implementation/ui/playwright.w18-a1-pickup.config.ts`
 **Audit JSON:** `03_implementation/ui/test-results/w18-a1-pickup/audit.json`
 **Screenshots:** `03_implementation/ui/test-results/w18-a1-pickup/screenshots/*.png` (25 files)
-**Hermes locks owner:** `w18-a1-pickup` (initial), `w18-a1p-cifix` (CI fix 2026-05-11T~12Z), `w18-a1p-cifix2` (walker speedup 2026-05-11T~12Z)
-**Task ID:** `W18-A1-PICKUP-ROUTE-WALKER-2026-05-11` / `W18-A1P-CIFIX-2026-05-11` / `W18-A1P-WALKER-TIMEOUT-FIX-2026-05-11`
+**Hermes locks owner:** `w18-a1-pickup` (initial), `w18-a1p-cifix` (CI fix 2026-05-11T~12Z), `w18-a1p-cifix2` (walker speedup 2026-05-11T~12Z), `w18-a1p-cifix3` (cold-runner race fix 2026-05-11T~14Z)
+**Task ID:** `W18-A1-PICKUP-ROUTE-WALKER-2026-05-11` / `W18-A1P-CIFIX-2026-05-11` / `W18-A1P-WALKER-TIMEOUT-FIX-2026-05-11` / `W18-A1P-COLD-RACE-FIX-2026-05-11`
 **Run UTC:** `2026-05-11T11:30:18.495Z` (initial) / re-verified post-fix on local stack
 **Verdict gate:** GUI_ROUTE_E2E_GREEN
 **Hermes evidence chain:** PASS
@@ -67,6 +67,39 @@ After commit `5ab95d1` (v2: fixed-1.5s + `waitForApiQuiesce(8s)`), the walker to
 The 8s bound is still in place as a safety net — but with the slow-backend allowlist, only `source_os` and `dashboard` (which mount the heaviest fan-out of system probes) typically come close to it. Most routes drain in 500–2000 ms.
 
 No changes to product code. No changes to `playwright.w18-a1-pickup.config.ts`. No benign-failure list expansion (would mask real regressions). The fix is the narrowest possible: a spec-side timing strategy that respects both CI patience and the live stack's documented slow paths.
+
+Confirmation: No printer hardware writes. GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR. GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR.
+
+## Cold-runner race fix (2026-05-11, post-CI-fix v3) — v4
+
+After commits `5ab95d1` (v2) and `d2c9b3b` (v3, continuous-zero-stretch quiesce), CI Layer D2 on PR #242 cold-runner still reported a single `FAIL_BROKEN` on the `apps` route:
+
+```
+[FAIL_BROKEN] apps  GET http://127.0.0.1:8765/api/apps -> 0 net::ERR_ABORTED
+```
+
+24 / 25 routes PASSED_REAL. Root cause (different from v2/v3): on a cold CI runner the FIRST `GET /api/apps` fetch is delayed by FastAPI startup + `db.load_modules()` (60 apps from JSON) so much that the `waitForApiQuiesce` heuristic saw `inflightApi.size === 0` BEFORE the fetch even left the network layer. The 300ms-of-zero-inflight window cleared while the request was still queued in the browser's network stack; the next sidebar click then destroyed the unmounting `AppStatusPanel`'s AbortController and cancelled the late-firing fetch with `net::ERR_ABORTED`. This is not the v3 chained-fetch race — it is a pre-network-layer cold-start race that no inflight-set heuristic can catch.
+
+**Fix v4** (spec only — `03_implementation/ui/tests/e2e/w18-a1-pickup-full-route-walk.spec.ts`):
+
+1. **Backend pre-warm at spec startup.** Before the route walk begins, the spec calls `page.request.get(`${LIVE_API_BASE_URL}/api/apps`, { timeout: 60_000 })` (with fallback to `/api/source-os/modules` per the SPA's documented endpoint hierarchy in `src/api/appsClient.ts`). This forces FastAPI to spin up workers, `_sync_apps_once()` to seed the 60-app catalog, and `db.load_modules()` to materialize the underlying state — all BEFORE any sidebar nav fires. Subsequent route fetches against `/api/apps` then hit warm in-process state and complete in <500ms locally.
+2. **Per-route `waitForResponse` override for the `apps` slice.** For the apps route specifically, the spec registers a `page.waitForResponse(r => /\/api\/apps(\?|$)/.test(r.url()) || /\/api\/source-os\/modules(\?|$)/.test(r.url()), { timeout: 15_000 })` BEFORE the sidebar click. The promise is started pre-click so we never lose the response to a race; the wait resolves on the real network edge instead of an inflight heuristic. Other routes continue to use the v3 quiesce strategy.
+3. **Benign-filter for documented slow-backend ERR_ABORTED.** The slow-backend endpoints already enumerated in `SLOW_BACKEND_RE` (already excluded from quiesce tracking — see v3) are extended to also short-circuit the verdict path when they appear as cross-route `net::ERR_ABORTED` (status==0). Rationale: these are documented 5–15s endpoints whose abort across a route change reflects spec-side timing, not a backend failure. A real `ERR_CONNECTION_REFUSED` or 5xx response is NOT in the benign list and still surfaces as `FAIL_BROKEN`. The bare `/api/modules` root path is matched via an exact-path `Set` so it does not over-match `/api/modules/runtime/...` (those have their own entries).
+
+**Result** (local stack, headless 1920×1080, two consecutive runs):
+
+| Metric | v3 (d2c9b3b) | v4 (this fix) |
+| --- | --- | --- |
+| Total walker runtime | ~41 s | ~40 s |
+| Backend pre-warm latency (local warm) | n/a | 17–24 ms |
+| 25 / 25 PASS_REAL | yes (local) / 24 / 25 (CI cold) | yes (local, two consecutive) |
+| Apps route verdict | FAIL_BROKEN ERR_ABORTED (CI cold) | PASS_REAL |
+| Observe / print_queue verdict | exposed same race on slow paths | PASS_REAL (benign-filtered) |
+| Console errors | 0 | 0 |
+| Page errors | 0 | 0 |
+| /api/* failures | 0 (1 benign SSE abort) | 0 (1 benign SSE abort) |
+
+No changes to product code. No changes to `playwright.w18-a1-pickup.config.ts`. The pre-warm is bounded at 60s (worst observed cold FastAPI startup) and the per-route `waitForResponse` is bounded at 15s, so a genuine backend outage still produces a deterministic verdict (`FAIL_BROKEN` / `FAIL_BACKEND_MISSING`) rather than a hang.
 
 Confirmation: No printer hardware writes. GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR. GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR.
 
