@@ -26,7 +26,7 @@
  * spec — the smoke + assist runs are server-side only.
  */
 import { expect, request as pwRequest, test, type APIRequestContext } from "@playwright/test";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -37,10 +37,90 @@ const ARTIFACT_DIR = path.resolve(__dirname, "..", "..", "test-results", "w18-a2
 
 // The Vite dev/preview server (where the React app is served) is reached
 // via the baseURL Playwright was configured with. The FastAPI bridge that
-// owns the team-task endpoints can be a different origin in dev; use the
-// W18_A21_API_BASE override when running locally with Vite on 5180 and
-// the FastAPI on 8030. In production CI both are the same host.
-const API_BASE = process.env.W18_A21_API_BASE ?? process.env.HERMES3D_API_BASE ?? "";
+// owns the team-task endpoints is on a DIFFERENT origin (default 8765)
+// — Vite has no proxy, so relative /api/... fetches against the Vite
+// origin return the SPA index.html with content-type text/html.
+//
+// We follow the W18-A4 pattern: build a candidate list and probe each
+// with the well-known `/api/code-operator/health` (or `/health`) endpoint
+// to find the bridge the e2e stack actually bound. Honors the explicit
+// W18_A21_API_BASE / HERMES3D_API_BASE env override for split-host dev.
+const API_BASE_OVERRIDE = process.env.W18_A21_API_BASE ?? process.env.HERMES3D_API_BASE ?? "";
+
+/**
+ * Build an ordered list of candidate FastAPI bridge URLs (most-likely first).
+ * Mirrors the W18-A4 resolution pattern so this spec keeps working when CI
+ * binds a non-default port (e.g. 8765 was already in use locally).
+ */
+async function candidateBridgeUrls(): Promise<string[]> {
+  const candidates: string[] = [];
+  if (API_BASE_OVERRIDE) {
+    candidates.push(API_BASE_OVERRIDE);
+  }
+  // FastAPI default in start-e2e-stack.mjs.
+  candidates.push("http://127.0.0.1:8765");
+  // Any env var inherited from the webServer spawn.
+  const explicit = process.env.HERMES3D_GUI_API_PORT ?? process.env.VITE_HERMES3D_BRIDGE_PORT;
+  if (explicit && /^\d+$/.test(explicit)) {
+    candidates.push(`http://127.0.0.1:${explicit}`);
+  }
+  // Runtime manifest the webServer script writes (may be stale; tried last).
+  const manifestPaths = [
+    path.resolve(process.cwd(), "..", "var", "runtime-ports.json"),
+    path.resolve(process.cwd(), "var", "runtime-ports.json"),
+    path.resolve(process.cwd(), "public", "hermes3d-runtime.json"),
+  ];
+  for (const candidate of manifestPaths) {
+    try {
+      const raw = await readFile(candidate, "utf-8");
+      const parsed = JSON.parse(raw) as {
+        urls?: { gui_api?: string };
+        ports?: { api?: number };
+      };
+      if (parsed?.urls?.gui_api) {
+        candidates.push(parsed.urls.gui_api);
+      } else if (parsed?.ports?.api) {
+        candidates.push(`http://127.0.0.1:${parsed.ports.api}`);
+      }
+    } catch {
+      // try next candidate
+    }
+  }
+  // Dedupe while preserving order.
+  const seen = new Set<string>();
+  return candidates.filter((url) => {
+    if (seen.has(url)) return false;
+    seen.add(url);
+    return true;
+  });
+}
+
+/**
+ * Probe `/health` on each candidate and return the FIRST that responds
+ * with HTTP 200 + JSON content-type. We deliberately do NOT call
+ * `/api/code-operator/teams/readiness` for the probe because that endpoint
+ * is the contract under test — failing it here would mask the real failure
+ * mode behind a routing/lookup error.
+ */
+async function resolveBridgeBaseURL(candidates: string[]): Promise<string> {
+  for (const baseURL of candidates) {
+    const ctx = await pwRequest.newContext({ baseURL });
+    try {
+      const resp = await ctx.get("/health", { timeout: 5_000 });
+      const contentType = resp.headers()["content-type"] ?? "";
+      if (resp.ok() && contentType.includes("json")) {
+        await ctx.dispose();
+        return baseURL;
+      }
+    } catch {
+      // try next candidate
+    }
+    await ctx.dispose();
+  }
+  // Last resort — use the first candidate; later requests will surface real
+  // backend errors if the bridge is genuinely missing.
+  return candidates[0] ?? "http://127.0.0.1:8765";
+}
 
 const W18_A21_TASK_TITLE = "W18-A21 Playwright minimax-team task proof";
 const W18_A21_TASK_ID = `W18-A21-MINIMAX-TEAM-${Date.now()}`;
@@ -168,11 +248,16 @@ test.beforeAll(async () => {
 test("real MiniMax team task appears in #agents GUI without manual refresh (env-aware)", async ({
   page,
 }, testInfo) => {
-  // Build a dedicated API context so we can target the FastAPI bridge
-  // even when Playwright's baseURL points at the Vite dev server.
-  const request: APIRequestContext = API_BASE
-    ? await pwRequest.newContext({ baseURL: API_BASE })
-    : await pwRequest.newContext();
+  // Build a dedicated API context that targets the FastAPI bridge
+  // directly. Playwright's global baseURL points at the Vite dev server
+  // (5173) which has no /api proxy, so we must resolve the bridge
+  // origin (default 8765) before making any /api/... call — otherwise
+  // Vite's SPA fallback returns index.html and JSON parsing throws
+  // "Unexpected token '<', '<!doctype'... is not valid JSON".
+  const candidates = await candidateBridgeUrls();
+  const bridgeBaseURL = await resolveBridgeBaseURL(candidates);
+  console.log(`[W18-A21] bridge_base_url=${bridgeBaseURL} candidates=${JSON.stringify(candidates)}`);
+  const request: APIRequestContext = await pwRequest.newContext({ baseURL: bridgeBaseURL });
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") {

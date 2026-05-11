@@ -286,9 +286,9 @@ def _cloud_provider_health_entry(
     """Build a /api/providers/health entry for a cloud provider.
 
     Enriches the entry from the latest code_provider_smoke evidence row so
-    operators see real status (green/red/amber) instead of stub 'idle' once
-    a live smoke has succeeded or failed. Returns honest 'idle' only when
-    no smoke evidence exists or the smoke is older than the staleness
+    operators see real status (green/red/amber) instead of a baseline 'idle'
+    once a live smoke has succeeded or failed. Returns honest 'idle' only
+    when no smoke evidence exists or the smoke is older than the staleness
     window — never fabricates a passing status.
     """
     base: dict[str, Any] = {
