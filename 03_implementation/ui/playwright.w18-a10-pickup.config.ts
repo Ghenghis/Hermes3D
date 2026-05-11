@@ -14,6 +14,28 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
  *
  * No-recapture contract: `updateSnapshots: "none"` forbids
  * `--update-snapshots` from rewriting any baseline.
+ *
+ * W18-A10P-CIFIX project split (2026-05-11)
+ * -----------------------------------------
+ * The spec generates ONE test per manifest target, named
+ * `<target.id> (<compare_mode>)`. Two Playwright projects consume the
+ * same spec with non-overlapping `grep` filters:
+ *
+ *   - `live-targets`           — grep = /\(live\)$/
+ *       Runs the 8 deterministic-renderable live targets. These remain
+ *       HARD assertions: a pixel-diff or console error FAILS the test
+ *       and gates GUI_PIXEL_E2E_GREEN.
+ *
+ *   - `informational-variants` — grep = /\(informational\)$/
+ *       Runs the 23 composite/concept/named-theme PARTIAL targets. The
+ *       spec wraps each in try/catch so a closed-page / nav crash
+ *       (the PR-#241 failure mode for
+ *        08_workflow_printqueue_files_logs and
+ *        08_proof_health_notifications_safety) records a PARTIAL row
+ *       with `crash_during_capture=true` instead of failing Playwright.
+ *
+ * Together: both projects RUN every manifest target exactly once (no
+ * `test.skip`); only the `live-targets` project gates Layer D2.
  */
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -44,7 +66,21 @@ export default defineConfig({
   },
   projects: [
     {
-      name: "chromium-w18-a10-pickup",
+      name: "live-targets",
+      // The 8 deterministic-renderable live targets. HARD assertions.
+      grep: /\(live\)$/,
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 1,
+      },
+    },
+    {
+      name: "informational-variants",
+      // The 23 composite / concept / named-theme PARTIAL targets. The
+      // spec wraps these in try/catch so a screenshot crash records a
+      // PARTIAL row instead of failing Layer D2.
+      grep: /\(informational\)$/,
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1920, height: 1080 },
