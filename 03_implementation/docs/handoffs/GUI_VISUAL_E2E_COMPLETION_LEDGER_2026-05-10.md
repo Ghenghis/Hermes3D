@@ -1,3 +1,49 @@
+## SUPERSEDED 2026-05-11 — W17 Weakness Correction
+
+> This ledger's "GUI Visual E2E Completion" framing and the verdict snapshot it
+> ratchets toward (loop closure on W15-A24 → W16 GREEN addendum) is
+> **NO LONGER VALID**. It is preserved verbatim below as a historical record of
+> the W15 24-agent loop execution log, but **DO NOT cite it as evidence of GUI
+> completion**.
+>
+> ### Why this was superseded
+>
+> **User directive (W17 rejection, 2026-05-11):**
+> > "Stop claiming GUI complete until the entire GUI is Playwright-verified
+> > visually and functionally."
+>
+> A Codex W17 audit overturned the loop's terminal verdicts (`TRUTH_GREEN`,
+> `WALKTHROUGH_GREEN`, `GUI_VISUAL_E2E_GREEN`). The empirical W17 sweep showed:
+>
+> - **28 / 28 visual targets** logged `console.error` (the ledger's
+>   "GUI_VISUAL_E2E_GREEN" downstream of A21 / A22 / A23 only held under a
+>   permissive `isHermesOfflineMessage` allow-list).
+> - **27 / 28 targets** rendered an offline / honest-blocked placeholder
+>   instead of the wired product surface.
+> - **`POST /api/agents/update/status`** returned HTTP 502 against the live
+>   backend.
+> - **`GET /api/files`** returned HTTP 404.
+> - **`GET /api/health/services`** returned HTTP 404.
+>
+> ### W17 fix PRs that addressed each finding
+>
+> | Finding | W17 fix PR | State |
+> |---|---|---|
+> | `/api/agents/update/status` 502 → 200 honest-blocked | [#225](https://github.com/Ghenghis/Hermes3D/pull/225) | MERGED |
+> | `/api/mcp/locks` honest-blocked contract gap | [#226](https://github.com/Ghenghis/Hermes3D/pull/226) | MERGED |
+> | Print Queue Submit Job control unwired | [#227](https://github.com/Ghenghis/Hermes3D/pull/227) | MERGED |
+> | `/api/files` 404 + `/api/health/services` 404 | [#228](https://github.com/Ghenghis/Hermes3D/pull/228) | OPEN |
+> | `#printers` tab not consuming `/api/printers` | [#229](https://github.com/Ghenghis/Hermes3D/pull/229) | OPEN |
+>
+> ### Status of this document
+>
+> - **Classification:** GREEN_CLAIM_NOW_FALSE
+> - **Preserved as:** historical record of W15 loop execution
+> - **Do not:** quote this ledger's per-phase "GREEN" markers, the "Verdicts" block, or the loop-closure log entries in any new PR, status report, or handoff
+> - **Do:** cite the W17 fix PRs above and any forthcoming W17 verification handoff for the current state
+
+---
+
 # GUI Visual E2E Completion Ledger (Wave 15 — 24-Agent Loop)
 
 **Started:** 2026-05-10

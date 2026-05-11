@@ -1,3 +1,58 @@
+## SUPERSEDED 2026-05-11 — W17 Weakness Correction
+
+> This document's "GUI Visual E2E Completion" claim is **NO LONGER VALID**. It
+> is preserved verbatim below as a historical record of what W15-A24 reported
+> on 2026-05-10, but **DO NOT cite it as evidence of GUI completion**. See the
+> W17 corrections section for the current truth.
+>
+> ### Why this was superseded
+>
+> **User directive (W17 rejection, 2026-05-11):**
+> > "Stop claiming GUI complete until the entire GUI is Playwright-verified
+> > visually and functionally."
+>
+> The W15-A24 verdict in this doc (`GUI_VISUAL_E2E_BLOCKED` flipping to GREEN
+> via the W16 addendum) was based on a narrow 11-LIVE-target subset of the
+> Playwright visual oracle and a console-allow-list that masked real failures.
+> A subsequent Codex audit during Wave 17 produced the following empirical
+> findings that contradict the prior claim:
+>
+> - **28 / 28 visual targets** logged `console.error` during the W17 full-sweep
+>   run (the W16 addendum reported "11 / 11 LIVE MATCH with 0 `console_error`"
+>   only after applying a permissive `isHermesOfflineMessage` allow-list that
+>   silenced real product errors).
+> - **27 / 28 targets** rendered an offline / honest-blocked placeholder
+>   instead of the wired product surface, meaning the screenshots compared
+>   to `Images-GUI/` were of empty / placeholder UI, not the actual GUI.
+> - **`POST /api/agents/update/status`** returned HTTP 502 (GitHub Releases
+>   upstream rate-limit / DNS failure was propagated as a 5xx instead of
+>   honest-blocked 200).
+> - **`GET /api/files`** returned HTTP 404 (route missing).
+> - **`GET /api/health/services`** returned HTTP 404 (route missing).
+>
+> ### W17 fix PRs that addressed each finding
+>
+> | Finding | W17 fix PR | State |
+> |---|---|---|
+> | `/api/agents/update/status` 502 → 200 honest-blocked | [#225](https://github.com/Ghenghis/Hermes3D/pull/225) | MERGED |
+> | `/api/mcp/locks` honest-blocked contract gap | [#226](https://github.com/Ghenghis/Hermes3D/pull/226) | MERGED |
+> | Print Queue Submit Job control unwired (1 of 28 placeholder surfaces) | [#227](https://github.com/Ghenghis/Hermes3D/pull/227) | MERGED |
+> | `/api/files` 404 + `/api/health/services` 404 (backend gaps) | [#228](https://github.com/Ghenghis/Hermes3D/pull/228) | OPEN |
+> | `#printers` tab not consuming `/api/printers` (workflow wiring) | [#229](https://github.com/Ghenghis/Hermes3D/pull/229) | OPEN |
+>
+> The 27 placeholder surfaces and the console-error allow-list are tracked
+> separately in the W17 correction lane; this supersession header does not
+> assert that those follow-on fixes are landed.
+>
+> ### Status of this document
+>
+> - **Classification:** GREEN_CLAIM_NOW_FALSE
+> - **Preserved as:** historical record of W15-A24 reporting
+> - **Do not:** quote this document's verdict, exit criteria, or "Final Integrator Handoff" framing in any new PR, status report, or handoff
+> - **Do:** cite the W17 fix PRs above and any forthcoming W17 verification handoff for the current state
+
+---
+
 # GUI Visual E2E Completion — Final Integrator Handoff (Wave 15, Agent 24)
 
 **Owner:** `claude-w15-a24-final` (Hermes MCP lock holder)
