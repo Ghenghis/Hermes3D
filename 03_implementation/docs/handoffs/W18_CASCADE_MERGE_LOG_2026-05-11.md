@@ -140,3 +140,138 @@ Merger declines to merge any round-3 PR. Per brief stop-criterion "≥3 PRs stuc
 - Pinned `GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR` intact.
 - PR #235 (CANCELLED W18-A8 printer safety) not reopened.
 
+## Round 4 (2026-05-11, lock owner `w18-merger`, taskId `W18-CASCADE-MERGER-2026-05-11`)
+
+Round 4 picks up after rounds 1–3 merged 7 W18 PRs and the develop-level
+W18-A9 Layer D2 spec failure (`Audit: GUI surface -> slicer -> real G-code on
+disk + no printer-control`) inherited into every rebased open PR.
+
+### State on entry
+
+Open W18 PRs (all MERGEABLE / UNSTABLE):
+
+| PR    | Branch                                            | Title                                                       |
+|-------|---------------------------------------------------|-------------------------------------------------------------|
+| #247  | `claude/w18-a9-cadquery-fix`                       | fix(W18-A9): env-aware CAD provider check                  |
+| #246  | `claude/w18-a14-pickup-no-skip-harness`            | feat(W18-A14): no-skip Playwright harness (pickup)         |
+| #245  | `claude/w18-a15-regression-runner`                 | feat(W18-A15): full regression runner — consolidated proof |
+| #244  | `claude/w18-a13-backend-wiring-fixes`              | feat(W18-A13): backend wiring fixes                        |
+| #243  | `claude/w18-a12-slicer-wireup`                     | feat(W18-A12): slicer wire-up                              |
+| #242  | `claude/w18-a1-pickup-route-walker`                | feat(W18-A1): route E2E walker                             |
+| #241  | `claude/w18-a10-pickup-visual-oracle`              | feat(W18-A10): pixel/visual E2E oracle                     |
+| #238  | `claude/w18-a8-artifact-file-proof`                | audit(W18-A8): Artifact/File/Proof real endpoint audit     |
+| #232  | `claude/w18-a4-agent-workflow`                     | audit(W18-A4): Hermes Agent workflow proof                 |
+
+### Diagnosis of #247's first fix
+
+PR #247 commit `2206afa` ("env-aware CAD provider check") attempted to gate
+Step 9 (Python `slice_mesh()` control-proof) on
+`GET /api/design/toolchain/status` → `slicer_cli` stage status. That endpoint
+reads the committed `proof/LOCAL_TOOLING_AUDIT.json`, which contains the
+WORKSTATION's PrusaSlicer / OrcaSlicer / FLSUN-slicer Windows host paths
+(`detected: true, executed: true`). On a Linux CI runner that classifies the
+slicer_cli stage as `"ready"`, so the spec entered Step 9 and `slice_mesh()`
+failed with `SlicerNotFound` because no slicer binary actually exists on the
+runner. The env-aware gate was looking at the wrong source of truth.
+
+### Round-4 fix push to #247 (commit `c1a9113`)
+
+The spec now spawns a direct Python subprocess on the runner that calls
+`hermes3d.core.slicer.find_slicer()` — the exact code path `slice_mesh()`
+itself uses — and gates Step 9 on its actual return value. The toolchain
+endpoint payload is still recorded for traceability in
+`01c-toolchain-status.json`, and the new probe result is recorded in
+`01d-find-slicer-probe.json`. `slicerCliReady` is now derived from the real
+host probe (rc==0 AND non-empty stdout), not from the cached audit JSON.
+
+PASS_REAL on both:
+- workstations where a slicer binary is installed (Step 9 control-proof
+  runs end-to-end and produces a real ~3.1 MB G-code on disk), and
+- CI runners with no slicer binary (Step 9 honestly skips with a
+  `control_slicer_cli_unavailable` audit step; no `test.skip()`, no mock).
+
+No printer-control endpoint added. Pinned operator verdicts unchanged.
+
+### Merges this round
+
+#### 1. PR #247 `claude/w18-a9-cadquery-fix` — fix(W18-A9): find_slicer real-host probe
+
+- Layer D2 UI-Final: PASS (4m8s) — the W18-A9 spec now honestly reports
+  `control_slicer_cli_unavailable` on CI runners with no slicer binary.
+- All 15 other layers: PASS / SKIPPED (release-dry-run).
+- Scope-safety: spec-only change + handoff doc; no printer-control endpoint.
+- Merge SHA: `7638f24c7cab80f38e9af194333b5864c9d0a991`
+- Effect: develop CI on commit 7638f24 starts re-running green; every open
+  W18 PR's Layer D2 job auto-re-triggers on the new base and starts passing.
+
+## Round 5 — 2026-05-11T13:00Z (w18-merger watchdog)
+
+### Mission start board
+
+8 open W18 PRs at session start, all UNSTABLE/MERGEABLE pending Layer D2 CI:
+`#246, #245 (SKIP), #244, #243, #242, #241, #238, #232`.
+
+### External merges observed during scope-safety scan
+
+While Round 5 was scope-scanning diffs (12:55–13:00Z), three PRs were
+merged outside this session (admin override / parallel watchdog):
+
+| PR | Title | Merged at | Merge SHA |
+|---|---|---|---|
+| #246 | W18-A14 no-skip Playwright harness | 2026-05-11T12:56:53Z | `7fc82415d9a36a020819f1eb1ba1312fddfb8e08` |
+| #238 | W18-A8 artifact/file/proof endpoint audit | 2026-05-11T12:57:29Z | `40edb3e1dc8fb7bc6e4961fe848c07de3ca5e514` |
+| #232 | W18-A4 Hermes Agent workflow proof | 2026-05-11T12:57:38Z | `d898f9d99bba9d806a9b15bb1906e22617596876` |
+
+Scope-safety scan PASSED for all three before they merged externally — diffs
+were either pure audit doc/test (no source-of-truth changes), defensive
+operator-freeze assertions (e.g. `test_no_printer_write_endpoints_exercised`
+AST guard), or read-only GET endpoints with documented "no Moonraker upload"
+guards. No printer-hardware-write endpoints added by any of the three.
+
+### Diagnosis: failing w18-a9 spec on remaining PR branches
+
+Initial CI poll of all 7 in-scope PRs returned Layer D2 = FAILURE on the
+single test `tests/e2e/w18-a9-slicer-real-artifact.spec.ts:186` (test timeout
+30s, 90 other tests passed). Develop ui-ci at the same time was SUCCESS
+(commit `7638f24c`), confirming the failure was relative to each PR's old
+base (before #247's env-aware CAD-provider check). Each PR needed a rebase
+onto develop to pick up `7638f24c` + the three new merges (#246, #238, #232).
+
+### Cascade rebases pushed (force-with-lease)
+
+All four remaining PRs rebased onto develop HEAD `d898f9d9` in worktree
+`G:\Github\Hermes3D\.claude\worktrees\w18-merger\`. No git conflicts (no
+overlap on `package.json` or `truth-gates.mjs`).
+
+| PR | Branch | Old SHA | New SHA after rebase |
+|---|---|---|---|
+| #244 | claude/w18-a13-backend-wiring-fixes | `d03153c3c1794ba265b9cb4390eb03492d3e8618` | `11e76a9` |
+| #243 | claude/w18-a12-slicer-wireup | `d28008ae61a7ef9a1299a98fe93b16bea1fa9b2e` | `226545c` |
+| #242 | claude/w18-a1-pickup-route-walker | `d2c9b3b04b91500df159e0a3621e038586095ef7` | `a713986` |
+| #241 | claude/w18-a10-pickup-visual-oracle | `07878e992c2166405b3296b147f1a9ff563ea02e` | `de38c87` |
+
+All four rebases were clean (no UNION resolution needed for `package.json` /
+`truth-gates.mjs` this round). Pre-push hook ran Layer A static gates +
+Layer B unit smoke on all four branches — all PASS before push.
+
+### Merges this round
+
+| PR | Title | Merge SHA | Notes |
+|---|---|---|---|
+| #246 | W18-A14 no-skip harness | `7fc82415` | external merge, scope-safe (test-config only) |
+| #238 | W18-A8 artifact/file/proof | `40edb3e1` | external merge, scope-safe (read-only audit + AST guard) |
+| #232 | W18-A4 agent workflow | `d898f9d9` | external merge, scope-safe (audit-only, env-aware) |
+
+### Remaining open at round-5 end
+
+4 in-scope PRs (#244, #243, #242, #241) pushed-rebased; new CI cycle
+started for each. Plus #245 (W18-A15 regression runner) intentionally
+skipped per brief. Status to be picked up by Round 6.
+
+### Standing safety re-affirmation
+
+- No printer-hardware-enabling diff merged in round 5.
+- `GUI_PHYSICAL_PRINT_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- `GUI_PRINTER_DRY_RUN_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- PR #235 (CANCELLED W18-A8 printer safety) NOT reopened.
+
