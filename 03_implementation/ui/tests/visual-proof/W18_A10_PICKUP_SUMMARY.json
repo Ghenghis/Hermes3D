@@ -1,0 +1,1208 @@
+{
+  "wave": "W18",
+  "agent": "W18-A10-PICKUP",
+  "lock_owner": "w18-a10-pickup",
+  "task_id": "W18-A10-PICKUP-VISUAL-ORACLE-2026-05-11",
+  "generated_utc": "2026-05-11T13:53:05.827Z",
+  "total_targets": 31,
+  "buckets": {
+    "pass": 8,
+    "diff": 0,
+    "informational": 23,
+    "error": 0
+  },
+  "live_total": 8,
+  "live_pass": 8,
+  "live_diff": 0,
+  "live_error": 0,
+  "informational_total": 23,
+  "informational_error": 0,
+  "informational_crash": 0,
+  "live_total_diff_pixels": 839769,
+  "gui_pixel_e2e_green": true,
+  "printer_freeze": {
+    "gui_physical_print_green": "OUT_OF_SCOPE_BY_OPERATOR",
+    "gui_printer_dry_run_green": "OUT_OF_SCOPE_BY_OPERATOR",
+    "printer_hardware_writes": 0
+  },
+  "rows": [
+    {
+      "target": "00_user_hermes3d",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Hermes3D.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 112662,
+      "diff_ratio": 0.07162857055664062,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_hermes3d.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_hermes3d.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "User-approved baseline of the app shell at default route.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "01_dashboard_advanced_a",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/01-dashboard-modes/advanced-dashboard-a.png",
+      "route": "/?mode=advanced#dashboard",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "dashboard-advanced-a",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 112598,
+      "diff_ratio": 0.07158788045247395,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\01_dashboard_advanced_a.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\01_dashboard_advanced_a.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Advanced dashboard mode primary view A. dashboardModeStore reads ?mode=advanced.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "01_dashboard_simple_a",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/01-dashboard-modes/simple-dashboard-a.png",
+      "route": "/?mode=simple#dashboard",
+      "viewport": {
+        "width": 1672,
+        "height": 941
+      },
+      "theme": "dark",
+      "state": "dashboard-simple-a",
+      "expected_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "observed_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "diff_pixels": 86590,
+      "diff_ratio": 0.05503536398720693,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\01_dashboard_simple_a.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\01_dashboard_simple_a.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Simple dashboard mode A.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "01_dashboard_custom_a",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/01-dashboard-modes/custom-dashboard-a.png",
+      "route": "/?mode=custom#dashboard",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "dashboard-custom-a",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 101246,
+      "diff_ratio": 0.06437047322591145,
+      "max_diff_ratio": 0.25,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\01_dashboard_custom_a.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\01_dashboard_custom_a.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Custom dashboard mode A (default empty layout).",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "04_source_os_60_app_coverage_matrix",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/04-source-os/source-os-60-app-coverage-matrix.png",
+      "route": "/#sources",
+      "viewport": {
+        "width": 1672,
+        "height": 941
+      },
+      "theme": "dark",
+      "state": "source-os-matrix",
+      "expected_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "observed_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "diff_pixels": 92974,
+      "diff_ratio": 0.05909294296508347,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\04_source_os_60_app_coverage_matrix.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\04_source_os_60_app_coverage_matrix.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Source OS 60-app coverage matrix view.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "04_source_os_core_categories",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/04-source-os/source-os-core-categories.png",
+      "route": "/#sources",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "source-os-core",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 116636,
+      "diff_ratio": 0.07415517171223958,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\04_source_os_core_categories.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\04_source_os_core_categories.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Source OS core categories landing.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "04_source_os_remaining_categories",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/04-source-os/source-os-remaining-categories.png",
+      "route": "/#sources",
+      "viewport": {
+        "width": 1586,
+        "height": 992
+      },
+      "theme": "dark",
+      "state": "source-os-remaining",
+      "expected_size": {
+        "width": 1586,
+        "height": 992
+      },
+      "observed_size": {
+        "width": 1586,
+        "height": 992
+      },
+      "diff_pixels": 99683,
+      "diff_ratio": 0.06335869808404182,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\04_source_os_remaining_categories.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\04_source_os_remaining_categories.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Source OS remaining categories.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "07_plugins_skills_mcp_app_connectors",
+      "compare_mode": "live",
+      "verdict": "pass",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/07-plugins-skills-mcp/plugins-skills-mcp-app-connectors.png",
+      "route": "/#plugins",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "plugins-default",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 117380,
+      "diff_ratio": 0.07462819417317708,
+      "max_diff_ratio": 0.2,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\07_plugins_skills_mcp_app_connectors.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\07_plugins_skills_mcp_app_connectors.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": null,
+      "notes": "Plugins / Skills / MCP / App Connectors landing.",
+      "bucket": "pass",
+      "playwright_project": "live-targets",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_1",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 1.png",
+      "route": "/",
+      "viewport": {
+        "width": 1672,
+        "height": 941
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "observed_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "diff_pixels": 96327,
+      "diff_ratio": 0.06122406174841993,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_1.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_1.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image (1672x941); not a 1:1 page render of the implemented UI. PARTIAL — out-of-scope for pixel fix-it.",
+      "notes": "AI-direction reference. Spec still navigates, screenshots, diff-compares for documentation.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_2",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 2.png",
+      "route": "/",
+      "viewport": {
+        "width": 1672,
+        "height": 941
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "observed_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "diff_pixels": 102540,
+      "diff_ratio": 0.06517295557510334,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_2.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_2.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_3",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 3.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 118361,
+      "diff_ratio": 0.07525189717610677,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_3.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_3.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_4",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 4.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 112572,
+      "diff_ratio": 0.07157135009765625,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_4.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_4.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_5",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 5.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 112975,
+      "diff_ratio": 0.07182757059733073,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_5.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_5.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_6",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 6.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 111081,
+      "diff_ratio": 0.07062339782714844,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_6.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_6.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_7",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 7.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 112388,
+      "diff_ratio": 0.07145436604817708,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_7.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_7.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_8",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 8.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 102849,
+      "diff_ratio": 0.06538963317871094,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_8.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_8.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "00_user_generated_9",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/00-user-current-downloads/Generated image 9.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "default-shell",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 116731,
+      "diff_ratio": 0.07421557108561198,
+      "max_diff_ratio": 0.5,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\00_user_generated_9.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\00_user_generated_9.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "AI-generated direction concept image; not a 1:1 page render. PARTIAL.",
+      "notes": "AI-direction reference.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "01_dashboard_advanced_b",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/01-dashboard-modes/advanced-dashboard-b.png",
+      "route": "/?mode=advanced#dashboard",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "dashboard-advanced-b",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 119292,
+      "diff_ratio": 0.07584381103515625,
+      "max_diff_ratio": 0.3,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\01_dashboard_advanced_b.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\01_dashboard_advanced_b.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Advanced-dashboard alt view B = scroll/secondary panel state; no deterministic alt-view trigger in the implemented advanced dashboard. PARTIAL.",
+      "notes": "Same route as advanced-a; intentional A vs B is a UX follow-up.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "01_dashboard_simple_b",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/01-dashboard-modes/simple-dashboard-b.png",
+      "route": "/?mode=simple#dashboard",
+      "viewport": {
+        "width": 1672,
+        "height": 941
+      },
+      "theme": "dark",
+      "state": "dashboard-simple-b",
+      "expected_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "observed_size": {
+        "width": 1672,
+        "height": 941
+      },
+      "diff_pixels": 93150,
+      "diff_ratio": 0.05920480604467405,
+      "max_diff_ratio": 0.3,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\01_dashboard_simple_b.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\01_dashboard_simple_b.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Simple-dashboard alt view B; no deterministic trigger. PARTIAL.",
+      "notes": "Same route as simple-a; intentional A vs B is a UX follow-up.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "01_dashboard_custom_b",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/01-dashboard-modes/custom-dashboard-b.png",
+      "route": "/?mode=custom#dashboard",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "dashboard-custom-b",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 99992,
+      "diff_ratio": 0.06357320149739583,
+      "max_diff_ratio": 0.3,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\01_dashboard_custom_b.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\01_dashboard_custom_b.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Custom dashboard alt B = configured layout (user data, no deterministic seed). PARTIAL.",
+      "notes": "Same route as custom-a; alt B is user-state-dependent.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "02_primary_autopilot_design_gen3d_jobs",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/02-primary-pages/primary-tabs-autopilot-design-gen3d-jobs.png",
+      "route": "/#autopilot",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "primary-composite-autopilot-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 106880,
+      "diff_ratio": 0.06795247395833333,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\02_primary_autopilot_design_gen3d_jobs.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\02_primary_autopilot_design_gen3d_jobs.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite reference contains 4 distinct tabs (autopilot/design/gen3d/jobs) in one PNG; UI architecturally cannot render 4 tabs simultaneously. Per-tab oracles are the correct shape. PARTIAL.",
+      "notes": "Anchored to /#autopilot for evidence; diff is expected and informational.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "02_primary_printers_observe_agents_learning",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/02-primary-pages/primary-tabs-printers-observe-agents-learning.png",
+      "route": "/#printers",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "primary-composite-printers-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 115128,
+      "diff_ratio": 0.0731964111328125,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\02_primary_printers_observe_agents_learning.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\02_primary_printers_observe_agents_learning.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite of 4 tabs. PARTIAL.",
+      "notes": "Anchored to /#printers.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "02_primary_artifacts_approvals_plugins_roadmap",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/02-primary-pages/primary-tabs-artifacts-approvals-plugins-roadmap.png",
+      "route": "/#artifacts",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "primary-composite-artifacts-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 137044,
+      "diff_ratio": 0.08713022867838542,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\02_primary_artifacts_approvals_plugins_roadmap.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\02_primary_artifacts_approvals_plugins_roadmap.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite of 4 tabs. PARTIAL.",
+      "notes": "Anchored to /#artifacts.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "03_settings_subtabs_all",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/03-settings-voice/settings-subtabs-all.png",
+      "route": "/#settings",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "settings-default-subtab",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 106235,
+      "diff_ratio": 0.06754239400227864,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\03_settings_subtabs_all.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\03_settings_subtabs_all.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite of 6 settings subtabs in one PNG. PARTIAL.",
+      "notes": "Anchored to settings landing.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "03_voice_communication_subtabs",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/03-settings-voice/voice-communication-subtabs.png",
+      "route": "/#voice",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "voice-default-subtab",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 118502,
+      "diff_ratio": 0.07534154256184895,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\03_voice_communication_subtabs.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\03_voice_communication_subtabs.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite of 3 voice subtabs. PARTIAL.",
+      "notes": "Anchored to voice landing.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "05_action_window_core_apps",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/05-action-windows/action-window-core-apps.png",
+      "route": "/#apps",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "action-window-core-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 112077,
+      "diff_ratio": 0.07125663757324219,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\05_action_window_core_apps.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\05_action_window_core_apps.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Action Window resizable template is not yet implemented as a deterministic addressable state. PARTIAL.",
+      "notes": "Anchored to /#apps landing for evidence.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "05_action_window_advanced_tools",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/05-action-windows/action-window-advanced-tools.png",
+      "route": "/#apps",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "action-window-advanced-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 99495,
+      "diff_ratio": 0.06325721740722656,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\05_action_window_advanced_tools.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\05_action_window_advanced_tools.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Action Window advanced-tools template not addressable. PARTIAL.",
+      "notes": "Anchored to /#apps.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "06_states_responsive_reference",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/06-states-responsive/states-responsive-reference.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "responsive-states-collage",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 84409,
+      "diff_ratio": 0.0536657969156901,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\06_states_responsive_reference.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\06_states_responsive_reference.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Collage of loading/empty/blocked/recovering states; no single route renders all 4 simultaneously. PARTIAL.",
+      "notes": "Anchored to root shell.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "08_workflow_printqueue_files_logs",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/08-app-utility-pages/workflow-printqueue-files-logs.png",
+      "route": "/#workflows",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "utility-composite-workflows-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 79498,
+      "diff_ratio": 0.05054346720377604,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\08_workflow_printqueue_files_logs.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\08_workflow_printqueue_files_logs.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite of 4 utility tabs (workflows + print_queue + files + system_logs). Per-tab oracles are the correct shape. PARTIAL.",
+      "notes": "Anchored to /#workflows.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "08_proof_health_notifications_safety",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/08-app-utility-pages/proof-health-notifications-safety.png",
+      "route": "/#proof",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "utility-composite-proof-anchor",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 109094,
+      "diff_ratio": 0.06936009724934895,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\08_proof_health_notifications_safety.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\08_proof_health_notifications_safety.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Composite of 4 utility tabs (proof + service_health + notifications + safety). PARTIAL.",
+      "notes": "Anchored to /#proof.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    },
+    {
+      "target": "09_theme_variants_reference",
+      "compare_mode": "informational",
+      "verdict": "informational",
+      "crash_during_capture": false,
+      "crash_phase": null,
+      "crash_message": null,
+      "ref": "Images-GUI/09-themes/theme-variants-reference.png",
+      "route": "/",
+      "viewport": {
+        "width": 1536,
+        "height": 1024
+      },
+      "theme": "dark",
+      "state": "themes-collage",
+      "expected_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "observed_size": {
+        "width": 1536,
+        "height": 1024
+      },
+      "diff_pixels": 129590,
+      "diff_ratio": 0.08239110310872395,
+      "max_diff_ratio": 0.4,
+      "size_mismatch": false,
+      "observed_path": "03_implementation\\ui\\tests\\visual-proof\\observed-pickup\\09_theme_variants_reference.observed.png",
+      "diff_path": "03_implementation\\ui\\tests\\visual-proof\\diffs-pickup\\09_theme_variants_reference.diff.png",
+      "console_errors_count": 0,
+      "console_errors_sample": [],
+      "nav_error": null,
+      "blocker": "Reference depicts 6 named themes (cyberpunk/matrix/tron/forge/aurora/default) in a collage. Live ThemeSwitcher exposes only light/dark/system. Named themes are out-of-scope for this pickup. PARTIAL.",
+      "notes": "Anchored to root shell in dark theme.",
+      "bucket": "informational",
+      "playwright_project": "informational-variants",
+      "playwright_status": "passed"
+    }
+  ]
+}

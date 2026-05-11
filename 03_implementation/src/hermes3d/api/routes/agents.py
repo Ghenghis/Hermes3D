@@ -207,9 +207,6 @@ async def _chat_stream(persona_id: str, body: ChatRequest) -> AsyncIterator[str]
         (reply["id"], persona_id, reply["role"], reply["message_type"], reply["content"]),
     )
     yield f"data: {json.dumps(reply)}\n\n"
-    while True:
-        await asyncio.sleep(15)
-        yield ": keepalive\n\n"
 
 
 async def _runtime_chat_stream(
