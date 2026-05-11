@@ -344,3 +344,77 @@ merge). Force-pushed with `--force-with-lease`. CI re-triggered.
 |---|---|---|
 | 16 (excl. #245 skipped, #235 cancelled) | 12 (rounds 1-5: 11, round 6: +#244) | 4 (#248/#243/#242/#241 — all blocked on CI env/spec brittleness, no scope issues) |
 
+---
+
+## Round 7 — 2026-05-11 (watchdog, +1 new PR #249)
+
+### Starting state
+
+5 in-scope open PRs (1 new + 4 carried from round 6) plus #245 skip:
+
+| PR | Title | Branch | mergeable | CI state @ start |
+|---|---|---|---|---|
+| #249 | fix(W18-A18): cold-start timeouts on health/services + source-os/modules | claude/w18-a18-backend-timeouts | MERGEABLE | UNSTABLE (Layer A + M FAIL) |
+| #248 | feat(W18-A17): Hermes Agents operational | claude/w18-a17-hermes-agents-operational | MERGEABLE | UNSTABLE (Layer D2 FAIL) |
+| #243 | feat(W18-A12): slicer wire-up | claude/w18-a12-slicer-wireup | MERGEABLE | UNSTABLE (Layer A + D2 + M FAIL) |
+| #242 | feat(W18-A1): route walker | claude/w18-a1-pickup-route-walker | MERGEABLE | UNSTABLE (Layer D2 FAIL) |
+| #241 | feat(W18-A10): visual oracle | claude/w18-a10-pickup-visual-oracle | MERGEABLE | UNSTABLE (Layer D FAIL — checkout transient) |
+| #245 | W18-A15 regression runner | claude/w18-a15-regression-runner | MERGEABLE | SKIP per brief |
+
+No A19/A20 PRs landed during this round (smoke + modeling lanes still in flight on locks `w18-a19`, `w18-a20`).
+
+### Scope-safety scan (round 7 — re-verified)
+
+Diff scan for `heat-`, `start-print`, `upload-gcode`, `moonraker` write, `octoprint` write across all five PRs.
+
+| PR | Verdict | Notes |
+|---|---|---|
+| #249 | SAFE | Only touches `routes/modules.py`, `core/health/probe.py`, `test_w18_a18_backend_timeouts.py`. References to `moonraker_fleet`/`moonraker_specs_from_config()` are read-only health probes (already in place). |
+| #248 | SAFE | No new write endpoints. |
+| #243 | SAFE | All Moonraker/OctoPrint mentions are *negative assertions* (`no_moonraker_upload: true`, "no upload from the new endpoint", "/api/printers/{id}/upload-gcode" guard). |
+| #242 | SAFE | Spec/config only. |
+| #241 | SAFE | Spec/manifest only. |
+
+No PR introduces printer-hardware writes.
+
+### Per-PR post-fix CI diagnosis (root cause, not symptom)
+
+| PR | Last commit | CI verdict | Real blocker |
+|---|---|---|---|
+| #249 | `ba27457` | BLOCKED — needs ruff format | Layer A `ruff format --check` reports 3 files would be reformatted: `routes/modules.py`, `core/health/probe.py`, `test_w18_a18_backend_timeouts.py`. Layer M skipped (cascade from B-skip). Author must `ruff format` and push. Out of merger scope. |
+| #248 | `e3cd14f` | BLOCKED — fix did not land | Layer D2 `w18-a17-agents-operational.spec.ts:557` STATUS_UPDATE branch still asserts `proof_events count must NOT grow (no LLM ran). before=30 after=31`. Env-aware fix `e3cd14f` did NOT eliminate the proof event growth path on CI runner. 97/98 pass. Author must re-fix STATUS_UPDATE branch. |
+| #243 | (carried) | BLOCKED — multi-layer | Layer A ruff format (cascade from same files as #249?) + Layer D2 `w18-a12-slicer-wireup.spec.ts` slicer reaches 'failed' on cold CI (no CAD provider) + Layer M skip cascade. |
+| #242 | `5674db1` | BLOCKED — cold-race fix incomplete | Layer D2 `w18-a1-pickup-full-route-walk.spec.ts` still reports `[FAIL_BROKEN] apps GET /api/apps -> 0 net::ERR_ABORTED`. Backend pre-warm via /api/apps succeeded (134ms) but route walker still hit the abort. 24/25 PASS_REAL. The fix `5674db1` mitigated the seed race but did not eliminate it. |
+| #241 | `1d6cbd2` | BLOCKED — CI infra (transient) | Layer D `actions/checkout@v4` exit code 128 — Git server connection failure during CI checkout, not a code issue. Retry needed. |
+| #245 | — | SKIP | Regression runner; consolidates after others land. |
+
+### Merges this round
+
+| PR | Title | Merge SHA | Time UTC |
+|---|---|---|---|
+| (none) | — | — | — |
+
+Zero merges. All five MERGEABLE-marked PRs have real CI failures (post-fix). Watchdog correctly held the cascade.
+
+### Standing safety re-affirmation
+
+- No printer-hardware-enabling diff merged in round 7 (no merges at all).
+- `GUI_PHYSICAL_PRINT_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- `GUI_PRINTER_DRY_RUN_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- PR #235 (CANCELLED W18-A8 printer safety) NOT reopened.
+- All five candidate PRs verified scope-clean — blocks are CI-quality only.
+
+### Cumulative cascade tally (rounds 1-7)
+
+| Total in-scope PRs | Merged so far | Remaining |
+|---|---|---|
+| 17 (excl. #245 skipped, #235 cancelled; +#249 new this round) | 12 (rounds 1-6) | 5 (#249/#248/#243/#242/#241 — author re-fix required, no scope issues) |
+
+### Recommended next action (for round 8 / authors)
+
+1. **#249** — author: run `ruff format 03_implementation/src/hermes3d/api/routes/modules.py 03_implementation/src/hermes3d/core/health/probe.py 04_testing/pytest/integration/test_w18_a18_backend_timeouts.py` and push.
+2. **#248** — author: revisit STATUS_UPDATE branch in `w18-a17-agents-operational.spec.ts:557` — proof_events count growth is happening despite env-aware guard.
+3. **#243** — author: ruff format + revisit slicer cold-runner failure path (mock CAD provider or relax to `failed`-on-no-provider).
+4. **#242** — author: cold-runner `/api/apps` race remains; increase quiesce window or add explicit pre-warm retry for `apps` route.
+5. **#241** — re-run Layer D job (transient `actions/checkout@v4` exit 128).
+
