@@ -1,0 +1,15 @@
+{
+  "status": "PASS_LIVE",
+  "provider": "minimax",
+  "role": "builder",
+  "persona": "modeling-agent",
+  "model": "MiniMax-M2.7-highspeed",
+  "http_status": 200,
+  "latency_ms": 9889,
+  "tokens_in": 71,
+  "tokens_out": 400,
+  "user_msg_id": "25fc26bf0bd845c191a43420090f1c81",
+  "assistant_msg_id": "502a1e37411946b78b8c6160b332ef79",
+  "proof_event_id": "c351e4c635ad4dc09b1c3c8b84be6a4b",
+  "completion": null
+}

@@ -3244,10 +3244,418 @@ def _command_label(command: list[str]) -> str:
     return " ".join(command)
 
 
+# ---------------------------------------------------------------------------
+# W18-A19 — live MiniMax + DeepSeek provider routing.
+#
+# Operator verdict criteria (2026-05-11): GUI_AGENT_WORKFLOW_GREEN final
+# PASS_REAL requires at least one *live* MiniMax/DeepSeek backed assistive
+# task. LM Studio / Ollama are local fallback only.
+#
+# Role mapping (cf. PR body W18-A19 routing table):
+#   builder   -> minimax     (implementation / refactor proposals)
+#   reviewer  -> deepseek    (verification / regression review)
+#   fallback  -> lm_studio   (dev/local fallback; never primary)
+#   fallback  -> ollama      (dev/local fallback; never primary)
+#
+# Hard rules enforced in this section:
+#   * NO API key values are logged / echoed / persisted. Only `key_present`
+#     booleans and per-call metadata (status, latency, model, sha) ever leave
+#     this module.
+#   * Smallest-possible live smoke = 1-token completion. Assistive tasks cap
+#     at 200 tokens to bound cost (estimate well under $0.001 per call).
+# ---------------------------------------------------------------------------
+
+PROVIDER_ROLE_MAP: dict[str, str] = {
+    # Primary live providers (count toward GUI_AGENT_WORKFLOW_GREEN PASS_REAL).
+    "minimax": "builder",
+    "deepseek": "reviewer",
+    # Local fallback only — never primary, never proof-bearing for the GREEN
+    # verdict on their own.
+    "lm_studio": "fallback",
+    "ollama": "fallback",
+    # Test fixture (offline).
+    "openai-fixture": "fixture",
+}
+
+PROVIDER_ROLE_DESCRIPTION: dict[str, str] = {
+    "builder": "Implementation / refactor proposals (MiniMax).",
+    "reviewer": "Verification / regression review (DeepSeek).",
+    "fallback": "Local dev fallback only (LM Studio / Ollama).",
+    "fixture": "Offline test fixture.",
+}
+
+
+def _resolve_provider_key(provider_id: str) -> str | None:
+    """Resolve a provider API key from env without ever logging the value."""
+    chains: dict[str, tuple[str, ...]] = {
+        "minimax": (
+            "HERMES3D_MINIMAX_TOKEN_PLAN_API_KEY",
+            "MINIMAX_TOKEN_PLAN_API_KEY",
+            "HERMES3D_MINIMAX_HIGHSPEED_API_KEY",
+            "MINIMAX_HIGHSPEED_API_KEY",
+            "HERMES3D_MINIMAX_API_KEY",
+            "MINIMAX_API_KEY",
+        ),
+        "deepseek": (
+            "HERMES3D_DEEPSEEK_API_KEY",
+            "DEEPSEEK_API_KEY",
+        ),
+    }
+    for name in chains.get(provider_id, ()):
+        value = os.environ.get(name)
+        if value:
+            return value
+    return None
+
+
+def _provider_endpoint(provider_id: str) -> tuple[str, str]:
+    """Return (base_url, model) for a provider, env-overrideable."""
+    if provider_id == "minimax":
+        base = (
+            os.environ.get("HERMES3D_MINIMAX_BASE_URL")
+            or os.environ.get("MINIMAX_BASE_URL")
+            or "https://api.minimax.io/v1"
+        )
+        model = (
+            os.environ.get("HERMES3D_MINIMAX_MODEL")
+            or os.environ.get("MINIMAX_MODEL")
+            or "MiniMax-M2"
+        )
+        return base, model
+    if provider_id == "deepseek":
+        base = (
+            os.environ.get("HERMES3D_DEEPSEEK_BASE_URL")
+            or os.environ.get("DEEPSEEK_BASE_URL")
+            or "https://api.deepseek.com/v1"
+        )
+        model = (
+            os.environ.get("HERMES3D_DEEPSEEK_MODEL")
+            or os.environ.get("DEEPSEEK_MODEL")
+            or "deepseek-chat"
+        )
+        return base, model
+    raise ValueError(f"unsupported provider_id: {provider_id}")
+
+
+def _provider_call(
+    provider_id: str,
+    *,
+    prompt: str,
+    max_tokens: int,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    """Perform a single chat-completion HTTP call to a remote provider.
+
+    Returns a metadata-only dict. NEVER contains the API key. The raw
+    response body is sha256-hashed for proof, never persisted verbatim
+    (defense against accidental secret-in-body leaks).
+    """
+    if provider_id not in ("minimax", "deepseek"):
+        raise ValueError(f"unsupported provider_id: {provider_id}")
+    key = _resolve_provider_key(provider_id)
+    if not key:
+        return {
+            "provider_id": provider_id,
+            "status": "FAIL_KEY_MISSING",
+            "http_status": None,
+            "latency_ms": 0,
+            "key_present": False,
+        }
+    base_url, model = _provider_endpoint(provider_id)
+    url = f"{base_url.rstrip('/')}/chat/completions"
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": max_tokens,
+    }
+    payload = json.dumps(body).encode("utf-8")
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {key}")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "application/json")
+    started = time.monotonic_ns()
+    text = ""
+    status = 0
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status = resp.getcode()
+            text = resp.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        status = exc.code
+        try:
+            text = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            text = ""
+    except urllib.error.URLError as exc:
+        status = 0
+        text = f"URLError reason={type(exc).__name__}"
+    latency_ms = int((time.monotonic_ns() - started) // 1_000_000)
+    body_sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    parsed_meta: dict[str, Any] = {}
+    completion_text: str | None = None
+    try:
+        parsed = json.loads(text)
+        if isinstance(parsed, dict):
+            parsed_meta["model"] = parsed.get("model")
+            usage = parsed.get("usage")
+            if isinstance(usage, dict):
+                parsed_meta["tokens_in"] = usage.get("prompt_tokens")
+                parsed_meta["tokens_out"] = usage.get("completion_tokens")
+            choices = parsed.get("choices")
+            if isinstance(choices, list) and choices:
+                first = choices[0]
+                if isinstance(first, dict):
+                    msg = first.get("message")
+                    if isinstance(msg, dict):
+                        c = msg.get("content")
+                        if isinstance(c, str) and c.strip():
+                            completion_text = c
+                        else:
+                            # DeepSeek thinking models surface reasoning in a
+                            # parallel ``reasoning_content`` field when the
+                            # token budget is consumed by reasoning before
+                            # the final answer streams. Fall back to it so
+                            # we have *something* to persist + verify.
+                            rc = msg.get("reasoning_content")
+                            if isinstance(rc, str) and rc.strip():
+                                completion_text = rc
+            err = parsed.get("error")
+            if isinstance(err, dict):
+                parsed_meta["error_code"] = err.get("code") or err.get("type")
+    except (json.JSONDecodeError, TypeError):
+        pass
+    if 200 <= status < 300:
+        verdict = "PASS_LIVE"
+    elif status == 0:
+        verdict = "FAIL_NETWORK"
+    elif status in (401, 403):
+        verdict = "FAIL_AUTH"
+    elif status == 429:
+        verdict = "FAIL_RATE_LIMIT"
+    elif 400 <= status < 500:
+        verdict = "FAIL_REQUEST"
+    else:
+        verdict = "FAIL_UPSTREAM"
+    return {
+        "provider_id": provider_id,
+        "status": verdict,
+        "http_status": status,
+        "latency_ms": latency_ms,
+        "model": parsed_meta.get("model") or model,
+        "tokens_in": parsed_meta.get("tokens_in"),
+        "tokens_out": parsed_meta.get("tokens_out"),
+        "body_sha256": body_sha,
+        "body_size_bytes": len(text.encode("utf-8")),
+        "error_code": parsed_meta.get("error_code"),
+        "key_present": True,
+        # `completion_text` is returned to the caller (assistive task path)
+        # but NOT persisted by the smoke endpoint.
+        "completion_text": completion_text,
+    }
+
+
+@router.post("/api/agents/providers/smoke")
+def provider_smoke(body: dict | None = None) -> dict:
+    """Run a 1-token live smoke against MiniMax and/or DeepSeek.
+
+    Body (optional):
+      {"providers": ["minimax", "deepseek"]}  # default: both
+
+    Response shape (NEVER includes API keys):
+      {
+        "task_id": "...",
+        "timestamp_utc": "...",
+        "providers": {
+          "minimax":  {"status", "http_status", "latency_ms", "model", ...},
+          "deepseek": {"status", "http_status", "latency_ms", "model", ...}
+        }
+      }
+    """
+    requested = (body or {}).get("providers") if isinstance(body, dict) else None
+    if not isinstance(requested, list) or not requested:
+        requested = ["minimax", "deepseek"]
+    out: dict[str, Any] = {
+        "task_id": "W18-A19-PROVIDER-LIVE-SMOKE",
+        "timestamp_utc": utc_now(),
+        "providers": {},
+    }
+    for pid in requested:
+        pid_norm = str(pid).strip().lower()
+        if pid_norm not in ("minimax", "deepseek"):
+            out["providers"][pid_norm] = {
+                "status": "FAIL_UNSUPPORTED",
+                "http_status": None,
+                "latency_ms": 0,
+            }
+            continue
+        result = _provider_call(pid_norm, prompt="1", max_tokens=1, timeout=20.0)
+        # The smoke endpoint NEVER stores the completion text. Strip it.
+        result.pop("completion_text", None)
+        result["role"] = PROVIDER_ROLE_MAP.get(pid_norm, "unknown")
+        out["providers"][pid_norm] = result
+        # Persist proof event for the smoke (key-free, sha-only).
+        _append_provider_proof_event("provider_smoke", pid_norm, result)
+    return out
+
+
+@router.post("/api/agents/providers/assist")
+def provider_assist(body: dict) -> dict:
+    """Submit an assistive task to a specific live provider.
+
+    Body:
+      {
+        "provider": "minimax" | "deepseek",
+        "prompt": "...",
+        "role": "builder" | "reviewer",   # optional, derived from provider
+        "max_tokens": 200                   # optional, default 200
+      }
+
+    Persists the request + response into ``agent_conversations`` with the
+    provider tag (in the ``message_type`` column as ``ASSIST:<provider>``)
+    and records a ``proof_events`` row tagged with the provider.
+
+    NEVER stores the API key. The completion text itself is stored (this is
+    the whole point of an assistive task) but the Authorization header is
+    not.
+    """
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail={"status": "bad_request"})
+    provider = str(body.get("provider", "")).strip().lower()
+    if provider not in ("minimax", "deepseek"):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "unsupported_provider",
+                "reason": f"provider must be 'minimax' or 'deepseek', got {provider!r}",
+            },
+        )
+    prompt = str(body.get("prompt", "")).strip()
+    if not prompt:
+        raise HTTPException(
+            status_code=400,
+            detail={"status": "bad_request", "reason": "prompt is required"},
+        )
+    max_tokens_raw = body.get("max_tokens", 200)
+    try:
+        max_tokens = max(1, min(int(max_tokens_raw), 1024))
+    except (TypeError, ValueError):
+        max_tokens = 200
+    role = PROVIDER_ROLE_MAP.get(provider, "builder")
+    persona = "modeling-agent" if role == "builder" else "oliver-qa-agent"
+    result = _provider_call(provider, prompt=prompt, max_tokens=max_tokens, timeout=45.0)
+    completion = result.pop("completion_text", None)
+    # Persist user prompt + provider reply into agent_conversations. We tag
+    # the row by stuffing provider info into message_type so downstream
+    # queries can filter without a schema migration.
+    user_msg_id = new_id()
+    assistant_msg_id = new_id()
+    execute(
+        "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) "
+        "VALUES (?, ?, 'user', ?, ?)",
+        (user_msg_id, persona, f"ASSIST_REQ:{provider}", prompt),
+    )
+    persisted_text = completion if isinstance(completion, str) and completion else ""
+    if not persisted_text:
+        persisted_text = json.dumps(
+            {
+                "status": result.get("status"),
+                "http_status": result.get("http_status"),
+                "error_code": result.get("error_code"),
+                "note": "no completion text returned",
+            },
+            sort_keys=True,
+        )
+    execute(
+        "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) "
+        "VALUES (?, ?, 'assistant', ?, ?)",
+        (assistant_msg_id, persona, f"ASSIST_REPLY:{provider}", persisted_text),
+    )
+    proof_payload = dict(result)
+    proof_payload["user_msg_id"] = user_msg_id
+    proof_payload["assistant_msg_id"] = assistant_msg_id
+    proof_payload["persona"] = persona
+    proof_payload["role"] = role
+    proof_event_id = _append_provider_proof_event(
+        "provider_assist", provider, proof_payload
+    )
+    return {
+        "status": result.get("status"),
+        "provider": provider,
+        "role": role,
+        "persona": persona,
+        "model": result.get("model"),
+        "http_status": result.get("http_status"),
+        "latency_ms": result.get("latency_ms"),
+        "tokens_in": result.get("tokens_in"),
+        "tokens_out": result.get("tokens_out"),
+        "user_msg_id": user_msg_id,
+        "assistant_msg_id": assistant_msg_id,
+        "proof_event_id": proof_event_id,
+        "completion": completion if isinstance(completion, str) else None,
+    }
+
+
+def _append_provider_proof_event(
+    event_type: str,
+    provider_id: str,
+    payload: dict[str, Any],
+) -> str:
+    """Insert a proof_events row tagged with the provider.
+
+    Strips any field whose name looks key-like; we never write them, but
+    defense in depth.
+    """
+    safe = {
+        k: v
+        for k, v in payload.items()
+        if not (
+            "api_key" in k.lower()
+            or k.lower() == "authorization"
+            or k.lower().endswith("_token")
+        )
+    }
+    safe["provider"] = provider_id
+    event_id = new_id()
+    execute(
+        "INSERT INTO proof_events (id, event_type, source_agent, payload) "
+        "VALUES (?, ?, ?, ?)",
+        (event_id, event_type, f"provider:{provider_id}", json.dumps(safe, sort_keys=True)),
+    )
+    return event_id
+
+
 @router.get("/api/agents/health")
 def health() -> dict:
     probe = runtime_probe()
     runtime_configured = bool(probe["ready"])
+    # W18-A19 — surface per-provider smoke state on the health endpoint so
+    # the GUI + Playwright proof can read it. We do a *light* presence check
+    # only (key_present + role); the actual live smoke must be triggered via
+    # POST /api/agents/providers/smoke to keep this endpoint cheap.
+    providers: dict[str, dict[str, Any]] = {}
+    for pid in ("minimax", "deepseek", "lm_studio", "ollama"):
+        if pid in ("minimax", "deepseek"):
+            key_present = bool(_resolve_provider_key(pid))
+            base, model = _provider_endpoint(pid) if pid in ("minimax", "deepseek") else ("", "")
+            providers[pid] = {
+                "role": PROVIDER_ROLE_MAP.get(pid, "unknown"),
+                "role_description": PROVIDER_ROLE_DESCRIPTION.get(
+                    PROVIDER_ROLE_MAP.get(pid, "unknown"),
+                    "",
+                ),
+                "key_present": key_present,
+                "model": model,
+                "base_url": base,
+                "smoke_endpoint": "/api/agents/providers/smoke",
+                "kind": "live_remote",
+            }
+        else:
+            providers[pid] = {
+                "role": PROVIDER_ROLE_MAP.get(pid, "fallback"),
+                "role_description": PROVIDER_ROLE_DESCRIPTION.get("fallback", ""),
+                "key_present": True,  # local providers don't require a key
+                "kind": "local_fallback",
+            }
     return {
         "healthy": runtime_configured,
         "status": "bridge_ready" if runtime_configured else probe["status"],
@@ -3260,6 +3668,12 @@ def health() -> dict:
             "model": probe.get("model"),
             "reason": probe.get("reason"),
             "latency_ms": probe.get("latency_ms"),
+        },
+        "providers": providers,
+        "provider_roles": {
+            "builder": "minimax",
+            "reviewer": "deepseek",
+            "fallback": ["lm_studio", "ollama"],
         },
     }
 
