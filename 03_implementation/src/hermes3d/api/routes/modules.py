@@ -142,9 +142,7 @@ RUNTIME_RESPONSE_CACHE_TTL_S = 8.0
 _RUNTIME_RESPONSE_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 
 
-def _cached_runtime_response(
-    key: str, builder: Any
-) -> dict[str, Any]:
+def _cached_runtime_response(key: str, builder: Any) -> dict[str, Any]:
     cached = _RUNTIME_RESPONSE_CACHE.get(key)
     if cached is not None:
         cached_at, cached_payload = cached
@@ -869,9 +867,7 @@ def module_agent_cli_readiness() -> dict[str, Any]:
     ``_agent_cli_readiness_record``. The cache turns subsequent calls
     into a constant-time dictionary lookup.
     """
-    return _cached_runtime_response(
-        "agent_cli_readiness", _build_module_agent_cli_readiness
-    )
+    return _cached_runtime_response("agent_cli_readiness", _build_module_agent_cli_readiness)
 
 
 def _build_module_agent_cli_readiness() -> dict[str, Any]:

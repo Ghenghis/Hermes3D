@@ -183,9 +183,7 @@ def run_app_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str,
 
 
 @router.post("/api/source-os/modules/{app_id}/run-proof")
-def run_source_os_module_proof(
-    app_id: str, body: ProofRunRequest | None = None
-) -> dict[str, Any]:
+def run_source_os_module_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str, Any]:
     """W18-A13 — Source-OS alias of :func:`run_app_proof`.
 
     Matches the existing alias pattern (:func:`hermes3d.api.routes.modules.

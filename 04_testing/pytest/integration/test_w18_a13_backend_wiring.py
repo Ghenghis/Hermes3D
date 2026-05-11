@@ -128,13 +128,9 @@ def test_approvals_defer_transitions_pending_to_deferred(client: TestClient) -> 
 def test_approvals_defer_rejects_already_decided(client: TestClient) -> None:
     """Defer must respect the pending-only transition rule."""
     _seed_pending_approval("appr-w18-a13-twice")
-    first = client.post(
-        "/api/approvals/appr-w18-a13-twice/defer", json={"reason": "first"}
-    )
+    first = client.post("/api/approvals/appr-w18-a13-twice/defer", json={"reason": "first"})
     assert first.status_code == 200, first.text
-    second = client.post(
-        "/api/approvals/appr-w18-a13-twice/defer", json={"reason": "second"}
-    )
+    second = client.post("/api/approvals/appr-w18-a13-twice/defer", json={"reason": "second"})
     assert second.status_code == 409
 
 
@@ -327,9 +323,7 @@ def test_no_printer_write_endpoints_exercised(client: TestClient) -> None:
                         if isinstance(v, ast.Constant) and isinstance(v.value, str)
                     )
                 if literal and "/api/printers" in literal:
-                    violations.append(
-                        f"{self.func_name} → {method_name.upper()} {literal}"
-                    )
+                    violations.append(f"{self.func_name} → {method_name.upper()} {literal}")
             self.generic_visit(node)
 
     for node in ast.walk(tree):
