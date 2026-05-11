@@ -3,6 +3,10 @@ import { defineConfig, devices } from "@playwright/test";
 /** Playwright config for live local GUI verification. */
 export default defineConfig({
   testDir: "./tests/e2e",
+  // w18-a10-pickup visual oracle has its own dedicated config
+  // (playwright.w18-a10-pickup.config.ts) and must not run under the
+  // default suite — it needs reference images + per-project grep filters.
+  testIgnore: ["**/w18-a10-pickup-visual-oracle.spec.ts"],
   fullyParallel: false,
   retries: 0,
   workers: 1,
