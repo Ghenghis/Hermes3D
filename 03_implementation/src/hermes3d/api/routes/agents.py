@@ -1800,7 +1800,7 @@ def _agent_action_contracts() -> list[dict[str, Any]]:
     #
     # The contract-catalog only needs the "is the runner present?" answer
     # — it never blocks on a write run. So we run cli_runners with a 4s
-    # budget and fall back to a "deferred" placeholder that the catalog
+    # budget and fall back to a deferred entry that the catalog
     # surfaces as `status: setup_required` if it doesn't finish in time.
     # The next 60s-TTL warm hit returns the cached full payload, and the
     # operator can hit ``/api/code-operator/cli-runners`` directly for
