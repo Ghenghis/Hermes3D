@@ -3575,9 +3575,7 @@ def provider_assist(body: dict) -> dict:
     proof_payload["assistant_msg_id"] = assistant_msg_id
     proof_payload["persona"] = persona
     proof_payload["role"] = role
-    proof_event_id = _append_provider_proof_event(
-        "provider_assist", provider, proof_payload
-    )
+    proof_event_id = _append_provider_proof_event("provider_assist", provider, proof_payload)
     return {
         "status": result.get("status"),
         "provider": provider,
@@ -3609,16 +3607,13 @@ def _append_provider_proof_event(
         k: v
         for k, v in payload.items()
         if not (
-            "api_key" in k.lower()
-            or k.lower() == "authorization"
-            or k.lower().endswith("_token")
+            "api_key" in k.lower() or k.lower() == "authorization" or k.lower().endswith("_token")
         )
     }
     safe["provider"] = provider_id
     event_id = new_id()
     execute(
-        "INSERT INTO proof_events (id, event_type, source_agent, payload) "
-        "VALUES (?, ?, ?, ?)",
+        "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, ?, ?)",
         (event_id, event_type, f"provider:{provider_id}", json.dumps(safe, sort_keys=True)),
     )
     return event_id
