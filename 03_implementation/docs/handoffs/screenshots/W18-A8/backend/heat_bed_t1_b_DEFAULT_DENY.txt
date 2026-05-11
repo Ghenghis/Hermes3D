@@ -1,0 +1,2 @@
+{"detail":{"ok":false,"printer_id":"flsun_t1_b","blocked_by":["no camera bound to printer","no camera frame ever","no plate classification ever"],"reason":"Printer safety gate refused: camera-only and plate-clear gates must both pass before heat or start."}}
+HTTP 403

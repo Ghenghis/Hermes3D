@@ -1,0 +1,1 @@
+{"printer_id":"flsun_s1","camera_id":null,"camera_fresh":false,"camera_age_sec":null,"plate_classification":null,"plate_confidence":0.0,"plate_age_sec":null,"allow":false,"blocked_by":["no camera bound to printer","no camera frame ever","no plate classification ever"],"thresholds":{"camera_freshness_sec":5.0,"plate_freshness_sec":30.0,"plate_min_confidence":0.85}}
