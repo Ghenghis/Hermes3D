@@ -1,5 +1,5 @@
 {
-  "generated_utc": "2026-05-11T11:18:51.339Z",
+  "generated_utc": "2026-05-11T11:23:21.588Z",
   "repo": "Ghenghis/Hermes3D",
   "workspace": "G:\\Github\\Hermes3D",
   "gui_complete": false,
@@ -76,25 +76,25 @@
       "gate": "GUI_60_APPS_GREEN",
       "lane": "W18-A11",
       "pr_number": 240,
-      "pr_state": "OPEN",
+      "pr_state": "MERGED",
       "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/240",
-      "pr_merged_at": null,
-      "handoff_path": "03_implementation/docs/handoffs/W18-A11_APP_REGISTRY_REAL_DATA_2026-05-11.md",
-      "handoff_source": "pr#240@claude/w18-a11-app-registry-real-data",
-      "handoff_sha256": "99173bbc1fed74cd04683774b3c77f1a7945516efdc4609a45040398b5e65fc4",
-      "handoff_verdict": "PASS",
+      "pr_merged_at": "2026-05-11T11:22:17Z",
+      "handoff_path": null,
+      "handoff_source": null,
+      "handoff_sha256": null,
+      "handoff_verdict": null,
       "expected_verdicts": [
         "PASS_REAL"
       ],
-      "status": "PR_OPEN"
+      "status": "MERGED_BUT_HANDOFF_MISSING"
     },
     {
       "gate": "GUI_MODELER_GREEN",
       "lane": "W18-A5",
       "pr_number": 237,
-      "pr_state": "OPEN",
+      "pr_state": "MERGED",
       "pr_url": "https://github.com/Ghenghis/Hermes3D/pull/237",
-      "pr_merged_at": null,
+      "pr_merged_at": "2026-05-11T11:21:59Z",
       "handoff_path": "03_implementation/docs/handoffs/W18-A5_MODELER_WORKFLOW_2026-05-11.md",
       "handoff_source": "workspace",
       "handoff_sha256": "caa4b84225675ebb6fdbeb513a4ec040c413970aab9e964089b33d4ee44ca9a5",
@@ -103,7 +103,7 @@
         "PASS_REAL",
         "PASS_REAL_PARAMETRIC"
       ],
-      "status": "PR_OPEN"
+      "status": "PASS_REAL_VERIFIED"
     },
     {
       "gate": "GUI_SLICER_GREEN",

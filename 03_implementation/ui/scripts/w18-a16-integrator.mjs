@@ -194,17 +194,30 @@ function extractVerdict(text, gateId) {
 
 function locateHandoff(gate, pr) {
   const candidates = [gate.expectedHandoff, gate.altHandoff].filter(Boolean);
-  // 1. Try main workspace tree (for merged PRs the file is there)
+  const merged = pr && pr.state === 'MERGED' && pr.mergedAt;
+  // 1. Try main workspace tree (for merged PRs the file is there after rebase/pull)
   for (const rel of candidates) {
     const abs = path.join(WORKSPACE, rel);
     if (fs.existsSync(abs)) return {rel, abs, source: 'workspace'};
   }
-  // 2. If PR is open, try git show on the head ref
+  // 2. For merged PRs, git-show from origin/<base> (usually develop)
+  if (merged && pr.baseRefName) {
+    for (const rel of candidates) {
+      const text = gitShow(`origin/${pr.baseRefName}`, WORKSPACE, rel);
+      if (text) {
+        const shadowDir = path.join(WORKSPACE, '.hermes3d_orchestrator', 'a16_shadow');
+        fs.mkdirSync(shadowDir, {recursive: true});
+        const shadowPath = path.join(shadowDir, `${pr.number}_merged_${path.basename(rel)}`);
+        fs.writeFileSync(shadowPath, text);
+        return {rel, abs: shadowPath, source: `pr#${pr.number}@origin/${pr.baseRefName} (post-merge)`};
+      }
+    }
+  }
+  // 3. For any PR, git-show on the head ref (covers OPEN PRs and merged-but-unfetched bases)
   if (pr && pr.headRefName) {
     for (const rel of candidates) {
       const text = gitShow(`origin/${pr.headRefName}`, WORKSPACE, rel);
       if (text) {
-        // write to a temp shadow path so sha256 can be computed
         const shadowDir = path.join(WORKSPACE, '.hermes3d_orchestrator', 'a16_shadow');
         fs.mkdirSync(shadowDir, {recursive: true});
         const shadowPath = path.join(shadowDir, `${pr.number}_${path.basename(rel)}`);
