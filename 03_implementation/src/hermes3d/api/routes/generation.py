@@ -47,6 +47,7 @@ class GenerationRun(BaseModel):
     seed: int = 3201
     reference_artifact_id: str | None = None
     constraints: dict[str, Any] = Field(default_factory=dict)
+    template_id: str | None = None
 
 
 @router.get("/api/generation/services")
@@ -216,7 +217,11 @@ def gen3d_templates() -> list[dict[str, Any]]:
 def run_generation(body: GenerationRun | None = None) -> dict:
     request = body or GenerationRun()
     try:
-        template_id = _resolve_generation_template(request.prompt)
+        # Explicit template_id from the UI takes priority over prompt keyword matching
+        if request.template_id:
+            template_id = request.template_id
+        else:
+            template_id = _resolve_generation_template(request.prompt)
     except ValueError as exc:
         raise HTTPException(
             status_code=409,
