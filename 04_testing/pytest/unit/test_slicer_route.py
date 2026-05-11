@@ -20,7 +20,6 @@ correct posture when the dependency is genuinely absent.
 from __future__ import annotations
 
 import hashlib
-import sqlite3
 import sys
 import tempfile
 import time
@@ -42,10 +41,9 @@ pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 @pytest.fixture()
 def isolated_app(monkeypatch: pytest.MonkeyPatch) -> Generator[tuple, None, None]:
     """Build the FastAPI app against a fresh tmp SQLite + tmp var/slicer dir."""
-    from fastapi.testclient import TestClient
-
     import hermes3d.api.routes.slicer as slicer_route
     import hermes3d.db.init as dbinit
+    from fastapi.testclient import TestClient
 
     tmp = Path(tempfile.mkdtemp(prefix="hermes3d_slicer_test_"))
     db_path = tmp / "slicer_test.db"
