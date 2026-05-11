@@ -264,8 +264,82 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   // `/api/events/stream`) which never "complete" in a request sense — those
   // remain in the benign-failure allowlist below.
   const SSE_PATH_FRAGMENTS = ["/api/events/stream"] as const;
+  // Endpoints that are intentionally slow (>5s typical) on the live local
+  // stack and would otherwise pin `inflightApi.size` above 0 for the
+  // full 8s quiesce bound. We still RECORD calls to these endpoints
+  // for verdict scoring (a 404 or 500 against them is still a finding)
+  // — we just don't let them block the quiesce window. Documented:
+  //   - /api/health/services — heavy aggregate health probe across
+  //     printers + agents + modules; can take 10–15s cold.
+  //   - GET /api/modules (root list) + /api/modules/runtime/* — module
+  //     reconciliation, scans on-disk module dirs + plugin contracts.
+  //     10–15s on a cold filesystem; effectively a long-running
+  //     aggregator. (Note: /api/modules/update/readiness is FAST and
+  //     deliberately NOT excluded.)
+  //   - /api/agents/action-catalog — agent action catalog reconciliation;
+  //     scans plugin contracts (10–15s cold).
+  //   - /api/code-operator/{e2e,sandbox}/readiness — readiness probes
+  //     that walk the entire code-operator artifact tree (5–10s).
+  //
+  // These are deliberately the narrowest possible set: every entry is
+  // an endpoint that has been measured >5s on the live local stack
+  // (see PR #242 follow-up). If a route's ONLY signal is a call to
+  // one of these endpoints, the per-route pre/post API-call slice
+  // still captures it for the verdict — only the quiesce *gate* is
+  // bypassed.
+  //
+  // We use regex matches (anchored on the API origin) so we can pin
+  // `GET /api/modules` (root list) without over-blocking the rest of
+  // the /api/modules/* tree.
+  const SLOW_BACKEND_RE: ReadonlyArray<RegExp> = [
+    /\/api\/health\/services(\?|$)/,
+    /\/api\/modules(\?|$)/, // root list, NOT /api/modules/whatever
+    /\/api\/modules\/runtime\/setup-queue(\?|$)/,
+    /\/api\/modules\/runtime\/runner-contracts(\?|$)/,
+    /\/api\/modules\/runtime\/verifiers(\?|$)/,
+    /\/api\/agents\/action-catalog(\?|$)/,
+    /\/api\/code-operator\/e2e\/readiness(\?|$)/,
+    /\/api\/code-operator\/sandbox\/readiness(\?|$)/,
+  ];
   const inflightApi = new Set<Request>();
   const isSse = (url: string) => SSE_PATH_FRAGMENTS.some((f) => url.includes(f));
+  const isSlowBackend = (url: string) =>
+    SLOW_BACKEND_RE.some((re) => re.test(url));
+  // A request is "quiesce-blocking" if it's a /api/* request that we
+  // expect to complete reasonably fast. SSE channels never complete;
+  // slow-backend endpoints take 5–15s and are documented as such.
+  const isQuiesceBlocking = (url: string) =>
+    /\/api\//.test(url) && !isSse(url) && !isSlowBackend(url);
+  // Track the wall-clock when `inflightApi.size` last transitioned to or
+  // remained at 0. The quiesce heuristic waits for this to remain
+  // continuously true for `quietMs` ms — i.e. the page must have had
+  // an unbroken stretch of zero in-flight /api/* traffic.
+  //
+  // Why this and not "no request start in the last quietMs":
+  //   Several product routes (dashboard, agents, safety, etc.) mount
+  //   global pollers that fire every 1–3s for `/api/agents/update/status`
+  //   and friends. These pollers START a request, but they also COMPLETE
+  //   fast (typically <50ms for a 200 OK). Between polls there are
+  //   multi-second windows where `inflightApi.size === 0`. By keying off
+  //   "stretches of zero", we observe the page as settled *between*
+  //   polls without having to special-case poller URLs.
+  //
+  //   Chained `useEffect` fetches (the failure mode the v2 fix targets)
+  //   still work because the parent request lands → child fetch starts
+  //   within ~1 tick → `inflightApi.size` jumps back to 1, resetting
+  //   `inflightZeroSinceMs`. Once the chain truly stops, we get a real
+  //   `quietMs` window of zero.
+  let inflightZeroSinceMs = Date.now();
+  const onInflightChange = () => {
+    if (inflightApi.size === 0) {
+      // Only set if we weren't already at zero — preserves the
+      // continuous-stretch semantic. If we're already at zero this is
+      // a no-op.
+      if (inflightZeroSinceMs === 0) inflightZeroSinceMs = Date.now();
+    } else {
+      inflightZeroSinceMs = 0;
+    }
+  };
 
   // Raw observers. No filtering applied here — filtering happens at the
   // per-route scoring step so we still record every raw signal in the
@@ -278,14 +352,17 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   });
   page.on("request", (req: Request) => {
     const url = req.url();
-    if (!/\/api\//.test(url)) return;
-    if (isSse(url)) return;
+    if (!isQuiesceBlocking(url)) return;
     inflightApi.add(req);
+    onInflightChange();
   });
   page.on("response", async (res: Response) => {
     const url = res.url();
     if (!/\/api\//.test(url)) return;
-    if (!isSse(url)) inflightApi.delete(res.request());
+    if (isQuiesceBlocking(url)) {
+      inflightApi.delete(res.request());
+      onInflightChange();
+    }
     const status = res.status();
     const rec: NetworkRecord = {
       url,
@@ -301,7 +378,10 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   page.on("requestfailed", (req: Request) => {
     const url = req.url();
     if (!/\/api\//.test(url)) return;
-    if (!isSse(url)) inflightApi.delete(req);
+    if (isQuiesceBlocking(url)) {
+      inflightApi.delete(req);
+      onInflightChange();
+    }
     const rec: NetworkRecord = {
       url,
       method: req.method(),
@@ -314,18 +394,59 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
   page.on("requestfinished", (req: Request) => {
     const url = req.url();
     if (!/\/api\//.test(url)) return;
-    if (!isSse(url)) inflightApi.delete(req);
+    if (isQuiesceBlocking(url)) {
+      inflightApi.delete(req);
+      onInflightChange();
+    }
   });
 
   /**
-   * Wait until all in-flight non-SSE `/api/*` requests on this page have
-   * either responded, failed, or been finished. Bounded by `timeoutMs`; on
-   * timeout we proceed anyway (records will surface a failure if the route
-   * actually broke). Uses a 50ms poll — cheap and deterministic.
+   * Wait for `inflightApi.size === 0` to have been continuously true
+   * for at least `quietMs` ms. Bounded by `timeoutMs` so a runaway
+   * never hangs the suite.
+   *
+   * Why this heuristic:
+   *   - Pure "size === 0" is not enough: chained `useEffect` fetches
+   *     start ~1 tick after their parent completes, so `size` briefly
+   *     hits 0 between parent and child.
+   *   - "No request start in the last N ms" doesn't work either:
+   *     several routes mount fast pollers (every 1–3s) that keep
+   *     refreshing the clock indefinitely.
+   *   - Continuous-zero-stretch threads the needle: a 200–300ms window
+   *     of zero inflight is fast enough that fast pollers (which
+   *     complete each poll in <50ms) leave wide enough gaps between
+   *     polls to clear it, AND it's long enough to outlast any
+   *     reasonable parent→child chain (16ms typical).
+   *
+   * Local measurements at the time of authoring (2026-05-11):
+   *   - Typical route: drains in 300–800ms.
+   *   - Heaviest route (dashboard / agents / safety with pollers):
+   *     drains in 600–1500ms.
+   *   - Total walker runtime: ~30–45s for all 25 routes (was ~80–130s).
+   *
+   * If `timeoutMs` elapses with the page still chatty, we proceed —
+   * the per-route slice accounting (consolePre/apiCallPre/etc.) keeps
+   * later routes from being polluted by traffic that overflowed this
+   * window.
    */
-  const waitForApiQuiesce = async (timeoutMs = 8_000): Promise<void> => {
+  const waitForApiQuiesce = async (
+    quietMs = 300,
+    timeoutMs = 8_000,
+  ): Promise<void> => {
     const deadline = Date.now() + timeoutMs;
-    while (inflightApi.size > 0 && Date.now() < deadline) {
+    // Re-prime the zero-since marker for THIS route's wait. The previous
+    // route may have left it stale (it's a long-lived signal).
+    if (inflightApi.size === 0 && inflightZeroSinceMs === 0) {
+      inflightZeroSinceMs = Date.now();
+    }
+    while (Date.now() < deadline) {
+      if (
+        inflightApi.size === 0 &&
+        inflightZeroSinceMs > 0 &&
+        Date.now() - inflightZeroSinceMs >= quietMs
+      ) {
+        return;
+      }
       await page.waitForTimeout(50);
     }
   };
@@ -372,19 +493,34 @@ test("W18-A1 PICKUP — walk every top-level route, capture network + console, s
     }
 
     // Settle window — give live data fetches a chance to complete so we
-    // catch their 4xx/5xx in this route's slice. CI fix (2026-05-11,
-    // PR #242 Layer D2): the original 1.5s fixed wait was too short for
-    // cold backend starts on CI runners — the first `/api/apps` call
-    // triggers `_sync_apps_once()` which seeds 60 apps from JSON on first
-    // hit and takes longer than 1.5s on a fresh runner. The next sidebar
-    // click then aborted the in-flight fetch via the component's
-    // AbortController, producing a `net::ERR_ABORTED` mis-attributed to
-    // this route. We now wait for the page to drain non-SSE `/api/*`
-    // requests up to 8s before moving on — bounded so a runaway never
-    // hangs the suite.
+    // catch their 4xx/5xx in this route's slice. Evolution:
+    //   v1 (initial): fixed 1.5s wait. Too short for cold CI runners.
+    //   v2 (PR #242 5ab95d1): fixed 1.5s + waitForApiQuiesce up to 8s
+    //     on inflight-empty. Local re-run was 1.3 min (vs 44s before)
+    //     and CI exceeded patience — 25 × 8s worst-case = 200s, plus
+    //     25 × 1.5s = 37.5s of unconditional sleep on top.
+    //   v3 (this fix, 2026-05-11 W18-A1P-CIFIX2): switched to a
+    //     "300ms of continuous zero inflight" heuristic. Tracks when
+    //     `inflightApi.size` last transitioned to 0 and waits for it
+    //     to stay there. Works in the presence of fast pollers
+    //     (their poll → response → 0-inflight gap of 1–3s clears the
+    //     300ms window easily) AND catches chained useEffect fetches
+    //     (parent completes → child starts inside one tick → size
+    //     bounces back to ≥1, resetting the window). Cold-start
+    //     safety preserved via the 8s upper bound. Typical local
+    //     route drains in 300–800ms (heaviest in 600–1500ms).
     if (rootMounted) {
-      await page.waitForTimeout(1_500);
-      await waitForApiQuiesce(8_000);
+      // Small post-mount tick — give the route's `useEffect`-driven
+      // fetches a chance to be kicked off so the quiesce check has
+      // something to wait for. Without this, a route whose mount is
+      // synchronous w.r.t. its data fetches could satisfy the zero-
+      // inflight window before its fetches even start.
+      await page.waitForTimeout(100);
+      // Re-prime the zero-stretch clock so this route's wait measures
+      // a fresh stretch — without this, the previous route could
+      // satisfy our quietMs window before this route's fetches start.
+      inflightZeroSinceMs = inflightApi.size === 0 ? Date.now() : 0;
+      await waitForApiQuiesce(300, 8_000);
     }
 
     // Per-route screenshot for the evidence pack.

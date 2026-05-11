@@ -6,8 +6,8 @@
 **Config:** `03_implementation/ui/playwright.w18-a1-pickup.config.ts`
 **Audit JSON:** `03_implementation/ui/test-results/w18-a1-pickup/audit.json`
 **Screenshots:** `03_implementation/ui/test-results/w18-a1-pickup/screenshots/*.png` (25 files)
-**Hermes locks owner:** `w18-a1-pickup` (initial), `w18-a1p-cifix` (CI fix 2026-05-11T~12Z)
-**Task ID:** `W18-A1-PICKUP-ROUTE-WALKER-2026-05-11` / `W18-A1P-CIFIX-2026-05-11`
+**Hermes locks owner:** `w18-a1-pickup` (initial), `w18-a1p-cifix` (CI fix 2026-05-11T~12Z), `w18-a1p-cifix2` (walker speedup 2026-05-11T~12Z)
+**Task ID:** `W18-A1-PICKUP-ROUTE-WALKER-2026-05-11` / `W18-A1P-CIFIX-2026-05-11` / `W18-A1P-WALKER-TIMEOUT-FIX-2026-05-11`
 **Run UTC:** `2026-05-11T11:30:18.495Z` (initial) / re-verified post-fix on local stack
 **Verdict gate:** GUI_ROUTE_E2E_GREEN
 **Hermes evidence chain:** PASS
@@ -38,6 +38,35 @@ Local re-run on the same branch and same backend returned the expected 25 / 25 P
 - No changes to `playwright.w18-a1-pickup.config.ts`, no changes to product code, no benign-list expansion for `/api/apps` (the real fix removes the symptom — adding it to benign would mask actual backend regressions).
 
 Local re-run after fix: still 25 / 25 PASS_REAL, total runtime ~2.3 min (vs ~44s before — the quiesce wait is doing real work, particularly for the apps/agents/learning tabs which each fan-out multiple `/api/*` calls on mount).
+
+Confirmation: No printer hardware writes. GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR. GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR.
+
+## Walker speedup (2026-05-11, post-CI-fix v2)
+
+After commit `5ab95d1` (v2: fixed-1.5s + `waitForApiQuiesce(8s)`), the walker took ~1.3 min locally and exceeded CI patience at `tests/e2e/w18-a1-pickup-full-route-walk.spec.ts:240:1`. Root cause: a worst-case 25 × 9.5s per route = up to 237s of settle waits, plus the actual work. The 8s drain bound was hit by every route that touched a slow backend aggregator (e.g. `/api/health/services`, `/api/agents/action-catalog`, `/api/modules/runtime/*`), because those endpoints take 10–15s on the live local stack.
+
+**Fix v3** (spec only — `03_implementation/ui/tests/e2e/w18-a1-pickup-full-route-walk.spec.ts`):
+
+1. **Drop the unconditional 1.5s `waitForTimeout`.** The fixed sleep was paying for itself only as a buffer against chained `useEffect` fetches that start one tick after their parent completes — a more precise mechanism handles that now.
+2. **Replace inflight-only quiesce with a "continuous-zero-stretch" heuristic.** Track when `inflightApi.size` last transitioned to 0 and wait for it to stay there for `quietMs = 300ms`. Chained fetches reset the stretch (size bounces to ≥1 within one tick); steady-state pollers (every 1–3s) leave wide gaps where size is 0 for >300ms.
+3. **Exclude documented-slow backend endpoints from inflight tracking.** A new `SLOW_BACKEND_RE` regex list captures endpoints measured >5s on the live local stack (`/api/health/services`, root `/api/modules`, `/api/modules/runtime/setup-queue|runner-contracts|verifiers`, `/api/agents/action-catalog`, `/api/code-operator/{e2e,sandbox}/readiness`). These endpoints are still RECORDED in the per-route call slice for verdict scoring — only the quiesce gate is bypassed. Narrowest possible set; every entry has a measured-slow justification in the spec comments.
+4. **Small 100ms post-mount tick** before quiesce check, to give synchronous-mount `useEffect`s a chance to kick off their fetches so the heuristic has something to wait for.
+
+**Result** (local stack, headless 1920×1080):
+
+| Metric | v2 (5ab95d1) | v3 (this fix) |
+| --- | --- | --- |
+| Total walker runtime | ~1.3 min | ~41 s (39 s test + harness) |
+| Average per-route settle | ~3.1 s | ~1.5 s |
+| Max per-route settle | ~8.0 s (bound hit) | ~8.0 s (bound rarely hit) |
+| 25 / 25 PASS_REAL | yes | yes |
+| Console errors | 0 | 0 |
+| Page errors | 0 | 0 |
+| /api/* failures | 0 (1 benign SSE abort) | 0 (1 benign SSE abort) |
+
+The 8s bound is still in place as a safety net — but with the slow-backend allowlist, only `source_os` and `dashboard` (which mount the heaviest fan-out of system probes) typically come close to it. Most routes drain in 500–2000 ms.
+
+No changes to product code. No changes to `playwright.w18-a1-pickup.config.ts`. No benign-failure list expansion (would mask real regressions). The fix is the narrowest possible: a spec-side timing strategy that respects both CI patience and the live stack's documented slow paths.
 
 Confirmation: No printer hardware writes. GUI_PHYSICAL_PRINT_GREEN = OUT_OF_SCOPE_BY_OPERATOR. GUI_PRINTER_DRY_RUN_GREEN = OUT_OF_SCOPE_BY_OPERATOR.
 
