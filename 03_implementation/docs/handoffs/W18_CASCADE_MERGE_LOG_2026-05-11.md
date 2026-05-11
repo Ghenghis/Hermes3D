@@ -275,3 +275,72 @@ skipped per brief. Status to be picked up by Round 6.
 - `GUI_PRINTER_DRY_RUN_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
 - PR #235 (CANCELLED W18-A8 printer safety) NOT reopened.
 
+## Round 6 — 2026-05-11T13:25Z
+
+### Starting state
+
+5 in-scope open PRs (1 new + 4 carried from round 5):
+
+| PR | Title | Branch | mergeable | state @ start |
+|---|---|---|---|---|
+| #248 | feat(W18-A17): Hermes Agents operational | claude/w18-a17-hermes-agents-operational | MERGEABLE | UNSTABLE (CI running) |
+| #244 | feat(W18-A13): backend wiring fixes | claude/w18-a13-backend-wiring-fixes | MERGEABLE | **CLEAN** |
+| #243 | feat(W18-A12): slicer wire-up | claude/w18-a12-slicer-wireup | MERGEABLE | UNSTABLE (D2 fail) |
+| #242 | feat(W18-A1): route walker | claude/w18-a1-pickup-route-walker | MERGEABLE | UNSTABLE (D2 fail) |
+| #241 | feat(W18-A10): visual oracle | claude/w18-a10-pickup-visual-oracle | MERGEABLE | UNSTABLE (D2 fail) |
+| #245 | W18-A15 regression runner | claude/w18-a15-regression-runner | MERGEABLE | UNSTABLE (skip per brief) |
+
+### Scope-safety scan (all in-scope PRs)
+
+| PR | New write-endpoints? | Verdict | Notes |
+|---|---|---|---|
+| #244 | NONE | SAFE | `/api/printers/probe` confirmed GET-only alias; new endpoints all read-only or non-printer (approvals/defer, agents/config GET, source-os/run-proof, modules/update-readiness alias) |
+| #248 | Queue-state only | SAFE | Stale-job cancellation via `POST /api/jobs/{id}/cancel` is queue mutation, not hardware. `flsun_s1` policy block preserved. |
+| #243 | NONE | SAFE | `POST /api/slice` is slicer/disk-only; explicit AST guard `test_slicer_route_does_not_import_printer_clients` enforces no Moonraker/OctoPrint imports. |
+| #242 | NONE | SAFE | Pure Playwright spec + config changes |
+| #241 | NONE | SAFE | Pure Playwright spec + manifest changes |
+
+No PR introduces printer-hardware writes.
+
+### Cascade rebases
+
+All four PRs rebased clean onto develop (no UNION conflict on
+`package.json` / `truth-gates.mjs` — develop only advanced by #244
+merge). Force-pushed with `--force-with-lease`. CI re-triggered.
+
+| PR | Old SHA | New SHA |
+|---|---|---|
+| #243 | `226545c` | `16f9f77` |
+| #242 | `a713986` | `79e0959` |
+| #241 | `de38c87` | `8e7e248` |
+
+### Merges this round
+
+| PR | Title | Merge SHA | Time UTC |
+|---|---|---|---|
+| #244 | W18-A13 backend wiring fixes | `e880616f` | 13:29:21Z |
+
+### Per-PR remaining-open blockers (after rebase + CI rerun)
+
+| PR | Verdict | Blocker (root cause, not symptom) |
+|---|---|---|
+| #248 | BLOCKED — CI env gap | Layer D2 `w18-a17-agents-operational.spec.ts` precondition fails with `FAIL_PROVIDER_NOT_AVAILABLE: agent runtime not healthy. status=not_configured`. CI runner has no `HERMES3D_AGENT_RUNTIME_URL` configured. The spec is **strict by design** (no `test.skip`, no mocks per spec line 22). Needs CI infra fix outside merger scope. |
+| #243 | BLOCKED — CI env gap | Layer D2 `w18-a12-slicer-wireup.spec.ts` fails with `slicer panel must reach 'completed'; got 'failed'`. Slicer reaches `failed` state on cold CI runner (no CAD provider). PLUS pre-existing `w18-a4-agent-workflow` test fails for same env reason as #248. |
+| #242 | BLOCKED — CI env race | Layer D2 `w18-a1-pickup-full-route-walk.spec.ts` reports `[FAIL_BROKEN] apps GET /api/apps -> 0 net::ERR_ABORTED`. The PR's `waitForApiQuiesce(8_000)` mitigation did not fully eliminate the cold-runner `apps` route 60-module-seed race. Other 24 routes PASS_REAL. |
+| #241 | BLOCKED — informational-test brittleness | Layer D2 fails on `w18-a10-pickup-visual-oracle.spec.ts:424` "informational" tests (`08_workflow_printqueue_files_logs`, `08_proof_health_notifications_safety`) — named informational but hard-fail the suite. Needs author markup with `.fixme()` / `test.fail()`. |
+| #245 | SKIP | Per round-6 brief, skipped — re-run after the four others land. |
+
+### Standing safety re-affirmation
+
+- No printer-hardware-enabling diff merged in round 6.
+- `GUI_PHYSICAL_PRINT_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- `GUI_PRINTER_DRY_RUN_GREEN` = OUT_OF_SCOPE_BY_OPERATOR (unchanged).
+- PR #235 (CANCELLED W18-A8 printer safety) NOT reopened.
+- All four remaining PRs verified diff-clean of printer-write endpoints.
+
+### Cumulative cascade tally (rounds 1-6)
+
+| Total in-scope PRs | Merged so far | Remaining |
+|---|---|---|
+| 16 (excl. #245 skipped, #235 cancelled) | 12 (rounds 1-5: 11, round 6: +#244) | 4 (#248/#243/#242/#241 — all blocked on CI env/spec brittleness, no scope issues) |
+
