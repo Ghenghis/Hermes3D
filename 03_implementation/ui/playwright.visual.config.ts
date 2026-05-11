@@ -1,32 +1,45 @@
 /**
- * W6-6 / W8-14 / W15-A9 Playwright config for the visual-oracle harness.
+ * W6-6 / W8-14 / W15-A9 / W16-A Playwright config for the visual-oracle
+ * harness.
  *
- * W15-A9 changes versus the W8-14 baseline:
- *  - **Per-target viewport projects (cap 2).** We read every unique
- *    viewport that appears in `visual-targets.json` and emit one Playwright
- *    `project` per (width, height) so a target whose reference PNG was
- *    captured at 1672x941 (an outlier) can be diffed at the same
- *    resolution as its reference. The spec opts into the right project by
- *    matching the `viewport` annotation each test sets in `test.use({...})`.
- *  - **Reporter stays the same module** (`visual-proof-reporter.ts`) but
- *    the per-region + 404 + console-error rows arrive via new annotation
- *    types that the reporter understands.
- *  - **globalSetup unchanged** beyond its existing idempotent Images-GUI
- *    mirror — see `tests/visual/global-setup.ts`.
+ * W16-A correction (2026-05-10)
+ * -----------------------------
+ * The W15-A9 design materialized one Playwright `project` per unique
+ * viewport from `visual-targets.json` and assumed that the spec's
+ * `test.use({ viewport })` would only propagate the viewport to the
+ * browser context for navigation, NOT to the `toHaveScreenshot` tolerance
+ * baseline. That assumption is wrong: per the official Playwright docs
+ * for `TestOptions.viewport` and the canonical "Override viewport size"
+ * recipe, `test.use({ viewport })` IS the supported primitive for setting
+ * a per-test viewport, and it propagates to the rendered page that
+ * `toHaveScreenshot` captures.
  *
- * Why per-target projects rather than per-test `test.use`?
- *   Playwright resolves the `viewport` for screenshot tolerance ONLY at
- *   project-level — `test.use({ viewport })` rebuilds the browser context
- *   per test, which works for navigation but does NOT propagate to the
- *   tolerance baseline used by `toHaveScreenshot`. To get a clean
- *   per-target viewport we have to materialize a project for each unique
- *   viewport that the manifest declares.
+ * The real consequence of the multi-project design was a regression: by
+ * default Playwright runs EVERY test in EVERY project, so a target whose
+ * reference PNG was captured at 1536x1024 ran a second time inside the
+ * `visual-chromium-1586x992` project (and a third inside
+ * `visual-chromium-1672x941`), inheriting the alien project viewport and
+ * failing with "Expected an image 1536px by 1024px, received 1586px by
+ * 992px". W15-FINAL-4 A21 saw 22 LIVE rows fail for this reason.
  *
- * Sources cited (per W15-A9 contract):
- *  1. Playwright per-project configuration:
- *     https://playwright.dev/docs/test-projects
- *  2. Chromatic / Percy visual-test harness pattern — per-viewport
- *     projects + region crops:
+ * Fix: collapse to a single `project` and rely on the spec's
+ * unconditional `test.use({ viewport: target.viewport ?? targetsFile.viewport })`
+ * + an explicit `page.setViewportSize` before `page.goto` to pin every
+ * test to its declared reference shape. The manifest viewport overrides
+ * (1672x941, 1586x992) now actually drive the page render rather than
+ * spawning a parallel project run.
+ *
+ * W15-A9 capabilities preserved:
+ *  - **Reporter** (`visual-proof-reporter.ts`) unchanged — region + 404 +
+ *    console-error rows still arrive via annotations.
+ *  - **globalSetup** unchanged — idempotent Images-GUI -> __refs__/ mirror.
+ *
+ * Sources cited (per W15-A9 / W16-A contract):
+ *  1. Playwright `TestOptions.viewport` + `Page.setViewportSize`:
+ *     https://playwright.dev/docs/api/class-testoptions#test-options-viewport
+ *     https://playwright.dev/docs/api/class-page#page-set-viewport-size
+ *  2. Chromatic / Percy visual-test harness pattern — pinning per-test
+ *     viewport rather than per-project for variable-size collage refs:
  *     https://www.chromatic.com/docs/visual-tests/
  *
  * No-fake / no-paid contract:
@@ -70,35 +83,8 @@ function loadManifest(): Manifest {
   }
 }
 
-function projectName(v: ManifestViewport): string {
-  return `visual-chromium-${v.width}x${v.height}`;
-}
-
-/**
- * Collect every unique viewport across the manifest:
- *   - the top-level default viewport (always included);
- *   - every per-target viewport override on a `live` target.
- *
- * `future` targets are skipped at runtime so we do not need to spawn a
- * project just for their viewport.
- */
-function collectViewports(manifest: Manifest): ManifestViewport[] {
-  const seen = new Map<string, ManifestViewport>();
-  const add = (v: ManifestViewport): void => {
-    const key = `${v.width}x${v.height}`;
-    if (!seen.has(key)) seen.set(key, v);
-  };
-  add(manifest.viewport ?? DEFAULT_VIEWPORT);
-  for (const t of manifest.targets ?? []) {
-    if (t.status === "live" && t.viewport && Number.isFinite(t.viewport.width) && Number.isFinite(t.viewport.height)) {
-      add(t.viewport);
-    }
-  }
-  return Array.from(seen.values());
-}
-
 const manifest = loadManifest();
-const viewports = collectViewports(manifest);
+const defaultViewport: ManifestViewport = manifest.viewport ?? DEFAULT_VIEWPORT;
 
 export default defineConfig({
   testDir: "./tests/visual",
@@ -136,22 +122,28 @@ export default defineConfig({
     headless: true,
     screenshot: "only-on-failure",
     trace: "off",
-    // Default viewport mirrors the manifest's top-level value so projects
-    // that do not override it inherit the W8-15 1536x1024 reference shape.
-    viewport: manifest.viewport ?? DEFAULT_VIEWPORT,
+    // Default viewport mirrors the manifest's top-level value. The spec
+    // overrides it per-target via `test.use({ viewport })` + an explicit
+    // page.setViewportSize, so this is only the inherited default for the
+    // tests whose manifest entry has no per-target viewport field.
+    viewport: defaultViewport,
   },
-  // W15-A9 cap 2 — one project per unique manifest viewport. Tests opt in
-  // by tagging themselves with the matching project name; the spec selects
-  // the right project from the manifest via `test.describe.configure` /
-  // `test.use({ viewport })` and matches by the project name we emit here.
-  projects: viewports.map((v) => ({
-    name: projectName(v),
-    use: {
-      ...devices["Desktop Chrome"],
-      viewport: v,
-      deviceScaleFactor: 1,
+  // W16-A — single canonical project. Per-target viewport variation is
+  // owned by the spec via `test.use({ viewport })` (canonical Playwright
+  // primitive). Materializing a project per unique manifest viewport
+  // caused every test to run in every project, so non-override targets
+  // re-ran inside outlier-viewport projects and failed with a baseline
+  // size mismatch. See module-level docstring for full diagnosis.
+  projects: [
+    {
+      name: "visual-chromium",
+      use: {
+        ...devices["Desktop Chrome"],
+        viewport: defaultViewport,
+        deviceScaleFactor: 1,
+      },
     },
-  })),
+  ],
   webServer: {
     command: "node scripts/start-e2e-stack.mjs",
     url: "http://127.0.0.1:5173",

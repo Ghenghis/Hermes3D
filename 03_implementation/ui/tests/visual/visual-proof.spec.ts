@@ -132,14 +132,40 @@ function annotate(type: string, payload: Record<string, unknown>): void {
 for (const target of targetsFile.targets) {
   const referenceAbs = path.resolve(REPO_ROOT, target.reference);
 
+  // W16-A — Effective viewport resolved per-target, falling back to the
+  // manifest's top-level default when no override is declared. Computed once
+  // so test.use, the annotation, and the in-body page.setViewportSize all
+  // agree on the same shape (the per-target reference PNG's dimensions).
+  const effectiveViewport: { width: number; height: number } =
+    target.viewport &&
+    Number.isFinite(target.viewport.width) &&
+    Number.isFinite(target.viewport.height)
+      ? { width: target.viewport.width, height: target.viewport.height }
+      : {
+          width: targetsFile.viewport?.width ?? 1536,
+          height: targetsFile.viewport?.height ?? 1024,
+        };
+
   test.describe(`visual: ${target.target}`, () => {
-    // W15-A9 cap 2 — per-target viewport override. test.use propagates
-    // viewport to the underlying browser context so the screenshot
-    // assertion baseline matches the per-target reference shape. Tests
-    // without an override inherit the project's default viewport.
-    if (target.viewport && Number.isFinite(target.viewport.width) && Number.isFinite(target.viewport.height)) {
-      test.use({ viewport: { width: target.viewport.width, height: target.viewport.height } });
-    }
+    // W15-A9 cap 2 + W16-A fix — pin EVERY test to its effective viewport.
+    //
+    // Previously this guard was conditional on `target.viewport` being set,
+    // which meant the 2 dim-outlier targets (1672x941, 1586x992) were the
+    // only ones overriding viewport. With multiple Playwright projects in
+    // play (one per unique manifest viewport), every test runs in EVERY
+    // project by default — so a non-override target like
+    // `04_source_os_core_categories` (baseline 1536x1024) would render at
+    // 1586x992 when it ran inside the `visual-chromium-1586x992` project
+    // and fail with "Expected an image 1536px by 1024px, received
+    // 1586px by 992px". Making `test.use({ viewport })` unconditional pins
+    // the browser-context viewport to the target's declared shape
+    // regardless of which project picked up the test (W15-FINAL-4 A21
+    // 22-LIVE-row regression).
+    //
+    // `test.use({ viewport })` propagates to the underlying browser context,
+    // see Playwright docs:
+    //   https://playwright.dev/docs/api/class-testoptions#test-options-viewport
+    test.use({ viewport: effectiveViewport });
 
     if (target.status === "future") {
       // Future targets are skipped at runtime; the reporter still records a
@@ -201,11 +227,20 @@ for (const target of targetsFile.targets) {
         reference: target.reference,
         route: target.route,
         tolerance: target.tolerance,
-        viewport: target.viewport ?? targetsFile.viewport,
+        viewport: effectiveViewport,
         theme: target.theme ?? DEFAULT_THEME,
         clock_time: target.clock_time ?? DETERMINISTIC_TIME,
         regions: (target.regions ?? []).map((r: VisualRegion) => r.name),
       });
+
+      // W16-A — defense-in-depth viewport pin. test.use({ viewport })
+      // creates the context at the requested shape, but a stray
+      // page.setViewportSize earlier in the run, or a project-level resize
+      // hook, could leave the live page at a different size by the time we
+      // navigate. Re-pinning RIGHT before goto guarantees the rendered DOM
+      // for the screenshot matches the reference PNG's dimensions.
+      // Source: https://playwright.dev/docs/api/class-page#page-set-viewport-size
+      await page.setViewportSize(effectiveViewport);
 
       await page.goto(target.route);
       // Re-assert theme post-navigation in case the SPA cleared LS during
