@@ -949,7 +949,13 @@ test("Source OS wires source app backup, update check, and gated update executio
   await sourceRoot.getByRole("button", { name: "Check Update", exact: true }).click();
   await expect(sourceRoot.getByText(/Check Update accepted/)).toBeVisible();
   await expect(sourceRoot.getByText("current · def456789012", { exact: true })).toBeVisible();
+  // Guard with waitForResponse so the counter is checked only AFTER the
+  // apply endpoint actually responds.  Without this, the still-visible
+  // "Check Update accepted" toast from the previous step satisfies the
+  // /Update accepted/ regex before the real POST /update/apply completes.
+  const applyResponsePromise = page.waitForResponse("**/api/modules/printrun/update/apply");
   await sourceRoot.getByRole("button", { name: "Update", exact: true }).click();
+  await applyResponsePromise;
   await expect(sourceRoot.getByText(/Update accepted/)).toBeVisible();
   expect(applyRequests).toBe(1);
 
