@@ -60,6 +60,21 @@ WINDOWS_TOOL_FALLBACKS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+APP_PROOF_PYTHON_FALLBACKS: tuple[str, ...] = (
+    r"G:\Gen3D\envs\hermes3d-app-proofs-py312\Scripts\python.exe",
+    r"C:\Python312\python.exe",
+)
+APP_PROOF_SIDECAR_IMPORTS: tuple[str, ...] = (
+    "build123d",
+    "cadquery",
+    "langchain",
+    "open3d",
+    "pymeshfix",
+    "stl",
+)
+PYTHON_IMPORT_PROBE_TIMEOUT_S = 30
+_PYTHON_IMPORT_RESOLUTION_CACHE: dict[str, str | None] = {}
+
 
 def run_proof_command(
     proof_command: str | None,
@@ -221,6 +236,10 @@ def _resolve_seeded_command(cmd: str) -> str:
     operator-seeded commands, and leave everything else unchanged.
     """
 
+    python_resolved = _resolve_python_import_command(cmd)
+    if python_resolved is not None:
+        return python_resolved
+
     token, suffix = _split_first_token(cmd)
     if not token:
         return cmd
@@ -228,6 +247,105 @@ def _resolve_seeded_command(cmd: str) -> str:
     if resolved is None:
         return cmd
     return f"{_quote_shell_path(resolved)}{suffix}"
+
+
+def _resolve_python_import_command(cmd: str) -> str | None:
+    """Route selected Python import proofs through an import-capable sidecar.
+
+    The backend currently runs on Python 3.14, while several CAD/modeling
+    wheels are available only on older supported runtimes. This resolver is
+    deliberately proof-specific: it rewrites only seeded ``python -c
+    "import ..."`` commands for known app-proof modules, and only when the
+    sidecar interpreter proves it can import that exact module.
+    """
+
+    module = _extract_sidecar_import_module(cmd)
+    if module is None:
+        return None
+    python_path = _resolve_python_for_import(module)
+    if python_path is None:
+        return None
+    _token, suffix = _split_first_token(cmd)
+    return f"{_quote_shell_path(python_path)}{suffix}"
+
+
+def _extract_sidecar_import_module(cmd: str) -> str | None:
+    token, _suffix = _split_first_token(cmd)
+    if not token:
+        return None
+    name = Path(token).name.lower()
+    if name not in {"python", "python.exe", "py", "py.exe"}:
+        return None
+    try:
+        tokens = shlex.split(cmd, posix=False)
+    except ValueError:
+        return None
+    normalized = [token.strip("\"'") for token in tokens]
+    if "-c" not in normalized:
+        return None
+    index = normalized.index("-c")
+    if index + 1 >= len(normalized):
+        return None
+    script = normalized[index + 1]
+    for module in APP_PROOF_SIDECAR_IMPORTS:
+        if _script_imports_module(script, module):
+            return module
+    return None
+
+
+def _script_imports_module(script: str, module: str) -> bool:
+    normalized = script.replace("\n", " ").replace("\r", " ")
+    return (
+        f"import {module}" in normalized
+        or f"from {module} " in normalized
+        or f"from {module}." in normalized
+    )
+
+
+def _resolve_python_for_import(module: str) -> str | None:
+    if module in _PYTHON_IMPORT_RESOLUTION_CACHE:
+        return _PYTHON_IMPORT_RESOLUTION_CACHE[module]
+    resolved: str | None = None
+    for candidate in _app_proof_python_candidates():
+        if _python_can_import(candidate, module):
+            resolved = candidate
+            break
+    _PYTHON_IMPORT_RESOLUTION_CACHE[module] = resolved
+    return resolved
+
+
+def _app_proof_python_candidates() -> tuple[str, ...]:
+    candidates: list[str] = []
+    env_candidate = os.environ.get("HERMES3D_APP_PROOF_PYTHON")
+    if env_candidate:
+        candidates.append(env_candidate)
+    candidates.extend(APP_PROOF_PYTHON_FALLBACKS)
+
+    seen: set[str] = set()
+    existing: list[str] = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        key = str(Path(candidate)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if Path(candidate).exists():
+            existing.append(candidate)
+    return tuple(existing)
+
+
+def _python_can_import(python_path: str, module: str) -> bool:
+    try:
+        result = subprocess.run(
+            [python_path, "-c", f"import {module}"],
+            capture_output=True,
+            timeout=PYTHON_IMPORT_PROBE_TIMEOUT_S,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
 
 
 def _split_first_token(cmd: str) -> tuple[str, str]:

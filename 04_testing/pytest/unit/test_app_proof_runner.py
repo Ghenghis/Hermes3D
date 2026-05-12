@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from pathlib import Path
 
 from hermes3d.services import app_proof_runner
 
@@ -67,3 +68,78 @@ def test_seeded_command_leaves_path_tool_unchanged(monkeypatch, tmp_path):
     monkeypatch.setitem(app_proof_runner.WINDOWS_TOOL_FALLBACKS, "blender", (str(fallback),))
 
     assert app_proof_runner._resolve_seeded_command("blender --version") == "blender --version"
+
+
+def test_seeded_python_import_uses_sidecar_when_probe_passes(monkeypatch, tmp_path):
+    sidecar = tmp_path / "proof python" / "python.exe"
+    sidecar.parent.mkdir()
+    sidecar.write_text("fake")
+    probes: list[tuple[list[str], int]] = []
+
+    def fake_run(args, **kwargs):  # noqa: ANN001, ANN003
+        probes.append((args, kwargs["timeout"]))
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(app_proof_runner, "APP_PROOF_PYTHON_FALLBACKS", (str(sidecar),))
+    monkeypatch.setattr(app_proof_runner.subprocess, "run", fake_run)
+    app_proof_runner._PYTHON_IMPORT_RESOLUTION_CACHE.clear()
+
+    resolved = app_proof_runner._resolve_seeded_command(
+        'python -c "import cadquery;print(cadquery.__version__)"'
+    )
+
+    assert resolved == f'"{sidecar}" -c "import cadquery;print(cadquery.__version__)"'
+    assert probes == [
+        ([str(sidecar), "-c", "import cadquery"], app_proof_runner.PYTHON_IMPORT_PROBE_TIMEOUT_S)
+    ]
+
+
+def test_seeded_python_import_stays_original_when_sidecar_probe_fails(monkeypatch, tmp_path):
+    sidecar = tmp_path / "python.exe"
+    sidecar.write_text("fake")
+
+    def fake_run(args, **kwargs):  # noqa: ANN001, ANN003
+        return subprocess.CompletedProcess(args, 1, b"", b"missing")
+
+    monkeypatch.setattr(app_proof_runner, "APP_PROOF_PYTHON_FALLBACKS", (str(sidecar),))
+    monkeypatch.setattr(app_proof_runner.subprocess, "run", fake_run)
+    app_proof_runner._PYTHON_IMPORT_RESOLUTION_CACHE.clear()
+
+    command = 'python -c "import open3d;print(open3d.__version__)"'
+
+    assert app_proof_runner._resolve_seeded_command(command) == command
+
+
+def test_seeded_python_non_import_command_does_not_use_sidecar(monkeypatch, tmp_path):
+    sidecar = tmp_path / "python.exe"
+    sidecar.write_text("fake")
+
+    def fail_if_called(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("sidecar probe should not run")
+
+    monkeypatch.setattr(app_proof_runner, "APP_PROOF_PYTHON_FALLBACKS", (str(sidecar),))
+    monkeypatch.setattr(app_proof_runner.subprocess, "run", fail_if_called)
+    app_proof_runner._PYTHON_IMPORT_RESOLUTION_CACHE.clear()
+
+    command = "python -c \"print('proof-ok')\""
+
+    assert app_proof_runner._resolve_seeded_command(command) == command
+
+
+def test_app_proof_python_candidates_prefers_env_and_deduplicates(monkeypatch, tmp_path):
+    env_python = tmp_path / "env" / "python.exe"
+    fallback_python = tmp_path / "fallback" / "python.exe"
+    for path in (env_python, fallback_python):
+        path.parent.mkdir()
+        path.write_text("fake")
+    monkeypatch.setenv("HERMES3D_APP_PROOF_PYTHON", str(env_python))
+    monkeypatch.setattr(
+        app_proof_runner,
+        "APP_PROOF_PYTHON_FALLBACKS",
+        (str(env_python), str(fallback_python), str(Path("Z:/missing/python.exe"))),
+    )
+
+    assert app_proof_runner._app_proof_python_candidates() == (
+        str(env_python),
+        str(fallback_python),
+    )
