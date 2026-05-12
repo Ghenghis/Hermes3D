@@ -15,6 +15,7 @@ import json
 import sqlite3
 import sys
 import tempfile
+import uuid
 from pathlib import Path
 
 import pytest
@@ -105,6 +106,14 @@ def app_client(tmp_path, monkeypatch):
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
     from hermes3d.api.routes import generation
+
+    monkeypatch.setattr(
+        generation,
+        "_GEN3D_MODEL_MANIFEST_PATH",
+        tmp_path / "missing-gen3d-model-manifest.json",
+        raising=True,
+    )
+    monkeypatch.setenv("HERMES3D_COMFYUI_ROOT", str(tmp_path / "missing-ComfyUI"))
 
     app = FastAPI(title="gen3d-test")
     app.add_middleware(
@@ -271,6 +280,79 @@ class TestGen3DProviders:
         assert bambu is not None
         assert bambu["installed"] is True
 
+    def test_model_manifest_marks_downloaded_weights_installed_not_running(
+        self, app_client, fake_proof_file, tmp_path, monkeypatch
+    ):
+        """Downloaded HF weights are real installed evidence, but not service availability."""
+        import hermes3d.api.routes.generation as gen_mod
+
+        model_root = tmp_path / "models"
+        hunyuan_dir = model_root / "hunyuan3d"
+        triposr_dir = model_root / "triposr"
+        trellis_dir = model_root / "trellis"
+        for directory in (hunyuan_dir, triposr_dir, trellis_dir):
+            directory.mkdir(parents=True)
+            (directory / "weights.bin").write_bytes(b"weights")
+        comfy_root = tmp_path / "ComfyUI"
+        comfy_root.mkdir()
+        (comfy_root / "main.py").write_text("print('comfy')", encoding="utf-8")
+
+        manifest_path = tmp_path / "GEN3D_MODEL_MANIFEST.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "repos": [
+                        {
+                            "repo_id": "tencent/Hunyuan3D-2.1",
+                            "local_dir": str(hunyuan_dir),
+                            "expected_file_count": 1,
+                            "actual_file_count_without_hf_cache": 1,
+                            "expected_bytes": 7,
+                            "actual_bytes_without_hf_cache": 7,
+                            "revision": "rev-hy",
+                        },
+                        {
+                            "repo_id": "stabilityai/TripoSR",
+                            "local_dir": str(triposr_dir),
+                            "expected_file_count": 1,
+                            "actual_file_count_without_hf_cache": 1,
+                            "expected_bytes": 7,
+                            "actual_bytes_without_hf_cache": 7,
+                            "revision": "rev-tripo",
+                        },
+                        {
+                            "repo_id": "microsoft/TRELLIS-image-large",
+                            "local_dir": str(trellis_dir),
+                            "expected_file_count": 1,
+                            "actual_file_count_without_hf_cache": 1,
+                            "expected_bytes": 7,
+                            "actual_bytes_without_hf_cache": 7,
+                            "revision": "rev-trellis",
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
+        monkeypatch.setattr(gen_mod, "_GEN3D_MODEL_MANIFEST_PATH", manifest_path)
+        monkeypatch.setenv("HERMES3D_COMFYUI_ROOT", str(comfy_root))
+        monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
+
+        res = app_client.get("/api/gen3d/providers")
+        data = res.json()
+
+        for provider_id in ("comfyui", "hunyuan3d", "triposr", "trellis2"):
+            provider = next(p for p in data if p["provider_id"] == provider_id)
+            assert provider["installed"] is True
+            assert provider["readiness"] == "installed_not_running"
+            assert provider["model_proof_source"] == "GEN3D_MODEL_MANIFEST.json"
+
+        hunyuan = next(p for p in data if p["provider_id"] == "hunyuan3d")
+        assert hunyuan["weights_present"] is True
+        assert hunyuan["model_evidence"]["revision"] == "rev-hy"
+
     def test_proof_source_field_reflects_file(self, app_client, fake_proof_file, monkeypatch):
         """proof_source field is set when proof file is present."""
         import hermes3d.api.routes.generation as gen_mod
@@ -337,6 +419,14 @@ class TestGen3DTemplates:
         assert "stl" in cube["outputs"]
         assert "proof_envelope" in cube["outputs"]
 
+    def test_image_to_3d_templates_expose_3mf_outputs(self, app_client):
+        """Image-backed generation templates expose 3MF print-package artifacts."""
+        res = app_client.get("/api/gen3d/templates")
+        data = res.json()
+        by_id = {template["id"]: template for template in data}
+        assert "3mf" in by_id["precision_image_relief"]["outputs"]
+        assert "3mf" in by_id["hunyuan3d_image_to_3d"]["outputs"]
+
     def test_required_fields_present(self, app_client):
         """Each template has required fields."""
         res = app_client.get("/api/gen3d/templates")
@@ -371,3 +461,215 @@ class TestGen3DTemplates:
                 if template.get("schema_present") is not None:
                     assert template["schema_present"] is False
                     assert template["schema_file"] is None
+
+
+# ---------------------------------------------------------------------------
+# /api/generation/run reference-image relief tests
+# ---------------------------------------------------------------------------
+
+
+class TestReferenceImageReliefGeneration:
+    def test_reference_relief_blocks_without_reference_artifact(self, app_client):
+        res = app_client.post(
+            "/api/generation/run",
+            json={"prompt": "logo relief", "template_id": "reference_image_relief"},
+        )
+        assert res.status_code == 409
+        body = res.json()["detail"]
+        assert body["status"] == "blocked"
+        assert "reference_artifact_id" in body["reason"]
+
+    def test_reference_relief_persists_processed_image_mesh_proof_and_lineage(
+        self, app_client, tmp_path, monkeypatch
+    ):
+        Image = pytest.importorskip("PIL.Image")
+        import hermes3d.api.routes.generation as gen_mod
+        from hermes3d.api.routes._common import execute, row, rows
+
+        runtime_root = tmp_path / "runtime"
+        monkeypatch.setattr(
+            gen_mod, "implementation_path", lambda *parts: runtime_root.joinpath(*parts)
+        )
+
+        source_path = tmp_path / "logo-source.png"
+        source = Image.new("RGBA", (32, 32), (255, 255, 255, 255))
+        for y in range(8, 24):
+            for x in range(8, 24):
+                source.putpixel((x, y), (15, 15, 15, 255))
+        source.save(source_path)
+
+        reference_id = uuid.uuid4().hex
+        execute(
+            """
+            INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+            VALUES (?, NULL, 'reference_image', 'test', 'INTAKE', NULL, 'logo-source.png', ?, ?, '{}')
+            """,
+            (reference_id, str(source_path), source_path.stat().st_size),
+        )
+
+        def write_processed(reference_path: Path, output_path: Path) -> dict:
+            processed = Image.new("RGBA", (32, 32), (255, 255, 255, 0))
+            for y in range(8, 24):
+                for x in range(8, 24):
+                    processed.putpixel((x, y), (15, 15, 15, 255))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            processed.save(output_path)
+            return {
+                "engine": "rembg",
+                "output_path": str(output_path),
+                "alpha": {
+                    "width": 32,
+                    "height": 32,
+                    "transparent_pixels": 768,
+                    "foreground_pixels": 256,
+                    "foreground_bbox": [8, 8, 24, 24],
+                },
+            }
+
+        monkeypatch.setattr(gen_mod, "_remove_background_to_png", write_processed)
+
+        res = app_client.post(
+            "/api/generation/run",
+            json={
+                "prompt": "logo relief",
+                "template_id": "reference_image_relief",
+                "reference_artifact_id": reference_id,
+                "constraints": {"size_mm": 60, "thickness_mm": 3},
+            },
+        )
+        assert res.status_code == 202, res.text
+        body = res.json()
+        assert body["accepted"] is True
+        assert body["template"] == "reference_image_relief"
+        assert body["reference"]["id"] == reference_id
+        assert body["processed_reference"]["id"]
+        assert Path(body["artifact"]["file_path"]).is_file()
+        assert Path(body["processed_reference"]["file_path"]).is_file()
+        assert Path(body["proof"]["file_path"]).is_file()
+
+        mesh_row = row("SELECT * FROM artifacts WHERE id = ?", (body["artifact"]["id"],))
+        assert mesh_row is not None
+        mesh_notes = json.loads(mesh_row["notes"])
+        assert mesh_notes["reference_artifact_id"] == reference_id
+        assert mesh_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert mesh_notes["background_removal"]["engine"] == "rembg"
+
+        processed_row = row(
+            "SELECT * FROM artifacts WHERE id = ?",
+            (body["processed_reference"]["id"],),
+        )
+        assert processed_row is not None
+        assert processed_row["evidence_type"] == "processed_image"
+        assert json.loads(processed_row["notes"])["reference_artifact_id"] == reference_id
+
+        events = rows(
+            "SELECT * FROM proof_events WHERE event_type = 'generation.reference_relief.completed'"
+        )
+        assert len(events) == 1
+        payload = json.loads(events[0]["payload"])
+        assert payload["reference_artifact_id"] == reference_id
+        assert payload["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+
+
+class TestPrecisionImageReliefGeneration:
+    def test_precision_relief_persists_exact_image_mesh_proof_and_lineage(
+        self, app_client, tmp_path, monkeypatch
+    ):
+        Image = pytest.importorskip("PIL.Image")
+        import hermes3d.api.routes.generation as gen_mod
+        from hermes3d.api.routes._common import execute, row, rows
+
+        runtime_root = tmp_path / "runtime"
+        monkeypatch.setattr(
+            gen_mod, "implementation_path", lambda *parts: runtime_root.joinpath(*parts)
+        )
+
+        source_path = tmp_path / "logo-source.png"
+        source = Image.new("RGBA", (32, 32), (255, 255, 255, 255))
+        for y in range(8, 24):
+            for x in range(8, 24):
+                source.putpixel((x, y), (80 + x, 80 + y, 80 + x, 255))
+        source.save(source_path)
+
+        reference_id = uuid.uuid4().hex
+        execute(
+            """
+            INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+            VALUES (?, NULL, 'reference_image', 'test', 'INTAKE', NULL, 'logo-source.png', ?, ?, '{}')
+            """,
+            (reference_id, str(source_path), source_path.stat().st_size),
+        )
+
+        def write_processed(reference_path: Path, output_path: Path) -> dict:
+            processed = Image.new("RGBA", (32, 32), (255, 255, 255, 0))
+            for y in range(8, 24):
+                for x in range(8, 24):
+                    shade = 80 + x + y
+                    processed.putpixel((x, y), (shade, shade, shade, 255))
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            processed.save(output_path)
+            return {
+                "engine": "rembg",
+                "output_path": str(output_path),
+                "alpha": {
+                    "width": 32,
+                    "height": 32,
+                    "transparent_pixels": 768,
+                    "foreground_pixels": 256,
+                    "foreground_bbox": [8, 8, 24, 24],
+                },
+            }
+
+        monkeypatch.setattr(gen_mod, "_remove_background_to_png", write_processed)
+
+        res = app_client.post(
+            "/api/generation/run",
+            json={
+                "prompt": "perfect 1:1 logo relief",
+                "template_id": "precision_image_relief",
+                "reference_artifact_id": reference_id,
+                "constraints": {
+                    "size_mm": 80,
+                    "base_thickness_mm": 3,
+                    "relief_height_mm": 3,
+                    "max_resolution": 96,
+                },
+            },
+        )
+        assert res.status_code == 202, res.text
+        body = res.json()
+        assert body["accepted"] is True
+        assert body["template"] == "precision_image_relief"
+        assert Path(body["artifact"]["file_path"]).is_file()
+        assert Path(body["package_3mf"]["file_path"]).is_file()
+        assert Path(body["processed_reference"]["file_path"]).is_file()
+        assert Path(body["proof"]["file_path"]).is_file()
+        assert body["package_3mf"]["label"].endswith(".3mf")
+        assert "3D/3dmodel.model" in body["package_3mf"]["package"]["entries"]
+        assert body["mesh_build"]["foreground_cells"] > 0
+
+        mesh_row = row("SELECT * FROM artifacts WHERE id = ?", (body["artifact"]["id"],))
+        assert mesh_row is not None
+        mesh_notes = json.loads(mesh_row["notes"])
+        assert mesh_notes["reference_artifact_id"] == reference_id
+        assert mesh_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert mesh_notes["package_3mf_artifact_id"] == body["package_3mf"]["id"]
+        assert mesh_notes["mesh_build"]["mesh_width"] == 16
+        assert mesh_notes["mesh"]["is_watertight"] is True
+
+        package_row = row("SELECT * FROM artifacts WHERE id = ?", (body["package_3mf"]["id"],))
+        assert package_row is not None
+        assert package_row["evidence_type"] == "3mf"
+        package_notes = json.loads(package_row["notes"])
+        assert package_notes["mesh_artifact_id"] == body["artifact"]["id"]
+        assert package_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert package_notes["package"]["format"] == "3mf"
+
+        events = rows(
+            "SELECT * FROM proof_events WHERE event_type = 'generation.precision_image_relief.completed'"
+        )
+        assert len(events) == 1
+        payload = json.loads(events[0]["payload"])
+        assert payload["reference_artifact_id"] == reference_id
+        assert payload["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert payload["package_3mf_artifact_id"] == body["package_3mf"]["id"]
