@@ -5,21 +5,22 @@
  *
  * Strategy
  * --------
- * Stub the relevant fetch endpoints with a route handler that
- * increments a counter and returns a tick-aware response. Open the
- * tab, observe the initial render, then wait until the poll fires at
- * least once more. The stub returns different rows on the second-plus
- * call so the assertion is "the UI now shows the second response",
- * not "the request was made twice" (route-only green is explicitly
- * forbidden).
+ * Each spec stubs the relevant endpoint with a closure-flag the test
+ * controls. While the flag is ``false`` the stub returns the first-
+ * tick payload; flipping it to ``true`` switches subsequent responses
+ * to the second-tick payload. The test mounts the tab, waits for the
+ * first-tick UI, flips the flag, then asserts the second-tick UI
+ * appears within one poll cycle (PANEL_POLL_MS = 15 s + buffer).
  *
- * Cadence: ``PANEL_POLL_MS = 15_000`` in src/hooks/_useQuery.ts. We
- * give Playwright 25 s per polling assertion so the test still
- * tolerates CI hiccups. Total wall time per spec: ~30-45 s.
+ * Why not a per-call counter? Dashboard mounts on ``/`` and may
+ * pre-fetch ``/api/artifacts`` before the operator opens the
+ * Artifacts tab — so a naive ``callCount === 1`` rule races with
+ * the dashboard's own request and the second-tick rows show up on
+ * the very first render. A flag flipped from the test avoids the
+ * race entirely.
  *
- * No printer hardware. No fake data: the rows we stub are
- * legitimate-shape artifact / file / agent records that mirror the
- * production schema verbatim.
+ * No printer hardware. No fake data: every stubbed row mirrors the
+ * live ``artifacts`` / ``agents`` schema verbatim.
  */
 import { expect, test, type Route } from "@playwright/test";
 import { TAB_FIXTURES, attachErrorCapture, fulfillJson, openTab } from "./_helpers";
@@ -28,77 +29,54 @@ test.beforeEach(async ({ page }) => {
   await attachErrorCapture(page);
 });
 
-// 30 s + buffer for the 15 s poll cycle.
-test.setTimeout(60_000);
+// 30 s test work + 25 s polling window + buffer.
+test.setTimeout(75_000);
 
 // ---------------------------------------------------------------------------
 // Artifacts — /api/artifacts list should refresh after the panel poll
 // ---------------------------------------------------------------------------
 
 test("Artifacts tab refreshes its list after the polling cadence", async ({ page }) => {
-  let callCount = 0;
+  let secondTickEnabled = false;
+  let calls = 0;
   await page.route("**/api/artifacts**", async (route: Route) => {
     const url = route.request().url();
-    // The lineage endpoint and proof manifest share the /api/artifacts
-    // prefix; route only the bare list endpoint here so unrelated calls
-    // pass through untouched. Lineage / proof_dir / proof file routes
-    // are caught by the `/list` and `/lineage` / `/proof/` suffixes.
+    // Lineage / proof_dir / proof file routes share the prefix; only
+    // intercept the bare list endpoint.
     if (url.includes("/api/artifacts/list") || url.includes("/lineage") || url.includes("/proof/")) {
       await route.fallback();
       return;
     }
-    callCount += 1;
-    // Schema mirrors a live ``artifacts`` row from var/hermes3d.db.
-    // evidence_type must be in the UI's ArtifactType allow-list
-    // (mesh / report / screenshot / g-code / …). The Files tab
-    // renders ``a.name`` which the adapter derives from
-    // ``value.name ?? basename(file_path)``.
-    const rows = callCount === 1
-      ? [{
-          id: "a-tick1",
-          job_id: "job-w21mvp5",
-          evidence_type: "mesh",
-          agent: "test",
-          stage: "MODELING",
-          gate: "MODEL_APPROVAL",
-          label: "tick1.stl",
-          name: "tick1.stl",
-          file_path: "/tmp/tick1.stl",
-          file_size: 100,
-          notes: "{}",
-          created_at: "2026-05-12 00:00:00",
-        }]
-      : [
-          {
-            id: "a-tick1",
-            job_id: "job-w21mvp5",
-            evidence_type: "mesh",
-            agent: "test",
-            stage: "MODELING",
-            gate: "MODEL_APPROVAL",
-            label: "tick1.stl",
-            name: "tick1.stl",
-            file_path: "/tmp/tick1.stl",
-            file_size: 100,
-            notes: "{}",
-            created_at: "2026-05-12 00:00:00",
-          },
-          {
-            id: "a-tick2",
-            job_id: "job-w21mvp5",
-            evidence_type: "report",
-            agent: "test",
-            stage: "MODELING",
-            gate: "MODEL_APPROVAL",
-            label: "tick2.report.json",
-            name: "tick2.report.json",
-            file_path: "/tmp/tick2.report.json",
-            file_size: 200,
-            notes: "{}",
-            created_at: "2026-05-12 00:00:01",
-          },
-        ];
-    await fulfillJson(route, rows);
+    calls += 1;
+    const tick1 = {
+      id: "a-tick1",
+      job_id: "job-w21mvp5",
+      evidence_type: "mesh",
+      agent: "test",
+      stage: "MODELING",
+      gate: "MODEL_APPROVAL",
+      label: "tick1.stl",
+      name: "tick1.stl",
+      file_path: "/tmp/tick1.stl",
+      file_size: 100,
+      notes: "{}",
+      created_at: "2026-05-12 00:00:00",
+    };
+    const tick2 = {
+      id: "a-tick2",
+      job_id: "job-w21mvp5",
+      evidence_type: "report",
+      agent: "test",
+      stage: "MODELING",
+      gate: "MODEL_APPROVAL",
+      label: "tick2.report.json",
+      name: "tick2.report.json",
+      file_path: "/tmp/tick2.report.json",
+      file_size: 200,
+      notes: "{}",
+      created_at: "2026-05-12 00:00:01",
+    };
+    await fulfillJson(route, secondTickEnabled ? [tick1, tick2] : [tick1]);
   });
 
   await page.goto("/");
@@ -106,132 +84,110 @@ test("Artifacts tab refreshes its list after the polling cadence", async ({ page
   const root = page.getByTestId("artifacts-root");
   await expect(root).toBeVisible();
 
-  // First render — only tick1 visible.
+  // First render carries tick1, NOT tick2.
   await expect(root).toContainText("tick1.stl");
   await expect(root).not.toContainText("tick2.report.json");
 
-  // Wait for at least one polling re-fetch to fire and the UI to
-  // re-render with the second-call payload. PANEL_POLL_MS = 15 s.
+  // Operator-side "backend change": flip the closure flag so the next
+  // poll returns the second-tick payload.
+  secondTickEnabled = true;
+
+  // Wait for the polling re-fetch (PANEL_POLL_MS = 15 s) to land the
+  // second row in the DOM.
   await expect(root).toContainText("tick2.report.json", { timeout: 25_000 });
 
-  // Both tick1 + tick2 are now visible (polling appended, not replaced
-  // erroneously).
+  // Both rows visible — polling appended, not replaced.
   await expect(root).toContainText("tick1.stl");
-  expect(callCount).toBeGreaterThanOrEqual(2);
+  expect(calls).toBeGreaterThanOrEqual(2);
 });
 
 // ---------------------------------------------------------------------------
-// Files — adapters.getArtifacts is the live source for the Files tab;
-// reuse the artifact stub to prove the Files tab repaints.
+// Files — adapters.getArtifacts is the live source for the Files tab.
+// The tab lives in the utility group, so we navigate via ``/#files``.
 // ---------------------------------------------------------------------------
 
 test("Files tab refreshes its artifact preview after the polling cadence", async ({ page }) => {
-  let callCount = 0;
+  let secondTickEnabled = false;
+  let calls = 0;
   await page.route("**/api/artifacts**", async (route: Route) => {
     const url = route.request().url();
     if (url.includes("/api/artifacts/list") || url.includes("/lineage") || url.includes("/proof/")) {
       await route.fallback();
       return;
     }
-    callCount += 1;
-    const rows = callCount === 1
-      ? [{
-          id: "f-tick1",
-          job_id: "job-files-poll",
-          evidence_type: "mesh",
-          agent: "test",
-          stage: "MODELING",
-          gate: "MODEL_APPROVAL",
-          label: "files_tick1.stl",
-          name: "files_tick1.stl",
-          file_path: "/tmp/files_tick1.stl",
-          file_size: 50,
-          notes: "{}",
-          created_at: "2026-05-12 00:00:00",
-        }]
-      : [
-          {
-            id: "f-tick1",
-            job_id: "job-files-poll",
-            evidence_type: "mesh",
-            agent: "test",
-            stage: "MODELING",
-            gate: "MODEL_APPROVAL",
-            label: "files_tick1.stl",
-            name: "files_tick1.stl",
-            file_path: "/tmp/files_tick1.stl",
-            file_size: 50,
-            notes: "{}",
-            created_at: "2026-05-12 00:00:00",
-          },
-          {
-            id: "f-tick2",
-            job_id: "job-files-poll",
-            evidence_type: "mesh",
-            agent: "test",
-            stage: "MODELING",
-            gate: "MODEL_APPROVAL",
-            label: "files_tick2.stl",
-            name: "files_tick2.stl",
-            file_path: "/tmp/files_tick2.stl",
-            file_size: 80,
-            notes: "{}",
-            created_at: "2026-05-12 00:00:01",
-          },
-        ];
-    await fulfillJson(route, rows);
+    calls += 1;
+    const tick1 = {
+      id: "f-tick1",
+      job_id: "job-files-poll",
+      evidence_type: "mesh",
+      agent: "test",
+      stage: "MODELING",
+      gate: "MODEL_APPROVAL",
+      label: "files_tick1.stl",
+      name: "files_tick1.stl",
+      file_path: "/tmp/files_tick1.stl",
+      file_size: 50,
+      notes: "{}",
+      created_at: "2026-05-12 00:00:00",
+    };
+    const tick2 = {
+      id: "f-tick2",
+      job_id: "job-files-poll",
+      evidence_type: "mesh",
+      agent: "test",
+      stage: "MODELING",
+      gate: "MODEL_APPROVAL",
+      label: "files_tick2.stl",
+      name: "files_tick2.stl",
+      file_path: "/tmp/files_tick2.stl",
+      file_size: 80,
+      notes: "{}",
+      created_at: "2026-05-12 00:00:01",
+    };
+    await fulfillJson(route, secondTickEnabled ? [tick1, tick2] : [tick1]);
   });
 
-  await page.goto("/");
-  await openTab(page, TAB_FIXTURES.files);
+  // Files lives in the utility group at the bottom of the sidebar;
+  // its main sidebar button may be collapsed. Navigate via the hash
+  // route ``#files`` (mirrors the App.tsx UTILITY_TAB_HASHES table).
+  await page.goto("/#files");
   const root = page.getByTestId("files-root");
-  await expect(root).toBeVisible();
+  await expect(root).toBeVisible({ timeout: 15_000 });
 
-  // Initial render carries tick1.
   await expect(root).toContainText("files_tick1.stl");
   await expect(root).not.toContainText("files_tick2.stl");
 
-  // After the poll fires, the second row appears.
+  secondTickEnabled = true;
   await expect(root).toContainText("files_tick2.stl", { timeout: 25_000 });
-  expect(callCount).toBeGreaterThanOrEqual(2);
+  expect(calls).toBeGreaterThanOrEqual(2);
 });
 
 // ---------------------------------------------------------------------------
-// Agents — /api/agents roster + /api/notifications should refresh after the poll
+// Agents — /api/agents roster should refresh after the poll. Asserts on
+// the ``id`` field (rendered by AgentCommandCenter) — the UI does NOT
+// render ``display_name`` so we anchor on what is actually visible.
 // ---------------------------------------------------------------------------
 
 test("Agents tab refreshes its roster after the polling cadence", async ({ page }) => {
-  let callCount = 0;
+  let secondTickEnabled = false;
+  let calls = 0;
   await page.route("**/api/agents", async (route: Route) => {
-    callCount += 1;
-    const agents = callCount === 1
-      ? [{
-          id: "agent-tick1",
-          role: "factory-operator",
-          status: "idle",
-          display_name: "AGENT_TICK1_PERSONA",
-          model_provider: "minimax",
-          configured: true,
-        }]
-      : [
-          {
-            id: "agent-tick1",
-            role: "factory-operator",
-            status: "active",
-            display_name: "AGENT_TICK1_PERSONA",
-            model_provider: "minimax",
-            configured: true,
-          },
-          {
-            id: "agent-tick2",
-            role: "modeling-agent",
-            status: "idle",
-            display_name: "AGENT_TICK2_PERSONA",
-            model_provider: "deepseek",
-            configured: true,
-          },
-        ];
-    await fulfillJson(route, agents);
+    calls += 1;
+    const tick1Agent = {
+      id: "agent-w21mvp5-tick1",
+      role: "agent-w21mvp5-tick1",
+      status: "active",
+      model_provider: "minimax",
+      configured: true,
+    };
+    const tick2Agent = {
+      id: "agent-w21mvp5-tick2",
+      role: "agent-w21mvp5-tick2",
+      status: "idle",
+      model_provider: "deepseek",
+      configured: true,
+    };
+    await fulfillJson(route, secondTickEnabled ? [tick1Agent, tick2Agent] : [tick1Agent]);
   });
 
   await page.goto("/");
@@ -239,11 +195,14 @@ test("Agents tab refreshes its roster after the polling cadence", async ({ page 
   const root = page.getByTestId("agents-root");
   await expect(root).toBeVisible();
 
-  // First render — only AGENT_TICK1.
-  await expect(root).toContainText("AGENT_TICK1_PERSONA");
-  await expect(root).not.toContainText("AGENT_TICK2_PERSONA");
+  // First render: only tick1.
+  await expect(root).toContainText("agent-w21mvp5-tick1");
+  await expect(root).not.toContainText("agent-w21mvp5-tick2");
 
-  // After the poll fires, the second agent appears.
-  await expect(root).toContainText("AGENT_TICK2_PERSONA", { timeout: 25_000 });
-  expect(callCount).toBeGreaterThanOrEqual(2);
+  secondTickEnabled = true;
+
+  // Poll should refresh the roster within one cycle.
+  await expect(root).toContainText("agent-w21mvp5-tick2", { timeout: 25_000 });
+  await expect(root).toContainText("agent-w21mvp5-tick1");
+  expect(calls).toBeGreaterThanOrEqual(2);
 });
