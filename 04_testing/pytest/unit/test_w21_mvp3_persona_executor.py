@@ -261,8 +261,11 @@ def test_sanitize_unwraps_bare_triple_fence() -> None:
 def test_sanitize_collapses_excess_blank_lines() -> None:
     raw = "# A\n\n\n\n\nbody"
     out = persona_executor._sanitize_llm_output(raw)
-    # 3+ blank lines collapsed to 2.
-    assert "\n\n\n" not in out
+    # CodeRabbit nit (2026-05-12): pin the exact normalization. 3+ blank
+    # lines collapse to ONE blank line between content (i.e. exactly
+    # two newlines), never to a single newline (which would lose the
+    # paragraph break) and never back to triple newlines.
+    assert out == "# A\n\nbody"
 
 
 def test_sanitize_no_tags_passes_through() -> None:
@@ -329,7 +332,13 @@ def test_quality_gate_rejects_boilerplate_density() -> None:
 
 
 def test_quality_gate_rejects_surviving_whole_doc_markdown_fence() -> None:
-    body = "```markdown\n# Doc\n\nstuff " * 40
+    # A properly-formed whole-doc fence: opener, body, closer. The
+    # sanitizer should have unwrapped it; if it survives, the gate
+    # must reject. CodeRabbit nit (2026-05-12): the prior fixture
+    # used a repeated opener, which would also fail the
+    # bare-fence-at-head check and so wouldn't pin the closed-fence
+    # path. This version pins the closed-fence regression.
+    body = "```markdown\n# Doc\n\n" + ("substantive line of content " * 30) + "\n```"
     ok, reason = persona_executor._passes_quality_gate(body)
     assert not ok
     assert "whole_document_markdown_fence" in reason
@@ -454,6 +463,10 @@ def test_existing_substantial_handoff_is_preserved(
     result = persona_executor.execute_one(snap, tmp_path)
     assert result["outcome"] == "done"
     assert result["reason"] == "preserved_existing_handoff"
+    # CodeRabbit nit (2026-05-12): the result contract pins the
+    # preserved file path; assert it points at the existing handoff so
+    # callers can rely on the field across done/preserved/written paths.
+    assert result["handoff"] == str(handoff_abs)
     # File content was NOT modified.
     assert handoff_abs.read_text(encoding="utf-8") == human_content
     # Task moved to done/.
