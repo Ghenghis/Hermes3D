@@ -112,4 +112,44 @@ describe("appsClient HTTP layer", () => {
     });
     await expect(client.getApp("missing")).rejects.toThrow(/not found in registry/);
   });
+
+  it("runProofSweep posts a bounded operator request and maps the summary", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      expect(init?.method).toBe("POST");
+      expect(JSON.parse(String(init?.body))).toEqual({
+        actor: "test-operator",
+        limit: 3,
+        timeout_s: 7,
+        include_without_command: false,
+      });
+      return new Response(
+        JSON.stringify({
+          accepted: true,
+          status: "completed",
+          proof_event_id: "proof-sweep-1",
+          summary: { total: 3, pass: 1, fail: 1, timeout: 0, error: 0, not_set: 1 },
+        }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const client = createAppsClient({ baseUrl: "http://test.local", fetcher });
+
+    const result = await client.runProofSweep({
+      actor: "test-operator",
+      limit: 3,
+      timeout_s: 7,
+    });
+
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://test.local/api/apps/run-proofs",
+      expect.any(Object),
+    );
+    expect(result).toEqual({
+      accepted: true,
+      status: "completed",
+      proof_event_id: "proof-sweep-1",
+      summary: { total: 3, pass: 1, fail: 1, timeout: 0, error: 0, not_set: 1 },
+      reason: "",
+    });
+  });
 });

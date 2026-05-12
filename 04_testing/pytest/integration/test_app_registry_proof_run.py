@@ -23,6 +23,7 @@ Sources:
 
 from __future__ import annotations
 
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -188,6 +189,98 @@ def test_run_proof_when_not_set(client: TestClient) -> None:
     body = response.json()
     assert body["status"] == "not_set"
     assert body["accepted"] is False
+
+
+def test_run_proof_sweep_executes_bounded_batch_and_records_event(client: TestClient) -> None:
+    """Batch proof sweep must persist explicit pass/fail/not_set evidence.
+
+    The route is operator-triggered and bounded; this fixture pins the
+    behavior with three app ids and benign cross-platform Python commands.
+    """
+    client.get("/api/apps")  # populate modules table
+    import hermes3d.db.init as dbinit
+
+    conn = dbinit.connect()
+    conn.execute(
+        "UPDATE modules SET proof_command = ? WHERE id = ?",
+        ("python -c \"print('proof-ok')\"", "trimesh"),
+    )
+    conn.execute(
+        "UPDATE modules SET proof_command = ? WHERE id = ?",
+        ('python -c "import sys; sys.exit(5)"', "cadquery"),
+    )
+    conn.execute("UPDATE modules SET proof_command = NULL WHERE id = ?", ("kiln",))
+    conn.commit()
+    conn.close()
+
+    response = client.post(
+        "/api/apps/run-proofs",
+        json={
+            "actor": "test-suite",
+            "timeout_s": 5,
+            "app_ids": ["trimesh", "cadquery", "kiln"],
+            "include_without_command": True,
+            "limit": 10,
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["accepted"] is True
+    assert body["status"] == "completed"
+    assert body["proof_event_id"]
+    assert body["summary"] == {
+        "total": 3,
+        "pass": 1,
+        "fail": 1,
+        "timeout": 0,
+        "error": 0,
+        "not_set": 1,
+    }
+
+    by_id = {result["app_id"]: result for result in body["results"]}
+    assert by_id["trimesh"]["status"] == "pass"
+    assert by_id["cadquery"]["status"] == "fail"
+    assert by_id["kiln"]["status"] == "not_set"
+
+    conn = dbinit.connect()
+    statuses = {
+        row["id"]: row["last_proof_status"]
+        for row in conn.execute(
+            "SELECT id, last_proof_status FROM modules WHERE id IN ('trimesh','cadquery','kiln')"
+        ).fetchall()
+    }
+    event = conn.execute(
+        "SELECT * FROM proof_events WHERE id = ?",
+        (body["proof_event_id"],),
+    ).fetchone()
+    conn.close()
+    assert statuses == {"trimesh": "pass", "cadquery": "fail", "kiln": "not_set"}
+    assert event is not None
+    payload = json.loads(event["payload"])
+    assert payload["summary"]["total"] == 3
+    assert sorted(payload["app_ids"]) == ["cadquery", "kiln", "trimesh"]
+
+
+def test_run_proof_sweep_defaults_to_rows_with_proof_commands_only(client: TestClient) -> None:
+    client.get("/api/apps")
+    import hermes3d.db.init as dbinit
+
+    conn = dbinit.connect()
+    conn.execute("UPDATE modules SET proof_command = NULL")
+    conn.execute(
+        "UPDATE modules SET proof_command = ? WHERE id = ?",
+        ("python -c \"print('only-one')\"", "trimesh"),
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.post("/api/apps/run-proofs", json={"actor": "test-suite", "limit": 20})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["summary"]["total"] == 1
+    assert body["summary"]["not_set"] == 0
+    assert body["results"][0]["app_id"] == "trimesh"
+    assert body["results"][0]["status"] == "pass"
 
 
 def test_rollback_unsupported_returns_501(client: TestClient) -> None:
