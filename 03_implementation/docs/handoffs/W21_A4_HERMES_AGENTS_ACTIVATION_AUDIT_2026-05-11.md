@@ -249,3 +249,60 @@ After MVP-1 lands and the backend is restarted with the env loaded:
 Only after MVP-2 ships and a persona claims at least one W21 task can this
 audit be marked `done`. Until then, this handoff doc IS the in-flight work
 product for W21-A4.
+
+---
+
+## MVP-2 LIVE PROOF — added 2026-05-12T00:26 UTC
+
+MVP-2 (orchestrator queue bridge) was implemented and proven end-to-end on
+the live runtime. Sequence:
+
+1. Backend restarted from branch `claude/w21-a4-mvp2-queue-bridge` with the
+   poller env vars: `HERMES3D_QUEUE_POLL_INTERVAL=5`,
+   `HERMES3D_QUEUE_MAX_CLAIMS_PER_TICK=8`.
+
+2. `GET /api/agents/queue/status` returned BEFORE poller tick fired:
+   `counts={pending:8, claimed:0, done:0, blocked:0}`.
+
+3. Within the first 5-second tick, the poller walked `tasks/pending/` and
+   matched each task's `target_owner_pattern` against the live
+   `hermes3d.api.routes.agents.PERSONAS` roster. All 8 W21 tasks were
+   claimed:
+
+   ```
+   W21-A1-FEATURE-ACTION-DEEP-AUDIT-2026-05-11      → hermes/factory-operator
+   W21-A2-DESIGN-MODELER-E2E-AUDIT-2026-05-11       → hermes/modeling-agent
+   W21-A3-GEN3D-PROVIDER-3090TI-AUDIT-2026-05-11    → hermes/modeling-agent
+   W21-A4-HERMES-AGENTS-ACTIVATION-AUDIT-2026-05-11 → hermes/factory-operator
+   W21-A5-60-APP-PROOF-DEEP-AUDIT-2026-05-11        → hermes/factory-operator
+   W21-A6-REALTIME-UX-STALE-STATE-AUDIT-2026-05-11  → hermes/factory-operator
+   W21-A7-LAG-PROTECTED-E2E-HARNESS-2026-05-11      → hermes/factory-operator
+   W21-A8-GEN3D-MODEL-INSTALL-EXECUTION-PLAN-...    → hermes/factory-operator
+   ```
+
+4. Two-stable-read confirmation:
+   - **Backend filesystem evidence:** `ls .hermes3d_orchestrator/tasks/pending/`
+     returned empty; `ls .hermes3d_orchestrator/tasks/claimed/` listed all 8 ids.
+   - **UI/API evidence:** `GET /api/agents/queue/status` returned
+     `counts={pending:0, claimed:8, done:0, blocked:0}` with each task's
+     `claimed_by` field populated.
+   - **Heartbeat liveness:** sample task W21-A1 showed `claimed_utc` and
+     `heartbeat_utc` 30s apart on a second probe, proving the poller's
+     heartbeat refresh path is alive (per the lag-protected contract:
+     the orchestrator considers an unrefreshed claim stale).
+
+5. Lag-protection rules followed:
+   - Poll interval 5s (above the sub-5s anti-pattern but tunable up to 15s default).
+   - Each tick is bounded: list pending once, claim up to
+     `MAX_CLAIMS_PER_TICK`, never retry inside a tick.
+   - Heartbeat refresh is idempotent and only applies to `claimed_by` owned
+     by our personas; another claimer's task is left alone.
+
+6. LM Studio / MiniMax / DeepSeek separation preserved: the queue bridge
+   does not route work through any LLM. The claim is a queue-management
+   primitive; per-persona execution (MVP-3) is a separate concern.
+
+W21-A4 audit is closed pending PR merge. Once
+`claude/w21-a4-mvp2-queue-bridge` is on develop and the operator restarts
+the live backend, the same claim flow will run automatically — no operator
+action required to keep agents claiming W21 work.

@@ -26,6 +26,7 @@ _hydrate_env()
 # reorganization that moves these imports above _hydrate_env() will
 # silently regress the env-loader contract.
 from hermes3d.api.routes import (  # noqa: E402
+    agent_queue,
     agent_updates,
     agents,
     approvals,
@@ -105,6 +106,39 @@ def create_gui_app() -> FastAPI:
         except Exception:
             pass  # reconcile is best-effort; never block startup
 
+        # W21-A4 MVP-2: spawn the orchestrator queue poller as a background
+        # task. Reads `.hermes3d_orchestrator/tasks/pending/` every
+        # HERMES3D_QUEUE_POLL_INTERVAL seconds (default 15s), claims matching
+        # tasks for Hermes Agent personas, and heartbeats live claims.
+        #
+        # Disable with HERMES3D_QUEUE_POLLER_DISABLED=1 (operator override,
+        # used in tests that drive the bridge synchronously).
+        try:
+            import asyncio as _asyncio
+
+            from hermes3d.services import queue_poller
+
+            app.state.queue_poller_task = _asyncio.create_task(
+                queue_poller.run_forever(),
+                name="hermes3d.queue_poller",
+            )
+        except Exception:
+            # Poller failure must not block backend boot — bridge is still
+            # callable via the HTTP routes even if auto-poll is off.
+            pass
+
+    @app.on_event("shutdown")
+    async def _shutdown() -> None:
+        # Cancel the queue poller cleanly on shutdown so a re-run of
+        # the dev server does not leak the task.
+        task = getattr(app.state, "queue_poller_task", None)
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
+
     @app.middleware("http")
     async def _optional_api_auth(request: Request, call_next):
         token = _api_token()
@@ -152,6 +186,9 @@ def create_gui_app() -> FastAPI:
         code_operator,
         events,
         agents,
+        # W21-A4 MVP-2: orchestrator queue bridge HTTP surface
+        # (/api/agents/queue/{status,claim,release,complete,block}).
+        agent_queue,
         agent_updates,
         desktop_compat,
         desktop_updates,
