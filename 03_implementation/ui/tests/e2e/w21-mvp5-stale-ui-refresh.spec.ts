@@ -102,49 +102,42 @@ test("Artifacts tab refreshes its list after the polling cadence", async ({ page
 });
 
 // ---------------------------------------------------------------------------
-// Files — adapters.getArtifacts is the live source for the Files tab.
+// Files — /api/files is the live source for the Files tab.
 // The tab lives in the utility group, so we navigate via ``/#files``.
 // ---------------------------------------------------------------------------
 
-test("Files tab refreshes its artifact preview after the polling cadence", async ({ page }) => {
+test("Files tab refreshes its file index after the polling cadence", async ({ page }) => {
   let secondTickEnabled = false;
   let calls = 0;
-  await page.route("**/api/artifacts**", async (route: Route) => {
-    const url = route.request().url();
-    if (url.includes("/api/artifacts/list") || url.includes("/lineage") || url.includes("/proof/")) {
-      await route.fallback();
-      return;
-    }
+  await page.route(/.*\/api\/files.*/, async (route: Route) => {
     calls += 1;
     const tick1 = {
       id: "f-tick1",
-      job_id: "job-files-poll",
-      evidence_type: "mesh",
-      agent: "test",
-      stage: "MODELING",
-      gate: "MODEL_APPROVAL",
-      label: "files_tick1.stl",
       name: "files_tick1.stl",
-      file_path: "/tmp/files_tick1.stl",
-      file_size: 50,
-      notes: "{}",
-      created_at: "2026-05-12 00:00:00",
+      size_bytes: 50,
+      kind: "model",
+      bucket: "generation",
+      run_id: "job-files-poll",
+      usable: true,
+      invalid_reason: null,
     };
     const tick2 = {
       id: "f-tick2",
-      job_id: "job-files-poll",
-      evidence_type: "mesh",
-      agent: "test",
-      stage: "MODELING",
-      gate: "MODEL_APPROVAL",
-      label: "files_tick2.stl",
-      name: "files_tick2.stl",
-      file_path: "/tmp/files_tick2.stl",
-      file_size: 80,
-      notes: "{}",
-      created_at: "2026-05-12 00:00:01",
+      name: "files_tick2.manual-test.3mf",
+      size_bytes: 0,
+      kind: "model",
+      bucket: "generation",
+      run_id: "job-files-poll",
+      usable: false,
+      invalid_reason: "zero_byte_artifact",
     };
-    await fulfillJson(route, secondTickEnabled ? [tick1, tick2] : [tick1]);
+    await fulfillJson(route, {
+      accepted: true,
+      status: "ready",
+      reason: null,
+      items: secondTickEnabled ? [tick1, tick2] : [tick1],
+      total: secondTickEnabled ? 2 : 1,
+    });
   });
 
   // Files lives in the utility group at the bottom of the sidebar; its
@@ -165,10 +158,11 @@ test("Files tab refreshes its artifact preview after the polling cadence", async
   await expect(root).toBeVisible({ timeout: 15_000 });
 
   await expect(root).toContainText("files_tick1.stl");
-  await expect(root).not.toContainText("files_tick2.stl");
+  await expect(root).not.toContainText("files_tick2.manual-test.3mf");
 
   secondTickEnabled = true;
-  await expect(root).toContainText("files_tick2.stl", { timeout: 25_000 });
+  await expect(root).toContainText("files_tick2.manual-test.3mf", { timeout: 25_000 });
+  await expect(root).toContainText("zero_byte_artifact");
   expect(calls).toBeGreaterThanOrEqual(2);
 });
 

@@ -38,6 +38,8 @@ _LINEAGE_KEYS: tuple[str, ...] = (
     "reference_artifact_id",
     "processed_reference_artifact_id",
     "package_3mf_artifact_id",
+    "runtime_evidence_artifact_id",
+    "gcode_artifact_id",
 )
 
 

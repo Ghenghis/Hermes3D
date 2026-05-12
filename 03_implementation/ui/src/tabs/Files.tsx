@@ -1,17 +1,15 @@
 /**
- * Files tab — honest blocked state.
+ * Files tab — live var/ scanner plus artifact fallback.
  *
- * Per W15-A3 backend route inventory, the `/api/files/*` surface is NOT yet
- * implemented. Rather than show fake rows, this tab:
- *   1. Probes a small set of candidate file endpoints
- *      (`/api/files/list`, `/api/files`, `/api/artifacts`) so the page
- *      auto-promotes itself once the backend ships, and
- *   2. Renders an explicit "Files API not available" message in the meantime,
- *      including the upstream tracking link.
+ * The `/api/files/*` surface now ships as a real var/ scanner. This tab:
+ *   1. Probes `/api/files/*` and renders the live file index when available,
+ *      including backend-provided `usable=false` invalid-artifact markers; and
+ *   2. Falls back to the Artifacts surface only when the dedicated Files API
+ *      is unavailable.
  *
- * The `/api/artifacts` probe also lets the page render the existing Artifacts
- * surface as a read-only preview while the dedicated Files API matures. This
- * keeps the tab routed and usable without violating the no-fake-data rule.
+ * The `/api/artifacts` probe still lets the page render the existing Artifacts
+ * surface as a read-only preview if the dedicated Files API regresses or is
+ * unreachable. This keeps the tab routed and usable without fake rows.
  */
 
 import { useCallback, useState } from "react";
@@ -38,6 +36,17 @@ interface ProbeResult {
   status: ProbeStatus;
   http_status?: number | null;
   detail?: string;
+}
+
+interface FileIndexItem {
+  id: string;
+  name: string;
+  size_bytes: number;
+  kind: "model" | "slice" | "image" | "log" | "other";
+  bucket: string;
+  run_id: string | null;
+  usable: boolean;
+  invalid_reason: string | null;
 }
 
 const CANDIDATE_PATHS = ["/api/files", "/api/files/list", "/api/files/index"];
@@ -75,6 +84,7 @@ export function FilesTab() {
   const [probes, setProbes] = useState<ProbeResult[]>(
     CANDIDATE_PATHS.map((p) => ({ path: p, status: "pending" })),
   );
+  const [files, setFiles] = useState<FileIndexItem[] | null>(null);
   const [artifacts, setArtifacts] = useState<Artifact[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +94,8 @@ export function FilesTab() {
     try {
       const next = await Promise.all(CANDIDATE_PATHS.map(probe));
       setProbes(next);
+      const filesIndex = await loadFilesIndex();
+      setFiles(filesIndex);
       // Always also pull artifacts as the runtime preview — this is the
       // existing live source for file-like records, so showing it here is
       // honest (it's the same data the Artifacts tab renders).
@@ -106,6 +118,7 @@ export function FilesTab() {
   usePollingEffect(refresh, PANEL_POLL_MS, [refresh]);
 
   const dedicatedFilesApiAvailable = probes.some((p) => p.status === "available");
+  const invalidFiles = (files ?? []).filter((item) => !item.usable);
 
   return (
     <div data-testid="files-root" className="flex h-full flex-col gap-3">
@@ -163,10 +176,57 @@ export function FilesTab() {
 
       <div className="min-h-0 flex-1 overflow-auto rounded border border-border bg-surface p-3">
         <h3 className="text-xs font-semibold uppercase text-muted">
-          Artifacts (live fallback)
+          {dedicatedFilesApiAvailable ? "Files index (live)" : "Artifacts (live fallback)"}
         </h3>
         <div className="mt-2">
-          {artifacts === null ? (
+          {dedicatedFilesApiAvailable && files != null ? (
+            files.length === 0 ? (
+              <div
+                data-testid="files-empty"
+                className="rounded border border-border bg-bg/40 p-3 text-xs text-muted"
+              >
+                No files returned by GET /api/files.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {invalidFiles.length > 0 && (
+                  <div
+                    data-testid="files-invalid-summary"
+                    className="rounded border border-amber-700/50 bg-amber-950/30 p-2 text-xs text-amber-100"
+                  >
+                    {invalidFiles.length} file{invalidFiles.length === 1 ? "" : "s"} marked unusable by the
+                    backend scanner.
+                  </div>
+                )}
+                <ul className="space-y-1">
+                  {files.map((item) => (
+                    <li
+                      key={item.id}
+                      data-testid={`files-index-${item.id}`}
+                      data-usable={item.usable ? "true" : "false"}
+                      className="flex items-center justify-between gap-2 rounded border border-border bg-bg/40 px-3 py-1.5 text-xs"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <FileText size={12} className="shrink-0 text-muted" />
+                        <span className="truncate text-fg">{item.name}</span>
+                        <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted">
+                          {item.kind}
+                        </span>
+                        {!item.usable && (
+                          <span className="shrink-0 rounded border border-amber-700/60 px-1.5 py-0.5 font-mono text-[10px] text-amber-200">
+                            {item.invalid_reason ?? "unusable"}
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-muted">
+                        {item.size_bytes > 0 ? `${Math.round(item.size_bytes / 1024)} kB` : "0 B"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          ) : artifacts === null ? (
             <div className="rounded border border-border bg-bg/40 p-3 text-xs text-muted">
               Loading artifacts…
             </div>
@@ -205,4 +265,65 @@ export function FilesTab() {
       </div>
     </div>
   );
+}
+
+async function loadFilesIndex(): Promise<FileIndexItem[] | null> {
+  try {
+    const response = await fetch(`${LIVE_BASE_URL}/api/files`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      return null;
+    }
+    const payload: unknown = await response.json();
+    if (!isRecord(payload) || !Array.isArray(payload.items)) {
+      return null;
+    }
+    return payload.items.map(normalizeFileIndexItem).filter((item): item is FileIndexItem => item != null);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeFileIndexItem(value: unknown): FileIndexItem | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const id = stringValue(value.id);
+  if (!id) {
+    return null;
+  }
+  return {
+    id,
+    name: stringValue(value.name) || id,
+    size_bytes: numberValue(value.size_bytes),
+    kind: fileKindValue(value.kind),
+    bucket: stringValue(value.bucket) || "other",
+    run_id: nullableString(value.run_id),
+    usable: value.usable !== false,
+    invalid_reason: nullableString(value.invalid_reason),
+  };
+}
+
+function fileKindValue(value: unknown): FileIndexItem["kind"] {
+  const kinds: FileIndexItem["kind"][] = ["model", "slice", "image", "log", "other"];
+  return kinds.includes(value as FileIndexItem["kind"]) ? (value as FileIndexItem["kind"]) : "other";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
