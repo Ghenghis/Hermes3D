@@ -109,9 +109,28 @@ async function stubApps(page: import("@playwright/test").Page) {
     status: "pending",
     reason: "queued",
   };
+  const proofSweepPayload = {
+    accepted: true,
+    status: "completed",
+    proof_event_id: "proof-sweep-1",
+    summary: {
+      total: 3,
+      pass: 1,
+      fail: 1,
+      timeout: 0,
+      error: 0,
+      not_set: 1,
+    },
+  };
   await page.route("**/api/apps", (route) => {
     if (route.request().method() === "GET") {
       return fulfillJson(route, SAMPLE_APPS);
+    }
+    return route.continue();
+  });
+  await page.route("**/api/apps/run-proofs", (route) => {
+    if (route.request().method() === "POST") {
+      return fulfillJson(route, proofSweepPayload);
     }
     return route.continue();
   });
@@ -180,6 +199,20 @@ test("Run proof shows success toast and updates state", async ({ page }) => {
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(/Hermes Agent/);
   await expect(toast).toContainText(/proof requested/i);
+
+  await assertNoErrors(page);
+});
+
+test("Run proof sweep shows persisted summary toast", async ({ page }) => {
+  await stubApps(page);
+  await page.goto("/#apps");
+
+  await page.getByTestId("app-proof-sweep").click();
+
+  const toast = page.getByTestId("app-status-toast-success");
+  await expect(toast).toBeVisible();
+  await expect(toast).toContainText(/Proof sweep completed/);
+  await expect(toast).toContainText(/1 pass, 1 fail, 0 timeout, 0 error across 3 apps/);
 
   await assertNoErrors(page);
 });

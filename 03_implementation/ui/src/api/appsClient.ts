@@ -28,6 +28,7 @@ import type {
   ProofStatus,
   RegistryApp,
   RegistryAppDetail,
+  RegistryProofSweepResponse,
   RegistryRunProofResponse,
 } from "../types/app-registry";
 
@@ -273,6 +274,46 @@ export async function runProof(
   };
 }
 
+export async function runProofSweep(
+  options: { limit?: number; timeout_s?: number; actor?: string } = {},
+  signal?: AbortSignal,
+): Promise<RegistryProofSweepResponse> {
+  const response = await fetch(`${LIVE_BASE_URL}/api/apps/run-proofs`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      actor: options.actor ?? "operator",
+      limit: options.limit ?? 20,
+      timeout_s: options.timeout_s ?? 12,
+      include_without_command: false,
+    }),
+    cache: "no-store",
+    signal,
+  });
+  if (!response.ok) {
+    return {
+      accepted: false,
+      status: "blocked",
+      proof_event_id: null,
+      summary: emptySweepSummary(),
+      reason: redactProofReason(
+        `proof sweep failed: ${response.status} ${response.statusText}`,
+      ),
+    };
+  }
+  const payload = (await response.json()) as Record<string, unknown>;
+  return {
+    accepted: payload.accepted === true,
+    status: payload.status === "completed" ? "completed" : "unknown",
+    proof_event_id: readString(payload, "proof_event_id"),
+    summary: sweepSummaryValue(payload.summary),
+    reason: redactProofReason(readString(payload, "reason")),
+  };
+}
+
 /**
  * Convenience client object. Mirrors the shape W6-5 ships in
  * `hermes3dClient.ts` (where `appsClient` is a sibling of `agentsClient`,
@@ -290,6 +331,7 @@ export type AppsClient = {
   listApps: typeof listApps;
   getApp: typeof getApp;
   runProof: typeof runProof;
+  runProofSweep: typeof runProofSweep;
 };
 
 /** Error thrown when both `/api/apps` and `/api/source-os/modules` endpoints
@@ -322,6 +364,7 @@ export function createAppsClient(options: {
     `${baseUrl}/api/apps/${encodeURIComponent(id)}/run-proof`;
   const moduleRunProofUrl = (id: string) =>
     `${baseUrl}/api/source-os/modules/${encodeURIComponent(id)}/run-proof`;
+  const proofSweepUrl = `${baseUrl}/api/apps/run-proofs`;
 
   function extractList(payload: unknown): RegistryApp[] {
     if (Array.isArray(payload)) {
@@ -432,6 +475,45 @@ export function createAppsClient(options: {
         ),
       };
     },
+    async runProofSweep(
+      options: { limit?: number; timeout_s?: number; actor?: string } = {},
+      signal?: AbortSignal,
+    ): Promise<RegistryProofSweepResponse> {
+      const response = await fetcher(proofSweepUrl, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          actor: options.actor ?? "operator",
+          limit: options.limit ?? 20,
+          timeout_s: options.timeout_s ?? 12,
+          include_without_command: false,
+        }),
+        cache: "no-store",
+        signal,
+      });
+      if (!response.ok) {
+        return {
+          accepted: false,
+          status: "blocked",
+          proof_event_id: null,
+          summary: emptySweepSummary(),
+          reason: redactProofReason(
+            `proof sweep failed: ${response.status} ${response.statusText}`,
+          ),
+        };
+      }
+      const payload = (await response.json()) as Record<string, unknown>;
+      return {
+        accepted: payload.accepted === true,
+        status: payload.status === "completed" ? "completed" : "unknown",
+        proof_event_id: readString(payload, "proof_event_id"),
+        summary: sweepSummaryValue(payload.summary),
+        reason: redactProofReason(readString(payload, "reason")),
+      };
+    },
   };
 }
 
@@ -440,3 +522,27 @@ export function createAppsClient(options: {
  * it inherits the `/api/apps` → `/api/source-os/modules` fallback semantics.
  */
 export const appsClient: AppsClient = createAppsClient({ baseUrl: LIVE_BASE_URL });
+
+function emptySweepSummary() {
+  return { total: 0, pass: 0, fail: 0, timeout: 0, error: 0, not_set: 0 };
+}
+
+function sweepSummaryValue(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return emptySweepSummary();
+  }
+  const record = value as Record<string, unknown>;
+  return {
+    total: readNumber(record, "total"),
+    pass: readNumber(record, "pass"),
+    fail: readNumber(record, "fail"),
+    timeout: readNumber(record, "timeout"),
+    error: readNumber(record, "error"),
+    not_set: readNumber(record, "not_set"),
+  };
+}
+
+function readNumber(record: Record<string, unknown>, key: string): number {
+  const value = record[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}

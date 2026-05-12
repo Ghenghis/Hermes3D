@@ -140,21 +140,18 @@ class ProofRunRequest(BaseModel):
     timeout_s: int | None = None
 
 
-@router.post("/api/apps/{app_id}/run-proof")
-def run_app_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str, Any]:
-    """Run the seeded ``proof_command``.
+class ProofSweepRequest(BaseModel):
+    actor: str = "operator"
+    timeout_s: int | None = None
+    app_ids: list[str] | None = None
+    include_without_command: bool = False
+    limit: int = 20
 
-    Persists the resulting status into ``modules.last_proof_status``
-    and the timestamp into ``modules.last_proof_at`` so the GUI lane
-    can render up-to-date proof state without re-running the command
-    on every page load.
-    """
-    record = _app_or_404(app_id)
+
+def _run_proof_for_record(record: dict[str, Any], *, timeout_s: int) -> dict[str, Any]:
+    app_id = str(record["id"])
     proof_command = (record.get("proof_command") or "").strip()
-    timeout_s = (body.timeout_s if body else None) or 12
     if not proof_command:
-        # No-op: don't run, but update state to "not_set" once so the
-        # GUI can show a deterministic value.
         execute(
             """
             UPDATE modules
@@ -173,6 +170,7 @@ def run_app_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str,
             "captured_output_redacted": "",
             "evidence_id": None,
         }
+
     result = run_proof_command(proof_command, timeout_s=timeout_s)
     execute(
         """
@@ -201,6 +199,95 @@ def run_app_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str,
         "captured_output_redacted": captured,
         "evidence_id": evidence_id,
     }
+
+
+@router.post("/api/apps/run-proofs")
+def run_app_proof_sweep(body: ProofSweepRequest | None = None) -> dict[str, Any]:
+    """Run a bounded batch of app proof commands.
+
+    This is intentionally operator-triggered and bounded. It does not
+    auto-run on page load, does not touch printer hardware, and by default
+    skips rows without ``proof_command`` so the operator can advance the
+    60-app registry from "installed but unproven" to explicit pass/fail
+    evidence without pretending every app is ready.
+    """
+    _sync_apps_once()
+    request = body or ProofSweepRequest()
+    timeout_s = request.timeout_s or 12
+    limit = max(1, min(int(request.limit or 20), 60))
+    selected_ids = [item.strip() for item in request.app_ids or [] if item.strip()]
+    if selected_ids:
+        placeholders = ",".join("?" for _ in selected_ids)
+        records = rows(
+            f"SELECT * FROM modules WHERE id IN ({placeholders}) ORDER BY section, display_name",
+            tuple(selected_ids),
+        )
+    else:
+        filter_sql = (
+            ""
+            if request.include_without_command
+            else "WHERE proof_command IS NOT NULL AND trim(proof_command) != ''"
+        )
+        records = rows(
+            f"SELECT * FROM modules {filter_sql} ORDER BY section, display_name LIMIT ?",
+            (limit,),
+        )
+    records = records[:limit]
+
+    results = [
+        _run_proof_for_record(record, timeout_s=timeout_s)
+        for record in records
+        if request.include_without_command or (record.get("proof_command") or "").strip()
+    ]
+    summary = {
+        "total": len(results),
+        "pass": sum(1 for result in results if result["status"] == "pass"),
+        "fail": sum(1 for result in results if result["status"] == "fail"),
+        "timeout": sum(1 for result in results if result["status"] == "timeout"),
+        "error": sum(1 for result in results if result["status"] == "error"),
+        "not_set": sum(1 for result in results if result["status"] == "not_set"),
+    }
+    proof_event_id = uuid.uuid4().hex
+    execute(
+        """
+        INSERT INTO proof_events (id, event_type, source_agent, payload)
+        VALUES (?, 'apps.proof_sweep.completed', ?, ?)
+        """,
+        (
+            proof_event_id,
+            request.actor,
+            json.dumps(
+                {
+                    "summary": summary,
+                    "app_ids": [result["app_id"] for result in results],
+                    "timeout_s": timeout_s,
+                    "include_without_command": request.include_without_command,
+                },
+                sort_keys=True,
+            ),
+        ),
+    )
+    return {
+        "accepted": True,
+        "status": "completed",
+        "proof_event_id": proof_event_id,
+        "summary": summary,
+        "results": results,
+    }
+
+
+@router.post("/api/apps/{app_id}/run-proof")
+def run_app_proof(app_id: str, body: ProofRunRequest | None = None) -> dict[str, Any]:
+    """Run the seeded ``proof_command``.
+
+    Persists the resulting status into ``modules.last_proof_status``
+    and the timestamp into ``modules.last_proof_at`` so the GUI lane
+    can render up-to-date proof state without re-running the command
+    on every page load.
+    """
+    record = _app_or_404(app_id)
+    timeout_s = (body.timeout_s if body else None) or 12
+    return _run_proof_for_record(record, timeout_s=timeout_s)
 
 
 @router.post("/api/source-os/modules/{app_id}/run-proof")

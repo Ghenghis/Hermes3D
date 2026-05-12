@@ -46,7 +46,7 @@ interface ToastState {
 
 interface PendingAction {
   id: string;
-  kind: "run-proof" | "rollback";
+  kind: "run-proof" | "rollback" | "proof-sweep";
 }
 
 export interface AppStatusPanelProps {
@@ -152,6 +152,29 @@ export function AppStatusPanel({
     [loadApps, pushToast],
   );
 
+  const runProofSweep = useCallback(async () => {
+    setPending({ id: "__proof_sweep__", kind: "proof-sweep" });
+    try {
+      const result = await appsClient.runProofSweep({ limit: 20, timeout_s: 12 });
+      pushToast({
+        tone: result.accepted ? "success" : "error",
+        title: result.accepted ? "Proof sweep completed" : "Proof sweep blocked",
+        body:
+          result.reason ||
+          `${result.summary.pass} pass, ${result.summary.fail} fail, ${result.summary.timeout} timeout, ${result.summary.error} error across ${result.summary.total} apps${result.proof_event_id ? ` · proof ${result.proof_event_id}` : ""}`,
+      });
+      await loadApps();
+    } catch (error) {
+      pushToast({
+        tone: "error",
+        title: "Proof sweep failed",
+        body: errorMessage(error),
+      });
+    } finally {
+      setPending(null);
+    }
+  }, [loadApps, pushToast]);
+
   const requestRollback = useCallback(
     (app: RegistryApp) => {
       // Rollback is intentionally surfaced as a navigation to the detail
@@ -202,6 +225,16 @@ export function AppStatusPanel({
           <CountPill label="proof pass" value={totals.pass} tone="green" />
           <CountPill label="proof fail" value={totals.fail} tone={totals.fail ? "amber" : "muted"} />
           <CountPill label="never proofed" value={totals.unknown} tone={totals.unknown ? "cyan" : "muted"} />
+          <button
+            type="button"
+            onClick={() => void runProofSweep()}
+            disabled={pending?.kind === "proof-sweep"}
+            data-testid="app-proof-sweep"
+            className="rounded border border-border px-2 py-1 text-[11px] text-fg hover:border-accent-cyan/40 disabled:opacity-50"
+            title="Runs a bounded proof-command sweep for up to 20 apps; does not touch printer hardware."
+          >
+            {pending?.kind === "proof-sweep" ? "Sweeping…" : "Run proof sweep"}
+          </button>
         </div>
       </header>
 

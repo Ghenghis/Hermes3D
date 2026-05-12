@@ -103,3 +103,20 @@ export interface RegistryRunProofResponse {
   /** Free-text human reason. */
   reason?: string | null;
 }
+
+export interface RegistryProofSweepSummary {
+  total: number;
+  pass: number;
+  fail: number;
+  timeout: number;
+  error: number;
+  not_set: number;
+}
+
+export interface RegistryProofSweepResponse {
+  accepted: boolean;
+  status: "completed" | "blocked" | "unknown";
+  proof_event_id: string | null;
+  summary: RegistryProofSweepSummary;
+  reason?: string | null;
+}
