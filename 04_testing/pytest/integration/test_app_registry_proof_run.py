@@ -24,6 +24,7 @@ Sources:
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -178,6 +179,35 @@ def test_run_proof_failing_command(client: TestClient) -> None:
     assert body["status"] == "fail"
     assert body["accepted"] is False
     assert body["exit_code"] == 7
+
+
+def test_run_proof_uses_app_local_path_as_working_directory(
+    client: TestClient, tmp_path: Path
+) -> None:
+    app_id = "trimesh"
+    app_dir = tmp_path / "app-source"
+    app_dir.mkdir()
+    subprocess.run(["git", "init"], cwd=app_dir, check=True, capture_output=True)
+    client.get("/api/apps")  # populate modules table
+    import hermes3d.db.init as dbinit
+
+    conn = dbinit.connect()
+    conn.execute(
+        "UPDATE modules SET proof_command = ?, local_path = ? WHERE id = ?",
+        (
+            "git rev-parse --is-inside-work-tree",
+            str(app_dir),
+            app_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    response = client.post(f"/api/apps/{app_id}/run-proof")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "pass"
+    assert "true" in body["captured_output_redacted"]
 
 
 def test_run_proof_when_not_set(client: TestClient) -> None:

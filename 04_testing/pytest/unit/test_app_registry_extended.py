@@ -212,6 +212,15 @@ def test_proof_command_round_trip(isolated_db: sqlite3.Connection) -> None:
     assert record["proof_command"] == "python -c \"print('round-trip ok')\""
 
 
+def test_app_proof_commands_avoid_known_stale_relative_paths() -> None:
+    from hermes3d.db.app_registry_extensions import APP_EXTENSIONS
+
+    assert APP_EXTENSIONS["firmware_klipper"]["proof_command"] == "git rev-parse --short HEAD"
+    assert APP_EXTENSIONS["marlin"]["proof_command"] == "git rev-parse --short HEAD"
+    assert APP_EXTENSIONS["klipper"]["proof_command"] == "git rev-parse --short HEAD"
+    assert "server/index.js" in APP_EXTENSIONS["model_context_protocol"]["proof_command"]
+
+
 def test_rollback_supported_is_boolean_int() -> None:
     """SQLite stores booleans as integers; ensure 0/1 only."""
     from hermes3d.db.app_registry_extensions import APP_EXTENSIONS

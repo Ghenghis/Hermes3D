@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -171,7 +172,11 @@ def _run_proof_for_record(record: dict[str, Any], *, timeout_s: int) -> dict[str
             "evidence_id": None,
         }
 
-    result = run_proof_command(proof_command, timeout_s=timeout_s)
+    result = run_proof_command(
+        proof_command,
+        timeout_s=timeout_s,
+        cwd=_proof_cwd(record, proof_command),
+    )
     execute(
         """
         UPDATE modules
@@ -199,6 +204,18 @@ def _run_proof_for_record(record: dict[str, Any], *, timeout_s: int) -> dict[str
         "captured_output_redacted": captured,
         "evidence_id": evidence_id,
     }
+
+
+def _proof_cwd(record: dict[str, Any], proof_command: str) -> str | None:
+    if not proof_command.strip().startswith("git rev-parse "):
+        return None
+    local_path = str(record.get("local_path") or "").strip()
+    if not local_path:
+        return None
+    path = Path(local_path)
+    if path.exists() and path.is_dir():
+        return str(path)
+    return None
 
 
 @router.post("/api/apps/run-proofs")

@@ -108,7 +108,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "MIT",
         "rollback_supported": True,
         "rollback_runbook_url": None,
-        "proof_command": "node -e \"require('@modelcontextprotocol/sdk');console.log('ok')\"",
+        "proof_command": "node -e \"import('@modelcontextprotocol/sdk/server/index.js').then(()=>console.log('ok'))\"",
         "update_lane": "stable",
     },
     # -------- firmware (frozen lane: never auto-update; operator approval) --------
@@ -117,7 +117,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "GPL-3.0-only",
         "rollback_supported": True,
         "rollback_runbook_url": "/docs/runbooks/firmware_rollback.md",
-        "proof_command": "git -C ./source-lab/sources/firmware/klipper rev-parse --short HEAD",
+        "proof_command": "git rev-parse --short HEAD",
         "update_lane": "frozen",
     },
     "marlin": {
@@ -125,7 +125,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "GPL-3.0-only",
         "rollback_supported": True,
         "rollback_runbook_url": "/docs/runbooks/firmware_rollback.md",
-        "proof_command": "git -C ./source-lab/sources/firmware/Marlin rev-parse --short HEAD",
+        "proof_command": "git rev-parse --short HEAD",
         "update_lane": "frozen",
     },
     "prusa_firmware": {
@@ -338,7 +338,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "GPL-3.0-only",
         "rollback_supported": True,
         "rollback_runbook_url": "/docs/runbooks/firmware_rollback.md",
-        "proof_command": "git -C ./source-lab/sources/print-farm/klipper rev-parse --short HEAD",
+        "proof_command": "git rev-parse --short HEAD",
         "update_lane": "frozen",
     },
     "klipperscreen": {
