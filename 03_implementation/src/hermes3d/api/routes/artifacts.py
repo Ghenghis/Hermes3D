@@ -26,6 +26,7 @@ router = APIRouter()
 #   proof_report row's notes:``mesh_artifact_id``     (proof → mesh)
 #   thumbnail row's notes:   ``mesh_artifact_id``     (thumbnail → mesh)
 #   generation mesh notes:   ``reference_artifact_id``(mesh → upstream logo/image)
+#   3MF row's notes:         ``mesh_artifact_id``     (3MF print package → mesh)
 #
 # The set below pins the keys we recognise. Adding a new lineage relation
 # means: (a) record it in notes inside the producer, (b) add it here, and
@@ -35,6 +36,8 @@ _LINEAGE_KEYS: tuple[str, ...] = (
     "proof_artifact_id",
     "thumbnail_artifact_id",
     "reference_artifact_id",
+    "processed_reference_artifact_id",
+    "package_3mf_artifact_id",
 )
 
 

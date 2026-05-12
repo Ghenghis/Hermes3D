@@ -36,6 +36,9 @@ interface GeneratedModelResult {
   artifactLabel: string;
   artifactPath: string;
   artifactSize: number;
+  packageLabel?: string;
+  packagePath?: string;
+  packageSize?: number;
   previewLabel?: string;
   proofLabel?: string;
   proofEvent?: string;
@@ -67,6 +70,8 @@ interface Gen3DTemplate {
   requires_provider: string | null;
   schema_file: string | null;
   schema_present?: boolean;
+  requires_reference_image?: boolean;
+  requires_background_removal?: boolean;
 }
 
 export function Gen3DTab() {
@@ -81,6 +86,7 @@ export function Gen3DTab() {
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [generatedModels, setGeneratedModels] = useState<GeneratedModelResult[]>([]);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
+  const [referenceArtifactId, setReferenceArtifactId] = useState<string | null>(null);
   const [referenceMessage, setReferenceMessage] = useState<string | null>(null);
   const plannerMode = previewDag?.metadata?.planner_mode;
 
@@ -162,12 +168,25 @@ export function Gen3DTab() {
         return;
       }
     }
+    if (template?.requires_reference_image && referenceArtifactId == null) {
+      setGenerateMessage("Blocked: Attach a reference image before running this template.");
+      await adapters.emitProofEvent("generation.run.blocked", {
+        reason: "reference_image_required",
+        template_id: template.id,
+      });
+      return;
+    }
 
     try {
       const response = await fetch(`${LIVE_BASE_URL}/api/generation/run`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, template_id: selectedTemplate, constraints: { size_mm: sizeMm } }),
+        body: JSON.stringify({
+          prompt,
+          template_id: selectedTemplate,
+          reference_artifact_id: referenceArtifactId,
+          constraints: { size_mm: sizeMm },
+        }),
         cache: "no-store",
       });
       const payload: unknown = await response.json().catch(() => null);
@@ -192,7 +211,7 @@ export function Gen3DTab() {
       return;
     }
     const params = new URLSearchParams({
-      evidence_type: "screenshot",
+      evidence_type: "reference_image",
       stage: "INTAKE",
       label: referenceFile.name,
       notes: `3D generation reference image for prompt: ${prompt}`,
@@ -205,8 +224,12 @@ export function Gen3DTab() {
         cache: "no-store",
       });
       const payload: unknown = await response.json().catch(() => null);
+      const artifactId = parseArtifactId(payload);
+      if (response.ok && artifactId) {
+        setReferenceArtifactId(artifactId);
+      }
       setReferenceMessage(`${response.ok ? "Attached" : "Blocked"}: ${generationSummary(payload, response.statusText)}`);
-      await adapters.emitProofEvent("generation.reference.attached", { accepted: response.ok, filename: referenceFile.name, response: payload });
+      await adapters.emitProofEvent("generation.reference.attached", { accepted: response.ok, filename: referenceFile.name, artifact_id: artifactId, response: payload });
     } catch {
       setReferenceMessage("Blocked: artifacts backend API is unreachable.");
       await adapters.emitProofEvent("generation.reference.attached", { accepted: false, filename: referenceFile.name, reason: "backend_unreachable" });
@@ -244,7 +267,7 @@ export function Gen3DTab() {
                   aria-label="Generation size mm"
                   type="number"
                   min={5}
-                  max={80}
+                  max={180}
                   value={sizeMm}
                   onChange={(event) => setSizeMm(Number(event.target.value))}
                   className="w-20 rounded border border-border bg-bg px-2 py-1 text-[11px] font-semibold text-fg"
@@ -295,7 +318,10 @@ export function Gen3DTab() {
                 <input
                   type="file"
                   accept=".png,.jpg,.jpeg,.webp"
-                  onChange={(event) => setReferenceFile(event.target.files?.[0] ?? null)}
+                  onChange={(event) => {
+                    setReferenceFile(event.target.files?.[0] ?? null);
+                    setReferenceArtifactId(null);
+                  }}
                   className="w-full text-[10px]"
                 />
                 <button type="button" onClick={() => void attachReference()} className="rounded border border-border px-2 py-1 text-[10px] text-fg">
@@ -475,6 +501,19 @@ export function Gen3DTab() {
                         // If it's a local template, pre-fill a matching prompt keyword
                         if (t.source === "local_executor" && t.id === "calibration_cube") {
                           setPrompt("calibration cube");
+                          setSizeMm(20);
+                        }
+                        if (t.source === "local_executor" && t.id === "reference_image_relief") {
+                          setPrompt("logo relief from reference image");
+                          setSizeMm(60);
+                        }
+                        if (t.source === "local_executor" && t.id === "precision_image_relief") {
+                          setPrompt("perfect 1:1 precision relief from reference image");
+                          setSizeMm(180);
+                        }
+                        if (t.id === "hunyuan3d_image_to_3d") {
+                          setPrompt("Hunyuan image to 3D from reference image");
+                          setSizeMm(60);
                         }
                       }}
                       data-testid="gen3d-template-card"
@@ -512,6 +551,9 @@ export function Gen3DTab() {
                         {t.requires_provider && (
                           <span className="ml-1 text-amber-400">· requires {t.requires_provider}</span>
                         )}
+                        {t.requires_reference_image && (
+                          <span className="ml-1 text-amber-400">· requires image</span>
+                        )}
                       </div>
                     </button>
                   );
@@ -545,10 +587,11 @@ export function Gen3DTab() {
                   <div className="grid content-start gap-1 text-[11px] text-muted">
                     <div className="truncate">Template: <span className="text-fg">{model.template}</span></div>
                     <div className="truncate">Mesh: <span className="font-mono text-fg">{formatBytes(model.artifactSize)}</span></div>
+                    {model.packageLabel && <div className="truncate">3MF: <span className="font-mono text-fg">{model.packageLabel}{model.packageSize != null ? ` · ${formatBytes(model.packageSize)}` : ""}</span></div>}
                     {model.previewLabel && <div className="truncate">Preview: <span className="font-mono text-fg">{model.previewLabel}</span></div>}
                     {model.proofLabel && <div className="truncate">Proof: <span className="font-mono text-fg">{model.proofLabel}</span></div>}
                   </div>
-                  <div className="truncate font-mono text-[10px] text-accent-cyan">{model.proofEvent ?? model.artifactPath}</div>
+                  <div className="truncate font-mono text-[10px] text-accent-cyan">{model.packagePath ?? model.proofEvent ?? model.artifactPath}</div>
                 </article>
               ))}
             </div>
@@ -572,8 +615,9 @@ function generationSummary(payload: unknown, fallback: string): string {
     return payload.detail;
   }
   if (isRecord(payload.artifact) && typeof payload.artifact.label === "string") {
+    const packageLabel = isRecord(payload.package_3mf) && typeof payload.package_3mf.label === "string" ? `; 3MF ${payload.package_3mf.label}` : "";
     const proofId = isRecord(payload.proof) && typeof payload.proof.event_id === "string" ? `; proof ${payload.proof.event_id}` : "";
-    return `${payload.artifact.label}${proofId}`;
+    return `${payload.artifact.label}${packageLabel}${proofId}`;
   }
   return String(payload.reason ?? payload.message ?? payload.status ?? payload.id ?? payload.artifact_id ?? fallback);
 }
@@ -609,17 +653,28 @@ function parseGeneratedModel(payload: unknown): GeneratedModelResult | null {
   if (typeof artifact.label !== "string" || typeof artifact.file_path !== "string") {
     return null;
   }
+  const package3mf = isRecord(payload.package_3mf) ? payload.package_3mf : null;
   return {
     jobId: payload.job_id,
     template: typeof payload.template === "string" ? payload.template : "local_template",
     artifactLabel: artifact.label,
     artifactPath: artifact.file_path,
     artifactSize: typeof artifact.file_size === "number" ? artifact.file_size : 0,
+    packageLabel: package3mf != null && typeof package3mf.label === "string" ? package3mf.label : undefined,
+    packagePath: package3mf != null && typeof package3mf.file_path === "string" ? package3mf.file_path : undefined,
+    packageSize: package3mf != null && typeof package3mf.file_size === "number" ? package3mf.file_size : undefined,
     previewLabel: isRecord(payload.preview) && typeof payload.preview.label === "string" ? payload.preview.label : undefined,
     proofLabel: isRecord(payload.proof) && typeof payload.proof.label === "string" ? payload.proof.label : undefined,
     proofEvent: isRecord(payload.proof) && typeof payload.proof.event_id === "string" ? payload.proof.event_id : undefined,
     truthGate: isRecord(payload.truth_gate) && typeof payload.truth_gate.status === "string" ? payload.truth_gate.status : undefined,
   };
+}
+
+function parseArtifactId(payload: unknown): string | null {
+  if (!isRecord(payload)) {
+    return null;
+  }
+  return typeof payload.id === "string" ? payload.id : null;
 }
 
 function formatBytes(bytes: number): string {
