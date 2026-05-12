@@ -57,6 +57,11 @@ def _llm_timeout_s() -> float:
 # Maximum completion tokens the LLM may emit per audit handoff. Large
 # enough for a thorough audit doc, small enough to keep latency bounded.
 def _max_completion_tokens() -> int:
+    # 4096 tokens fits the gateway's tunable timeout (default 60 s via
+    # HERMES3D_MINIMAX_COMPLETION_TIMEOUT_S). Earlier 1024 cap forced
+    # reasoning-aloud models to exhaust their budget mid-think, leaving
+    # raw <think> tags in the handoff body. With 4096 the model can
+    # finish reasoning AND emit the final audit markdown.
     return int(os.environ.get("HERMES3D_PERSONA_EXEC_MAX_TOKENS", "4096"))
 
 
@@ -147,10 +152,11 @@ _AUDIT_PROMPT_TEMPLATE = """You are the Hermes Agent persona `{persona}` working
 The task is to produce the markdown deliverable below as an honest audit doc that obeys these strict rules:
 
 1. No printer hardware claims.
-2. No fake-pass / no-aspirational language. If something is not measured, say "not measured".
-3. Cite filepaths, route names, byte counts, or HTTP status codes when known.
-4. Surface unknowns explicitly with a header section.
-5. Mark this doc as MVP-3-generated and require operator review before treating it as final.
+2. No fake-pass / no-aspirational language. If something is not measured, say "not measured" — but use that phrase AT MOST 2 times in the whole doc.
+3. Cite filepaths, route names, byte counts, or HTTP status codes ONLY when they appear verbatim in the task summary above OR are obvious Hermes3D-wide names (e.g. `/api/agents/health`). Do NOT invent file paths, line numbers, framework names, or component names. If you don't know a specific file, say so explicitly rather than making one up.
+4. This is a Python + React codebase. The backend lives under `03_implementation/src/hermes3d/` (FastAPI) and the UI under `03_implementation/ui/src/` (React/TypeScript). Do NOT cite Vue.js, Angular, Django, Flask, Go, or any framework not used here.
+5. Surface unknowns explicitly with a header section.
+6. Mark this doc as MVP-3-generated and require operator review before treating it as final.
 
 Task title: {title}
 Task summary:
@@ -160,15 +166,15 @@ Deliverable path (relative to repo root): {handoff_path}
 Auditor identity: persona `{persona}` (Hermes Agent MVP-3 executor)
 Date (UTC): {now}
 
-Produce a complete markdown document starting with a level-1 header. Include sections for:
+Produce a CONCISE markdown document starting with a level-1 header. Include compact sections:
   - Verdict (one short sentence)
   - Scope (what is and is NOT in this audit)
-  - Findings (numbered, each with evidence type)
-  - Gaps / Unknowns
-  - Recommended next actions
-  - MVP-3 attestation footer
+  - Findings (3-6 numbered bullets, each one line)
+  - Gaps / Unknowns (3-5 bullets)
+  - Recommended next actions (3-5 bullets, imperative phrasing)
+  - MVP-3 attestation footer (one paragraph)
 
-Keep the doc under 3000 words. Do not invent data; defer to "not measured" or "operator must verify" when uncertain.
+STRICT: keep under 600 words total. Do NOT invent data; mark uncertain items "not measured" or "operator must verify". This is a starting draft, not a final audit.
 """
 
 
@@ -217,6 +223,11 @@ def _generate_audit_markdown(
             LLMRequest(
                 prompt=prompt,
                 max_completion_tokens=_max_completion_tokens(),
+                # token_id is an audit-ledger identifier the gateway threads
+                # through to the proof envelope; use the task_id so the
+                # generated handoff is traceable to the originating queue
+                # task without an extra lookup.
+                token_id=f"persona-executor/{task.task_id}",
             )
         )
     except Exception as exc:  # noqa: BLE001 — LLM failure must not crash poller
@@ -236,42 +247,212 @@ def _generate_audit_markdown(
     return response.redacted_text, metadata
 
 
+def _sanitize_llm_output(text: str) -> str:
+    """Aggressive sanitiser for reasoning-aloud LLM output.
+
+    Performs:
+
+    1. Strip closed ``<think>...</think>`` blocks (any case).
+    2. Drop unclosed ``<think>...`` to end of string (truncated reasoning).
+    3. Unwrap a single outermost ```markdown / ``` fence that wraps the
+       entire document (some MiniMax responses wrap the whole answer in
+       a code fence — we want the rendered markdown, not a code block).
+    4. Strip an outermost ```/```` fence with no language tag too.
+    5. Collapse 3+ consecutive blank lines to 2.
+
+    Returns the cleaned text with leading/trailing whitespace trimmed.
+
+    The strict ``_passes_quality_gate`` check below catches anything this
+    sanitiser misses (e.g. multiple nested fences, mid-document leaks).
+    """
+    import re
+
+    if not text:
+        return ""
+    # 1. Closed <think>...</think>.
+    text = re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL | re.IGNORECASE)
+    # 2. Unclosed <think> ... <EOF>.
+    text = re.sub(r"<think>.*$", "", text, flags=re.DOTALL | re.IGNORECASE)
+    # 3-4. Unwrap outermost whole-doc code fence (```markdown or bare ```).
+    fence_match = re.match(
+        r"\s*```(?:markdown|md)?\s*\n(.*?)\n```\s*\Z",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if fence_match:
+        text = fence_match.group(1)
+    # 5. Collapse runs of blank lines.
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
+# Backward-compat alias for existing tests.
+_strip_think_blocks = _sanitize_llm_output
+
+
+# Quality-gate thresholds. Tunable but conservative defaults so a model
+# producing "I don't know" boilerplate is rejected.
+_QUALITY_MIN_CHARS = 400
+_QUALITY_MAX_NOT_MEASURED_HITS = 3
+_QUALITY_BOILERPLATE_PHRASES = (
+    "not measured",
+    "operator must verify",
+    "i don't have access",
+    "i cannot verify",
+    "i can't verify",
+    "i don't know",
+    "as an ai",
+    "i am an ai",
+    "as a language model",
+)
+
+# Hallucination tripwires: phrases that prove the LLM invented frameworks /
+# tools that this codebase does NOT use. Hermes3D is Python (FastAPI) +
+# React (TypeScript). Any other framework reference is a hallucination.
+_HALLUCINATION_PHRASES = (
+    ".vue",  # Vue single-file components
+    "vue.js",
+    "vuejs",
+    "angular",
+    "django",
+    "flask",
+    "express.js",
+    "rails",
+    "spring boot",
+    "spring-boot",
+    "node.js backend",  # the backend is Python, not Node
+    "express server",
+)
+
+
+def _passes_quality_gate(sanitized_body: str) -> tuple[bool, str | None]:
+    """Run the quality gate against sanitised LLM output.
+
+    Returns ``(True, None)`` on pass, or ``(False, reason)`` on reject.
+
+    Rejects:
+
+    * Still contains a ``<think>`` tag (sanitiser bypass).
+    * Still contains a ``​``-suspicious fenced ```markdown header
+      anywhere in the body (multi-fence response).
+    * Body length under :data:`_QUALITY_MIN_CHARS` (empty / near-empty).
+    * Body has more than :data:`_QUALITY_MAX_NOT_MEASURED_HITS`
+      occurrences of any boilerplate phrase (mostly "I don't know").
+
+    A rejecting task is moved to ``blocked/`` with the returned reason
+    so the operator sees exactly why MVP-3 declined to publish.
+    """
+    if not sanitized_body or not sanitized_body.strip():
+        return False, "quality_gate:empty_after_sanitize"
+    if "<think>" in sanitized_body.lower():
+        return False, "quality_gate:think_tag_survived_sanitizer"
+    # A whole-doc fence should already be unwrapped; reject if one
+    # survives at the very start (defensive — the LLM emitted nested or
+    # malformed fences).
+    # Any triple-fence at the very top of the doc is suspect: a real
+    # handoff starts with an ``#`` heading. ``` (bare), ```markdown,
+    # ```md, ```text are all treated as a sanitizer bypass.
+    head = sanitized_body[:200].lstrip()
+    if head.startswith("```"):
+        return False, "quality_gate:whole_document_markdown_fence_survived"
+    if len(sanitized_body) < _QUALITY_MIN_CHARS:
+        return False, f"quality_gate:too_short:{len(sanitized_body)}<{_QUALITY_MIN_CHARS}"
+    lower = sanitized_body.lower()
+    hits = sum(lower.count(phrase) for phrase in _QUALITY_BOILERPLATE_PHRASES)
+    if hits > _QUALITY_MAX_NOT_MEASURED_HITS:
+        return False, f"quality_gate:boilerplate_density:{hits}>{_QUALITY_MAX_NOT_MEASURED_HITS}"
+    # Hallucination tripwire: any framework/tool reference the codebase
+    # doesn't use indicates the LLM invented context. Reject so the
+    # operator sees the explicit reason.
+    for phrase in _HALLUCINATION_PHRASES:
+        if phrase in lower:
+            return False, f"quality_gate:hallucinated_framework:{phrase}"
+    return True, None
+
+
+def _resolve_handoff_path(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> Path | None:
+    """Resolve task.handoff_path under workspace_root with escape guard.
+
+    Returns the absolute Path or None on failure. Pure resolution — does
+    NOT touch the filesystem.
+    """
+    if not task.handoff_path:
+        LOG.warning("persona_executor: task=%s has no handoff_path", task.task_id)
+        return None
+    abs_path = (workspace_root / task.handoff_path).resolve()
+    try:
+        ws_resolved = workspace_root.resolve()
+        abs_path.relative_to(ws_resolved)
+    except ValueError:
+        LOG.warning(
+            "persona_executor: handoff_path %s escapes workspace %s",
+            abs_path,
+            workspace_root,
+        )
+        return None
+    except Exception as exc:  # noqa: BLE001
+        LOG.warning("persona_executor: path resolution failed: %s", exc)
+        return None
+    return abs_path
+
+
+def _is_existing_handoff_substantial(abs_path: Path) -> bool:
+    """A handoff file is 'substantial' if it exists and is non-trivial.
+
+    >= 200 bytes is the cutoff so a tiny one-line `# Title` left by a
+    prior bad MVP-3 run still counts as overwrite-able, but a real
+    operator-written audit (always > 1 KB) is preserved.
+    """
+    try:
+        if not abs_path.is_file():
+            return False
+        return abs_path.stat().st_size >= 200
+    except OSError:
+        return False
+
+
 def _write_handoff_doc(
     task: queue_bridge.TaskSnapshot,
     body_markdown: str,
     persona: str,
     metadata: dict[str, Any],
     workspace_root: Path,
-) -> Path | None:
-    """Write the LLM-generated markdown to ``task.handoff_path``.
+) -> tuple[Path, str] | tuple[None, str]:
+    """Sanitise + quality-gate + write the LLM-generated markdown.
 
-    Prepends an MVP-3 attestation header so the doc is clearly marked as
-    machine-generated and must be operator-reviewed.
+    Returns ``(Path, "written")`` on success, ``(None, "<reject_reason>")``
+    on quality-gate reject or write failure. The reject reason flows into
+    the task's blocked_reason so the operator knows exactly why the
+    persona declined to publish.
 
-    Returns the absolute Path on success, ``None`` on failure (path
-    outside workspace, write error, etc.).
+    Preserves any existing substantial handoff file at the target path:
+    returns ``(existing_path, "preserved_existing_handoff")`` without
+    overwriting. This protects human-written audits from being
+    clobbered by MVP-3 drafts.
     """
-    if not task.handoff_path:
-        LOG.warning("persona_executor: task=%s has no handoff_path", task.task_id)
-        return None
+    # 1. Path resolution + escape guard.
+    abs_path = _resolve_handoff_path(task, workspace_root)
+    if abs_path is None:
+        return None, "handoff_path_unresolvable_or_outside_workspace"
 
-    abs_path = (workspace_root / task.handoff_path).resolve()
-    try:
-        # Safety: refuse to write outside the workspace root.
-        ws_resolved = workspace_root.resolve()
-        try:
-            abs_path.relative_to(ws_resolved)
-        except ValueError:
-            LOG.warning(
-                "persona_executor: handoff_path %s escapes workspace %s",
-                abs_path,
-                ws_resolved,
-            )
-            return None
-    except Exception as exc:  # noqa: BLE001
-        LOG.warning("persona_executor: path resolution failed: %s", exc)
-        return None
+    # 2. Preserve existing substantial handoff.
+    if _is_existing_handoff_substantial(abs_path):
+        LOG.info(
+            "persona_executor: preserving existing handoff at %s (task=%s)",
+            abs_path,
+            task.task_id,
+        )
+        return abs_path, "preserved_existing_handoff"
 
+    # 3. Sanitise LLM output.
+    body_markdown = _sanitize_llm_output(body_markdown)
+
+    # 4. Quality gate.
+    ok, reject_reason = _passes_quality_gate(body_markdown)
+    if not ok:
+        return None, reject_reason or "quality_gate:unknown_reason"
+
+    # 5. Write attestation header + sanitised body.
     header = (
         f"# {task.title}\n\n"
         f"> ⚙️ **MVP-3 attestation — operator review REQUIRED.**\n"
@@ -287,14 +468,13 @@ def _write_handoff_doc(
         f"target_owner_pattern `{task.target_owner_pattern}`\n\n"
         f"---\n\n"
     )
-
     try:
         abs_path.parent.mkdir(parents=True, exist_ok=True)
         abs_path.write_text(header + body_markdown, encoding="utf-8")
     except OSError as exc:
         LOG.warning("persona_executor: write %s failed: %s", abs_path, exc)
-        return None
-    return abs_path
+        return None, f"write_failed:{exc.__class__.__name__}"
+    return abs_path, "written"
 
 
 # ---------------------------------------------------------------------------
@@ -345,6 +525,63 @@ def execute_one(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> dict[s
             "class": task_class,
         }
 
+    # PRESERVE-EXISTING short-circuit: if the handoff_path already exists
+    # with substantial human-written content (>=200 bytes), do NOT call
+    # the LLM — mark the task done and keep the existing file untouched.
+    # Prevents the executor from clobbering operator-written audits with
+    # weaker MVP-3 drafts.
+    abs_path = _resolve_handoff_path(task, workspace_root)
+    if abs_path is None:
+        # Malformed task: handoff_path missing or escaping the workspace.
+        # Block before burning an LLM call — the operator must fix the
+        # task definition.
+        reason = "invalid_handoff_path"
+        ok = queue_bridge.block_task(workspace_root, task.task_id, reason, persona=persona)
+        _emit_proof_event(
+            "persona_executor.task.blocked",
+            {
+                "task_id": task.task_id,
+                "persona": persona,
+                "class": task_class,
+                "handoff_path": task.handoff_path,
+                "reason": reason,
+                "moved": ok,
+            },
+        )
+        return {
+            "task_id": task.task_id,
+            "outcome": "blocked",
+            "reason": reason,
+            "handoff": None,
+            "class": task_class,
+        }
+
+    if _is_existing_handoff_substantial(abs_path):
+        LOG.info(
+            "persona_executor: preserving existing handoff at %s for task=%s",
+            abs_path,
+            task.task_id,
+        )
+        ok = queue_bridge.complete_task(workspace_root, task.task_id, persona=persona)
+        _emit_proof_event(
+            "persona_executor.task.done",
+            {
+                "task_id": task.task_id,
+                "persona": persona,
+                "class": task_class,
+                "handoff_path": str(abs_path),
+                "write_status": "preserved_existing_handoff",
+                "moved": ok,
+            },
+        )
+        return {
+            "task_id": task.task_id,
+            "outcome": "done",
+            "reason": "preserved_existing_handoff",
+            "handoff": str(abs_path),
+            "class": task_class,
+        }
+
     # Audit class — try to generate the handoff doc.
     generated = _generate_audit_markdown(task, persona)
     if generated is None:
@@ -369,9 +606,10 @@ def execute_one(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> dict[s
         }
 
     body, metadata = generated
-    written_path = _write_handoff_doc(task, body, persona, metadata, workspace_root)
+    written_path, write_status = _write_handoff_doc(task, body, persona, metadata, workspace_root)
     if written_path is None:
-        reason = "handoff_path_write_failed_or_outside_workspace"
+        # Quality gate or write failure — block with the gate's exact reason.
+        reason = write_status
         ok = queue_bridge.block_task(workspace_root, task.task_id, reason, persona=persona)
         _emit_proof_event(
             "persona_executor.task.blocked",
@@ -380,6 +618,9 @@ def execute_one(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> dict[s
                 "persona": persona,
                 "class": task_class,
                 "reason": reason,
+                "tokens_in": metadata.get("tokens_in"),
+                "tokens_out": metadata.get("tokens_out"),
+                "model": metadata.get("model"),
                 "moved": ok,
             },
         )
@@ -391,7 +632,8 @@ def execute_one(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> dict[s
             "class": task_class,
         }
 
-    # Success: mark task done.
+    # Success: mark task done. write_status is "written" or
+    # "preserved_existing_handoff" (we keep human-verified content).
     ok = queue_bridge.complete_task(workspace_root, task.task_id, persona=persona)
     _emit_proof_event(
         "persona_executor.task.done",
@@ -400,16 +642,24 @@ def execute_one(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> dict[s
             "persona": persona,
             "class": task_class,
             "handoff_path": str(written_path),
+            "write_status": write_status,
             "tokens_in": metadata.get("tokens_in"),
             "tokens_out": metadata.get("tokens_out"),
             "model": metadata.get("model"),
             "moved": ok,
         },
     )
+    # If we preserved an existing human-verified handoff, surface that
+    # in the reason so audit logs differentiate human vs. MVP-3 drafts.
+    reason = (
+        "preserved_existing_handoff"
+        if write_status == "preserved_existing_handoff"
+        else "audit_handoff_generated"
+    )
     return {
         "task_id": task.task_id,
         "outcome": "done",
-        "reason": "audit_handoff_generated",
+        "reason": reason,
         "handoff": str(written_path),
         "class": task_class,
     }

@@ -89,7 +89,16 @@ def completion_caller(config: ProviderConfig) -> LLMCaller:
             "messages": [{"role": "user", "content": request.prompt}],
             "max_completion_tokens": request.max_completion_tokens,
         }
-        with httpx.Client(timeout=httpx.Timeout(10.0)) as client:
+        # W21-MVP-3: completion (vs probe) needs a generous timeout — a
+        # 1024-token audit response routinely takes 30-60 s on the
+        # MiniMax high-speed model. Default 60 s; operator-tunable via
+        # HERMES3D_MINIMAX_COMPLETION_TIMEOUT_S. The probe path stays at
+        # the original short timeout because probes are latency-sensitive.
+        try:
+            timeout_s = float(os.environ.get("HERMES3D_MINIMAX_COMPLETION_TIMEOUT_S", "60.0"))
+        except (TypeError, ValueError):
+            timeout_s = 60.0
+        with httpx.Client(timeout=httpx.Timeout(timeout_s)) as client:
             response = client.post(url, headers=headers, json=body)
         parsed = response.json()
         return LLMResponse(

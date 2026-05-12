@@ -38,7 +38,20 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
 
     # Patch the LLM caller globally so the integration test stays hermetic.
     persona_executor_mod = importlib.import_module("hermes3d.services.persona_executor")
-    fake_md = "# Integration Test Audit\n\nVerdict: stubbed for integration test.\n"
+    # Stub body must be substantial enough to pass the W21-MVP-3 quality
+    # gate (>= 400 chars, no surviving <think>, no boilerplate density).
+    fake_md = (
+        "# Integration Test Audit\n\n"
+        "**Verdict:** Backend at /api/agents/health returned 200 OK with eight "
+        "Hermes Agent personas registered. No printer hardware actions taken.\n\n"
+        "## Findings\n\n"
+        "1. /api/agents/queue/status surfaces real claim counts.\n"
+        "2. Workspace root resolved via HERMES3D_WORKSPACE_ROOT env var.\n"
+        "3. proof_events table holds the new task.done row.\n\n"
+        "## Recommended actions\n\n"
+        "- Operator: verify the on-disk handoff path matches the task summary.\n"
+        "- Operator: re-run after next CI cycle if backend changed.\n"
+    )
     fake_meta = {"model": "stub-llm", "tokens_in": 100, "tokens_out": 30}
     monkeypatch.setattr(
         persona_executor_mod, "_generate_audit_markdown", lambda t, p: (fake_md, fake_meta)
