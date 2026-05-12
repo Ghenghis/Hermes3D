@@ -131,12 +131,27 @@ def create_gui_app() -> FastAPI:
     async def _shutdown() -> None:
         # Cancel the queue poller cleanly on shutdown so a re-run of
         # the dev server does not leak the task.
+        #
+        # CRITICAL hotfix (W21-A4 regression in #258):
+        # asyncio.CancelledError extends BaseException (NOT Exception) in
+        # Python 3.8+. A bare `except Exception:` does NOT catch it; the
+        # CancelledError propagates out of the shutdown hook into
+        # TestClient.__exit__ — causing test_blk021_coldstart_concurrent_
+        # first_requests to report "child errored: CancelledError" when
+        # the child fork tears down the app. Catch BaseException so the
+        # poller cancel is silent.
+        import asyncio as _asyncio
+
         task = getattr(app.state, "queue_poller_task", None)
         if task is not None and not task.done():
             task.cancel()
             try:
                 await task
-            except Exception:
+            except _asyncio.CancelledError:
+                pass
+            except BaseException:
+                # Defense-in-depth: any other shutdown error must not
+                # propagate out of the lifespan hook either.
                 pass
 
     @app.middleware("http")
