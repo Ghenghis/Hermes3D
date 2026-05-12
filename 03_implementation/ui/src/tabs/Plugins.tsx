@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { adapters } from "../api/adapters";
 import { ResizablePane } from "../components/layout/ResizablePane";
 import { PluginList } from "../components/plugins/PluginList";
+import { PANEL_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
 import type { Plugin } from "../types/plugin";
 import type { SourceModuleRuntimeSetupQueue, SourceModuleUpdateReadiness } from "../types/source-os";
 
@@ -58,10 +59,22 @@ export function PluginsTab() {
   };
 
   useEffect(() => {
-    load();
     loadReadiness(false);
     loadSetupQueue();
+    // Readiness and the setup queue change rarely (operator action +
+    // bg backups) — one-shot mount is fine for them; do NOT re-poll
+    // and clobber the operator's view if they're mid-action.
   }, []);
+
+  // W21-MVP-5: poll the plugin list itself so install_state /
+  // activation toggles surface without a manual reload after the
+  // operator (or another tab) flips a plugin. Reuses ``load`` so the
+  // normalisation pipeline stays identical.
+  const refreshPlugins = useCallback(async () => {
+    const next = await adapters.getPlugins();
+    setPlugins(next.map(normalizePlugin));
+  }, []);
+  usePollingEffect(refreshPlugins, PANEL_POLL_MS, [refreshPlugins]);
 
   const activate = async (plugin: Plugin) => {
     if (!plugin.configured) {

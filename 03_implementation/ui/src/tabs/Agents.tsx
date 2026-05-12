@@ -4,7 +4,8 @@
  * Roster · selected agent details · live activity log · model/provider
  * selector · action row (all dangerous actions locked).
  */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { PANEL_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
 import { Panel } from "../components/layout/Panel";
 import { StatusBadge, type StatusTone } from "../components/badges/StatusBadge";
 import { AgentCommandCenter } from "../components/agents/AgentCommandCenter";
@@ -233,6 +234,38 @@ export function AgentsTab() {
       setSelectedId(agents[0]?.id ?? null);
     }
   }, [agents, selectedId]);
+
+  // W21-MVP-5: poll the agent roster + notification queue + idle
+  // workbench candidates on PANEL_POLL_MS. The one-shot useEffects
+  // above seed selectedId / loadState / messages on mount; this poll
+  // refreshes the data those panels render without disturbing
+  // operator-controlled state. ``usePollingEffect`` cancels overlap.
+  // Errors from one fetch don't break the others — each branch
+  // catches locally.
+  const refreshAgentsPanel = useCallback(async () => {
+    await Promise.all([
+      Promise.all([adapters.getAgents(), adapters.getNotifications()])
+        .then(([nextAgents, nextNotifications]) => {
+          setAgents(nextAgents);
+          setNotifications(nextNotifications);
+        })
+        .catch(() => {
+          /* keep previous data on transient backend hiccup */
+        }),
+      adapters
+        .getIdleWorkbench()
+        .then((next) => {
+          setWorkbench(next);
+          setWorkbenchMessage(
+            `${next.candidates.length} candidate${next.candidates.length === 1 ? "" : "s"} · ${next.blockers.length} blocker${next.blockers.length === 1 ? "" : "s"}.`,
+          );
+        })
+        .catch(() => {
+          /* keep previous workbench data */
+        }),
+    ]);
+  }, []);
+  usePollingEffect(refreshAgentsPanel, PANEL_POLL_MS, [refreshAgentsPanel]);
 
   const activeAgents = agents.filter((a) => a.status === "active").length;
   const selectedProvider = selected?.model_provider ?? "";

@@ -167,3 +167,73 @@ export function useMutation<TVars, TResult>(
 
 /** Standard polling cadence for status panels (5 s). */
 export const STATUS_POLL_MS = 5_000;
+
+/**
+ * Polling cadence for "background" data panels (15 s) — the Files,
+ * Artifacts, Agents, Gen3D, Plugins tabs whose data changes when the
+ * operator (or another tab) acts, but doesn't need 5 s status-strip
+ * freshness. W21-MVP-5 baseline; tune per-tab if a workflow needs it.
+ */
+export const PANEL_POLL_MS = 15_000;
+
+/**
+ * Lag-protected polling effect. Calls ``effect`` once immediately, then
+ * on every ``intervalMs`` tick — but **never overlaps** in-flight runs:
+ * if a previous invocation is still pending when the next tick fires,
+ * the tick is skipped. The most-recent ``effect`` closure is always
+ * used (via ref) so callers can pass an inline arrow without
+ * re-arming the interval every render.
+ *
+ * Cleans up on unmount: cancels the interval and sets a ``cancelled``
+ * flag so any pending ``effect`` can early-exit before touching state.
+ *
+ * Cancellation note: this hook does NOT pass an AbortSignal because the
+ * stale tabs reuse their existing un-aborted fetch functions; if a
+ * caller wants cancellation, they can capture an AbortController inside
+ * their own ``effect`` and close over it. ``useQuery`` is the
+ * preferred primitive when AbortSignal-based cancellation matters.
+ *
+ *   usePollingEffect(refresh, PANEL_POLL_MS, []);
+ *
+ * Match-points: pass an empty dep array if ``effect`` is stable across
+ * renders (``useCallback`` or top-level function); otherwise list the
+ * inputs that should restart the timer.
+ */
+export function usePollingEffect(
+  effect: () => void | Promise<void>,
+  intervalMs: number,
+  deps: ReadonlyArray<unknown> = [],
+): void {
+  const effectRef = useRef(effect);
+  effectRef.current = effect;
+
+  useEffect(() => {
+    let cancelled = false;
+    let inFlight = false;
+
+    const tick = async (): Promise<void> => {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+      try {
+        await effectRef.current();
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void tick(); // immediate first call
+    if (!intervalMs || intervalMs <= 0) {
+      return () => {
+        cancelled = true;
+      };
+    }
+    const timer = window.setInterval(() => {
+      void tick();
+    }, intervalMs);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intervalMs, ...deps]);
+}
