@@ -101,16 +101,46 @@ def _heartbeat_our_claims(root: Path, personas: set[str]) -> int:
 
 def tick_once() -> dict[str, int]:
     """One poll cycle. Public so unit tests can drive it without
-    spawning the asyncio loop."""
+    spawning the asyncio loop.
+
+    W21-MVP-3: each tick now ALSO runs the persona executor against the
+    claimed/ dir (bounded by HERMES3D_PERSONA_EXEC_MAX_PER_TICK). This is
+    what makes claimed tasks actually produce a deliverable instead of
+    sitting forever in claimed/. Disable with HERMES3D_PERSONA_EXECUTOR_
+    DISABLED=1 for tests that want to drive execution synchronously.
+    """
     root = _workspace_root()
     personas = _available_personas()
     if not personas:
-        return {"personas": 0, "claimed": 0, "heartbeats": 0, "pending_seen": 0}
+        return {
+            "personas": 0,
+            "claimed": 0,
+            "heartbeats": 0,
+            "pending_seen": 0,
+            "executed_done": 0,
+            "executed_blocked": 0,
+        }
     persona_set = set(personas)
 
-    # 1. Refresh heartbeats first so a long-running claimed task does not
-    #    look stale to the orchestrator while we are also trying to claim.
+    # 1. Refresh heartbeats on currently-claimed tasks FIRST. The MVP-3
+    #    executor below may move some of them to done/blocked, but any
+    #    that survive (e.g. the executor disabled flag, max-per-tick
+    #    reached) need their heartbeat updated so the orchestrator does
+    #    not consider them stale.
     heartbeats = _heartbeat_our_claims(root, persona_set)
+
+    # 2. W21-MVP-3: run the persona executor on currently-claimed tasks
+    #    BEFORE claiming more. Keeps the pipeline flowing
+    #    (claim -> execute -> done) instead of accumulating claims.
+    try:
+        from hermes3d.services import persona_executor
+
+        exec_results = persona_executor.execute_claimed_tasks(workspace_root=root)
+    except Exception as exc:  # noqa: BLE001 — executor failure must not stall poll
+        LOG.warning("queue_poller: persona executor raised: %s", exc)
+        exec_results = []
+    executed_done = sum(1 for r in exec_results if r.get("outcome") == "done")
+    executed_blocked = sum(1 for r in exec_results if r.get("outcome") == "blocked")
 
     # 2. Walk pending tasks in priority order (descending). The
     #    queue_bridge.list_tasks sort is by filename today; sort here
@@ -139,6 +169,8 @@ def tick_once() -> dict[str, int]:
         "claimed": claimed_this_tick,
         "heartbeats": heartbeats,
         "pending_seen": seen,
+        "executed_done": executed_done,
+        "executed_blocked": executed_blocked,
     }
 
 

@@ -153,8 +153,12 @@ def test_poller_tick_once_claims_matching_task(
     persona id from the PERSONAS roster. This is the core proof that
     the auto-poller will pick up real W21 tasks in production."""
     monkeypatch.setenv("HERMES3D_WORKSPACE_ROOT", str(tmp_path))
+    # MVP-2 test scope only — disable MVP-3 executor so it doesn't move
+    # tasks out of the claimed/ dir before the test asserts on them.
+    monkeypatch.setenv("HERMES3D_PERSONA_EXECUTOR_DISABLED", "1")
     # Re-import to pick up the new env var.
     sys.modules.pop("hermes3d.services.queue_poller", None)
+    sys.modules.pop("hermes3d.services.persona_executor", None)
     from hermes3d.services import queue_poller
 
     # The real PERSONAS roster includes factory-operator; seed a matching task.
@@ -226,7 +230,11 @@ def test_poller_heartbeats_our_claimed_tasks(
     heartbeat refresh on the next tick — the orchestrator uses this to
     avoid considering live claims stale."""
     monkeypatch.setenv("HERMES3D_WORKSPACE_ROOT", str(tmp_path))
+    # MVP-2 test scope — disable MVP-3 executor so the seeded claim
+    # is not moved out of claimed/ before this test asserts on it.
+    monkeypatch.setenv("HERMES3D_PERSONA_EXECUTOR_DISABLED", "1")
     sys.modules.pop("hermes3d.services.queue_poller", None)
+    sys.modules.pop("hermes3d.services.persona_executor", None)
     from hermes3d.services import queue_poller
 
     # Manually seed a claimed task as if a prior tick had taken it.
