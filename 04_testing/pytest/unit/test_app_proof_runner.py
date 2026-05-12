@@ -46,3 +46,24 @@ def test_run_proof_timeout_kills_process_tree(monkeypatch):
     assert "process tree killed" in result["stderr"]
     assert killed == [12345]
     assert fake.killed is False
+
+
+def test_seeded_command_resolves_known_windows_tool_when_not_on_path(monkeypatch, tmp_path):
+    tool = tmp_path / "Tool App" / "tool.exe"
+    tool.parent.mkdir()
+    tool.write_text("fake")
+    monkeypatch.setattr(app_proof_runner.shutil, "which", lambda token: None)
+    monkeypatch.setitem(app_proof_runner.WINDOWS_TOOL_FALLBACKS, "tool", (str(tool),))
+
+    resolved = app_proof_runner._resolve_seeded_command("tool --version")
+
+    assert resolved == f'"{tool}" --version'
+
+
+def test_seeded_command_leaves_path_tool_unchanged(monkeypatch, tmp_path):
+    fallback = tmp_path / "fallback.exe"
+    fallback.write_text("fake")
+    monkeypatch.setattr(app_proof_runner.shutil, "which", lambda token: f"C:/bin/{token}.exe")
+    monkeypatch.setitem(app_proof_runner.WINDOWS_TOOL_FALLBACKS, "blender", (str(fallback),))
+
+    assert app_proof_runner._resolve_seeded_command("blender --version") == "blender --version"

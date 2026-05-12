@@ -27,9 +27,11 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
 import signal
 import subprocess
 import time
+from pathlib import Path
 from typing import Any
 
 from hermes3d.gateways.redaction import redact_text
@@ -37,6 +39,26 @@ from hermes3d.gateways.redaction import redact_text
 DEFAULT_TIMEOUT_S = 12
 MAX_TIMEOUT_S = 60
 MAX_OUTPUT_BYTES = 16 * 1024
+
+WINDOWS_TOOL_FALLBACKS: dict[str, tuple[str, ...]] = {
+    "blender": (
+        r"C:\Program Files\Blender Foundation\Blender 5.1\blender.exe",
+        r"C:\Program Files\Blender Foundation\Blender 4.5\blender.exe",
+        r"C:\Program Files\Blender Foundation\Blender 4.4\blender.exe",
+        r"C:\Program Files\Blender Foundation\Blender 4.3\blender.exe",
+        r"C:\Program Files\Blender Foundation\Blender 3.6\blender.exe",
+    ),
+    "openscad": (
+        r"C:\Program Files\OpenSCAD\openscad.exe",
+        r"C:\Program Files (x86)\OpenSCAD\openscad.exe",
+        r"C:\Program Files\OpenSCAD (Nightly)\openscad.exe",
+    ),
+    "curaengine": (
+        r"C:\Program Files\UltiMaker Cura 5.12.1\CuraEngine.exe",
+        r"C:\Program Files\Ultimaker Cura\CuraEngine.exe",
+        r"C:\Program Files\Ultimaker Cura 4.13.1\CuraEngine.exe",
+    ),
+}
 
 
 def run_proof_command(
@@ -66,7 +88,7 @@ def run_proof_command(
             "timed_out": False,
             "accepted": False,
         }
-    cmd = proof_command.strip()
+    cmd = _resolve_seeded_command(proof_command.strip())
     safe_timeout = max(1, min(int(timeout_s or DEFAULT_TIMEOUT_S), MAX_TIMEOUT_S))
     started = time.monotonic()
     try:
@@ -188,6 +210,65 @@ def _redact_command(cmd: str) -> str:
     canonicalize so the operator can see exactly what we ran.
     """
     return redact_text(cmd)
+
+
+def _resolve_seeded_command(cmd: str) -> str:
+    """Resolve known seeded proof commands to real local tool paths.
+
+    The 60-app registry is supposed to report whether local tools are usable,
+    not whether the operator remembered to put every desktop app on PATH.
+    Keep this intentionally tiny: only replace the first token for known,
+    operator-seeded commands, and leave everything else unchanged.
+    """
+
+    token, suffix = _split_first_token(cmd)
+    if not token:
+        return cmd
+    resolved = _resolve_tool_token(token)
+    if resolved is None:
+        return cmd
+    return f"{_quote_shell_path(resolved)}{suffix}"
+
+
+def _split_first_token(cmd: str) -> tuple[str, str]:
+    stripped = cmd.lstrip()
+    leading = cmd[: len(cmd) - len(stripped)]
+    if not stripped:
+        return "", ""
+    try:
+        tokens = shlex.split(stripped, posix=False)
+    except ValueError:
+        tokens = []
+    if not tokens:
+        parts = stripped.split(maxsplit=1)
+        token = parts[0]
+    else:
+        token = tokens[0].strip("\"'")
+    suffix_start = len(leading) + len(token)
+    # Handle quoted first tokens by advancing over the closing quote.
+    if stripped[0] in "\"'":
+        quote = stripped[0]
+        end = cmd.find(quote, len(leading) + 1)
+        if end != -1:
+            suffix_start = end + 1
+    return token, cmd[suffix_start:]
+
+
+def _resolve_tool_token(token: str) -> str | None:
+    name = Path(token).name.lower()
+    if name.endswith(".exe"):
+        name = name[:-4]
+    if shutil.which(token):
+        return None
+    for candidate in WINDOWS_TOOL_FALLBACKS.get(name, ()):
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+def _quote_shell_path(path: str) -> str:
+    escaped = path.replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def parse_command(cmd: str) -> list[str]:
