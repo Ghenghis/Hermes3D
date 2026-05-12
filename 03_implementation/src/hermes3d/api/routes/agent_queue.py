@@ -187,3 +187,44 @@ def block(task_id: str, body: BlockRequest = Body(...)) -> dict[str, Any]:
             },
         )
     return {"accepted": True, "status": "blocked", "reason": body.reason}
+
+
+@router.post("/api/agents/queue/execute-now")
+def execute_now() -> dict[str, Any]:
+    """W21-MVP-3: operator-triggered persona executor pass.
+
+    Runs the persona executor synchronously against the current
+    ``claimed/`` queue, bounded by ``HERMES3D_PERSONA_EXEC_MAX_PER_TICK``
+    (default 2 tasks). Each task is classified and either:
+
+    * ``done`` — handoff_path markdown generated via MiniMax and the
+      task is moved to ``done/`` with a proof_events row.
+    * ``blocked`` — task class has no automated executor; moved to
+      ``blocked/`` with reason ``no_automated_executor_for_task_class``
+      so the UI surfaces it for human follow-up.
+
+    The route is operator-driven so the auto-poller's behavior can be
+    overridden (e.g. when the poller is disabled in tests but the
+    operator wants to flush the queue).
+
+    Response shape::
+
+        {
+          "accepted": true,
+          "status":   "ready",
+          "results":  [ {task_id, outcome, reason, handoff, class}, ... ],
+          "counts":   {"done": N, "blocked": M}
+        }
+    """
+    from hermes3d.services import persona_executor
+
+    root = _workspace_root()
+    results = persona_executor.execute_claimed_tasks(workspace_root=root)
+    done_count = sum(1 for r in results if r.get("outcome") == "done")
+    blocked_count = sum(1 for r in results if r.get("outcome") == "blocked")
+    return {
+        "accepted": True,
+        "status": "ready",
+        "results": results,
+        "counts": {"done": done_count, "blocked": blocked_count},
+    }
