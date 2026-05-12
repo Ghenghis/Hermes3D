@@ -147,10 +147,20 @@ test("Files tab refreshes its artifact preview after the polling cadence", async
     await fulfillJson(route, secondTickEnabled ? [tick1, tick2] : [tick1]);
   });
 
-  // Files lives in the utility group at the bottom of the sidebar;
-  // its main sidebar button may be collapsed. Navigate via the hash
-  // route ``#files`` (mirrors the App.tsx UTILITY_TAB_HASHES table).
-  await page.goto("/#files");
+  // Files lives in the utility group at the bottom of the sidebar; its
+  // main sidebar button is hidden when the utility group is collapsed.
+  // Run #2 (commit 781ad72) showed ``page.goto("/#files")`` alone does
+  // not mount ``files-root`` reliably on a fresh page-load — App.tsx
+  // reads ``window.location.hash`` in a useEffect that may not see the
+  // initial hash before Zustand hydration sets activeTabId. The
+  // proven pattern (W18-A1 PICKUP walker, lines 716-719) is: mount
+  // the SPA on ``/`` first, then SET ``window.location.hash`` from
+  // inside the page so a real ``hashchange`` event fires.
+  await page.goto("/");
+  await expect(page.getByTestId("dashboard-root")).toBeVisible({ timeout: 15_000 });
+  await page.evaluate(() => {
+    window.location.hash = "#files";
+  });
   const root = page.getByTestId("files-root");
   await expect(root).toBeVisible({ timeout: 15_000 });
 
