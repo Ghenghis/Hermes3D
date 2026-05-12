@@ -44,6 +44,7 @@ export const TAB_FIXTURES: Record<string, TabFixture> = {
   artifacts: { label: "Artifacts", rootTestId: "artifacts-root" },
   approvals: { label: "Approvals", rootTestId: "approvals-root" },
   apps: { label: "Apps", rootTestId: "apps-root" },
+  files: { label: "Files", rootTestId: "files-root" },
   plugins: { label: "Plugins", rootTestId: "plugins-root" },
   settings: { label: "Settings", rootTestId: "settings-root" },
   roadmap: { label: "Roadmap", rootTestId: "roadmap-root" },

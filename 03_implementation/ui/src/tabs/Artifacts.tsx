@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { adapters } from "../api/adapters";
 import { ArtifactList } from "../components/artifacts/ArtifactList";
+import { PANEL_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
 import type { Agent } from "../types/agent";
 import type { Artifact, ArtifactGate, ArtifactStage, ArtifactType, EvidenceForm } from "../types/artifact";
 import type { Job } from "../types/job";
@@ -51,6 +52,9 @@ export function ArtifactsTab() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const ready = form.jobId !== "" && form.agent !== "" && form.label !== "" && form.file != null;
 
+  // One-shot mount: pull jobs + agents (used to seed the upload form's
+  // default jobId / agent). These rarely change during a session and
+  // re-fetching them would clobber the operator's current form selection.
   useEffect(() => {
     void adapters.getJobs().then((next) => {
       setJobs(next);
@@ -60,15 +64,27 @@ export function ArtifactsTab() {
       setAgents(next);
       setForm((current) => ({ ...current, agent: next[0]?.role ?? "" }));
     });
-    void loadArtifacts().then(setArtifacts);
-    void loadProofManifest(LIVE_BASE_URL).then((result) => {
-      if (result.ok) {
-        setProofManifest(result.manifest);
-      } else {
-        setProofError(result.error);
-      }
-    });
   }, []);
+
+  // W21-MVP-5: poll the artifact-list and proof-manifest panels on
+  // PANEL_POLL_MS so newly-produced artifacts (mesh, proof, thumbnail)
+  // surface without a manual reload. Re-uses the existing fetch
+  // functions; ``usePollingEffect`` cancels overlap + cleans up on
+  // unmount.
+  const refresh = useCallback(async () => {
+    const [arts, proofResult] = await Promise.all([
+      loadArtifacts(),
+      loadProofManifest(LIVE_BASE_URL),
+    ]);
+    setArtifacts(arts);
+    if (proofResult.ok) {
+      setProofManifest(proofResult.manifest);
+      setProofError(null);
+    } else {
+      setProofError(proofResult.error);
+    }
+  }, []);
+  usePollingEffect(refresh, PANEL_POLL_MS, [refresh]);
 
   const attach = async () => {
     const file = form.file;

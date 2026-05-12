@@ -17,7 +17,8 @@ import { adapters } from "../api/adapters";
 import type { TaskDAG } from "../types/dag";
 import type { ProviderHealth } from "../types/provider";
 import { GitBranch, Image as ImageIcon, Layers, AlertTriangle } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { PANEL_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -83,52 +84,51 @@ export function Gen3DTab() {
   const [referenceMessage, setReferenceMessage] = useState<string | null>(null);
   const plannerMode = previewDag?.metadata?.planner_mode;
 
-  useEffect(() => {
-    let cancelled = false;
-
-    // Existing provider health (LLM providers)
-    adapters.getProviderHealth()
-      .then((data) => {
-        if (!cancelled) setProviderHealth(data);
+  // W21-MVP-5: poll provider health + Gen3D providers + Gen3D templates
+  // on PANEL_POLL_MS. When the operator installs rembg / TripoSR /
+  // Hunyuan3D in the background, this tab will surface readiness
+  // without a reload. ``usePollingEffect`` cancels overlap + cleans up
+  // on unmount; per-fetch failures are caught locally so one bad
+  // endpoint never breaks the others.
+  const refreshGen3DPanels = useCallback(async () => {
+    await Promise.all([
+      adapters
+        .getProviderHealth()
+        .then((data) => setProviderHealth(data))
+        .catch((error) => setGenerateMessage(`Blocked: ${errorMessage(error)}`)),
+      fetch(`${LIVE_BASE_URL}/api/gen3d/providers`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
       })
-      .catch((error) => {
-        if (!cancelled) setGenerateMessage(`Blocked: ${errorMessage(error)}`);
-      });
-
-    // Lane 13: real 3D generation provider readiness
-    fetch(`${LIVE_BASE_URL}/api/gen3d/providers`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    })
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data: unknown = await res.json();
-        if (!cancelled && Array.isArray(data)) {
-          setGen3DProviders(data as Gen3DProvider[]);
-        }
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data: unknown = await res.json();
+          if (Array.isArray(data)) {
+            setGen3DProviders(data as Gen3DProvider[]);
+          }
+        })
+        .catch(() => {
+          /* backend not yet running — silently ignore */
+        }),
+      fetch(`${LIVE_BASE_URL}/api/gen3d/templates`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
       })
-      .catch(() => {/* backend not yet running — silently ignore */});
-
-    // Lane 13: real local template gallery
-    fetch(`${LIVE_BASE_URL}/api/gen3d/templates`, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    })
-      .then(async (res) => {
-        if (!res.ok) return;
-        const data: unknown = await res.json();
-        if (!cancelled && Array.isArray(data)) {
-          setGen3DTemplates(data as Gen3DTemplate[]);
-        }
-      })
-      .catch(() => {/* backend not yet running — silently ignore */});
-
-    return () => {
-      cancelled = true;
-    };
+        .then(async (res) => {
+          if (!res.ok) return;
+          const data: unknown = await res.json();
+          if (Array.isArray(data)) {
+            setGen3DTemplates(data as Gen3DTemplate[]);
+          }
+        })
+        .catch(() => {
+          /* backend not yet running — silently ignore */
+        }),
+    ]);
   }, []);
+  usePollingEffect(refreshGen3DPanels, PANEL_POLL_MS, [refreshGen3DPanels]);
 
   const previewPlan = async () => {
     setPreviewState("loading");

@@ -14,9 +14,10 @@
  * keeps the tab routed and usable without violating the no-fake-data rule.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { FileText, RefreshCw } from "lucide-react";
 import { adapters } from "../api/adapters";
+import { PANEL_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
 import type { Artifact } from "../types/artifact";
 
 type HermesImportMeta = ImportMeta & {
@@ -98,9 +99,11 @@ export function FilesTab() {
     }
   }, []);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  // W21-MVP-5: lag-protected 15 s polling. The Files tab was previously
+  // a one-shot mount fetch — operators had to manually reload after
+  // any backend change. ``usePollingEffect`` cancels overlap and cleans
+  // up on unmount.
+  usePollingEffect(refresh, PANEL_POLL_MS, [refresh]);
 
   const dedicatedFilesApiAvailable = probes.some((p) => p.status === "available");
 
