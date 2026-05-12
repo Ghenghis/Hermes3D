@@ -396,9 +396,9 @@ def _resolve_handoff_path(task: queue_bridge.TaskSnapshot, workspace_root: Path)
 def _is_existing_handoff_substantial(abs_path: Path) -> bool:
     """A handoff file is 'substantial' if it exists and is non-trivial.
 
-    >= 200 bytes is the cutoff so a stub `# Title` from a prior bad MVP-3
-    run still counts as overwrite-able, but a real operator-written audit
-    (always > 1 KB) is preserved.
+    >= 200 bytes is the cutoff so a tiny one-line `# Title` left by a
+    prior bad MVP-3 run still counts as overwrite-able, but a real
+    operator-written audit (always > 1 KB) is preserved.
     """
     try:
         if not abs_path.is_file():
