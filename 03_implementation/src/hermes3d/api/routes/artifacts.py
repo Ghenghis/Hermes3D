@@ -255,10 +255,14 @@ def artifact_lineage(artifact_id: str) -> dict[str, Any]:
 
     # Children — find every other row whose notes mention this id under
     # any lineage key. SQL LIKE on the JSON column is bounded, but we
-    # still need to JSON-parse to distinguish the key path.
+    # still need to JSON-parse to distinguish the key path. Artifact
+    # ids are usually UUID hex (no LIKE-meta chars), but escape ``%``
+    # / ``_`` / ``\`` defensively so a hand-rolled id with those chars
+    # cannot widen the scan or accidentally match unrelated rows.
+    escaped_id = artifact_id.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     candidates = rows(
-        "SELECT * FROM artifacts WHERE id != ? AND notes LIKE ? ORDER BY created_at",
-        (artifact_id, f"%{artifact_id}%"),
+        "SELECT * FROM artifacts WHERE id != ? AND notes LIKE ? ESCAPE '\\' ORDER BY created_at",
+        (artifact_id, f"%{escaped_id}%"),
     )
     children: list[dict[str, Any]] = []
     for cand in candidates:

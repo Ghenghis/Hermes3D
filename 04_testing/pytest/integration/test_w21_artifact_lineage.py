@@ -257,6 +257,39 @@ def test_lineage_ignores_self_referential_edges(client: TestClient) -> None:
     assert body["parents"] == []
 
 
+def test_lineage_query_escapes_like_wildcards_in_artifact_id(client: TestClient) -> None:
+    """CodeRabbit nit (2026-05-12): the children SQL uses LIKE on notes.
+    If a caller passes an id containing ``%`` or ``_``, those must be
+    treated literally — not as wildcards. Fixture: seed a probe id with
+    a ``%``, plus an unrelated row that would match if the wildcard
+    leaked, and assert it is NOT pulled in as a child."""
+    probe_id = "probe%X-" + uuid.uuid4().hex
+    other_id = "noise-" + uuid.uuid4().hex
+    _seed(
+        client,
+        artifact_id=probe_id,
+        evidence_type="mesh",
+        label="probe.stl",
+        notes={},
+    )
+    # An unrelated row whose notes literally contain the substring
+    # "probe" (which a naive LIKE %probe%X-%% pattern would catch as
+    # %probe%X% matching any "probe...X..." text). Without escaping,
+    # that LIKE %probe%X% would match this row.
+    _seed(
+        client,
+        artifact_id=other_id,
+        evidence_type="agent_attachment",
+        label="probeXunrelated.png",
+        notes={"label_hint": "probe_X_marker_text"},
+    )
+    resp = client.get(f"/api/artifacts/{probe_id}/lineage")
+    assert resp.status_code == 200
+    body = resp.json()
+    # No false children should leak from the unescaped LIKE pattern.
+    assert body["children"] == []
+
+
 def test_lineage_response_shape_pins_compact_projection(client: TestClient) -> None:
     """Each parent/child entry must carry exactly: id, evidence_type,
     label, file_path, created_at, via. No raw notes leakage, no full row
