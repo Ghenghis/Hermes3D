@@ -25,7 +25,9 @@ Accepted proof status values (returned in ``status`` field):
 
 from __future__ import annotations
 
+import os
 import shlex
+import signal
 import subprocess
 import time
 from typing import Any
@@ -68,29 +70,38 @@ def run_proof_command(
     safe_timeout = max(1, min(int(timeout_s or DEFAULT_TIMEOUT_S), MAX_TIMEOUT_S))
     started = time.monotonic()
     try:
-        completed = subprocess.run(  # noqa: S602 (intentional, see module docstring)
+        proc = subprocess.Popen(  # noqa: S602 (intentional, see module docstring)
             cmd,
             shell=True,
-            capture_output=True,
-            timeout=safe_timeout,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=cwd,
+            **_process_group_kwargs(),
         )
-    except subprocess.TimeoutExpired as exc:
-        elapsed_ms = int((time.monotonic() - started) * 1000)
-        # Capture whatever was emitted before the kill.
-        stdout = (exc.stdout or b"").decode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
-        stderr = (exc.stderr or b"").decode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
-        return {
-            "status": "timeout",
-            "exit_code": None,
-            "stdout": redact_text(stdout),
-            "stderr": redact_text(stderr),
-            "duration_ms": elapsed_ms,
-            "command": _redact_command(cmd),
-            "timed_out": True,
-            "accepted": False,
-        }
+        try:
+            stdout_raw, stderr_raw = proc.communicate(timeout=safe_timeout)
+        except subprocess.TimeoutExpired:
+            _kill_process_tree(proc.pid)
+            try:
+                stdout_raw, stderr_raw = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                stdout_raw, stderr_raw = proc.communicate()
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            stdout = _decode_output(stdout_raw)
+            stderr = _decode_output(stderr_raw)
+            timeout_note = "Proof command process tree killed after timeout."
+            stderr = (stderr + ("\n" if stderr else "") + timeout_note)[:MAX_OUTPUT_BYTES]
+            return {
+                "status": "timeout",
+                "exit_code": None,
+                "stdout": redact_text(stdout[:MAX_OUTPUT_BYTES]),
+                "stderr": redact_text(stderr),
+                "duration_ms": elapsed_ms,
+                "command": _redact_command(cmd),
+                "timed_out": True,
+                "accepted": False,
+            }
     except (FileNotFoundError, OSError) as exc:
         # Command interpreter not available (rare on Linux/Win), or
         # cwd not found. Don't crash the API route.
@@ -106,12 +117,13 @@ def run_proof_command(
             "accepted": False,
         }
     elapsed_ms = int((time.monotonic() - started) * 1000)
-    stdout = completed.stdout.decode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
-    stderr = completed.stderr.decode("utf-8", errors="replace")[:MAX_OUTPUT_BYTES]
-    status = "pass" if completed.returncode == 0 else "fail"
+    stdout = _decode_output(stdout_raw)[:MAX_OUTPUT_BYTES]
+    stderr = _decode_output(stderr_raw)[:MAX_OUTPUT_BYTES]
+    return_code = proc.returncode
+    status = "pass" if return_code == 0 else "fail"
     return {
         "status": status,
-        "exit_code": completed.returncode,
+        "exit_code": return_code,
         "stdout": redact_text(stdout),
         "stderr": redact_text(stderr),
         "duration_ms": elapsed_ms,
@@ -119,6 +131,53 @@ def run_proof_command(
         "timed_out": False,
         "accepted": status == "pass",
     }
+
+
+def _process_group_kwargs() -> dict[str, Any]:
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _kill_process_tree(pid: int) -> None:
+    """Terminate a timed-out shell and its children.
+
+    ``subprocess.run(..., timeout=...)`` only kills the immediate shell on
+    Windows. Tools like ``uvx`` can leave Python child processes running, which
+    makes the app proof sweep hang and contaminates later probes. Use taskkill
+    on Windows and a process group on POSIX.
+    """
+
+    if pid <= 0:
+        return
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(pid), "/T", "/F"],
+                capture_output=True,
+                timeout=5,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return
+        return
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    except OSError:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            return
+
+
+def _decode_output(value: bytes | str | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    return value.decode("utf-8", errors="replace")
 
 
 def _redact_command(cmd: str) -> str:
