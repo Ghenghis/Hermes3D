@@ -349,8 +349,11 @@ def _passes_quality_gate(sanitized_body: str) -> tuple[bool, str | None]:
     # A whole-doc fence should already be unwrapped; reject if one
     # survives at the very start (defensive — the LLM emitted nested or
     # malformed fences).
+    # Any triple-fence at the very top of the doc is suspect: a real
+    # handoff starts with an ``#`` heading. ``` (bare), ```markdown,
+    # ```md, ```text are all treated as a sanitizer bypass.
     head = sanitized_body[:200].lstrip()
-    if head.startswith("```markdown") or head.startswith("```md"):
+    if head.startswith("```"):
         return False, "quality_gate:whole_document_markdown_fence_survived"
     if len(sanitized_body) < _QUALITY_MIN_CHARS:
         return False, f"quality_gate:too_short:{len(sanitized_body)}<{_QUALITY_MIN_CHARS}"
@@ -528,7 +531,32 @@ def execute_one(task: queue_bridge.TaskSnapshot, workspace_root: Path) -> dict[s
     # Prevents the executor from clobbering operator-written audits with
     # weaker MVP-3 drafts.
     abs_path = _resolve_handoff_path(task, workspace_root)
-    if abs_path is not None and _is_existing_handoff_substantial(abs_path):
+    if abs_path is None:
+        # Malformed task: handoff_path missing or escaping the workspace.
+        # Block before burning an LLM call — the operator must fix the
+        # task definition.
+        reason = "invalid_handoff_path"
+        ok = queue_bridge.block_task(workspace_root, task.task_id, reason, persona=persona)
+        _emit_proof_event(
+            "persona_executor.task.blocked",
+            {
+                "task_id": task.task_id,
+                "persona": persona,
+                "class": task_class,
+                "handoff_path": task.handoff_path,
+                "reason": reason,
+                "moved": ok,
+            },
+        )
+        return {
+            "task_id": task.task_id,
+            "outcome": "blocked",
+            "reason": reason,
+            "handoff": None,
+            "class": task_class,
+        }
+
+    if _is_existing_handoff_substantial(abs_path):
         LOG.info(
             "persona_executor: preserving existing handoff at %s for task=%s",
             abs_path,

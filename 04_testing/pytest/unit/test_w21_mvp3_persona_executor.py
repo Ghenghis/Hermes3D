@@ -335,6 +335,26 @@ def test_quality_gate_rejects_surviving_whole_doc_markdown_fence() -> None:
     assert "whole_document_markdown_fence" in reason
 
 
+def test_quality_gate_rejects_bare_triple_fence_at_head() -> None:
+    """CodeRabbit follow-up: a bare ``` (no language tag) at the very top
+    of the doc must also be rejected — not just ```markdown / ```md.
+    Otherwise the LLM can wrap the whole answer in a language-less fence
+    and slip past the existing check."""
+    body = "```\n# Doc\n\n" + ("substantive line of content " * 30)
+    ok, reason = persona_executor._passes_quality_gate(body)
+    assert not ok
+    assert "whole_document_markdown_fence" in reason
+
+
+def test_quality_gate_rejects_bare_triple_fence_with_text_language() -> None:
+    """Variant of the bare-fence guard: ```text is also a fence and must
+    be rejected even though it isn't markdown/md."""
+    body = "```text\n# Doc\n\n" + ("substantive line of content " * 30)
+    ok, reason = persona_executor._passes_quality_gate(body)
+    assert not ok
+    assert "whole_document_markdown_fence" in reason
+
+
 def test_quality_gate_rejects_hallucinated_vue_path() -> None:
     """Vue isn't used in this codebase. A Vue file mention is a
     hallucination (LLM invented framework) and must be rejected."""
@@ -439,6 +459,37 @@ def test_existing_substantial_handoff_is_preserved(
     # Task moved to done/.
     assert (
         tmp_path / ".hermes3d_orchestrator" / "tasks" / "done" / f"{snap.task_id}.json"
+    ).exists()
+
+
+def test_handoff_path_escaping_workspace_blocks_before_llm(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CodeRabbit follow-up: a handoff_path that classifies as audit
+    (matches AUDIT and ends in .md) but resolves outside the workspace
+    (path-traversal) must block with reason 'invalid_handoff_path'
+    BEFORE burning an LLM call."""
+    monkeypatch.setenv("HERMES3D_WORKSPACE_ROOT", str(tmp_path))
+    _seed_task(
+        tmp_path,
+        "W21-A99-ESCAPING-AUDIT-2026-05-12",
+        # Path traversal: resolves outside tmp_path but still ends in
+        # .md so classify_task returns "audit". This is the exact
+        # combination that previously fell through to the LLM call.
+        handoff_path="../../../escaping_AUDIT.md",
+    )
+    snap = queue_bridge.list_tasks(tmp_path, "claimed")[0]
+
+    def _explode(task, persona):  # noqa: ANN001
+        raise AssertionError("LLM must not be invoked when handoff_path escapes workspace")
+
+    monkeypatch.setattr(persona_executor, "_generate_audit_markdown", _explode)
+    result = persona_executor.execute_one(snap, tmp_path)
+    assert result["outcome"] == "blocked"
+    assert result["reason"] == "invalid_handoff_path"
+    # Task moved to blocked/.
+    assert (
+        tmp_path / ".hermes3d_orchestrator" / "tasks" / "blocked" / f"{snap.task_id}.json"
     ).exists()
 
 
