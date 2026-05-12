@@ -326,13 +326,31 @@ def gen3d_templates() -> list[dict[str, Any]]:
             "description": "Uses the exact reference image silhouette and luminance as a high-resolution height field for 1:1 bas-relief preservation.",
             "parameters": [
                 {"name": "size_mm", "type": "float", "default": 180.0, "min": 20.0, "max": 180.0},
-                {"name": "base_thickness_mm", "type": "float", "default": 3.0, "min": 1.2, "max": 8.0},
-                {"name": "relief_height_mm", "type": "float", "default": 5.0, "min": 1.0, "max": 20.0},
+                {
+                    "name": "base_thickness_mm",
+                    "type": "float",
+                    "default": 3.0,
+                    "min": 1.2,
+                    "max": 8.0,
+                },
+                {
+                    "name": "relief_height_mm",
+                    "type": "float",
+                    "default": 5.0,
+                    "min": 1.0,
+                    "max": 20.0,
+                },
                 {"name": "max_resolution", "type": "int", "default": 144, "min": 96, "max": 768},
                 {"name": "min_feature_mm", "type": "float", "default": 1.2, "min": 1.2, "max": 4.0},
                 {"name": "seed", "type": "int", "default": 3201},
             ],
-            "outputs": ["stl", "3mf", "proof_envelope", "background_removed_png", "heightfield_mesh"],
+            "outputs": [
+                "stl",
+                "3mf",
+                "proof_envelope",
+                "background_removed_png",
+                "heightfield_mesh",
+            ],
             "requires_provider": None,
             "schema_file": None,
             "requires_reference_image": True,
@@ -346,11 +364,29 @@ def gen3d_templates() -> list[dict[str, Any]]:
             "parameters": [
                 {"name": "size_mm", "type": "float", "default": 60.0, "min": 20.0, "max": 120.0},
                 {"name": "steps", "type": "int", "default": 30, "min": 8, "max": 50},
-                {"name": "octree_resolution", "type": "int", "default": 256, "min": 128, "max": 384},
-                {"name": "guidance_scale", "type": "float", "default": 5.0, "min": 1.0, "max": 12.0},
+                {
+                    "name": "octree_resolution",
+                    "type": "int",
+                    "default": 256,
+                    "min": 128,
+                    "max": 384,
+                },
+                {
+                    "name": "guidance_scale",
+                    "type": "float",
+                    "default": 5.0,
+                    "min": 1.0,
+                    "max": 12.0,
+                },
                 {"name": "seed", "type": "int", "default": 3201},
             ],
-            "outputs": ["stl", "3mf", "proof_envelope", "background_removed_png", "runtime_evidence_json"],
+            "outputs": [
+                "stl",
+                "3mf",
+                "proof_envelope",
+                "background_removed_png",
+                "runtime_evidence_json",
+            ],
             "requires_provider": None,
             "runtime_provider": "hunyuan3d",
             "schema_file": "hunyuan3d.schema.json"
@@ -488,7 +524,13 @@ def _supported_generation_templates() -> list[dict[str, Any]]:
         {
             "id": "precision_image_relief",
             "name": "Precision Image Relief",
-            "outputs": ["stl", "3mf", "proof_envelope", "background_removed_png", "heightfield_mesh"],
+            "outputs": [
+                "stl",
+                "3mf",
+                "proof_envelope",
+                "background_removed_png",
+                "heightfield_mesh",
+            ],
             "parameters": [
                 "size_mm",
                 "base_thickness_mm",
@@ -502,7 +544,13 @@ def _supported_generation_templates() -> list[dict[str, Any]]:
         {
             "id": "hunyuan3d_image_to_3d",
             "name": "Hunyuan3D 2.1 Image Mesh",
-            "outputs": ["stl", "3mf", "proof_envelope", "background_removed_png", "runtime_evidence_json"],
+            "outputs": [
+                "stl",
+                "3mf",
+                "proof_envelope",
+                "background_removed_png",
+                "runtime_evidence_json",
+            ],
             "parameters": [
                 "size_mm",
                 "steps",
@@ -768,7 +816,6 @@ def _execute_calibration_cube_template(request: GenerationRun, template_id: str)
 def _execute_reference_image_relief_template(
     request: GenerationRun, template_id: str
 ) -> dict[str, Any]:
-
     from hermes3d.core.proof import write_proof
 
     if not request.reference_artifact_id:
@@ -1078,7 +1125,6 @@ def _execute_reference_image_relief_template(
 def _execute_precision_image_relief_template(
     request: GenerationRun, template_id: str
 ) -> dict[str, Any]:
-
     from hermes3d.core.proof import write_proof
 
     if not request.reference_artifact_id:
@@ -1897,9 +1943,10 @@ def _run_hunyuan3d_shape_subprocess(
     ]
     timeout_s = int(os.environ.get("HERMES3D_HUNYUAN3D_TIMEOUT_S", "900"))
     try:
-        with stdout_path.open("w", encoding="utf-8") as stdout, stderr_path.open(
-            "w", encoding="utf-8"
-        ) as stderr:
+        with (
+            stdout_path.open("w", encoding="utf-8") as stdout,
+            stderr_path.open("w", encoding="utf-8") as stderr,
+        ):
             proc = subprocess.run(
                 command,
                 stdout=stdout,
@@ -1932,7 +1979,9 @@ def _run_hunyuan3d_shape_subprocess(
     runtime["return_code"] = proc.returncode
     runtime["stdout_log"] = str(stdout_path)
     runtime["stderr_log"] = str(stderr_path)
-    runtime_evidence_path.write_text(json.dumps(runtime, indent=2, sort_keys=True), encoding="utf-8")
+    runtime_evidence_path.write_text(
+        json.dumps(runtime, indent=2, sort_keys=True), encoding="utf-8"
+    )
     if proc.returncode != 0 or runtime.get("status") != "completed":
         raise HTTPException(
             status_code=500,
@@ -1961,7 +2010,9 @@ def _load_runtime_evidence(path: Path) -> dict[str, Any]:
             "runtime_evidence_path": str(path),
             "error": f"{type(exc).__name__}: {exc}",
         }
-    return data if isinstance(data, dict) else {"status": "invalid", "raw_type": type(data).__name__}
+    return (
+        data if isinstance(data, dict) else {"status": "invalid", "raw_type": type(data).__name__}
+    )
 
 
 def _generation_title(prompt: str) -> str:
@@ -2069,7 +2120,9 @@ def _export_mesh_to_3mf(
         package.writestr("_rels/.rels", relationships_xml)
         package.writestr("3D/3dmodel.model", model_xml)
 
-    return _verify_3mf_package(package_path, vertex_count=len(mesh.vertices), face_count=len(mesh.faces))
+    return _verify_3mf_package(
+        package_path, vertex_count=len(mesh.vertices), face_count=len(mesh.faces)
+    )
 
 
 def _three_mf_model_xml(mesh: Any, *, metadata: dict[str, Any]) -> bytes:
@@ -2353,7 +2406,10 @@ def _alpha_png_to_relief_mesh(
     if bbox is None:
         raise HTTPException(
             status_code=409,
-            detail={"status": "blocked", "reason": "Reference image has no usable foreground mask."},
+            detail={
+                "status": "blocked",
+                "reason": "Reference image has no usable foreground mask.",
+            },
         )
     cropped = mask.crop(bbox)
     max_cells = max(12, min(72, int(size_mm / 1.5)))
@@ -2485,7 +2541,10 @@ def _image_to_precision_relief_mesh(
     if bbox is None:
         raise HTTPException(
             status_code=409,
-            detail={"status": "blocked", "reason": "Reference image has no usable foreground mask."},
+            detail={
+                "status": "blocked",
+                "reason": "Reference image has no usable foreground mask.",
+            },
         )
 
     cropped = image.crop(bbox)
@@ -2612,7 +2671,9 @@ def _image_to_precision_relief_mesh(
     }
 
 
-def _thicken_mask_for_min_feature(mask: Any, *, cell_mm: float, min_feature_mm: float) -> tuple[Any, int]:
+def _thicken_mask_for_min_feature(
+    mask: Any, *, cell_mm: float, min_feature_mm: float
+) -> tuple[Any, int]:
     """Thicken image-derived foreground so fine logo strokes pass printability.
 
     The truth gate samples physical wall thickness. A one-pixel-wide stroke

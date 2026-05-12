@@ -487,7 +487,9 @@ class TestReferenceImageReliefGeneration:
         from hermes3d.api.routes._common import execute, row, rows
 
         runtime_root = tmp_path / "runtime"
-        monkeypatch.setattr(gen_mod, "implementation_path", lambda *parts: runtime_root.joinpath(*parts))
+        monkeypatch.setattr(
+            gen_mod, "implementation_path", lambda *parts: runtime_root.joinpath(*parts)
+        )
 
         source_path = tmp_path / "logo-source.png"
         source = Image.new("RGBA", (32, 32), (255, 255, 255, 255))
@@ -578,7 +580,9 @@ class TestPrecisionImageReliefGeneration:
         from hermes3d.api.routes._common import execute, row, rows
 
         runtime_root = tmp_path / "runtime"
-        monkeypatch.setattr(gen_mod, "implementation_path", lambda *parts: runtime_root.joinpath(*parts))
+        monkeypatch.setattr(
+            gen_mod, "implementation_path", lambda *parts: runtime_root.joinpath(*parts)
+        )
 
         source_path = tmp_path / "logo-source.png"
         source = Image.new("RGBA", (32, 32), (255, 255, 255, 255))

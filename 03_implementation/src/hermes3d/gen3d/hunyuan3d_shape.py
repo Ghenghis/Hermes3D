@@ -19,7 +19,9 @@ DEFAULT_COMFYUI_ROOT = Path(os.environ.get("HERMES3D_COMFYUI_ROOT", r"G:\Github\
 DEFAULT_MODEL_CKPT = Path(
     os.environ.get(
         "HERMES3D_HUNYUAN3D_CKPT",
-        str(DEFAULT_COMFYUI_ROOT / "models" / "hunyuan3d" / "hunyuan3d-dit-v2-1" / "model.fp16.ckpt"),
+        str(
+            DEFAULT_COMFYUI_ROOT / "models" / "hunyuan3d" / "hunyuan3d-dit-v2-1" / "model.fp16.ckpt"
+        ),
     )
 )
 DEFAULT_CONFIG = Path(
