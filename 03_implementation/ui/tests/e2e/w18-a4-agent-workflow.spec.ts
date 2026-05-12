@@ -189,11 +189,11 @@ test.describe("W18-A4 Hermes Agent workflow proof", () => {
     try {
       const agentsResp = await clearCtx.get("/api/agents", { timeout: 10_000 });
       if (agentsResp.ok()) {
-        const agents = (await agentsResp.json()) as Array<{ name?: string }>;
+        const agents = (await agentsResp.json()) as Array<{ id?: string; name?: string }>;
         await Promise.all(
           agents.map((a) =>
             clearCtx
-              .delete(`/api/agents/${encodeURIComponent(a.name ?? "")}/history`, {
+              .delete(`/api/agents/${encodeURIComponent(a.id ?? a.name ?? "")}/history`, {
                 timeout: 10_000,
               })
               .catch(() => undefined),
