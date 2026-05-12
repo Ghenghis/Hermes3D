@@ -72,8 +72,13 @@ APP_PROOF_SIDECAR_IMPORTS: tuple[str, ...] = (
     "pymeshfix",
     "stl",
 )
+APP_PROOF_NODE_MODULE_FALLBACKS: tuple[str, ...] = (
+    r"G:\Gen3D\envs\hermes3d-node-proofs\node_modules",
+)
+APP_PROOF_NODE_PACKAGES: tuple[str, ...] = ("microsoft-cognitiveservices-speech-sdk",)
 PYTHON_IMPORT_PROBE_TIMEOUT_S = 30
 _PYTHON_IMPORT_RESOLUTION_CACHE: dict[str, str | None] = {}
+_NODE_PACKAGE_RESOLUTION_CACHE: dict[str, str | None] = {}
 
 
 def run_proof_command(
@@ -239,6 +244,9 @@ def _resolve_seeded_command(cmd: str) -> str:
     python_resolved = _resolve_python_import_command(cmd)
     if python_resolved is not None:
         return python_resolved
+    node_resolved = _resolve_node_require_command(cmd)
+    if node_resolved is not None:
+        return node_resolved
 
     token, suffix = _split_first_token(cmd)
     if not token:
@@ -346,6 +354,101 @@ def _python_can_import(python_path: str, module: str) -> bool:
     except (OSError, subprocess.TimeoutExpired):
         return False
     return result.returncode == 0
+
+
+def _resolve_node_require_command(cmd: str) -> str | None:
+    """Route selected Node ``require(...)`` proofs to a package sidecar.
+
+    Source checkouts are not always built Node packages. The Azure Speech SDK
+    JS checkout, for example, has TypeScript source but no ``distrib`` output.
+    Only rewrite known seeded package proofs after a sidecar package can be
+    required successfully.
+    """
+
+    package = _extract_sidecar_node_package(cmd)
+    if package is None:
+        return None
+    package_path = _resolve_node_package(package)
+    if package_path is None:
+        return None
+    return _replace_node_package_require(cmd, package, package_path)
+
+
+def _extract_sidecar_node_package(cmd: str) -> str | None:
+    token, _suffix = _split_first_token(cmd)
+    if not token:
+        return None
+    name = Path(token).name.lower()
+    if name not in {"node", "node.exe"}:
+        return None
+    try:
+        tokens = shlex.split(cmd, posix=False)
+    except ValueError:
+        return None
+    normalized = [token.strip("\"'") for token in tokens]
+    if "-e" not in normalized:
+        return None
+    index = normalized.index("-e")
+    if index + 1 >= len(normalized):
+        return None
+    script = normalized[index + 1]
+    for package in APP_PROOF_NODE_PACKAGES:
+        if f"require('{package}')" in script or f'require("{package}")' in script:
+            return package
+    return None
+
+
+def _resolve_node_package(package: str) -> str | None:
+    if package in _NODE_PACKAGE_RESOLUTION_CACHE:
+        return _NODE_PACKAGE_RESOLUTION_CACHE[package]
+    resolved: str | None = None
+    for node_modules in _app_proof_node_module_candidates():
+        candidate = Path(node_modules) / package
+        if candidate.exists() and _node_can_require(candidate):
+            resolved = candidate.as_posix()
+            break
+    _NODE_PACKAGE_RESOLUTION_CACHE[package] = resolved
+    return resolved
+
+
+def _app_proof_node_module_candidates() -> tuple[str, ...]:
+    candidates: list[str] = []
+    env_candidate = os.environ.get("HERMES3D_APP_PROOF_NODE_MODULES")
+    if env_candidate:
+        candidates.append(env_candidate)
+    candidates.extend(APP_PROOF_NODE_MODULE_FALLBACKS)
+
+    seen: set[str] = set()
+    existing: list[str] = []
+    for candidate in candidates:
+        if not candidate:
+            continue
+        key = str(Path(candidate)).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if Path(candidate).exists():
+            existing.append(candidate)
+    return tuple(existing)
+
+
+def _node_can_require(package_path: Path) -> bool:
+    try:
+        result = subprocess.run(
+            ["node", "-e", f"require('{package_path.as_posix()}')"],
+            capture_output=True,
+            timeout=10,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def _replace_node_package_require(cmd: str, package: str, package_path: str) -> str:
+    return cmd.replace(f"require('{package}')", f"require('{package_path}')").replace(
+        f'require("{package}")', f"require('{package_path}')"
+    )
 
 
 def _split_first_token(cmd: str) -> tuple[str, str]:

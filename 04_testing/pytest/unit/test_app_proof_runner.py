@@ -143,3 +143,59 @@ def test_app_proof_python_candidates_prefers_env_and_deduplicates(monkeypatch, t
         str(env_python),
         str(fallback_python),
     )
+
+
+def test_seeded_node_require_uses_sidecar_package_when_probe_passes(monkeypatch, tmp_path):
+    node_modules = tmp_path / "node_modules"
+    package = node_modules / "microsoft-cognitiveservices-speech-sdk"
+    package.mkdir(parents=True)
+    probes: list[list[str]] = []
+
+    def fake_run(args, **kwargs):  # noqa: ANN001, ANN003
+        probes.append(args)
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(app_proof_runner, "APP_PROOF_NODE_MODULE_FALLBACKS", (str(node_modules),))
+    monkeypatch.setattr(app_proof_runner.subprocess, "run", fake_run)
+    app_proof_runner._NODE_PACKAGE_RESOLUTION_CACHE.clear()
+
+    resolved = app_proof_runner._resolve_seeded_command(
+        "node -e \"require('microsoft-cognitiveservices-speech-sdk');console.log('ok')\""
+    )
+
+    expected_path = package.as_posix()
+    assert resolved == f"node -e \"require('{expected_path}');console.log('ok')\""
+    assert probes == [["node", "-e", f"require('{expected_path}')"]]
+
+
+def test_seeded_node_require_stays_original_when_sidecar_probe_fails(monkeypatch, tmp_path):
+    node_modules = tmp_path / "node_modules"
+    package = node_modules / "microsoft-cognitiveservices-speech-sdk"
+    package.mkdir(parents=True)
+
+    def fake_run(args, **kwargs):  # noqa: ANN001, ANN003
+        return subprocess.CompletedProcess(args, 1, b"", b"missing")
+
+    monkeypatch.setattr(app_proof_runner, "APP_PROOF_NODE_MODULE_FALLBACKS", (str(node_modules),))
+    monkeypatch.setattr(app_proof_runner.subprocess, "run", fake_run)
+    app_proof_runner._NODE_PACKAGE_RESOLUTION_CACHE.clear()
+
+    command = "node -e \"require('microsoft-cognitiveservices-speech-sdk');console.log('ok')\""
+
+    assert app_proof_runner._resolve_seeded_command(command) == command
+
+
+def test_seeded_node_non_package_command_does_not_use_sidecar(monkeypatch, tmp_path):
+    node_modules = tmp_path / "node_modules"
+    node_modules.mkdir()
+
+    def fail_if_called(*args, **kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("node sidecar probe should not run")
+
+    monkeypatch.setattr(app_proof_runner, "APP_PROOF_NODE_MODULE_FALLBACKS", (str(node_modules),))
+    monkeypatch.setattr(app_proof_runner.subprocess, "run", fail_if_called)
+    app_proof_runner._NODE_PACKAGE_RESOLUTION_CACHE.clear()
+
+    command = "node -e \"console.log('ok')\""
+
+    assert app_proof_runner._resolve_seeded_command(command) == command
