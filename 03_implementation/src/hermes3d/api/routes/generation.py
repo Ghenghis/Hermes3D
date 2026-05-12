@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -43,6 +44,7 @@ _DEFAULT_COMFYUI_TORCH_LIB = Path(
     )
 )
 _REMBG_SESSIONS: dict[str, Any] = {}
+_REMBG_RUNTIME_PROBE_CACHE: dict[str, Any] = {}
 
 # Adapter registry schemas dir for template discovery
 _SCHEMAS_DIR = (
@@ -186,7 +188,136 @@ def _gen3d_model_evidence(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]
             ],
         }
 
+    background = evidence.get("background_removal", {})
+    rembg_runtime = _probe_rembg_runtime()
+    local_deps = {
+        "pillow": importlib.util.find_spec("PIL") is not None,
+        "numpy": importlib.util.find_spec("numpy") is not None,
+        "trimesh": importlib.util.find_spec("trimesh") is not None,
+    }
+    local_ready = (
+        all(local_deps.values())
+        and bool(background.get("weights_present"))
+        and rembg_runtime.get("status") == "ready"
+    )
+    evidence["local_image_relief"] = {
+        "installed": local_ready,
+        "repo_reachable": True,
+        "weights_present": bool(background.get("weights_present")),
+        "runtime_ready": local_ready,
+        "runtime": rembg_runtime,
+        "local_dependencies": local_deps,
+        "background_removal": background or None,
+        "repo_id": "local:Hermes3D precision_image_relief",
+        "local_dir": str(Path(__file__).resolve().parents[5]),
+    }
+
     return evidence
+
+
+def _configured_rembg_python_path() -> Path:
+    return Path(
+        os.environ.get("HERMES3D_REMBG_PYTHON")
+        or os.environ.get("HERMES3D_HUNYUAN3D_PYTHON")
+        or r"G:\Github\ComfyUI\.venv\Scripts\python.exe"
+    )
+
+
+def _rembg_subprocess_env() -> dict[str, str]:
+    env = os.environ.copy()
+    if "U2NET_HOME" not in env and _DEFAULT_REMBG_MODEL_HOME.exists():
+        env["U2NET_HOME"] = str(_DEFAULT_REMBG_MODEL_HOME)
+    if _DEFAULT_COMFYUI_TORCH_LIB.is_dir():
+        env["PATH"] = str(_DEFAULT_COMFYUI_TORCH_LIB) + os.pathsep + env.get("PATH", "")
+    return env
+
+
+def _probe_rembg_runtime() -> dict[str, Any]:
+    ttl_s = int(os.environ.get("HERMES3D_REMBG_PROBE_TTL_S", "60"))
+    now = time.monotonic()
+    cached = _REMBG_RUNTIME_PROBE_CACHE.get("value")
+    if isinstance(cached, dict) and now - float(cached.get("_monotonic", 0.0)) < ttl_s:
+        return {k: v for k, v in cached.items() if k != "_monotonic"}
+
+    backend_ready = (
+        importlib.util.find_spec("rembg") is not None
+        and importlib.util.find_spec("onnxruntime") is not None
+        and importlib.util.find_spec("PIL") is not None
+    )
+    if backend_ready:
+        result = {
+            "status": "ready",
+            "kind": "in_process",
+            "python": "backend",
+            "reason": "rembg, onnxruntime, and Pillow import from the active backend runtime.",
+        }
+        _REMBG_RUNTIME_PROBE_CACHE["value"] = {**result, "_monotonic": now}
+        return result
+
+    python_path = _configured_rembg_python_path()
+    if not python_path.is_file():
+        result = {
+            "status": "blocked",
+            "kind": "subprocess",
+            "python": str(python_path),
+            "reason": "Configured rembg subprocess Python runtime is missing.",
+        }
+        _REMBG_RUNTIME_PROBE_CACHE["value"] = {**result, "_monotonic": now}
+        return result
+
+    probe_code = (
+        "import json, rembg, onnxruntime, PIL; "
+        "print(json.dumps({'providers': onnxruntime.get_available_providers()}))"
+    )
+    try:
+        proc = subprocess.run(
+            [str(python_path), "-c", probe_code],
+            capture_output=True,
+            text=True,
+            timeout=int(os.environ.get("HERMES3D_REMBG_PROBE_TIMEOUT_S", "20")),
+            check=False,
+            env=_rembg_subprocess_env(),
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        result = {
+            "status": "blocked",
+            "kind": "subprocess",
+            "python": str(python_path),
+            "reason": f"rembg subprocess probe failed: {type(exc).__name__}: {exc}",
+        }
+        _REMBG_RUNTIME_PROBE_CACHE["value"] = {**result, "_monotonic": now}
+        return result
+
+    stdout = (proc.stdout or "").strip()
+    stderr = (proc.stderr or "").strip()
+    if proc.returncode != 0:
+        result = {
+            "status": "blocked",
+            "kind": "subprocess",
+            "python": str(python_path),
+            "return_code": proc.returncode,
+            "reason": (stderr or stdout or "rembg subprocess probe returned non-zero")[:500],
+        }
+        _REMBG_RUNTIME_PROBE_CACHE["value"] = {**result, "_monotonic": now}
+        return result
+
+    providers: list[str] = []
+    try:
+        parsed = json.loads(stdout.splitlines()[-1]) if stdout else {}
+        raw_providers = parsed.get("providers")
+        if isinstance(raw_providers, list):
+            providers = [str(item) for item in raw_providers]
+    except (json.JSONDecodeError, AttributeError, IndexError):
+        providers = []
+    result = {
+        "status": "ready",
+        "kind": "subprocess",
+        "python": str(python_path),
+        "onnxruntime_providers": providers,
+        "reason": "rembg, onnxruntime, and Pillow import from the configured subprocess runtime.",
+    }
+    _REMBG_RUNTIME_PROBE_CACHE["value"] = {**result, "_monotonic": now}
+    return result
 
 
 @router.get("/api/gen3d/providers")
@@ -216,6 +347,7 @@ def gen3d_providers() -> list[dict[str, Any]]:
 
     # Provider definitions: id, label, http_probe_url (None if not HTTP-accessible)
     provider_defs: list[tuple[str, str, str | None]] = [
+        ("local_image_relief", "Local Image Relief", None),
         ("comfyui", "ComfyUI", service_url("comfyui") or "http://127.0.0.1:8188"),
         ("trellis2", "TRELLIS", None),
         ("hunyuan3d", "Hunyuan3D", None),
@@ -243,7 +375,10 @@ def gen3d_providers() -> list[dict[str, Any]]:
             live_reachable = port_reachable(probe_url)
 
         # Determine readiness status
-        if live_reachable is True:
+        if provider_id == "local_image_relief" and bool(local_evidence.get("runtime_ready")):
+            readiness = "available"
+            live_reachable = True
+        elif live_reachable is True:
             readiness = "available"
         elif installed and (weights_present or live_reachable is not False):
             readiness = "installed_not_running"
@@ -2303,16 +2438,7 @@ def _remove_background_to_png(reference_path: Path, output_path: Path) -> dict[s
     try:
         import rembg
     except ImportError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "status": "blocked",
-                "reason": (
-                    "rembg is not installed in the active backend Python runtime. "
-                    "Run Hermes3D with a Python 3.11-3.13 environment that includes rembg and onnxruntime."
-                ),
-            },
-        ) from exc
+        return _remove_background_to_png_subprocess(reference_path, output_path, import_error=exc)
 
     try:
         session, model_name, providers = _get_rembg_session(rembg)
@@ -2361,6 +2487,145 @@ def _remove_background_to_png(reference_path: Path, output_path: Path) -> dict[s
         "providers": providers,
         "output_path": str(output_path),
         "alpha": alpha,
+    }
+
+
+def _remove_background_to_png_subprocess(
+    reference_path: Path, output_path: Path, *, import_error: ImportError | None = None
+) -> dict[str, Any]:
+    python_path = _configured_rembg_python_path()
+    if not python_path.is_file():
+        reason = (
+            "rembg is not installed in the active backend Python runtime and the configured "
+            f"subprocess runtime is missing: {python_path}."
+        )
+        if import_error is not None:
+            reason += f" Backend import error: {type(import_error).__name__}: {import_error}"
+        raise HTTPException(
+            status_code=409,
+            detail={"status": "blocked", "reason": reason},
+        ) from import_error
+
+    runner_path = Path(__file__).resolve().parents[2] / "gen3d" / "rembg_remove.py"
+    if not runner_path.is_file():
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "status": "failed",
+                "reason": f"rembg subprocess runner missing: {runner_path}",
+            },
+        ) from import_error
+
+    runtime_evidence_path = output_path.with_name(f"{output_path.stem}.runtime.json")
+    stdout_path = output_path.with_name(f"{output_path.stem}.stdout.log")
+    stderr_path = output_path.with_name(f"{output_path.stem}.stderr.log")
+    command = [
+        str(python_path),
+        str(runner_path),
+        "--input",
+        str(reference_path),
+        "--output",
+        str(output_path),
+        "--proof-json",
+        str(runtime_evidence_path),
+        "--model",
+        os.environ.get("HERMES3D_REMBG_MODEL", "bria-rmbg"),
+    ]
+    timeout_s = int(os.environ.get("HERMES3D_REMBG_TIMEOUT_S", "240"))
+    try:
+        with (
+            stdout_path.open("w", encoding="utf-8") as stdout,
+            stderr_path.open("w", encoding="utf-8") as stderr,
+        ):
+            proc = subprocess.run(
+                command,
+                stdout=stdout,
+                stderr=stderr,
+                text=True,
+                timeout=timeout_s,
+                check=False,
+                env=_rembg_subprocess_env(),
+            )
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "status": "failed",
+                "reason": f"rembg subprocess timed out after {timeout_s}s.",
+                "stdout_log": str(stdout_path),
+                "stderr_log": str(stderr_path),
+            },
+        ) from exc
+    except OSError as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "status": "blocked",
+                "reason": f"rembg subprocess failed to start: {type(exc).__name__}: {exc}",
+            },
+        ) from exc
+
+    runtime = _load_runtime_evidence(runtime_evidence_path)
+    runtime["return_code"] = proc.returncode
+    runtime["stdout_log"] = str(stdout_path)
+    runtime["stderr_log"] = str(stderr_path)
+    runtime_evidence_path.write_text(
+        json.dumps(runtime, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    if proc.returncode != 0 or runtime.get("status") != "completed":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "status": "blocked",
+                "reason": (
+                    f"rembg subprocess failed with return code {proc.returncode}: "
+                    f"{runtime.get('error') or 'see runtime logs'}"
+                ),
+                "runtime_evidence_path": str(runtime_evidence_path),
+                "stdout_log": str(stdout_path),
+                "stderr_log": str(stderr_path),
+            },
+        )
+    if not output_path.is_file() or output_path.stat().st_size <= 0:
+        raise HTTPException(
+            status_code=500,
+            detail={"status": "failed", "reason": "rembg subprocess did not write an output PNG."},
+        )
+
+    from PIL import Image
+
+    image = Image.open(output_path).convert("RGBA")
+    alpha = _alpha_stats(image)
+    if alpha["foreground_pixels"] == 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "status": "blocked",
+                "reason": "Background removal produced no foreground pixels.",
+            },
+        )
+    if alpha["transparent_pixels"] == 0:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "status": "blocked",
+                "reason": "Background removal produced no transparent pixels; white background is still present.",
+            },
+        )
+
+    return {
+        "engine": "rembg-subprocess",
+        "model": runtime.get("model"),
+        "providers": runtime.get("providers"),
+        "output_path": str(output_path),
+        "alpha": alpha,
+        "runtime": {
+            "python": str(python_path),
+            "runtime_evidence_path": str(runtime_evidence_path),
+            "stdout_log": str(stdout_path),
+            "stderr_log": str(stderr_path),
+            "return_code": proc.returncode,
+        },
     }
 
 

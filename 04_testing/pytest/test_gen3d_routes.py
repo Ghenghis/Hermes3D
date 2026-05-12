@@ -353,6 +353,59 @@ class TestGen3DProviders:
         assert hunyuan["weights_present"] is True
         assert hunyuan["model_evidence"]["revision"] == "rev-hy"
 
+    def test_local_image_relief_available_when_rembg_runtime_and_models_present(
+        self, app_client, fake_proof_file, tmp_path, monkeypatch
+    ):
+        """The local image-relief pipeline is a real provider when rembg can run."""
+        import hermes3d.api.routes.generation as gen_mod
+
+        rembg_model = tmp_path / "bria-rmbg.onnx"
+        rembg_model.write_bytes(b"onnx-weights")
+        manifest_path = tmp_path / "GEN3D_MODEL_MANIFEST.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "rembg_sessions": [
+                        {
+                            "session": "bria-rmbg",
+                            "model_path": str(rembg_model),
+                            "bytes": rembg_model.stat().st_size,
+                            "providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
+        monkeypatch.setattr(gen_mod, "_GEN3D_MODEL_MANIFEST_PATH", manifest_path)
+        monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
+        monkeypatch.setattr(
+            gen_mod,
+            "_probe_rembg_runtime",
+            lambda: {
+                "status": "ready",
+                "kind": "subprocess",
+                "python": "G:\\Github\\ComfyUI\\.venv\\Scripts\\python.exe",
+                "onnxruntime_providers": ["CUDAExecutionProvider", "CPUExecutionProvider"],
+            },
+        )
+        monkeypatch.setattr(
+            gen_mod.importlib.util,
+            "find_spec",
+            lambda name: object() if name in {"PIL", "numpy", "trimesh"} else None,
+        )
+
+        res = app_client.get("/api/gen3d/providers")
+        assert res.status_code == 200, res.text
+        local = next(p for p in res.json() if p["provider_id"] == "local_image_relief")
+        assert local["readiness"] == "available"
+        assert local["installed"] is True
+        assert local["weights_present"] is True
+        assert local["live_reachable"] is True
+        assert local["model_evidence"]["runtime"]["kind"] == "subprocess"
+
     def test_proof_source_field_reflects_file(self, app_client, fake_proof_file, monkeypatch):
         """proof_source field is set when proof file is present."""
         import hermes3d.api.routes.generation as gen_mod
@@ -569,6 +622,54 @@ class TestReferenceImageReliefGeneration:
         payload = json.loads(events[0]["payload"])
         assert payload["reference_artifact_id"] == reference_id
         assert payload["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+
+    def test_rembg_subprocess_fallback_returns_runtime_evidence(
+        self, app_client, tmp_path, monkeypatch
+    ):
+        Image = pytest.importorskip("PIL.Image")
+        import hermes3d.api.routes.generation as gen_mod
+
+        source_path = tmp_path / "source.png"
+        source = Image.new("RGBA", (16, 16), (255, 255, 255, 255))
+        source.save(source_path)
+        output_path = tmp_path / "source.rembg.png"
+
+        class FakeProcess:
+            returncode = 0
+
+        def fake_run(command, **kwargs):
+            output = Path(command[command.index("--output") + 1])
+            proof = Path(command[command.index("--proof-json") + 1])
+            processed = Image.new("RGBA", (16, 16), (255, 255, 255, 0))
+            for y in range(4, 12):
+                for x in range(4, 12):
+                    processed.putpixel((x, y), (10, 10, 10, 255))
+            processed.save(output)
+            proof.write_text(
+                json.dumps(
+                    {
+                        "status": "completed",
+                        "model": "bria-rmbg",
+                        "providers": ["CPUExecutionProvider"],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            return FakeProcess()
+
+        monkeypatch.setattr(gen_mod, "_configured_rembg_python_path", lambda: Path(sys.executable))
+        monkeypatch.setattr(gen_mod.subprocess, "run", fake_run)
+
+        result = gen_mod._remove_background_to_png_subprocess(
+            source_path, output_path, import_error=ImportError("no rembg")
+        )
+
+        assert result["engine"] == "rembg-subprocess"
+        assert result["model"] == "bria-rmbg"
+        assert result["providers"] == ["CPUExecutionProvider"]
+        assert result["alpha"]["transparent_pixels"] > 0
+        assert result["alpha"]["foreground_pixels"] > 0
+        assert Path(result["runtime"]["runtime_evidence_path"]).is_file()
 
 
 class TestPrecisionImageReliefGeneration:
