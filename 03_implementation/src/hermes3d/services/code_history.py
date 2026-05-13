@@ -3544,6 +3544,8 @@ def _write_provider_smoke_status(
     auth_contract: dict[str, Any],
     content_sha256: str | None = None,
     evidence: dict[str, Any] | None = None,
+    http_status: int | None = None,
+    latency_ms: int | None = None,
 ) -> None:
     provider = str(provider_id or "").strip().lower()
     if provider not in PROVIDER_DEFAULT_BASE_URLS:
@@ -3570,6 +3572,8 @@ def _write_provider_smoke_status(
         },
         "content_sha256": content_sha256,
         "evidence_id": (evidence or {}).get("evidence_id"),
+        "http_status": http_status,
+        "latency_ms": latency_ms,
     }
     existing[provider] = record
     payload = {"schema": 1, "updated_at": utc_now(), "providers": existing}
@@ -3579,6 +3583,59 @@ def _write_provider_smoke_status(
     )
     tmp_path.write_text(as_json(payload), encoding="utf-8")
     os.replace(tmp_path, PROVIDER_SMOKE_STATUS_FILE)
+
+
+def record_provider_http_smoke_status(
+    provider_id: str,
+    *,
+    accepted: bool,
+    status: str,
+    blocked_reasons: list[str],
+    base_url: str,
+    model: str,
+    content_sha256: str | None = None,
+    proof_event_id: str | None = None,
+    http_status: int | None = None,
+    latency_ms: int | None = None,
+) -> None:
+    """Persist an HTTP smoke result from the lightweight agents route.
+
+    ``/api/agents/providers/smoke`` uses a small direct HTTP probe while
+    ``/api/providers/health`` reads the shared provider-smoke-status file.
+    This adapter keeps those two surfaces in sync without requiring the
+    heavier code-operator/MCP path for a basic live provider proof.
+    """
+    provider = str(provider_id or "").strip().lower()
+    if provider not in PROVIDER_DEFAULT_BASE_URLS:
+        return
+    config = _provider_chat_config(provider, require_ready=False)
+    effective_base = (base_url or str(config["base_url"])).strip().rstrip("/")
+    effective_model = (model or str(config["model"])).strip()
+    auth_contract = {
+        "provider_id": provider,
+        "base_url_label": _host_label(effective_base),
+        "chat_path": _provider_chat_path(effective_base),
+        "auth_scheme": "Authorization: Bearer <redacted>",
+        "api_key_configured": bool(config.get("api_key_configured")),
+        "api_key_source": config.get("api_key_source"),
+        "accepted_api_key_env": config.get("accepted_api_key_env") or [],
+        "model": effective_model,
+        "model_configured": bool(effective_model),
+        "model_source": config.get("model_source") or "agents_route",
+        "base_url_source": config.get("base_url_source") or "agents_route",
+    }
+    evidence = {"evidence_id": proof_event_id} if proof_event_id else None
+    _write_provider_smoke_status(
+        provider,
+        accepted=accepted,
+        status=status,
+        blocked_reasons=blocked_reasons,
+        auth_contract=auth_contract,
+        content_sha256=content_sha256,
+        evidence=evidence,
+        http_status=http_status,
+        latency_ms=latency_ms,
+    )
 
 
 def _provider_smoke_auth_failed(reason_text: str) -> bool:
