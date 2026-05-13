@@ -27,6 +27,7 @@ from hermes3d.services.agent_runtime import (
     runtime_request_body,
     trusted_runtime_url,
 )
+from hermes3d.services.llm_output_sanitizer import sanitize_reasoning_output
 
 router = APIRouter()
 IMPLEMENTATION_ROOT = Path(__file__).resolve().parents[4]
@@ -3695,8 +3696,8 @@ def _command_label(command: list[str]) -> str:
 #   * NO API key values are logged / echoed / persisted. Only `key_present`
 #     booleans and per-call metadata (status, latency, model, sha) ever leave
 #     this module.
-#   * Smallest-possible live smoke = 1-token completion. Assistive tasks cap
-#     at 200 tokens to bound cost (estimate well under $0.001 per call).
+#   * Smallest-possible live smoke = 1-token completion. Assistive tasks are
+#     bounded but give reasoning models enough budget to reach final output.
 # ---------------------------------------------------------------------------
 
 PROVIDER_ROLE_MAP: dict[str, str] = {
@@ -3717,6 +3718,9 @@ PROVIDER_ROLE_DESCRIPTION: dict[str, str] = {
     "fallback": "Local dev fallback only (LM Studio / Ollama).",
     "fixture": "Offline test fixture.",
 }
+
+MINIMAX_ASSIST_MIN_TOKENS = 1024
+DEEPSEEK_ASSIST_MIN_TOKENS = 512
 
 
 def _resolve_provider_key(provider_id: str) -> str | None:
@@ -3888,6 +3892,20 @@ def _provider_call(
     }
 
 
+def _provider_assist_token_budget(provider: str, raw_max_tokens: Any) -> tuple[int, int]:
+    """Return ``(requested, effective)`` token budget for provider assist."""
+
+    try:
+        requested = max(1, min(int(raw_max_tokens), 4096))
+    except (TypeError, ValueError):
+        requested = 200
+    if provider == "minimax":
+        return requested, max(requested, MINIMAX_ASSIST_MIN_TOKENS)
+    if provider == "deepseek":
+        return requested, max(requested, DEEPSEEK_ASSIST_MIN_TOKENS)
+    return requested, requested
+
+
 @router.post("/api/agents/providers/smoke")
 def provider_smoke(body: dict | None = None) -> dict:
     """Run a 1-token live smoke against MiniMax and/or DeepSeek.
@@ -4023,15 +4041,25 @@ def provider_assist(body: dict) -> dict:
             status_code=400,
             detail={"status": "bad_request", "reason": "prompt is required"},
         )
-    max_tokens_raw = body.get("max_tokens", 200)
-    try:
-        max_tokens = max(1, min(int(max_tokens_raw), 1024))
-    except (TypeError, ValueError):
-        max_tokens = 200
+    requested_max_tokens, max_tokens = _provider_assist_token_budget(
+        provider, body.get("max_tokens", 200)
+    )
     role = PROVIDER_ROLE_MAP.get(provider, "builder")
     persona = "modeling-agent" if role == "builder" else "oliver-qa-agent"
     result = _provider_call(provider, prompt=prompt, max_tokens=max_tokens, timeout=45.0)
-    completion = result.pop("completion_text", None)
+    raw_completion = result.pop("completion_text", None)
+    completion = sanitize_reasoning_output(
+        raw_completion if isinstance(raw_completion, str) else None
+    )
+    completion_sanitized = bool(
+        isinstance(raw_completion, str) and completion != raw_completion.strip()
+    )
+    if completion_sanitized:
+        result["completion_sanitized"] = True
+    result["requested_max_tokens"] = requested_max_tokens
+    result["effective_max_tokens"] = max_tokens
+    if isinstance(raw_completion, str) and raw_completion.strip() and not completion:
+        result["completion_blocked_reason"] = "completion_empty_after_sanitize"
     # Persist user prompt + provider reply into agent_conversations. We tag
     # the row by stuffing provider info into message_type so downstream
     # queries can filter without a schema migration.
@@ -4042,13 +4070,14 @@ def provider_assist(body: dict) -> dict:
         "VALUES (?, ?, 'user', ?, ?)",
         (user_msg_id, persona, f"ASSIST_REQ:{provider}", prompt),
     )
-    persisted_text = completion if isinstance(completion, str) and completion else ""
+    persisted_text = completion if completion else ""
     if not persisted_text:
         persisted_text = json.dumps(
             {
                 "status": result.get("status"),
                 "http_status": result.get("http_status"),
                 "error_code": result.get("error_code"),
+                "completion_blocked_reason": result.get("completion_blocked_reason"),
                 "note": "no completion text returned",
             },
             sort_keys=True,
@@ -4074,10 +4103,14 @@ def provider_assist(body: dict) -> dict:
         "latency_ms": result.get("latency_ms"),
         "tokens_in": result.get("tokens_in"),
         "tokens_out": result.get("tokens_out"),
+        "requested_max_tokens": requested_max_tokens,
+        "effective_max_tokens": max_tokens,
         "user_msg_id": user_msg_id,
         "assistant_msg_id": assistant_msg_id,
         "proof_event_id": proof_event_id,
-        "completion": completion if isinstance(completion, str) else None,
+        "completion_sanitized": completion_sanitized,
+        "completion_blocked_reason": result.get("completion_blocked_reason"),
+        "completion": completion or None,
     }
 
 
