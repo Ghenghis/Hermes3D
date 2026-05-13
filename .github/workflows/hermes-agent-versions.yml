@@ -112,14 +112,15 @@ jobs:
         # Hermes3D itself is tested as source via PYTHONPATH; we do
         # NOT pip install -e . because the pin tests only need pytest
         # plus what hermes3d.services / hermes3d.api / hermes3d.db
-        # transitively import. If a future commit pulls in a heavier
-        # transitive dep, surface 5/6 will tell us by failing.
+        # transitively import. ``jsonschema`` is already a production
+        # import via hermes3d.gateways.*, reached by agent_updates and
+        # code_history during these resolver pins.
         # shell: bash is set explicitly so backslash line continuation
         # works on both Ubuntu and Windows (Git Bash on the win runner).
         shell: bash
         run: |
           python -m pip install --upgrade pip
-          pip install pytest fastapi httpx pydantic
+          pip install pytest fastapi httpx pydantic jsonschema
 
       - name: Run resolver + v0.12 + v0.13 regression pins
         env:
