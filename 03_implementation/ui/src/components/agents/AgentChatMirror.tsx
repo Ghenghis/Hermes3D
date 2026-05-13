@@ -93,6 +93,8 @@ export function AgentChatMirror() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const historyLoadSeqRef = useRef(0);
+  const localHistoryRevisionRef = useRef(0);
 
   const selectedAgent = useMemo(() => agents.find((agent) => agent.id === selectedAgentId) ?? agents[0] ?? null, [agents, selectedAgentId]);
   const selectedVoice = useMemo(() => voiceAgents.find((agent) => agent.id === selectedAgent?.id) ?? null, [selectedAgent?.id, voiceAgents]);
@@ -101,6 +103,9 @@ export function AgentChatMirror() {
   const micSupported = speechSupported || audioRecordingSupported;
 
   const loadHistory = useCallback(async (agentId: string) => {
+    const requestSeq = historyLoadSeqRef.current + 1;
+    historyLoadSeqRef.current = requestSeq;
+    const revisionAtStart = localHistoryRevisionRef.current;
     try {
       const response = await fetch(`${LIVE_BASE_URL}/api/agents/${encodeURIComponent(agentId)}/history`, {
         method: "GET",
@@ -108,9 +113,15 @@ export function AgentChatMirror() {
         cache: "no-store",
       });
       const payload: unknown = await response.json().catch(() => []);
+      if (historyLoadSeqRef.current !== requestSeq || localHistoryRevisionRef.current !== revisionAtStart) {
+        return;
+      }
       setHistory(Array.isArray(payload) ? payload.map(parseAgentMessage).filter((item): item is AgentMessage => item != null) : []);
       setStatus(response.ok ? "Connected to local agent conversation history." : "Agent history endpoint returned an error.");
     } catch {
+      if (historyLoadSeqRef.current !== requestSeq || localHistoryRevisionRef.current !== revisionAtStart) {
+        return;
+      }
       setHistory([]);
       setStatus("Hermes agent backend is unreachable.");
     }
@@ -175,6 +186,7 @@ export function AgentChatMirror() {
       action_id: null,
       created_at: new Date().toISOString(),
     };
+    localHistoryRevisionRef.current += 1;
     setHistory((current) => [...current, localUserMessage]);
     setAttachments([]);
     const controller = new AbortController();
@@ -207,6 +219,7 @@ export function AgentChatMirror() {
       }
       const reply = await readFirstAgentReply(response.body, controller);
       if (reply) {
+        localHistoryRevisionRef.current += 1;
         setHistory((current) => [...current, reply]);
         setStatus("Agent reply received from local backend.");
         void speakAgentReply(agentId, reply.content);
@@ -378,6 +391,7 @@ export function AgentChatMirror() {
         setStatus(`Could not clear agent history: ${agentSummary(payload, response.statusText)}.`);
         return;
       }
+      localHistoryRevisionRef.current += 1;
       setHistory([]);
       setStatus("Agent conversation history cleared in the local backend.");
     } catch {
