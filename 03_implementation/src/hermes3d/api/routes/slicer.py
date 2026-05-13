@@ -657,7 +657,9 @@ def _artifact_status(artifact: dict[str, Any] | None) -> dict[str, Any] | None:
             sha256_match = _file_sha256(path) == expected_sha
         else:
             sha256_check_reason = f"file_size_exceeds_hash_limit:{max_hash_bytes}"
-    size_matches = actual_size == expected_size if actual_size is not None and expected_size else None
+    size_matches = (
+        actual_size == expected_size if actual_size is not None and expected_size else None
+    )
     valid = exists and bool(actual_size and actual_size > 0) and sha256_match is not False
     return {
         "id": artifact.get("id"),
@@ -726,7 +728,9 @@ def get_slicer_status() -> dict[str, Any]:
     execution_ready = slicer_binary is not None
     latest_job = _latest_slice_job()
     latest_gcode = _latest_slice_artifact("gcode")
-    proof_job_id = str(latest_gcode["job_id"]) if latest_gcode and latest_gcode.get("job_id") else None
+    proof_job_id = (
+        str(latest_gcode["job_id"]) if latest_gcode and latest_gcode.get("job_id") else None
+    )
     latest_success_job = _slice_job_by_id(proof_job_id)
     latest_proof = _latest_slice_artifact("proof_report", job_id=proof_job_id)
     latest_event = _latest_slice_proof_event(job_id=proof_job_id)
