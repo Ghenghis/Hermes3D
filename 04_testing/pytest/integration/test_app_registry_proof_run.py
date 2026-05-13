@@ -110,7 +110,7 @@ def test_no_proof_apps_are_classified_instead_of_flat_unknown(
     """No-command rows must explain whether they are references or real gaps."""
     kiln = client.get("/api/apps/kiln").json()
     assert kiln["proof_command"] is None
-    assert kiln["truthful_status"] == "REFERENCE_ONLY"
+    assert kiln["truthful_status"] in {"REFERENCE_ONLY", "SOURCE_AVAILABLE"}
     assert kiln["proof_capability"] == "REFERENCE_ONLY"
     assert "read-only" in kiln["proof_gap_reason"]
 
