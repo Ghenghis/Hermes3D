@@ -12,7 +12,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 from urllib.parse import urlparse, urlunparse
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -23,6 +23,10 @@ from hermes3d.services.agent_runtime import (
     runtime_probe,
     runtime_request_body,
     trusted_runtime_url,
+)
+from hermes3d.services.runtime_identity import (
+    AGENT_WORKBENCH_REQUIRED_ROUTES,
+    runtime_identity_payload,
 )
 
 router = APIRouter()
@@ -42,11 +46,15 @@ class ChatCompletionRequest(BaseModel):
 
 
 @router.get("/health")
-def desktop_health() -> dict[str, Any]:
+def desktop_health(request: Request) -> dict[str, Any]:
     runtime_url = _runtime_url()
     probe = runtime_probe()
+    identity = runtime_identity_payload(
+        required_routes=AGENT_WORKBENCH_REQUIRED_ROUTES,
+        route_paths=(str(getattr(route, "path", "")) for route in request.app.routes),
+    )
     return {
-        "status": "ok" if probe["ready"] else "degraded",
+        "status": "ok" if probe["ready"] and not identity["stale"] else "degraded",
         "service": "hermes3d-desktop-compat",
         "desktop_contract": DESKTOP_CONTRACT,
         "runtime_configured": bool(runtime_url),
@@ -54,6 +62,7 @@ def desktop_health() -> dict[str, Any]:
         "runtime_model": probe.get("model"),
         "runtime_reason": probe.get("reason"),
         "runtime_url": _redacted_runtime_url(runtime_url),
+        "runtime_identity": identity,
         "endpoints": {
             "health": "/health",
             "chat": "/v1/chat/completions",

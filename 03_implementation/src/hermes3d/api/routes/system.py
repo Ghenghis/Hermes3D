@@ -6,7 +6,6 @@ import json
 import os
 import platform
 import shutil
-import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -22,6 +21,10 @@ from hermes3d.api.routes._common import as_json, execute, new_id, rows, utc_now
 from hermes3d.db.init import DB_PATH
 from hermes3d.services.agent_runtime import runtime_probe
 from hermes3d.services.local_state import implementation_path, local_printers
+from hermes3d.services.runtime_identity import (
+    AGENT_WORKBENCH_REQUIRED_ROUTES,
+    runtime_identity_payload,
+)
 
 # W18-A21 fix (2026-05-11): /api/providers/health was hardcoding status="idle"
 # for every cloud provider (minimax/deepseek/openrouter) whose API key was
@@ -38,18 +41,6 @@ PROVIDER_SMOKE_STALENESS_S = 300  # 5 minutes — matches operator expectation
 
 router = APIRouter()
 SELF_BRIDGE_PORTS = {8765, 8642}
-AGENT_WORKBENCH_REQUIRED_ROUTES = [
-    "/api/code-operator/e2e/readiness",
-    "/api/code-operator/e2e/jobs",
-    "/api/code-operator/providers/smoke",
-    "/api/code-operator/patch/apply-reviewed",
-    "/api/code-operator/gates/run",
-    "/api/code-operator/git/pr",
-    "/api/code-operator/cli-runners",
-    "/api/code-operator/cli-runners/preflight",
-    "/api/code-operator/cli-runners/run",
-    "/api/code-operator/sandbox/readiness",
-]
 
 
 class ProofEventCreate(BaseModel):
@@ -81,6 +72,7 @@ def system_snapshot() -> dict[str, Any]:
         "hostname": platform.node(),
         "platform": platform.platform(),
         "database": {"path": str(DB_PATH), "exists": DB_PATH.exists()},
+        "runtime_identity": runtime_identity_payload(),
         "printers": {
             "total": len(printers),
             "online": sum(
@@ -101,28 +93,14 @@ def system_snapshot() -> dict[str, Any]:
 @router.get("/api/system/runtime-identity")
 def runtime_identity(request: Request) -> dict[str, Any]:
     route_paths = {str(getattr(route, "path", "")) for route in request.app.routes}
-    repo_root = implementation_path().parent
-    branch = _git_value(repo_root, ["branch", "--show-current"])
-    commit = _git_value(repo_root, ["rev-parse", "--short=12", "HEAD"])
-    dirty = bool(_git_value(repo_root, ["status", "--porcelain"]))
-    missing_agent_routes = [
-        path for path in AGENT_WORKBENCH_REQUIRED_ROUTES if path not in route_paths
-    ]
-    return {
-        "status": "fresh" if not missing_agent_routes else "stale",
-        "fresh": not missing_agent_routes,
-        "ts_utc": utc_now(),
-        "pid": os.getpid(),
-        "cwd": os.getcwd(),
-        "backend_source": str(Path(__file__).resolve()),
-        "repo_root": str(repo_root),
-        "branch": branch or "unknown",
-        "commit": commit or "unknown",
-        "dirty": dirty,
-        "agent_workbench_required_routes": AGENT_WORKBENCH_REQUIRED_ROUTES,
-        "missing_agent_workbench_routes": missing_agent_routes,
-        "route_count": len(route_paths),
-    }
+    payload = runtime_identity_payload(
+        required_routes=AGENT_WORKBENCH_REQUIRED_ROUTES,
+        route_paths=route_paths,
+    )
+    payload["agent_workbench_required_routes"] = AGENT_WORKBENCH_REQUIRED_ROUTES
+    payload["missing_agent_workbench_routes"] = payload["missing_routes"]
+    payload["route_count"] = len(route_paths)
+    return payload
 
 
 @router.get("/api/logs")
@@ -789,20 +767,3 @@ def _gpu_name() -> str | None:
         if candidate and candidate not in {"", "-1"}:
             return candidate
     return None
-
-
-def _git_value(cwd: Path, args: list[str]) -> str:
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            cwd=cwd,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
-    if result.returncode != 0:
-        return ""
-    return result.stdout.strip()
