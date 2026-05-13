@@ -186,11 +186,11 @@ class TestProbeProviders:
 
     def test_openscad_not_installed_has_no_path(self) -> None:
         """If OpenSCAD is absent, path must be None — not a fabricated string."""
-        if shutil.which("openscad") is not None:
-            pytest.skip("OpenSCAD is installed — skip the not_installed assertion")
         result = _probe_providers()
         openscad = next((p for p in result if p["id"] == "openscad"), None)
         assert openscad is not None
+        if shutil.which("openscad") is not None or openscad["detected"] is True:
+            pytest.skip("OpenSCAD is installed or detected via a known local install path")
         assert openscad["path"] is None
         assert openscad["status"] == "not_installed"
         assert openscad["detected"] is False

@@ -328,39 +328,77 @@ def _supported_templates() -> list[dict[str, Any]]:
                 "phone_slot",
                 "cable_passthrough",
             ],
-        }
+        },
+        {
+            "id": "calibration_cube",
+            "name": "Calibration Cube",
+            "executor": "hermes3d.core.design.primitives",
+            "outputs": ["stl", "proof_envelope"],
+            "parameters": ["size_mm"],
+        },
+        {
+            "id": "simple_box",
+            "name": "Simple Open Box",
+            "executor": "hermes3d.core.design.primitives",
+            "outputs": ["stl", "proof_envelope"],
+            "parameters": ["width_mm", "depth_mm", "height_mm", "wall_mm", "floor_mm"],
+        },
     ]
 
 
 def _parametric_executor_status() -> tuple[bool, str]:
     try:
         from hermes3d.core.design.desk_organizer import OrganizerSpec
+        from hermes3d.core.design.primitives import CalibrationCubeSpec, SimpleBoxSpec
 
         OrganizerSpec().validated()
+        CalibrationCubeSpec().validated()
+        SimpleBoxSpec().validated()
     except Exception as exc:
-        return False, f"Parametric desk organizer executor is unavailable: {exc}"
+        return False, f"Parametric design executor is unavailable: {exc}"
     if importlib.util.find_spec("trimesh") is None:
         return False, "trimesh is not importable in the backend runtime."
     return (
         True,
-        "Parametric desk organizer executor is wired through the local trimesh/manifold worker and writes STL plus signed proof envelopes.",
+        "Parametric design executors are wired through the local trimesh/manifold worker and write STL plus signed proof envelopes.",
     )
 
 
 def _resolve_supported_design(prompt: str, constraints: dict[str, Any]) -> tuple[str, Any]:
     from hermes3d.core.design.desk_organizer import OrganizerSpec
+    from hermes3d.core.design.primitives import CalibrationCubeSpec, SimpleBoxSpec
 
     template = (
         str(constraints.get("template") or constraints.get("design_template") or "").strip().lower()
     )
     text = f"{template} {prompt}".lower()
+    if template in {"calibration_cube", "calibration", "cube"} or any(
+        token in text for token in ("calibration cube", "calibration", "test cube", "cube")
+    ):
+        spec = CalibrationCubeSpec(
+            size_mm=_constraint_float(constraints, "size_mm", 20.0),
+        ).validated()
+        return "calibration_cube", spec
+
+    if template in {"simple_box", "open_box", "box"} or any(
+        token in text for token in ("simple box", "open box", "storage box", "box")
+    ):
+        spec = SimpleBoxSpec(
+            width_mm=_constraint_float(constraints, "width_mm", 80.0),
+            depth_mm=_constraint_float(constraints, "depth_mm", 50.0),
+            height_mm=_constraint_float(constraints, "height_mm", 30.0),
+            wall_mm=_constraint_float(constraints, "wall_mm", 2.0),
+            floor_mm=_constraint_float(constraints, "floor_mm", 2.0),
+        ).validated()
+        return "simple_box", spec
+
     supported = template in {"desk_organizer", "parametric_desk_organizer", "organizer"} or any(
         token in text
         for token in ("desk organizer", "organizer", "tray", "pen holder", "phone slot")
     )
     if not supported:
         raise UnsupportedDesignError(
-            "Supported Design executor currently handles parametric desk organizer requests only. Choose the Desk Organizer template or include organizer/tray/pen-holder intent."
+            "Supported Design executors handle desk_organizer, calibration_cube, and simple_box requests. Choose one of those templates or include matching organizer/cube/box intent."
         )
     spec = OrganizerSpec(
         width_mm=_constraint_float(constraints, "width_mm", 180.0),
@@ -385,6 +423,7 @@ def _execute_supported_design(
     prompt: str,
 ) -> dict[str, Any]:
     from hermes3d.core.design.desk_organizer import build_organizer
+    from hermes3d.core.design.primitives import build_calibration_cube, build_simple_box
     from hermes3d.core.proof import write_proof
 
     output_dir = implementation_path("var", "designs", job_id)
@@ -392,7 +431,14 @@ def _execute_supported_design(
     signature = spec.signature()
     mesh_path = output_dir / f"{template_id}_{signature}.stl"
     proof_path = output_dir / f"{template_id}_{signature}.proof.json"
-    mesh = build_organizer(spec)
+    if template_id == "desk_organizer":
+        mesh = build_organizer(spec)
+    elif template_id == "calibration_cube":
+        mesh = build_calibration_cube(spec)
+    elif template_id == "simple_box":
+        mesh = build_simple_box(spec)
+    else:
+        raise UnsupportedDesignError(f"Unsupported design template: {template_id}")
     mesh.export(mesh_path, file_type="stl")
     if not mesh_path.exists() or mesh_path.stat().st_size <= 0:
         raise RuntimeError(f"Mesh export produced no bytes at {mesh_path}")
@@ -438,7 +484,7 @@ def _execute_supported_design(
     written_proof = write_proof(
         mesh_path=mesh_path,
         output_path=proof_path,
-        generator_name="hermes3d.parametric.desk_organizer",
+        generator_name=f"hermes3d.parametric.{template_id}",
         generator_version="1.0.0",
         generator_signature=signature,
         visual_evidence_paths=visual_evidence if visual_evidence else None,
@@ -864,6 +910,36 @@ _TEMPLATE_REGISTRY: list[dict[str, Any]] = [
             "phone_slot",
             "cable_passthrough",
         ],
+        "requires": ["trimesh", "manifold3d"],
+        "preview_available": False,
+        "preview_note": "No renderer detected; preview not available.",
+    },
+    {
+        "id": "calibration_cube",
+        "name": "Calibration Cube",
+        "description": (
+            "Solid dimensional calibration cube generated locally with trimesh. "
+            "Useful for quick test slices and print-size checks."
+        ),
+        "executor_module": "hermes3d.core.design.primitives",
+        "executor_class": "CalibrationCubeSpec",
+        "outputs": ["stl", "proof_envelope"],
+        "parameters": ["size_mm"],
+        "requires": ["trimesh"],
+        "preview_available": False,
+        "preview_note": "No renderer detected; preview not available.",
+    },
+    {
+        "id": "simple_box",
+        "name": "Simple Open Box",
+        "description": (
+            "Open-top storage box with real wall and floor thickness. "
+            "Generated locally with trimesh + manifold3d boolean CSG."
+        ),
+        "executor_module": "hermes3d.core.design.primitives",
+        "executor_class": "SimpleBoxSpec",
+        "outputs": ["stl", "proof_envelope"],
+        "parameters": ["width_mm", "depth_mm", "height_mm", "wall_mm", "floor_mm"],
         "requires": ["trimesh", "manifold3d"],
         "preview_available": False,
         "preview_note": "No renderer detected; preview not available.",
