@@ -40,6 +40,7 @@ from pathlib import Path
 from typing import Any
 
 from hermes3d.services import queue_bridge
+from hermes3d.services.llm_output_sanitizer import sanitize_reasoning_output
 
 LOG = logging.getLogger(__name__)
 
@@ -265,25 +266,7 @@ def _sanitize_llm_output(text: str) -> str:
     The strict ``_passes_quality_gate`` check below catches anything this
     sanitiser misses (e.g. multiple nested fences, mid-document leaks).
     """
-    import re
-
-    if not text:
-        return ""
-    # 1. Closed <think>...</think>.
-    text = re.sub(r"<think>.*?</think>\s*", "", text, flags=re.DOTALL | re.IGNORECASE)
-    # 2. Unclosed <think> ... <EOF>.
-    text = re.sub(r"<think>.*$", "", text, flags=re.DOTALL | re.IGNORECASE)
-    # 3-4. Unwrap outermost whole-doc code fence (```markdown or bare ```).
-    fence_match = re.match(
-        r"\s*```(?:markdown|md)?\s*\n(.*?)\n```\s*\Z",
-        text,
-        flags=re.DOTALL | re.IGNORECASE,
-    )
-    if fence_match:
-        text = fence_match.group(1)
-    # 5. Collapse runs of blank lines.
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    return sanitize_reasoning_output(text)
 
 
 # Backward-compat alias for existing tests.

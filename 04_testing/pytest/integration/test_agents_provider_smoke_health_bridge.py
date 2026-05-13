@@ -135,3 +135,139 @@ def test_agents_provider_smoke_auth_failure_flips_shared_health_red(
     assert providers["deepseek"]["blocked_reason"].startswith(
         "Provider deepseek smoke failed authentication"
     )
+
+
+def test_provider_assist_strips_reasoning_before_return_and_persist(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Provider assist must not leak raw reasoning tags into UI/DB surfaces."""
+    from hermes3d.api.routes import agents as agents_route
+    from hermes3d.api.routes._common import rows
+
+    seen: dict[str, Any] = {}
+
+    def fake_reasoning(provider_id: str, **_kwargs: Any) -> dict[str, Any]:
+        seen.update(_kwargs)
+        return {
+            "provider_id": provider_id,
+            "status": "PASS_LIVE",
+            "http_status": 200,
+            "latency_ms": 11,
+            "model": "MiniMax-M2.7-highspeed",
+            "tokens_in": 3,
+            "tokens_out": 9,
+            "body_sha256": "a" * 64,
+            "body_size_bytes": 120,
+            "error_code": None,
+            "key_present": True,
+            "completion_text": "<think>private reasoning</think>\nClean MiniMax answer.",
+        }
+
+    monkeypatch.setattr(agents_route, "_provider_call", fake_reasoning)
+
+    response = client.post(
+        "/api/agents/providers/assist",
+        json={"provider": "minimax", "prompt": "prove assist", "max_tokens": 32},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "PASS_LIVE"
+    assert body["completion"] == "Clean MiniMax answer."
+    assert body["completion_sanitized"] is True
+    assert body["requested_max_tokens"] == 32
+    assert body["effective_max_tokens"] == 1024
+    assert seen["max_tokens"] == 1024
+    assert "<think>" not in json.dumps(body).lower()
+
+    persisted = rows(
+        "SELECT content FROM agent_conversations WHERE message_type = ?",
+        ("ASSIST_REPLY:minimax",),
+    )
+    assert persisted[-1]["content"] == "Clean MiniMax answer."
+    assert "<think>" not in persisted[-1]["content"].lower()
+
+
+def test_provider_assist_blocks_truncated_reasoning_only_completion(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A token-truncated thinking-only reply becomes an honest empty completion."""
+    from hermes3d.api.routes import agents as agents_route
+    from hermes3d.api.routes._common import rows
+
+    def fake_truncated(provider_id: str, **_kwargs: Any) -> dict[str, Any]:
+        return {
+            "provider_id": provider_id,
+            "status": "PASS_LIVE",
+            "http_status": 200,
+            "latency_ms": 13,
+            "model": "MiniMax-M2.7-highspeed",
+            "tokens_in": 3,
+            "tokens_out": 32,
+            "body_sha256": "b" * 64,
+            "body_size_bytes": 120,
+            "error_code": None,
+            "key_present": True,
+            "completion_text": "<think>\nreasoning got cut off before answer",
+        }
+
+    monkeypatch.setattr(agents_route, "_provider_call", fake_truncated)
+
+    response = client.post(
+        "/api/agents/providers/assist",
+        json={"provider": "minimax", "prompt": "prove assist", "max_tokens": 32},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["completion"] is None
+    assert body["completion_sanitized"] is True
+    assert body["completion_blocked_reason"] == "completion_empty_after_sanitize"
+    assert "<think>" not in json.dumps(body).lower()
+
+    persisted = rows(
+        "SELECT content FROM agent_conversations WHERE message_type = ?",
+        ("ASSIST_REPLY:minimax",),
+    )
+    assert "completion_empty_after_sanitize" in persisted[-1]["content"]
+    assert "<think>" not in persisted[-1]["content"].lower()
+
+
+def test_provider_assist_uses_deepseek_reviewer_token_floor(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer assist also needs enough budget to reach final output."""
+    from hermes3d.api.routes import agents as agents_route
+
+    seen: dict[str, Any] = {}
+
+    def fake_reviewer(provider_id: str, **_kwargs: Any) -> dict[str, Any]:
+        seen.update(_kwargs)
+        return {
+            "provider_id": provider_id,
+            "status": "PASS_LIVE",
+            "http_status": 200,
+            "latency_ms": 19,
+            "model": "deepseek-v4-pro",
+            "tokens_in": 3,
+            "tokens_out": 20,
+            "body_sha256": "c" * 64,
+            "body_size_bytes": 120,
+            "error_code": None,
+            "key_present": True,
+            "completion_text": "Clean DeepSeek review.",
+        }
+
+    monkeypatch.setattr(agents_route, "_provider_call", fake_reviewer)
+
+    response = client.post(
+        "/api/agents/providers/assist",
+        json={"provider": "deepseek", "prompt": "review assist", "max_tokens": 120},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["requested_max_tokens"] == 120
+    assert body["effective_max_tokens"] == 512
+    assert seen["max_tokens"] == 512
+    assert body["completion"] == "Clean DeepSeek review."
