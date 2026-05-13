@@ -228,15 +228,16 @@ def survey_backends() -> list[ModelingBackend]:
 def backend_for_template(template_id: str) -> ModelingBackend:
     """Return the modeling backend the named template runs on.
 
-    Today the only template is ``desk_organizer`` which uses
-    ``trimesh + manifold3d``. We return the *primary* backend (trimesh) but
-    populate its ``detail`` with the manifold3d version so downstream
-    consumers see the full picture without parsing a list.
+    ``desk_organizer`` and ``simple_box`` use ``trimesh + manifold3d``.
+    ``calibration_cube`` uses ``trimesh`` only. We return the *primary*
+    backend (trimesh) and populate details with the boolean engine when one
+    is used so downstream consumers see the full picture without parsing a
+    list.
 
     Raises ``KeyError`` if the template is unknown — never invents a
     backend, never returns "unknown" as the name.
     """
-    if template_id == "desk_organizer":
+    if template_id in {"desk_organizer", "simple_box"}:
         trimesh = _trimesh_backend()
         manifold = _manifold3d_backend()
         if not trimesh.available or not manifold.available:
@@ -246,12 +247,12 @@ def backend_for_template(template_id: str) -> ModelingBackend:
             if not manifold.available:
                 missing.append("manifold3d")
             trimesh.available = False
-            trimesh.detail = "desk_organizer requires trimesh + manifold3d; missing: " + ", ".join(
+            trimesh.detail = f"{template_id} requires trimesh + manifold3d; missing: " + ", ".join(
                 missing
             )
             return trimesh
         trimesh.detail = (
-            f"desk_organizer: trimesh {trimesh.version} routed to "
+            f"{template_id}: trimesh {trimesh.version} routed to "
             f"manifold3d {manifold.version} for boolean CSG. CPU pipeline."
         )
         trimesh.capabilities = [
@@ -261,6 +262,18 @@ def backend_for_template(template_id: str) -> ModelingBackend:
             "watertight_check",
             "winding_consistent",
             "manifold3d_engine",
+        ]
+        return trimesh
+    if template_id == "calibration_cube":
+        trimesh = _trimesh_backend()
+        trimesh.detail = (
+            f"calibration_cube: trimesh {trimesh.version} solid box mesh. CPU pipeline."
+        )
+        trimesh.capabilities = [
+            "primitive_box_mesh",
+            "stl_export",
+            "watertight_check",
+            "winding_consistent",
         ]
         return trimesh
     raise KeyError(f"Unknown template_id: {template_id!r}")
@@ -280,7 +293,7 @@ def backend_summary_for_proof(template_id: str) -> dict[str, Any]:
     }
     if backend.detail:
         payload["detail"] = backend.detail
-    if template_id == "desk_organizer":
+    if template_id in {"desk_organizer", "simple_box"}:
         manifold = _manifold3d_backend()
         payload["engine"] = {
             "name": "manifold3d",
