@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from hermes3d.api.routes._common import execute, row, rows
 from hermes3d.db.load_modules import load_modules
 from hermes3d.services.app_proof_runner import run_proof_command
+from hermes3d.services.app_proof_truth import classify_app_proof
 
 router = APIRouter()
 
@@ -66,6 +67,8 @@ def _truthful_status(record: dict[str, Any]) -> str:
     install_state = record.get("install_state") or ""
     last_proof = record.get("last_proof_status")
     has_proof_cmd = bool((record.get("proof_command") or "").strip())
+    proof_truth = classify_app_proof(record)
+    proof_capability = proof_truth.get("proof_capability")
 
     if install_state not in ("installed", "source_available"):
         return "NOT_INSTALLED"
@@ -77,11 +80,20 @@ def _truthful_status(record: dict[str, Any]) -> str:
     if last_proof == "fail":
         return "FAILED_PROOF"
     if not has_proof_cmd:
+        if proof_capability == "REFERENCE_ONLY":
+            return "REFERENCE_ONLY"
+        if proof_capability == "FIRMWARE_SOURCE_FROZEN":
+            return "FIRMWARE_SOURCE_FROZEN"
+        if proof_capability == "MODEL_RUNTIME_PROOF_REQUIRED":
+            return "MODEL_RUNTIME_PROOF_REQUIRED"
+        if proof_capability in {"DESKTOP_PROOF_REQUIRED", "RUNTIME_PROOF_REQUIRED"}:
+            return "PROOF_REQUIRED"
         return "NO_PROOF_COMMAND"
     return "INSTALLED_UNPROVEN"
 
 
 def _app_response(record: dict[str, Any]) -> dict[str, Any]:
+    proof_truth = classify_app_proof(record)
     return {
         "id": record["id"],
         "display_name": record.get("display_name"),
@@ -107,6 +119,7 @@ def _app_response(record: dict[str, Any]) -> dict[str, Any]:
         "last_sync_at": record.get("last_sync_at"),
         "updated_at": record.get("updated_at"),
         "truthful_status": _truthful_status(record),
+        **proof_truth,
     }
 
 
@@ -153,6 +166,7 @@ def _run_proof_for_record(record: dict[str, Any], *, timeout_s: int) -> dict[str
     app_id = str(record["id"])
     proof_command = (record.get("proof_command") or "").strip()
     if not proof_command:
+        proof_truth = classify_app_proof(record)
         execute(
             """
             UPDATE modules
@@ -167,7 +181,8 @@ def _run_proof_for_record(record: dict[str, Any], *, timeout_s: int) -> dict[str
             "accepted": False,
             "status": "not_set",
             "app_id": app_id,
-            "reason": "module has no proof_command configured",
+            "reason": proof_truth["proof_gap_reason"] or "module has no proof_command configured",
+            **proof_truth,
             "captured_output_redacted": "",
             "evidence_id": None,
         }

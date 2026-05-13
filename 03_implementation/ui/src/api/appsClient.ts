@@ -25,6 +25,7 @@
  */
 
 import type {
+  ProofCapability,
   ProofStatus,
   RegistryApp,
   RegistryAppDetail,
@@ -69,6 +70,17 @@ const KNOWN_PROOF_STATUSES = new Set<ProofStatus>([
   "pending",
   "unknown",
 ]);
+const KNOWN_PROOF_CAPABILITIES = new Set<ProofCapability>([
+  "COMMAND_PROOF",
+  "REFERENCE_ONLY",
+  "FIRMWARE_SOURCE_FROZEN",
+  "MODEL_RUNTIME_PROOF_REQUIRED",
+  "DESKTOP_PROOF_REQUIRED",
+  "RUNTIME_PROOF_REQUIRED",
+  "PROOF_COMMAND_MISSING",
+  "NOT_INSTALLED",
+  "UNKNOWN",
+]);
 
 function readString(record: Record<string, unknown>, key: string): string | null {
   const v = record[key];
@@ -89,6 +101,16 @@ function readProofStatus(value: unknown): ProofStatus {
     return value as ProofStatus;
   }
   return "unknown";
+}
+
+function readProofCapability(value: unknown): ProofCapability {
+  if (
+    typeof value === "string" &&
+    KNOWN_PROOF_CAPABILITIES.has(value as ProofCapability)
+  ) {
+    return value as ProofCapability;
+  }
+  return "UNKNOWN";
 }
 
 /** Cap proof reasons to a sane width and strip control characters defensively. */
@@ -145,6 +167,13 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
       at: readString(obj, "at") ?? readString(obj, "timestamp"),
       reason: readString(obj, "reason"),
     };
+  } else if (readString(record, "last_proof_status")) {
+    last_proof = {
+      proof_event_id: readString(record, "last_proof_event_id"),
+      status: readProofStatus(record.last_proof_status),
+      at: readString(record, "last_proof_at"),
+      reason: readString(record, "last_proof_reason"),
+    };
   }
   return {
     id: (typeof record.id === "string" ? record.id : "") || "(unknown)",
@@ -165,6 +194,10 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
     upstream_url: readString(record, "upstream_url") ?? readString(record, "repo_url"),
     truthful_status: (readString(record, "truthful_status") as import("../types/app-registry").TruthfulStatus | null) ?? "UNKNOWN",
     proof_command: readString(record, "proof_command"),
+    proof_capability: readProofCapability(record.proof_capability),
+    proof_capability_label: readString(record, "proof_capability_label"),
+    proof_gap_reason: readString(record, "proof_gap_reason"),
+    proof_next_action: readString(record, "proof_next_action"),
   };
 }
 

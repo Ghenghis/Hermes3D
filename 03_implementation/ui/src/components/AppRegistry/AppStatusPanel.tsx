@@ -225,6 +225,8 @@ export function AppStatusPanel({
           <CountPill label="proof pass" value={totals.pass} tone="green" />
           <CountPill label="proof fail" value={totals.fail} tone={totals.fail ? "amber" : "muted"} />
           <CountPill label="never proofed" value={totals.unknown} tone={totals.unknown ? "cyan" : "muted"} />
+          <CountPill label="reference only" value={totals.referenceOnly} tone={totals.referenceOnly ? "cyan" : "muted"} />
+          <CountPill label="proof gaps" value={totals.proofGaps} tone={totals.proofGaps ? "amber" : "muted"} />
           <button
             type="button"
             onClick={() => void runProofSweep()}
@@ -403,6 +405,9 @@ function Row({
         </td>
         <td role="cell" className="px-3 py-2">
           <ProofStatusIcon status={proof?.status ?? "unknown"} />
+          <div className="mt-1">
+            <ProofTruthBadge app={app} />
+          </div>
         </td>
         <td role="cell" className="px-3 py-2 text-[11px] text-muted">
           {formatRelative(proof?.at ?? null)}
@@ -413,7 +418,7 @@ function Row({
               type="button"
               onClick={onRunProof}
               disabled={busy || !app.proof_command}
-              title={!app.proof_command ? "No proof command configured for this app" : undefined}
+              title={!app.proof_command ? app.proof_gap_reason ?? "No proof command configured for this app" : undefined}
               data-testid={`app-row-${app.id}-run-proof`}
               className="rounded border border-border px-2 py-1 text-[11px] text-fg hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -462,6 +467,18 @@ function Row({
                 <dt className="text-[10px] uppercase">Last proof reason</dt>
                 <dd className="mt-0.5 text-fg">
                   {redactProofReason(proof?.reason ?? null) || "(none)"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase">Proof truth</dt>
+                <dd className="mt-0.5 text-fg">
+                  {app.proof_capability_label ?? app.proof_capability ?? "Unknown"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-[10px] uppercase">Proof next action</dt>
+                <dd className="mt-0.5 text-fg">
+                  {app.proof_next_action ?? app.proof_gap_reason ?? "(none)"}
                 </dd>
               </div>
             </dl>
@@ -589,6 +606,27 @@ function ProofStatusIcon({ status }: { status: ProofStatus }) {
   );
 }
 
+function ProofTruthBadge({ app }: { app: RegistryApp }) {
+  const capability = app.proof_capability ?? "UNKNOWN";
+  const label = app.proof_capability_label ?? capability;
+  const tone =
+    capability === "COMMAND_PROOF"
+      ? "bg-green-950/60 text-green-300"
+      : capability === "REFERENCE_ONLY" || capability === "FIRMWARE_SOURCE_FROZEN"
+      ? "bg-cyan-950/60 text-cyan-200"
+      : capability === "UNKNOWN"
+      ? "bg-surface2 text-muted"
+      : "bg-amber-950/60 text-amber-200";
+  return (
+    <span
+      className={`inline-block rounded px-1.5 py-0.5 text-[10px] uppercase ${tone}`}
+      title={app.proof_gap_reason ?? app.proof_next_action ?? label}
+    >
+      {label}
+    </span>
+  );
+}
+
 function UnknownPlaceholder() {
   return (
     <span className="text-muted" aria-label="value unknown">
@@ -611,13 +649,20 @@ function summarize(apps: RegistryApp[]) {
   let pass = 0;
   let fail = 0;
   let unknown = 0;
+  let referenceOnly = 0;
+  let proofGaps = 0;
   for (const app of apps) {
     const status = app.last_proof?.status ?? "unknown";
     if (status === "pass") pass += 1;
     else if (status === "fail") fail += 1;
     else unknown += 1;
+    if (app.proof_capability === "REFERENCE_ONLY" || app.proof_capability === "FIRMWARE_SOURCE_FROZEN") {
+      referenceOnly += 1;
+    } else if (!app.proof_command && app.proof_capability !== "NOT_INSTALLED") {
+      proofGaps += 1;
+    }
   }
-  return { total: apps.length, pass, fail, unknown };
+  return { total: apps.length, pass, fail, unknown, referenceOnly, proofGaps };
 }
 
 function formatRelative(iso: string | null): string {

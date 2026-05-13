@@ -22,6 +22,7 @@ from hermes3d.adapters.printrun import PrintrunAdapter
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.api.safety import check_s1_lock
 from hermes3d.db.load_modules import inspect_source_path, load_modules
+from hermes3d.services.app_proof_truth import classify_app_proof
 from hermes3d.services.module_runtime import (
     module_cli_install_config_runner_contract,
     module_executable_path_runner_contract,
@@ -383,6 +384,7 @@ def _module_response(mod: dict[str, Any]) -> dict[str, Any]:
         "providers": providers,
         "activeProvider": _active_provider(mod["id"], providers),
         "runtime": runtime,
+        **classify_app_proof(mod),
     }
 
 
