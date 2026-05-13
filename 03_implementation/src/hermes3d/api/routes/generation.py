@@ -1069,6 +1069,8 @@ def _execute_reference_image_relief_template(
     mesh_sha = _file_sha256(mesh_path)
     package_3mf_sha = _file_sha256(package_3mf_path)
     proof_sha = _file_sha256(written_proof)
+    runtime_evidence_path = _background_runtime_evidence_path(background)
+    runtime_evidence_sha = _file_sha256(runtime_evidence_path) if runtime_evidence_path else None
     execute(
         "INSERT INTO jobs (id, name, job_type, status, printer_id, dry_run) VALUES (?, ?, 'generation', 'completed', NULL, 1)",
         (job_id, _generation_title(request.prompt)),
@@ -1087,6 +1089,7 @@ def _execute_reference_image_relief_template(
     mesh_artifact_id = new_id()
     package_3mf_artifact_id = new_id()
     proof_artifact_id = new_id()
+    runtime_evidence_artifact_id = new_id() if runtime_evidence_path else None
     execute(
         """
         INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
@@ -1132,6 +1135,11 @@ def _execute_reference_image_relief_template(
                     "processed_reference_artifact_id": processed_artifact_id,
                     "package_3mf_artifact_id": package_3mf_artifact_id,
                     "proof_artifact_id": proof_artifact_id,
+                    **(
+                        {"runtime_evidence_artifact_id": runtime_evidence_artifact_id}
+                        if runtime_evidence_artifact_id
+                        else {}
+                    ),
                     "background_removal": background,
                     "mesh_build": mesh_build,
                     "mesh": _mesh_summary(mesh),
@@ -1157,6 +1165,11 @@ def _execute_reference_image_relief_template(
                     "proof_artifact_id": proof_artifact_id,
                     "processed_reference_artifact_id": processed_artifact_id,
                     "reference_artifact_id": request.reference_artifact_id,
+                    **(
+                        {"runtime_evidence_artifact_id": runtime_evidence_artifact_id}
+                        if runtime_evidence_artifact_id
+                        else {}
+                    ),
                     "package": package_3mf,
                 }
             ),
@@ -1179,11 +1192,40 @@ def _execute_reference_image_relief_template(
                     "mesh_artifact_id": mesh_artifact_id,
                     "package_3mf_artifact_id": package_3mf_artifact_id,
                     "processed_reference_artifact_id": processed_artifact_id,
+                    **(
+                        {"runtime_evidence_artifact_id": runtime_evidence_artifact_id}
+                        if runtime_evidence_artifact_id
+                        else {}
+                    ),
                     "truth_gate_status": truth_status,
                 }
             ),
         ),
     )
+    if runtime_evidence_path and runtime_evidence_artifact_id and runtime_evidence_sha:
+        execute(
+            """
+            INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+            VALUES (?, ?, 'runtime_evidence', 'generation-executor', 'MODELING', 'MODEL_RUNTIME', ?, ?, ?, ?)
+            """,
+            (
+                runtime_evidence_artifact_id,
+                job_id,
+                runtime_evidence_path.name,
+                str(runtime_evidence_path),
+                runtime_evidence_path.stat().st_size,
+                as_json(
+                    {
+                        "sha256": runtime_evidence_sha,
+                        "mesh_artifact_id": mesh_artifact_id,
+                        "processed_reference_artifact_id": processed_artifact_id,
+                        "reference_artifact_id": request.reference_artifact_id,
+                        "engine": background.get("engine"),
+                        "providers": background.get("providers"),
+                    }
+                ),
+            ),
+        )
     execute(
         "INSERT INTO truth_gate_results (id, job_id, gate_name, status, error, duration_s) VALUES (?, ?, 'generation.reference_relief_mesh', 'pass', NULL, ?)",
         (new_id(), job_id, _truth_duration(truth_report)),
@@ -1195,15 +1237,27 @@ def _execute_reference_image_relief_template(
         "reference_artifact_id": request.reference_artifact_id,
         "processed_reference_artifact_id": processed_artifact_id,
         "mesh_artifact_id": mesh_artifact_id,
+        "package_3mf_artifact_id": package_3mf_artifact_id,
         "proof_artifact_id": proof_artifact_id,
         "mesh_path": str(mesh_path),
+        "package_3mf_path": str(package_3mf_path),
         "processed_path": str(processed_path),
         "proof_path": str(written_proof),
         "mesh_sha256": mesh_sha,
+        "package_3mf_sha256": package_3mf_sha,
         "processed_sha256": processed_sha,
         "proof_sha256": proof_sha,
         "truth_gate_status": truth_status,
         "background_removal": background,
+        **(
+            {
+                "runtime_evidence_artifact_id": runtime_evidence_artifact_id,
+                "runtime_evidence_path": str(runtime_evidence_path),
+                "runtime_evidence_sha256": runtime_evidence_sha,
+            }
+            if runtime_evidence_artifact_id and runtime_evidence_path and runtime_evidence_sha
+            else {}
+        ),
         "prompt_head": request.prompt[:300],
     }
     execute(
@@ -1244,6 +1298,14 @@ def _execute_reference_image_relief_template(
             "file_size": mesh_path.stat().st_size,
             "sha256": mesh_sha,
         },
+        "package_3mf": {
+            "id": package_3mf_artifact_id,
+            "label": package_3mf_path.name,
+            "file_path": str(package_3mf_path),
+            "file_size": package_3mf_path.stat().st_size,
+            "sha256": package_3mf_sha,
+            "package": package_3mf,
+        },
         "proof": {
             "id": proof_artifact_id,
             "label": written_proof.name,
@@ -1252,6 +1314,19 @@ def _execute_reference_image_relief_template(
             "sha256": proof_sha,
             "event_id": proof_event_id,
         },
+        **(
+            {
+                "runtime_evidence": {
+                    "id": runtime_evidence_artifact_id,
+                    "label": runtime_evidence_path.name,
+                    "file_path": str(runtime_evidence_path),
+                    "file_size": runtime_evidence_path.stat().st_size,
+                    "sha256": runtime_evidence_sha,
+                }
+            }
+            if runtime_evidence_artifact_id and runtime_evidence_path and runtime_evidence_sha
+            else {}
+        ),
         "background_removal": background,
         "truth_gate": {"status": truth_status, "duration_s": _truth_duration(truth_report)},
     }
@@ -1394,6 +1469,8 @@ def _execute_precision_image_relief_template(
     mesh_sha = _file_sha256(mesh_path)
     package_3mf_sha = _file_sha256(package_3mf_path)
     proof_sha = _file_sha256(written_proof)
+    runtime_evidence_path = _background_runtime_evidence_path(background)
+    runtime_evidence_sha = _file_sha256(runtime_evidence_path) if runtime_evidence_path else None
     execute(
         "INSERT INTO jobs (id, name, job_type, status, printer_id, dry_run) VALUES (?, ?, 'generation', 'completed', NULL, 1)",
         (job_id, _generation_title(request.prompt)),
@@ -1424,6 +1501,7 @@ def _execute_precision_image_relief_template(
     mesh_artifact_id = new_id()
     package_3mf_artifact_id = new_id()
     proof_artifact_id = new_id()
+    runtime_evidence_artifact_id = new_id() if runtime_evidence_path else None
     execute(
         """
         INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
@@ -1472,6 +1550,11 @@ def _execute_precision_image_relief_template(
                     "processed_reference_artifact_id": processed_artifact_id,
                     "package_3mf_artifact_id": package_3mf_artifact_id,
                     "proof_artifact_id": proof_artifact_id,
+                    **(
+                        {"runtime_evidence_artifact_id": runtime_evidence_artifact_id}
+                        if runtime_evidence_artifact_id
+                        else {}
+                    ),
                     "background_removal": background,
                     "mesh_build": mesh_build,
                     "mesh": _mesh_summary(mesh),
@@ -1497,6 +1580,11 @@ def _execute_precision_image_relief_template(
                     "proof_artifact_id": proof_artifact_id,
                     "processed_reference_artifact_id": processed_artifact_id,
                     "reference_artifact_id": request.reference_artifact_id,
+                    **(
+                        {"runtime_evidence_artifact_id": runtime_evidence_artifact_id}
+                        if runtime_evidence_artifact_id
+                        else {}
+                    ),
                     "package": package_3mf,
                 }
             ),
@@ -1519,11 +1607,40 @@ def _execute_precision_image_relief_template(
                     "mesh_artifact_id": mesh_artifact_id,
                     "package_3mf_artifact_id": package_3mf_artifact_id,
                     "processed_reference_artifact_id": processed_artifact_id,
+                    **(
+                        {"runtime_evidence_artifact_id": runtime_evidence_artifact_id}
+                        if runtime_evidence_artifact_id
+                        else {}
+                    ),
                     "truth_gate_status": truth_status,
                 }
             ),
         ),
     )
+    if runtime_evidence_path and runtime_evidence_artifact_id and runtime_evidence_sha:
+        execute(
+            """
+            INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
+            VALUES (?, ?, 'runtime_evidence', 'generation-executor', 'MODELING', 'MODEL_RUNTIME', ?, ?, ?, ?)
+            """,
+            (
+                runtime_evidence_artifact_id,
+                job_id,
+                runtime_evidence_path.name,
+                str(runtime_evidence_path),
+                runtime_evidence_path.stat().st_size,
+                as_json(
+                    {
+                        "sha256": runtime_evidence_sha,
+                        "mesh_artifact_id": mesh_artifact_id,
+                        "processed_reference_artifact_id": processed_artifact_id,
+                        "reference_artifact_id": request.reference_artifact_id,
+                        "engine": background.get("engine"),
+                        "providers": background.get("providers"),
+                    }
+                ),
+            ),
+        )
     execute(
         "INSERT INTO truth_gate_results (id, job_id, gate_name, status, error, duration_s) VALUES (?, ?, 'generation.precision_image_relief', 'pass', NULL, ?)",
         (new_id(), job_id, _truth_duration(truth_report)),
@@ -1549,6 +1666,15 @@ def _execute_precision_image_relief_template(
         "background_removal": background,
         "mesh_build": mesh_build,
         "package_3mf": package_3mf,
+        **(
+            {
+                "runtime_evidence_artifact_id": runtime_evidence_artifact_id,
+                "runtime_evidence_path": str(runtime_evidence_path),
+                "runtime_evidence_sha256": runtime_evidence_sha,
+            }
+            if runtime_evidence_artifact_id and runtime_evidence_path and runtime_evidence_sha
+            else {}
+        ),
         "prompt_head": request.prompt[:300],
     }
     execute(
@@ -1605,6 +1731,19 @@ def _execute_precision_image_relief_template(
             "sha256": proof_sha,
             "event_id": proof_event_id,
         },
+        **(
+            {
+                "runtime_evidence": {
+                    "id": runtime_evidence_artifact_id,
+                    "label": runtime_evidence_path.name,
+                    "file_path": str(runtime_evidence_path),
+                    "file_size": runtime_evidence_path.stat().st_size,
+                    "sha256": runtime_evidence_sha,
+                }
+            }
+            if runtime_evidence_artifact_id and runtime_evidence_path and runtime_evidence_sha
+            else {}
+        ),
         "background_removal": background,
         "mesh_build": mesh_build,
         "truth_gate": {"status": truth_status, "duration_s": _truth_duration(truth_report)},
@@ -2148,6 +2287,22 @@ def _load_runtime_evidence(path: Path) -> dict[str, Any]:
     return (
         data if isinstance(data, dict) else {"status": "invalid", "raw_type": type(data).__name__}
     )
+
+
+def _background_runtime_evidence_path(background: dict[str, Any]) -> Path | None:
+    runtime = background.get("runtime")
+    if not isinstance(runtime, dict):
+        return None
+    raw_path = runtime.get("runtime_evidence_path")
+    if not isinstance(raw_path, str) or not raw_path:
+        return None
+    path = Path(raw_path)
+    try:
+        if path.is_file() and path.stat().st_size > 0:
+            return path
+    except OSError:
+        return None
+    return None
 
 
 def _generation_title(prompt: str) -> str:

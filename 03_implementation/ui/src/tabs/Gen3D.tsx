@@ -42,6 +42,9 @@ interface GeneratedModelResult {
   previewLabel?: string;
   proofLabel?: string;
   proofEvent?: string;
+  runtimeEvidenceLabel?: string;
+  runtimeEvidencePath?: string;
+  runtimeEvidenceSize?: number;
   truthGate?: string;
 }
 
@@ -63,7 +66,7 @@ interface Gen3DProvider {
 interface Gen3DTemplate {
   id: string;
   name: string;
-  source: "local_executor" | "provider_backed";
+  source: "local_executor" | "local_hunyuan3d_runtime" | "provider_backed";
   description: string;
   parameters: Array<{ name: string; type: string; default: unknown; min?: number; max?: number }>;
   outputs: string[];
@@ -489,6 +492,7 @@ export function Gen3DTab() {
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {gen3dTemplates.map((t) => {
                   const isSelected = selectedTemplate === t.id;
+                  const isLocalRuntime = t.source === "local_executor" || t.source === "local_hunyuan3d_runtime";
                   const requiresProvider = t.requires_provider != null;
                   const providerReady = !requiresProvider
                     || gen3dProviders.find((p) => p.provider_id === t.requires_provider)?.readiness === "available";
@@ -535,14 +539,14 @@ export function Gen3DTab() {
                         <span
                           className={[
                             "shrink-0 rounded px-1 py-0.5 text-[9px] uppercase font-medium",
-                            t.source === "local_executor"
+                            isLocalRuntime
                               ? "bg-accent-green/15 text-accent-green"
                               : providerReady
                                 ? "bg-accent-cyan/15 text-accent-cyan"
                                 : "bg-surface2 text-muted",
                           ].join(" ")}
                         >
-                          {t.source === "local_executor" ? "local" : (providerReady ? "ready" : "needs provider")}
+                          {isLocalRuntime ? "local" : (providerReady ? "ready" : "needs provider")}
                         </span>
                       </div>
                       <div className="text-muted text-[10px] leading-relaxed line-clamp-2">{t.description}</div>
@@ -590,8 +594,9 @@ export function Gen3DTab() {
                     {model.packageLabel && <div className="truncate">3MF: <span className="font-mono text-fg">{model.packageLabel}{model.packageSize != null ? ` · ${formatBytes(model.packageSize)}` : ""}</span></div>}
                     {model.previewLabel && <div className="truncate">Preview: <span className="font-mono text-fg">{model.previewLabel}</span></div>}
                     {model.proofLabel && <div className="truncate">Proof: <span className="font-mono text-fg">{model.proofLabel}</span></div>}
+                    {model.runtimeEvidenceLabel && <div className="truncate">Runtime: <span className="font-mono text-fg">{model.runtimeEvidenceLabel}{model.runtimeEvidenceSize != null ? ` · ${formatBytes(model.runtimeEvidenceSize)}` : ""}</span></div>}
                   </div>
-                  <div className="truncate font-mono text-[10px] text-accent-cyan">{model.packagePath ?? model.proofEvent ?? model.artifactPath}</div>
+                  <div className="truncate font-mono text-[10px] text-accent-cyan">{model.runtimeEvidencePath ?? model.packagePath ?? model.proofEvent ?? model.artifactPath}</div>
                 </article>
               ))}
             </div>
@@ -654,6 +659,7 @@ function parseGeneratedModel(payload: unknown): GeneratedModelResult | null {
     return null;
   }
   const package3mf = isRecord(payload.package_3mf) ? payload.package_3mf : null;
+  const runtimeEvidence = isRecord(payload.runtime_evidence) ? payload.runtime_evidence : null;
   return {
     jobId: payload.job_id,
     template: typeof payload.template === "string" ? payload.template : "local_template",
@@ -666,6 +672,9 @@ function parseGeneratedModel(payload: unknown): GeneratedModelResult | null {
     previewLabel: isRecord(payload.preview) && typeof payload.preview.label === "string" ? payload.preview.label : undefined,
     proofLabel: isRecord(payload.proof) && typeof payload.proof.label === "string" ? payload.proof.label : undefined,
     proofEvent: isRecord(payload.proof) && typeof payload.proof.event_id === "string" ? payload.proof.event_id : undefined,
+    runtimeEvidenceLabel: runtimeEvidence != null && typeof runtimeEvidence.label === "string" ? runtimeEvidence.label : undefined,
+    runtimeEvidencePath: runtimeEvidence != null && typeof runtimeEvidence.file_path === "string" ? runtimeEvidence.file_path : undefined,
+    runtimeEvidenceSize: runtimeEvidence != null && typeof runtimeEvidence.file_size === "number" ? runtimeEvidence.file_size : undefined,
     truthGate: isRecord(payload.truth_gate) && typeof payload.truth_gate.status === "string" ? payload.truth_gate.status : undefined,
   };
 }

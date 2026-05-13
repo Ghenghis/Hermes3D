@@ -191,8 +191,10 @@ test("Gen3D renders accepted local generation artifacts with proof", async ({ pa
       created: true,
       template: "calibration_cube",
       artifact: { id: "mesh-1", label: "calibration_cube_abc123.stl", file_path: "G:\\proof\\calibration_cube_abc123.stl", file_size: 684 },
+      package_3mf: { id: "package-1", label: "calibration_cube_abc123.3mf", file_path: "G:\\proof\\calibration_cube_abc123.3mf", file_size: 4096 },
       preview: { id: "preview-1", label: "calibration_cube_abc123.preview.svg", file_path: "G:\\proof\\calibration_cube_abc123.preview.svg", file_size: 1024 },
       proof: { id: "proof-1", label: "calibration_cube_abc123.proof.json", event_id: "proof-gen-1" },
+      runtime_evidence: { id: "runtime-1", label: "calibration_cube_abc123.runtime.json", file_path: "G:\\proof\\calibration_cube_abc123.runtime.json", file_size: 1310 },
       truth_gate: { status: "pass", duration_s: 0.2 },
     }, 202);
   });
@@ -203,9 +205,17 @@ test("Gen3D renders accepted local generation artifacts with proof", async ({ pa
   await expect(root).toBeVisible();
   await root.getByLabel("Generation size mm").fill("24");
   await root.getByRole("button", { name: "Generate", exact: true }).click();
-  await expect(root.getByText(/Accepted: calibration_cube_abc123\.stl; proof proof-gen-1/)).toBeVisible();
+  await expect(root.getByText(/Accepted: calibration_cube_abc123\.stl; 3MF calibration_cube_abc123\.3mf; proof proof-gen-1/)).toBeVisible();
   await expect(root.getByText("calibration_cube_abc123.stl", { exact: true })).toBeVisible();
-  await expect(root.getByText("calibration_cube_abc123.preview.svg", { exact: true })).toBeVisible();
+  const packageLabel = root.getByText(/calibration_cube_abc123\.3mf/).last();
+  await packageLabel.scrollIntoViewIfNeeded();
+  await expect(packageLabel).toBeVisible();
+  const previewLabel = root.getByText("calibration_cube_abc123.preview.svg", { exact: true });
+  await previewLabel.scrollIntoViewIfNeeded();
+  await expect(previewLabel).toBeVisible();
+  const runtimeLabel = root.getByText(/calibration_cube_abc123\.runtime\.json/).last();
+  await runtimeLabel.scrollIntoViewIfNeeded();
+  await expect(runtimeLabel).toBeVisible();
   expect(generationRequests).toHaveLength(1);
   expect(generationRequests[0].prompt).toBe("calibration cube");
   expect((generationRequests[0].constraints as Record<string, unknown>).size_mm).toBe(24);
