@@ -205,7 +205,7 @@ test("Gen3D renders accepted local generation artifacts with proof", async ({ pa
   await expect(root).toBeVisible();
   await root.getByLabel("Generation size mm").fill("24");
   await root.getByRole("button", { name: "Generate", exact: true }).click();
-  await expect(root.getByText(/Accepted: calibration_cube_abc123\.stl; proof proof-gen-1/)).toBeVisible();
+  await expect(root.getByText(/Accepted: calibration_cube_abc123\.stl; 3MF calibration_cube_abc123\.3mf; proof proof-gen-1/)).toBeVisible();
   await expect(root.getByText("calibration_cube_abc123.stl", { exact: true })).toBeVisible();
   await expect(root.getByText(/calibration_cube_abc123\.3mf/)).toBeVisible();
   await expect(root.getByText("calibration_cube_abc123.preview.svg", { exact: true })).toBeVisible();
