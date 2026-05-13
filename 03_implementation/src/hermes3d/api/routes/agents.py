@@ -4140,6 +4140,37 @@ Reject if constraints are physically impossible (e.g. size_mm < 5 or > 500).
 """
 
 
+def _extract_json_object_from_completion(
+    text: str | None,
+) -> tuple[dict[str, Any] | None, str | None, str]:
+    """Return the first JSON object from provider output after reasoning cleanup."""
+
+    cleaned = sanitize_reasoning_output(text)
+    if not cleaned:
+        return None, "completion_empty_after_sanitize", ""
+
+    # Some providers still wrap JSON in ```json fences. Keep this local so
+    # model-assist does not depend on exact fence-language handling elsewhere.
+    if cleaned.lstrip().startswith("```"):
+        lines = cleaned.splitlines()
+        if lines and lines[0].strip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
+
+    decoder = json.JSONDecoder()
+    for match in re.finditer(r"\{", cleaned):
+        candidate = cleaned[match.start() :]
+        try:
+            parsed, _end = decoder.raw_decode(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed, None, cleaned
+    return None, "JSON object not found in sanitized completion", cleaned
+
+
 @router.post("/api/agents/providers/model-assist")
 def model_assist(body: dict | None = None) -> dict:
     """MiniMax (builder) extracts design parameters; DeepSeek (reviewer) approves them.
@@ -4172,19 +4203,16 @@ def model_assist(body: dict | None = None) -> dict:
 
     # Step 1: MiniMax extracts structured design parameters
     extraction_prompt = f"{_MODEL_ASSIST_EXTRACT_SYSTEM}\n\nUser: {prompt}"
-    mm_result = _provider_call("minimax", prompt=extraction_prompt, max_tokens=300, timeout=45.0)
+    _mm_requested_tokens, mm_max_tokens = _provider_assist_token_budget("minimax", 300)
+    mm_result = _provider_call(
+        "minimax", prompt=extraction_prompt, max_tokens=mm_max_tokens, timeout=45.0
+    )
     mm_completion = mm_result.pop("completion_text", None) or ""
 
     extracted: dict[str, Any] = {}
     parse_error: str | None = None
-    raw_json = mm_completion.strip()
-    # Strip markdown fences if present
-    if raw_json.startswith("```"):
-        raw_json = "\n".join(
-            line for line in raw_json.splitlines() if not line.strip().startswith("```")
-        ).strip()
-    try:
-        parsed = json.loads(raw_json)
+    parsed, parse_error, mm_completion_clean = _extract_json_object_from_completion(mm_completion)
+    if parsed is not None:
         if isinstance(parsed, dict):
             extracted = {
                 "title": str(parsed.get("title", prompt[:60])),
@@ -4193,10 +4221,7 @@ def model_assist(body: dict | None = None) -> dict:
                 if isinstance(parsed.get("constraints"), dict)
                 else {},
             }
-        else:
-            parse_error = "MiniMax response was not a JSON object"
-    except (json.JSONDecodeError, TypeError) as exc:
-        parse_error = f"JSON parse failed: {exc}"
+    else:
         extracted = {"title": prompt[:60], "intent": prompt, "constraints": {}}
 
     # Persist MiniMax exchange
@@ -4208,33 +4233,39 @@ def model_assist(body: dict | None = None) -> dict:
     )
     execute(
         "INSERT INTO agent_conversations (id, persona_id, role, message_type, content) VALUES (?, ?, 'assistant', ?, ?)",
-        (mm_reply_id, "modeling-agent", "MODEL_ASSIST_REPLY:minimax", mm_completion or ""),
+        (mm_reply_id, "modeling-agent", "MODEL_ASSIST_REPLY:minimax", mm_completion_clean or ""),
     )
 
     # Step 2: DeepSeek reviews extracted parameters
     ds_review: dict[str, Any] | None = None
+    ds_result_meta: dict[str, Any] | None = None
+    deepseek_parse_error: str | None = None
+    ds_completion_clean = ""
     if not skip_review and mm_result.get("status") == "PASS_LIVE":
         review_prompt = (
             f"{_MODEL_ASSIST_REVIEW_SYSTEM}\n\nParameters to review:\n{json.dumps(extracted)}"
         )
+        _ds_requested_tokens, ds_max_tokens = _provider_assist_token_budget("deepseek", 100)
         ds_result_raw = _provider_call(
-            "deepseek", prompt=review_prompt, max_tokens=100, timeout=30.0
+            "deepseek", prompt=review_prompt, max_tokens=ds_max_tokens, timeout=30.0
         )
         ds_completion = ds_result_raw.pop("completion_text", None) or ""
-        raw_ds = ds_completion.strip()
-        if raw_ds.startswith("```"):
-            raw_ds = "\n".join(
-                line for line in raw_ds.splitlines() if not line.strip().startswith("```")
-            ).strip()
-        try:
-            rev = json.loads(raw_ds)
-            if isinstance(rev, dict):
-                ds_review = {
-                    "approved": bool(rev.get("approved", True)),
-                    "reason": str(rev.get("reason", "")),
-                }
-        except (json.JSONDecodeError, TypeError):
-            ds_review = {"approved": True, "reason": "DeepSeek response could not be parsed"}
+        ds_result_meta = dict(ds_result_raw)
+        rev, deepseek_parse_error, ds_completion_clean = _extract_json_object_from_completion(
+            ds_completion
+        )
+        if rev is not None and "approved" in rev:
+            ds_review = {
+                "approved": bool(rev.get("approved")),
+                "reason": str(rev.get("reason", "")),
+            }
+        else:
+            if deepseek_parse_error is None:
+                deepseek_parse_error = "DeepSeek review JSON did not contain approved"
+            ds_review = {
+                "approved": False,
+                "reason": "DeepSeek response could not be parsed as approval JSON.",
+            }
         # Persist DeepSeek exchange
         ds_user_id = new_id()
         ds_reply_id = new_id()
@@ -4253,14 +4284,18 @@ def model_assist(body: dict | None = None) -> dict:
                 ds_reply_id,
                 "oliver-qa-agent",
                 "MODEL_ASSIST_REVIEW_REPLY:deepseek",
-                ds_completion or "",
+                ds_completion_clean or "",
             ),
         )
 
     # Step 3: Optional auto-submit to design.intake
     intake_result: dict[str, Any] | None = None
-    if auto_submit and extracted.get("title"):
-        approved = (ds_review or {}).get("approved", True) if ds_review else True
+    review_accepted = skip_review or (
+        ds_review is not None and ds_review.get("approved") is True and deepseek_parse_error is None
+    )
+    extraction_accepted = mm_result.get("status") == "PASS_LIVE" and parse_error is None
+    if auto_submit and extracted.get("title") and extraction_accepted:
+        approved = review_accepted
         if approved:
             from hermes3d.api.routes import design as design_route
 
@@ -4279,15 +4314,19 @@ def model_assist(body: dict | None = None) -> dict:
             "prompt_head": prompt[:200],
             "extracted": extracted,
             "parse_error": parse_error,
+            "deepseek_parse_error": deepseek_parse_error,
             "deepseek_approved": (ds_review or {}).get("approved"),
+            "deepseek": ds_result_meta,
             "auto_submitted": auto_submit and intake_result is not None,
         },
     )
+    status_ready = bool(extracted.get("title")) and extraction_accepted and review_accepted
 
     return {
-        "status": "ready" if extracted.get("title") else "degraded",
+        "status": "ready" if status_ready else "degraded",
         "extracted": extracted,
         "parse_error": parse_error,
+        "deepseek_parse_error": deepseek_parse_error,
         "minimax": mm_result,
         "deepseek_review": ds_review,
         "intake_result": intake_result,

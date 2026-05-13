@@ -271,3 +271,117 @@ def test_provider_assist_uses_deepseek_reviewer_token_floor(
     assert body["effective_max_tokens"] == 512
     assert seen["max_tokens"] == 512
     assert body["completion"] == "Clean DeepSeek review."
+
+
+def test_model_assist_parses_reasoning_wrapped_provider_json(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Model assist must parse final JSON after provider reasoning wrappers."""
+    from hermes3d.api.routes import agents as agents_route
+    from hermes3d.api.routes._common import rows
+
+    seen: dict[str, int] = {}
+
+    def fake_model_assist_provider(provider_id: str, **kwargs: Any) -> dict[str, Any]:
+        seen[provider_id] = int(kwargs["max_tokens"])
+        if provider_id == "minimax":
+            completion = (
+                "<think>private builder reasoning</think>\n"
+                '{"title":"Calibration Cube","intent":"Create a 20 mm slicer proof cube.",'
+                '"constraints":{"size_mm":20}}'
+            )
+        else:
+            completion = (
+                "<think>private reviewer reasoning</think>\n"
+                '{"approved":true,"reason":"20 mm cube is safe and implementable."}'
+            )
+        return {
+            "provider_id": provider_id,
+            "status": "PASS_LIVE",
+            "http_status": 200,
+            "latency_ms": 15,
+            "model": "MiniMax-M2.7-highspeed" if provider_id == "minimax" else "deepseek-v4-pro",
+            "tokens_in": 20,
+            "tokens_out": 30,
+            "body_sha256": provider_id[:1] * 64,
+            "body_size_bytes": 220,
+            "error_code": None,
+            "key_present": True,
+            "completion_text": completion,
+        }
+
+    monkeypatch.setattr(agents_route, "_provider_call", fake_model_assist_provider)
+
+    response = client.post(
+        "/api/agents/providers/model-assist",
+        json={"prompt": "Design a 20 mm calibration cube", "auto_submit": False},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "ready"
+    assert body["parse_error"] is None
+    assert body["deepseek_parse_error"] is None
+    assert body["extracted"]["title"] == "Calibration Cube"
+    assert body["extracted"]["constraints"]["size_mm"] == 20
+    assert body["deepseek_review"]["approved"] is True
+    assert seen["minimax"] == 1024
+    assert seen["deepseek"] == 512
+    assert "<think>" not in json.dumps(body).lower()
+
+    persisted = rows(
+        """
+        SELECT message_type, content
+          FROM agent_conversations
+         WHERE message_type LIKE 'MODEL_ASSIST%'
+         ORDER BY created_at
+        """
+    )
+    assert persisted
+    assert "<think>" not in json.dumps([dict(row) for row in persisted]).lower()
+    assert any(row["message_type"] == "MODEL_ASSIST_REPLY:minimax" for row in persisted)
+    assert any(row["message_type"] == "MODEL_ASSIST_REVIEW_REPLY:deepseek" for row in persisted)
+
+
+def test_model_assist_does_not_fake_reviewer_approval_on_unparseable_json(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unparsable DeepSeek review must degrade, not silently approve."""
+    from hermes3d.api.routes import agents as agents_route
+
+    def fake_model_assist_provider(provider_id: str, **_kwargs: Any) -> dict[str, Any]:
+        completion = (
+            '{"title":"Calibration Cube","intent":"Create a 20 mm slicer proof cube.",'
+            '"constraints":{"size_mm":20}}'
+        )
+        if provider_id == "deepseek":
+            completion = "This looks safe, but I did not return JSON."
+        return {
+            "provider_id": provider_id,
+            "status": "PASS_LIVE",
+            "http_status": 200,
+            "latency_ms": 15,
+            "model": "MiniMax-M2.7-highspeed" if provider_id == "minimax" else "deepseek-v4-pro",
+            "tokens_in": 20,
+            "tokens_out": 30,
+            "body_sha256": provider_id[:1] * 64,
+            "body_size_bytes": 220,
+            "error_code": None,
+            "key_present": True,
+            "completion_text": completion,
+        }
+
+    monkeypatch.setattr(agents_route, "_provider_call", fake_model_assist_provider)
+
+    response = client.post(
+        "/api/agents/providers/model-assist",
+        json={"prompt": "Design a 20 mm calibration cube", "auto_submit": False},
+    )
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["parse_error"] is None
+    assert body["deepseek_parse_error"] == "JSON object not found in sanitized completion"
+    assert body["deepseek_review"]["approved"] is False
+    assert body["intake_result"] is None
