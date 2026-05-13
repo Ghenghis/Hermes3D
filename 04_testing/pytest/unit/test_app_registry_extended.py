@@ -219,6 +219,9 @@ def test_app_proof_commands_avoid_known_stale_relative_paths() -> None:
     assert APP_EXTENSIONS["marlin"]["proof_command"] == "git rev-parse --short HEAD"
     assert APP_EXTENSIONS["klipper"]["proof_command"] == "git rev-parse --short HEAD"
     assert "server/index.js" in APP_EXTENSIONS["model_context_protocol"]["proof_command"]
+    blender_mcp_cmd = APP_EXTENSIONS["blender_mcp_candidates"]["proof_command"]
+    assert "blender_mcp" in blender_mcp_cmd
+    assert " --help" not in blender_mcp_cmd
 
 
 def test_rollback_supported_is_boolean_int() -> None:

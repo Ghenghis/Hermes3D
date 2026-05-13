@@ -65,7 +65,7 @@ APP_EXTENSIONS: dict[str, dict[str, Any]] = {
         "license_spdx": "MIT",
         "rollback_supported": True,
         "rollback_runbook_url": None,
-        "proof_command": "uvx blender-mcp --help",
+        "proof_command": "uvx --from blender-mcp python -c \"import blender_mcp;print('ok')\"",
         "update_lane": "canary",
     },
     "hermes_agent": {
