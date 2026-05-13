@@ -186,6 +186,36 @@ def test_slicer_route_does_not_import_printer_clients() -> None:
     )
 
 
+def test_source_mesh_artifact_lookup_uses_existing_mesh_row(monkeypatch, tmp_path: Path) -> None:
+    """Slicer artifacts should link back to the source mesh when DB knows it."""
+
+    import hermes3d.api.routes.slicer as slicer_route
+
+    stl = tmp_path / "part.stl"
+    stl.write_text("solid part\nendsolid part\n", encoding="utf-8")
+    seen: dict[str, object] = {}
+
+    def fake_row(sql: str, params: tuple[str]):  # noqa: ANN202
+        seen["sql"] = sql
+        seen["params"] = params
+        return {"id": "mesh-artifact-123"}
+
+    monkeypatch.setattr(slicer_route, "row", fake_row)
+
+    assert slicer_route._source_mesh_artifact_id(stl) == "mesh-artifact-123"
+    assert seen["params"] == (str(stl),)
+    assert "evidence_type IN ('mesh', 'model')" in str(seen["sql"])
+
+
+def test_source_mesh_artifact_lookup_returns_none_when_absent(monkeypatch, tmp_path: Path) -> None:
+    import hermes3d.api.routes.slicer as slicer_route
+
+    stl = tmp_path / "missing-link.stl"
+    monkeypatch.setattr(slicer_route, "row", lambda *_args, **_kwargs: None)
+
+    assert slicer_route._source_mesh_artifact_id(stl) is None
+
+
 @pytest.mark.skipif(
     not _slicer_available(),
     reason="PrusaSlicer/OrcaSlicer CLI not installed — slice_mesh would raise SlicerNotFound",

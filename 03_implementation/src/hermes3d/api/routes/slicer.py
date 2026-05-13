@@ -99,6 +99,23 @@ def _file_sha256(path: Path) -> str:
     return hasher.hexdigest()
 
 
+def _source_mesh_artifact_id(stl_path: Path) -> str | None:
+    """Return the existing mesh artifact id for ``stl_path`` when known."""
+
+    artifact = row(
+        """
+        SELECT id FROM artifacts
+         WHERE file_path = ?
+           AND evidence_type IN ('mesh', 'model')
+         ORDER BY created_at DESC
+         LIMIT 1
+        """,
+        (str(stl_path),),
+    )
+    artifact_id = artifact.get("id") if artifact else None
+    return str(artifact_id) if artifact_id else None
+
+
 def _resolve_stl(raw_path: str) -> Path:
     """Resolve the user-supplied path against common repo roots."""
 
@@ -279,6 +296,7 @@ def _run_slice_job(job_id: str, body: SliceRequest, stl_path: Path) -> None:
         # pick them up. We attach two artifacts: the gcode + the proof envelope.
         gcode_artifact_id = new_id()
         proof_artifact_id = new_id()
+        source_mesh_artifact_id = _source_mesh_artifact_id(stl_path)
         gcode_notes = {
             "sha256": gcode_sha,
             "size_bytes": size_bytes,
@@ -290,6 +308,9 @@ def _run_slice_job(job_id: str, body: SliceRequest, stl_path: Path) -> None:
             "proof_event_id": proof_event_id,
             "slicer_binary": result_dict.get("slicer_binary"),
         }
+        if source_mesh_artifact_id:
+            gcode_notes["mesh_artifact_id"] = source_mesh_artifact_id
+            gcode_notes["source_stl_path"] = str(stl_path)
         execute(
             """
             INSERT INTO artifacts (id, job_id, evidence_type, agent, stage, gate, label, file_path, file_size, notes)
