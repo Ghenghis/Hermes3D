@@ -324,11 +324,11 @@ def _cloud_provider_health_entry(
     if smoke_status == "ready" and not is_stale:
         base["status"] = "green"
         base["stale"] = False
-        # Real smoke calls populate response objects with HTTP 200 and
-        # latency; we surface the smoke's content hash existence as a
-        # confirmation rather than re-probing here.
-        base["http_status"] = 200
-        base["latency_ms"] = base.get("latency_ms")
+        # Real smoke calls populate response objects with HTTP status and
+        # latency; older status records predate those fields, so keep the
+        # historical HTTP 200 fallback for ready smoke proofs.
+        base["http_status"] = record.get("http_status") or 200
+        base["latency_ms"] = record.get("latency_ms")
         base["content_sha256"] = record.get("content_sha256")
         base["blocked_reason"] = None
     elif smoke_status == "ready" and is_stale:

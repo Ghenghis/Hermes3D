@@ -3926,10 +3926,64 @@ def provider_smoke(body: dict | None = None) -> dict:
         # The smoke endpoint NEVER stores the completion text. Strip it.
         result.pop("completion_text", None)
         result["role"] = PROVIDER_ROLE_MAP.get(pid_norm, "unknown")
-        out["providers"][pid_norm] = result
         # Persist proof event for the smoke (key-free, sha-only).
-        _append_provider_proof_event("provider_smoke", pid_norm, result)
+        proof_event_id = _append_provider_proof_event("provider_smoke", pid_norm, result)
+        result["proof_event_id"] = proof_event_id
+        _record_provider_smoke_health_status(pid_norm, result, proof_event_id)
+        out["providers"][pid_norm] = result
     return out
+
+
+def _record_provider_smoke_health_status(
+    provider_id: str, result: dict[str, Any], proof_event_id: str
+) -> None:
+    """Bridge the agents smoke proof into /api/providers/health.
+
+    The agents route is the GUI-facing smoke button, while provider health
+    reads the shared code-history smoke-status file. Keep both surfaces
+    backed by the same proof event so operators do not see "PASS_LIVE" in one
+    panel and "idle" in another.
+    """
+    from hermes3d.services import code_history
+
+    base_url, default_model = _provider_endpoint(provider_id)
+    verdict = str(result.get("status") or "").strip()
+    http_status = result.get("http_status")
+    latency_ms = result.get("latency_ms")
+    error_code = result.get("error_code")
+    accepted = verdict == "PASS_LIVE"
+    if accepted:
+        status = "ready"
+        blocked_reasons: list[str] = []
+    elif verdict == "FAIL_KEY_MISSING":
+        status = "missing_config"
+        blocked_reasons = [f"Provider {provider_id} API key is missing."]
+    elif verdict == "FAIL_AUTH":
+        status = "auth_failed"
+        blocked_reasons = [
+            f"Provider {provider_id} smoke failed authentication"
+            + (f" (HTTP {http_status})" if http_status else "")
+            + (f": {error_code}" if error_code else "")
+        ]
+    else:
+        status = "smoke_failed"
+        blocked_reasons = [
+            f"Provider {provider_id} smoke returned {verdict or 'unknown'}"
+            + (f" (HTTP {http_status})" if http_status else "")
+            + (f": {error_code}" if error_code else "")
+        ]
+    code_history.record_provider_http_smoke_status(
+        provider_id,
+        accepted=accepted,
+        status=status,
+        blocked_reasons=blocked_reasons,
+        base_url=base_url,
+        model=str(result.get("model") or default_model),
+        content_sha256=str(result.get("body_sha256") or "") if accepted else None,
+        proof_event_id=proof_event_id,
+        http_status=int(http_status) if isinstance(http_status, int) else None,
+        latency_ms=int(latency_ms) if isinstance(latency_ms, int) else None,
+    )
 
 
 @router.post("/api/agents/providers/assist")
