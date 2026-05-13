@@ -98,6 +98,12 @@ def create_gui_app() -> FastAPI:
         # parent process and the worker forked without inheriting the
         # _initialized flag (e.g. multiprocessing spawn on Windows).
         init_db()
+        try:
+            from hermes3d.services.job_reconciler import retire_stale_dry_run_jobs
+
+            retire_stale_dry_run_jobs()
+        except Exception:
+            pass  # stale dry-run cleanup is best-effort; never block startup
         # W19-5: idempotent backfill of var/ files not yet in artifacts DB
         try:
             from hermes3d.api.routes.files import reconcile_var_artifacts
