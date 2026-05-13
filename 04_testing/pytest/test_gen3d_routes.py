@@ -567,8 +567,21 @@ class TestReferenceImageReliefGeneration:
                     processed.putpixel((x, y), (15, 15, 15, 255))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             processed.save(output_path)
+            runtime_path = output_path.with_name(f"{output_path.stem}.runtime.json")
+            runtime_path.write_text(
+                json.dumps(
+                    {
+                        "status": "completed",
+                        "model": "bria-rmbg",
+                        "providers": ["CPUExecutionProvider"],
+                    }
+                ),
+                encoding="utf-8",
+            )
             return {
                 "engine": "rembg",
+                "model": "bria-rmbg",
+                "providers": ["CPUExecutionProvider"],
                 "output_path": str(output_path),
                 "alpha": {
                     "width": 32,
@@ -576,6 +589,11 @@ class TestReferenceImageReliefGeneration:
                     "transparent_pixels": 768,
                     "foreground_pixels": 256,
                     "foreground_bbox": [8, 8, 24, 24],
+                },
+                "runtime": {
+                    "python": sys.executable,
+                    "runtime_evidence_path": str(runtime_path),
+                    "return_code": 0,
                 },
             }
 
@@ -596,8 +614,12 @@ class TestReferenceImageReliefGeneration:
         assert body["template"] == "reference_image_relief"
         assert body["reference"]["id"] == reference_id
         assert body["processed_reference"]["id"]
+        assert body["package_3mf"]["id"]
+        assert body["runtime_evidence"]["id"]
         assert Path(body["artifact"]["file_path"]).is_file()
         assert Path(body["processed_reference"]["file_path"]).is_file()
+        assert Path(body["package_3mf"]["file_path"]).is_file()
+        assert Path(body["runtime_evidence"]["file_path"]).is_file()
         assert Path(body["proof"]["file_path"]).is_file()
 
         mesh_row = row("SELECT * FROM artifacts WHERE id = ?", (body["artifact"]["id"],))
@@ -605,6 +627,8 @@ class TestReferenceImageReliefGeneration:
         mesh_notes = json.loads(mesh_row["notes"])
         assert mesh_notes["reference_artifact_id"] == reference_id
         assert mesh_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert mesh_notes["package_3mf_artifact_id"] == body["package_3mf"]["id"]
+        assert mesh_notes["runtime_evidence_artifact_id"] == body["runtime_evidence"]["id"]
         assert mesh_notes["background_removal"]["engine"] == "rembg"
 
         processed_row = row(
@@ -614,6 +638,15 @@ class TestReferenceImageReliefGeneration:
         assert processed_row is not None
         assert processed_row["evidence_type"] == "processed_image"
         assert json.loads(processed_row["notes"])["reference_artifact_id"] == reference_id
+        runtime_row = row(
+            "SELECT * FROM artifacts WHERE id = ?",
+            (body["runtime_evidence"]["id"],),
+        )
+        assert runtime_row is not None
+        assert runtime_row["evidence_type"] == "runtime_evidence"
+        runtime_notes = json.loads(runtime_row["notes"])
+        assert runtime_notes["mesh_artifact_id"] == body["artifact"]["id"]
+        assert runtime_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
 
         events = rows(
             "SELECT * FROM proof_events WHERE event_type = 'generation.reference_relief.completed'"
@@ -622,6 +655,8 @@ class TestReferenceImageReliefGeneration:
         payload = json.loads(events[0]["payload"])
         assert payload["reference_artifact_id"] == reference_id
         assert payload["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert payload["package_3mf_artifact_id"] == body["package_3mf"]["id"]
+        assert payload["runtime_evidence_artifact_id"] == body["runtime_evidence"]["id"]
 
     def test_rembg_subprocess_fallback_returns_runtime_evidence(
         self, app_client, tmp_path, monkeypatch
@@ -709,8 +744,21 @@ class TestPrecisionImageReliefGeneration:
                     processed.putpixel((x, y), (shade, shade, shade, 255))
             output_path.parent.mkdir(parents=True, exist_ok=True)
             processed.save(output_path)
+            runtime_path = output_path.with_name(f"{output_path.stem}.runtime.json")
+            runtime_path.write_text(
+                json.dumps(
+                    {
+                        "status": "completed",
+                        "model": "bria-rmbg",
+                        "providers": ["CPUExecutionProvider"],
+                    }
+                ),
+                encoding="utf-8",
+            )
             return {
                 "engine": "rembg",
+                "model": "bria-rmbg",
+                "providers": ["CPUExecutionProvider"],
                 "output_path": str(output_path),
                 "alpha": {
                     "width": 32,
@@ -718,6 +766,11 @@ class TestPrecisionImageReliefGeneration:
                     "transparent_pixels": 768,
                     "foreground_pixels": 256,
                     "foreground_bbox": [8, 8, 24, 24],
+                },
+                "runtime": {
+                    "python": sys.executable,
+                    "runtime_evidence_path": str(runtime_path),
+                    "return_code": 0,
                 },
             }
 
@@ -745,6 +798,7 @@ class TestPrecisionImageReliefGeneration:
         assert Path(body["package_3mf"]["file_path"]).is_file()
         assert Path(body["processed_reference"]["file_path"]).is_file()
         assert Path(body["proof"]["file_path"]).is_file()
+        assert Path(body["runtime_evidence"]["file_path"]).is_file()
         assert body["package_3mf"]["label"].endswith(".3mf")
         assert "3D/3dmodel.model" in body["package_3mf"]["package"]["entries"]
         assert body["mesh_build"]["foreground_cells"] > 0
@@ -755,6 +809,7 @@ class TestPrecisionImageReliefGeneration:
         assert mesh_notes["reference_artifact_id"] == reference_id
         assert mesh_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
         assert mesh_notes["package_3mf_artifact_id"] == body["package_3mf"]["id"]
+        assert mesh_notes["runtime_evidence_artifact_id"] == body["runtime_evidence"]["id"]
         assert mesh_notes["mesh_build"]["mesh_width"] == 16
         assert mesh_notes["mesh"]["is_watertight"] is True
 
@@ -764,7 +819,17 @@ class TestPrecisionImageReliefGeneration:
         package_notes = json.loads(package_row["notes"])
         assert package_notes["mesh_artifact_id"] == body["artifact"]["id"]
         assert package_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
+        assert package_notes["runtime_evidence_artifact_id"] == body["runtime_evidence"]["id"]
         assert package_notes["package"]["format"] == "3mf"
+        runtime_row = row(
+            "SELECT * FROM artifacts WHERE id = ?",
+            (body["runtime_evidence"]["id"],),
+        )
+        assert runtime_row is not None
+        assert runtime_row["evidence_type"] == "runtime_evidence"
+        runtime_notes = json.loads(runtime_row["notes"])
+        assert runtime_notes["mesh_artifact_id"] == body["artifact"]["id"]
+        assert runtime_notes["processed_reference_artifact_id"] == body["processed_reference"]["id"]
 
         events = rows(
             "SELECT * FROM proof_events WHERE event_type = 'generation.precision_image_relief.completed'"
@@ -774,3 +839,4 @@ class TestPrecisionImageReliefGeneration:
         assert payload["reference_artifact_id"] == reference_id
         assert payload["processed_reference_artifact_id"] == body["processed_reference"]["id"]
         assert payload["package_3mf_artifact_id"] == body["package_3mf"]["id"]
+        assert payload["runtime_evidence_artifact_id"] == body["runtime_evidence"]["id"]
