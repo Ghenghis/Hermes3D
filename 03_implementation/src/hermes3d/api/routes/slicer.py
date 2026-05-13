@@ -38,6 +38,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import threading
 from pathlib import Path
 from typing import Any
@@ -97,6 +98,15 @@ def _file_sha256(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1024 * 1024), b""):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def _detect_slicer_binary() -> Path | None:
+    """Return the local slicer CLI binary when the active host can slice."""
+
+    from hermes3d.core.slicer.slicer_runner import find_slicer
+
+    slicer = find_slicer()
+    return slicer if slicer is not None and slicer.is_file() else None
 
 
 def _source_mesh_artifact_id(stl_path: Path) -> str | None:
@@ -556,6 +566,227 @@ def _parse_notes(raw: Any) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _slice_job_counts() -> dict[str, int]:
+    counts = {"running": 0, "completed": 0, "failed": 0, "queued": 0, "total": 0}
+    for item in rows(
+        "SELECT status, COUNT(*) AS count FROM jobs WHERE job_type = 'slice' GROUP BY status"
+    ):
+        status = str(item.get("status") or "unknown").lower()
+        value = int(item.get("count") or 0)
+        counts[status] = value
+        counts["total"] += value
+    return counts
+
+
+def _latest_slice_job() -> dict[str, Any] | None:
+    job = row(
+        """
+        SELECT * FROM jobs
+         WHERE job_type = 'slice'
+         ORDER BY datetime(updated_at) DESC, datetime(created_at) DESC
+         LIMIT 1
+        """
+    )
+    return _slice_job_status(job)
+
+
+def _slice_job_by_id(job_id: str | None) -> dict[str, Any] | None:
+    if not job_id:
+        return None
+    job = row("SELECT * FROM jobs WHERE id = ? AND job_type = 'slice'", (job_id,))
+    return _slice_job_status(job)
+
+
+def _slice_job_status(job: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not job:
+        return None
+    return {
+        "id": job.get("id"),
+        "job_id": job.get("id"),
+        "name": job.get("name"),
+        "status": str(job.get("status") or "").lower(),
+        "dry_run": bool(job.get("dry_run")),
+        "created_at": job.get("created_at"),
+        "updated_at": job.get("updated_at"),
+    }
+
+
+def _latest_slice_artifact(evidence_type: str, job_id: str | None = None) -> dict[str, Any] | None:
+    params: tuple[Any, ...]
+    if job_id:
+        sql = """
+            SELECT * FROM artifacts
+             WHERE evidence_type = ?
+               AND job_id = ?
+             ORDER BY datetime(created_at) DESC
+             LIMIT 1
+        """
+        params = (evidence_type, job_id)
+    else:
+        sql = """
+            SELECT * FROM artifacts
+             WHERE evidence_type = ?
+               AND agent = 'slicer-executor'
+             ORDER BY datetime(created_at) DESC
+             LIMIT 1
+        """
+        params = (evidence_type,)
+    artifact = row(sql, params)
+    return _artifact_status(artifact) if artifact else None
+
+
+def _artifact_status(artifact: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not artifact:
+        return None
+    notes = _parse_notes(artifact.get("notes"))
+    raw_path = str(artifact.get("file_path") or "")
+    path = Path(raw_path) if raw_path else None
+    exists = bool(path and path.is_file())
+    actual_size = path.stat().st_size if path and exists else None
+    expected_size = artifact.get("file_size")
+    expected_sha = notes.get("sha256")
+    sha256_match: bool | None = None
+    sha256_checked = False
+    sha256_check_reason: str | None = None
+    if exists and expected_sha:
+        max_hash_bytes = int(os.environ.get("HERMES3D_SLICER_STATUS_HASH_LIMIT_BYTES", "67108864"))
+        if actual_size is not None and actual_size <= max_hash_bytes:
+            sha256_checked = True
+            sha256_match = _file_sha256(path) == expected_sha
+        else:
+            sha256_check_reason = f"file_size_exceeds_hash_limit:{max_hash_bytes}"
+    size_matches = actual_size == expected_size if actual_size is not None and expected_size else None
+    valid = exists and bool(actual_size and actual_size > 0) and sha256_match is not False
+    return {
+        "id": artifact.get("id"),
+        "job_id": artifact.get("job_id"),
+        "evidence_type": artifact.get("evidence_type"),
+        "label": artifact.get("label"),
+        "file_path": raw_path,
+        "file_exists": exists,
+        "file_size": expected_size,
+        "actual_size": actual_size,
+        "size_matches": size_matches,
+        "sha256": expected_sha,
+        "sha256_checked": sha256_checked,
+        "sha256_match": sha256_match,
+        "sha256_check_reason": sha256_check_reason,
+        "created_at": artifact.get("created_at"),
+        "notes": notes,
+        "valid": valid,
+    }
+
+
+def _latest_slice_proof_event(job_id: str | None = None) -> dict[str, Any] | None:
+    if job_id:
+        event = row(
+            """
+            SELECT id, event_type, source_agent, payload, created_at
+              FROM proof_events
+             WHERE event_type IN ('slice_completed','slice_failed')
+               AND payload LIKE ?
+             ORDER BY datetime(created_at) DESC
+             LIMIT 1
+            """,
+            (f'%"job_id":"{job_id}"%',),
+        )
+    else:
+        event = row(
+            """
+            SELECT id, event_type, source_agent, payload, created_at
+              FROM proof_events
+             WHERE event_type IN ('slice_completed','slice_failed')
+             ORDER BY datetime(created_at) DESC
+             LIMIT 1
+            """
+        )
+    if not event:
+        return None
+    return {
+        "id": event.get("id"),
+        "event_type": event.get("event_type"),
+        "source_agent": event.get("source_agent"),
+        "created_at": event.get("created_at"),
+        "payload": _parse_notes(event.get("payload")),
+    }
+
+
+@router.get("/api/slicer/status")
+def get_slicer_status() -> dict[str, Any]:
+    """Read-only slicer readiness + latest G-code proof summary.
+
+    This endpoint never invokes the slicer and never contacts a printer. It is
+    the operator-facing status surface for deciding whether the existing
+    ``POST /api/slice`` path has real local CLI + artifact proof behind it.
+    """
+
+    slicer_binary = _detect_slicer_binary()
+    execution_ready = slicer_binary is not None
+    latest_job = _latest_slice_job()
+    latest_gcode = _latest_slice_artifact("gcode")
+    proof_job_id = str(latest_gcode["job_id"]) if latest_gcode and latest_gcode.get("job_id") else None
+    latest_success_job = _slice_job_by_id(proof_job_id)
+    latest_proof = _latest_slice_artifact("proof_report", job_id=proof_job_id)
+    latest_event = _latest_slice_proof_event(job_id=proof_job_id)
+    proof_ready = bool(
+        latest_gcode
+        and latest_gcode.get("valid")
+        and latest_proof
+        and latest_proof.get("valid")
+        and latest_event
+        and latest_event.get("event_type") == "slice_completed"
+    )
+    if execution_ready and proof_ready:
+        overall = "ready"
+    elif execution_ready:
+        overall = "proof_required"
+    else:
+        overall = "blocked"
+    blockers: list[str] = []
+    if not execution_ready:
+        blockers.append(
+            "No PrusaSlicer/OrcaSlicer CLI binary found. Install one or set HERMES3D_SLICER_BIN."
+        )
+    if not proof_ready:
+        blockers.append(
+            "No valid latest slice_completed G-code + proof_report artifact pair is available."
+        )
+    return {
+        "accepted": True,
+        "status": overall,
+        "execution_ready": execution_ready,
+        "proof_ready": proof_ready,
+        "readiness": "ready" if execution_ready else "slicer_not_found",
+        "slicer_binary": str(slicer_binary) if slicer_binary else None,
+        "updated_at": _utc_now_for_status(),
+        "counts": _slice_job_counts(),
+        "latest_job": latest_job,
+        "latest_success_job": latest_success_job,
+        "latest_gcode": latest_gcode,
+        "latest_proof": latest_proof,
+        "latest_proof_event": latest_event,
+        "endpoints": {
+            "submit": "/api/slice",
+            "poll": "/api/slice/{job_id}",
+            "status": "/api/slicer/status",
+        },
+        "freeze": {
+            "no_printer_writes": True,
+            "no_dispatch": True,
+            "no_moonraker_upload": True,
+            "no_klipper_dispatch": True,
+            "no_octoprint_upload": True,
+        },
+        "blockers": blockers,
+    }
+
+
+def _utc_now_for_status() -> str:
+    from hermes3d.api.routes._common import utc_now
+
+    return utc_now()
 
 
 __all__ = ["router"]
