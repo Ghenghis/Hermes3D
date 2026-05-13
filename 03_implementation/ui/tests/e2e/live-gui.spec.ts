@@ -207,9 +207,15 @@ test("Gen3D renders accepted local generation artifacts with proof", async ({ pa
   await root.getByRole("button", { name: "Generate", exact: true }).click();
   await expect(root.getByText(/Accepted: calibration_cube_abc123\.stl; 3MF calibration_cube_abc123\.3mf; proof proof-gen-1/)).toBeVisible();
   await expect(root.getByText("calibration_cube_abc123.stl", { exact: true })).toBeVisible();
-  await expect(root.getByText(/calibration_cube_abc123\.3mf/)).toBeVisible();
-  await expect(root.getByText("calibration_cube_abc123.preview.svg", { exact: true })).toBeVisible();
-  await expect(root.getByText(/calibration_cube_abc123\.runtime\.json/)).toBeVisible();
+  const packageLabel = root.getByText(/calibration_cube_abc123\.3mf/).last();
+  await packageLabel.scrollIntoViewIfNeeded();
+  await expect(packageLabel).toBeVisible();
+  const previewLabel = root.getByText("calibration_cube_abc123.preview.svg", { exact: true });
+  await previewLabel.scrollIntoViewIfNeeded();
+  await expect(previewLabel).toBeVisible();
+  const runtimeLabel = root.getByText(/calibration_cube_abc123\.runtime\.json/).last();
+  await runtimeLabel.scrollIntoViewIfNeeded();
+  await expect(runtimeLabel).toBeVisible();
   expect(generationRequests).toHaveLength(1);
   expect(generationRequests[0].prompt).toBe("calibration cube");
   expect((generationRequests[0].constraints as Record<string, unknown>).size_mm).toBe(24);
