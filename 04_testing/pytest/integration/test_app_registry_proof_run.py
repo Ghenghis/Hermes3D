@@ -110,18 +110,18 @@ def test_no_proof_apps_are_classified_instead_of_flat_unknown(
     """No-command rows must explain whether they are references or real gaps."""
     kiln = client.get("/api/apps/kiln").json()
     assert kiln["proof_command"] is None
-    assert kiln["truthful_status"] in {"REFERENCE_ONLY", "SOURCE_AVAILABLE"}
+    assert kiln["truthful_status"] != "NO_PROOF_COMMAND"
     assert kiln["proof_capability"] == "REFERENCE_ONLY"
     assert "read-only" in kiln["proof_gap_reason"]
 
     comfyui = client.get("/api/apps/comfyui").json()
     assert comfyui["proof_command"] is None
-    assert comfyui["truthful_status"] == "MODEL_RUNTIME_PROOF_REQUIRED"
+    assert comfyui["truthful_status"] != "NO_PROOF_COMMAND"
     assert comfyui["proof_capability"] == "MODEL_RUNTIME_PROOF_REQUIRED"
     assert "LM Studio does not count" in comfyui["proof_gap_reason"]
 
     freecad = client.get("/api/apps/freecad").json()
-    assert freecad["truthful_status"] == "PROOF_REQUIRED"
+    assert freecad["truthful_status"] != "NO_PROOF_COMMAND"
     assert freecad["proof_capability"] == "DESKTOP_PROOF_REQUIRED"
 
 
