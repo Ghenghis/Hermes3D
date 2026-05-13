@@ -34,6 +34,8 @@ describe("appsClient mappers", () => {
       rollback_supported: true,
       description: "3D modeling app",
       upstream_url: "https://blender.org",
+      proof_capability: "COMMAND_PROOF",
+      proof_capability_label: "Command proof available",
     };
     const app = toRegistryApp(entry);
     expect(app.tested_versions).toEqual(["4.0.0", "4.1.0", "4.2.1"]);
@@ -41,6 +43,34 @@ describe("appsClient mappers", () => {
     expect(app.last_proof?.proof_event_id).toBe("ev-123");
     expect(app.rollback_supported).toBe(true);
     expect(app.update_lane).toBe("stable");
+    expect(app.proof_capability).toBe("COMMAND_PROOF");
+    expect(app.proof_capability_label).toBe("Command proof available");
+  });
+
+  it("maps proof truth fields for no-command rows", () => {
+    const app = toRegistryApp({
+      id: "comfyui",
+      name: "ComfyUI",
+      proof_capability: "MODEL_RUNTIME_PROOF_REQUIRED",
+      proof_capability_label: "Model runtime proof required",
+      proof_gap_reason: "LM Studio does not count as modeling readiness.",
+      proof_next_action: "Add a real ComfyUI model verifier.",
+    });
+    expect(app.proof_capability).toBe("MODEL_RUNTIME_PROOF_REQUIRED");
+    expect(app.proof_capability_label).toBe("Model runtime proof required");
+    expect(app.proof_gap_reason).toMatch(/LM Studio/);
+    expect(app.proof_next_action).toMatch(/ComfyUI/);
+  });
+
+  it("maps flat backend last_proof_status fields into last_proof", () => {
+    const app = toRegistryApp({
+      id: "langchain",
+      name: "LangChain",
+      last_proof_status: "pass",
+      last_proof_at: "2026-05-13 06:31:03",
+    });
+    expect(app.last_proof?.status).toBe("pass");
+    expect(app.last_proof?.at).toBe("2026-05-13 06:31:03");
   });
 
   it("includes recent_proofs and rollback_runbook_url on detail", () => {

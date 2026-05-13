@@ -100,6 +100,38 @@ def test_get_single_app_extended_payload(client: TestClient) -> None:
     assert "2.4.0" in body["tested_versions"]
     assert body["proof_command"]
     assert body["rollback_supported"] is True
+    assert body["proof_capability"] == "COMMAND_PROOF"
+    assert body["proof_capability_label"] == "Command proof available"
+
+
+def test_no_proof_apps_are_classified_instead_of_flat_unknown(
+    client: TestClient,
+) -> None:
+    """No-command rows must explain whether they are references or real gaps."""
+    kiln = client.get("/api/apps/kiln").json()
+    assert kiln["proof_command"] is None
+    assert kiln["truthful_status"] == "REFERENCE_ONLY"
+    assert kiln["proof_capability"] == "REFERENCE_ONLY"
+    assert "read-only" in kiln["proof_gap_reason"]
+
+    comfyui = client.get("/api/apps/comfyui").json()
+    assert comfyui["proof_command"] is None
+    assert comfyui["truthful_status"] == "MODEL_RUNTIME_PROOF_REQUIRED"
+    assert comfyui["proof_capability"] == "MODEL_RUNTIME_PROOF_REQUIRED"
+    assert "LM Studio does not count" in comfyui["proof_gap_reason"]
+
+    freecad = client.get("/api/apps/freecad").json()
+    assert freecad["truthful_status"] == "PROOF_REQUIRED"
+    assert freecad["proof_capability"] == "DESKTOP_PROOF_REQUIRED"
+
+
+def test_source_os_modules_expose_same_proof_truth_labels(client: TestClient) -> None:
+    response = client.get("/api/source-os/modules")
+    assert response.status_code == 200
+    by_id = {record["id"]: record for record in response.json()}
+    assert by_id["comfyui"]["proof_capability"] == "MODEL_RUNTIME_PROOF_REQUIRED"
+    assert "LM Studio does not count" in by_id["comfyui"]["proof_gap_reason"]
+    assert by_id["kiln"]["proof_capability"] == "REFERENCE_ONLY"
 
 
 def test_get_unknown_app_404(client: TestClient) -> None:

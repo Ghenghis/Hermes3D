@@ -18,9 +18,24 @@ export type TruthfulStatus =
   | "INSTALLED_UNPROVEN"
   | "FAILED_PROOF"
   | "NO_PROOF_COMMAND"
+  | "REFERENCE_ONLY"
+  | "FIRMWARE_SOURCE_FROZEN"
+  | "MODEL_RUNTIME_PROOF_REQUIRED"
+  | "PROOF_REQUIRED"
   | "NOT_INSTALLED"
   | "SOURCE_AVAILABLE"
   | "CONFIG_REQUIRED"
+  | "UNKNOWN";
+
+export type ProofCapability =
+  | "COMMAND_PROOF"
+  | "REFERENCE_ONLY"
+  | "FIRMWARE_SOURCE_FROZEN"
+  | "MODEL_RUNTIME_PROOF_REQUIRED"
+  | "DESKTOP_PROOF_REQUIRED"
+  | "RUNTIME_PROOF_REQUIRED"
+  | "PROOF_COMMAND_MISSING"
+  | "NOT_INSTALLED"
   | "UNKNOWN";
 
 export interface AppLicense {
@@ -71,6 +86,14 @@ export interface RegistryApp {
   truthful_status?: TruthfulStatus | null;
   /** Idempotent shell command to verify install (null = no proof available). */
   proof_command?: string | null;
+  /** Explicit proof capability classification from the backend. */
+  proof_capability?: ProofCapability | null;
+  /** Short label for proof capability, suitable for table badges. */
+  proof_capability_label?: string | null;
+  /** Why a missing proof command is honest/blocked. */
+  proof_gap_reason?: string | null;
+  /** Concrete next action to move the row toward real proof. */
+  proof_next_action?: string | null;
 }
 
 /** Wrapper for GET /api/apps. */
