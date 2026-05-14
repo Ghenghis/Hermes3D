@@ -401,10 +401,82 @@ class TestGen3DProviders:
         assert res.status_code == 200, res.text
         local = next(p for p in res.json() if p["provider_id"] == "local_image_relief")
         assert local["readiness"] == "available"
+        assert local["runtime_ready"] is True
         assert local["installed"] is True
         assert local["weights_present"] is True
         assert local["live_reachable"] is True
+        assert local["lm_studio_counts_for_modeling"] is False
+        assert local["runtime_blocker_accepted"] is False
+        assert local["artifact_output"]["supported"] is True
+        assert "stl" in local["artifact_output"]["artifact_types"]
         assert local["model_evidence"]["runtime"]["kind"] == "subprocess"
+
+    def test_heavy_model_providers_remain_blocked_without_runtime_even_with_weights(
+        self, app_client, fake_proof_file, tmp_path, monkeypatch
+    ):
+        """Weights are not enough: heavy providers need reachable model runtimes."""
+        import hermes3d.api.routes.generation as gen_mod
+
+        trellis_dir = tmp_path / "trellis"
+        hunyuan_dir = tmp_path / "hunyuan"
+        triposr_dir = tmp_path / "triposr"
+        comfy_root = tmp_path / "ComfyUI"
+        for path in (trellis_dir, hunyuan_dir, triposr_dir, comfy_root):
+            path.mkdir()
+        (comfy_root / "main.py").write_text("print('comfy')", encoding="utf-8")
+        manifest_path = tmp_path / "GEN3D_MODEL_MANIFEST.json"
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "repos": [
+                        {
+                            "repo_id": "microsoft/TRELLIS-image-large",
+                            "revision": "rev-trellis",
+                            "local_dir": str(trellis_dir),
+                            "actual_bytes_without_hf_cache": 10,
+                            "expected_bytes": 10,
+                            "actual_file_count_without_hf_cache": 1,
+                            "expected_file_count": 1,
+                        },
+                        {
+                            "repo_id": "tencent/Hunyuan3D-2.1",
+                            "revision": "rev-hunyuan",
+                            "local_dir": str(hunyuan_dir),
+                            "actual_bytes_without_hf_cache": 10,
+                            "expected_bytes": 10,
+                            "actual_file_count_without_hf_cache": 1,
+                            "expected_file_count": 1,
+                        },
+                        {
+                            "repo_id": "stabilityai/TripoSR",
+                            "revision": "rev-triposr",
+                            "local_dir": str(triposr_dir),
+                            "actual_bytes_without_hf_cache": 10,
+                            "expected_bytes": 10,
+                            "actual_file_count_without_hf_cache": 1,
+                            "expected_file_count": 1,
+                        },
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(gen_mod, "_LANE04_PROOF_PATH", fake_proof_file)
+        monkeypatch.setattr(gen_mod, "_GEN3D_MODEL_MANIFEST_PATH", manifest_path)
+        monkeypatch.setenv("HERMES3D_COMFYUI_ROOT", str(comfy_root))
+        monkeypatch.setattr(gen_mod, "port_reachable", lambda url: False)
+
+        res = app_client.get("/api/gen3d/providers")
+        assert res.status_code == 200, res.text
+        data = res.json()
+        for provider_id in ("comfyui", "hunyuan3d", "triposr", "trellis2"):
+            provider = next(p for p in data if p["provider_id"] == provider_id)
+            assert provider["readiness"] == "installed_not_running"
+            assert provider["runtime_ready"] is False
+            assert provider["runtime_blocker_accepted"] is True
+            assert provider["lm_studio_counts_for_modeling"] is False
+            assert provider["artifact_output"]["supported"] is False
+            assert "LM Studio" in provider["readiness_reason"]
 
     def test_proof_source_field_reflects_file(self, app_client, fake_proof_file, monkeypatch):
         """proof_source field is set when proof file is present."""

@@ -389,11 +389,43 @@ def gen3d_providers() -> list[dict[str, Any]]:
         else:
             readiness = "unavailable"
 
+        runtime_ready = readiness == "available"
+        if provider_id == "local_image_relief":
+            readiness_reason = (
+                "Local image-relief pipeline has rembg/ONNX runtime, Python deps, and model evidence."
+                if runtime_ready
+                else "Local image-relief pipeline still needs rembg/ONNX runtime and model evidence."
+            )
+            artifact_output = {
+                "supported": runtime_ready,
+                "artifact_types": ["stl", "proof_report", "thumbnail"],
+                "route_family": "/api/generation/precision-image-relief",
+            }
+            accepted_blocker = False
+        elif readiness == "installed_not_running":
+            readiness_reason = (
+                "Weights/source are present, but the actual modeling runtime is not reachable; "
+                "LM Studio/local LLM readiness does not count."
+            )
+            artifact_output = {"supported": False, "artifact_types": [], "route_family": None}
+            accepted_blocker = True
+        else:
+            readiness_reason = (
+                "Provider has not supplied enough local source/model/runtime evidence."
+            )
+            artifact_output = {"supported": False, "artifact_types": [], "route_family": None}
+            accepted_blocker = False
+
         result.append(
             {
                 "provider_id": provider_id,
                 "label": label,
                 "readiness": readiness,
+                "runtime_ready": runtime_ready,
+                "readiness_reason": readiness_reason,
+                "lm_studio_counts_for_modeling": False,
+                "runtime_blocker_accepted": accepted_blocker,
+                "artifact_output": artifact_output,
                 "installed": installed,
                 "pip_version": pip_version,
                 "repo_reachable": repo_reachable,
