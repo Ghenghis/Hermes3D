@@ -118,12 +118,14 @@ def test_no_proof_apps_are_classified_instead_of_flat_unknown(
     assert kiln["proof_capability"] == "REFERENCE_ONLY"
     assert "read-only" in kiln["proof_gap_reason"]
 
-    # Linux CI only has source proof for ComfyUI; set the seeded row to
-    # installed for this assertion so the test covers the runtime blocker path.
+    # Linux CI may only have source proof for these rows; set the seeded rows
+    # to installed so this test covers the explicit blocker status paths.
     import hermes3d.db.init as dbinit
 
     conn = dbinit.connect()
-    conn.execute("UPDATE modules SET install_state = 'installed' WHERE id = 'comfyui'")
+    conn.execute(
+        "UPDATE modules SET install_state = 'installed' WHERE id IN ('comfyui', 'freecad')"
+    )
     conn.commit()
     conn.close()
 
