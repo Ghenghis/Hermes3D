@@ -30,6 +30,12 @@ from hermes3d.services.app_proof_truth import classify_app_proof
 
 router = APIRouter()
 
+_ACCEPTED_BLOCKED_STATUS_BY_CAPABILITY = {
+    "DESKTOP_PROOF_REQUIRED": "ACCEPTED_BLOCKED_DESKTOP",
+    "RUNTIME_PROOF_REQUIRED": "ACCEPTED_BLOCKED_RUNTIME",
+    "MODEL_RUNTIME_PROOF_REQUIRED": "MODEL_RUNTIME_ACCEPTED_BLOCKED",
+}
+
 # Lazy one-shot sync, mirrors modules.py._sync_registry_once.
 _APPS_SYNCED = False
 
@@ -79,7 +85,11 @@ def _truthful_status(record: dict[str, Any]) -> str:
         return "INSTALLED_PROVEN"
     if last_proof == "fail":
         return "FAILED_PROOF"
+    if last_proof == "accepted_blocked":
+        return _accepted_blocker_status(proof_capability)
     if not has_proof_cmd:
+        if proof_truth.get("proof_blocker_accepted"):
+            return _accepted_blocker_status(proof_capability)
         if proof_capability == "REFERENCE_ONLY":
             return "REFERENCE_ONLY"
         if proof_capability == "FIRMWARE_SOURCE_FROZEN":
@@ -90,6 +100,16 @@ def _truthful_status(record: dict[str, Any]) -> str:
             return "PROOF_REQUIRED"
         return "NO_PROOF_COMMAND"
     return "INSTALLED_UNPROVEN"
+
+
+def _accepted_blocker_status(proof_capability: str | None) -> str:
+    if proof_capability in _ACCEPTED_BLOCKED_STATUS_BY_CAPABILITY:
+        return _ACCEPTED_BLOCKED_STATUS_BY_CAPABILITY[proof_capability]
+    if proof_capability == "REFERENCE_ONLY":
+        return "REFERENCE_ONLY"
+    if proof_capability == "FIRMWARE_SOURCE_FROZEN":
+        return "FIRMWARE_SOURCE_FROZEN"
+    return "ACCEPTED_BLOCKED"
 
 
 def _app_response(record: dict[str, Any]) -> dict[str, Any]:
@@ -123,6 +143,36 @@ def _app_response(record: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _proof_summary(apps: list[dict[str, Any]]) -> dict[str, Any]:
+    status_counts: dict[str, int] = {}
+    capability_counts: dict[str, int] = {}
+    for app in apps:
+        status = str(app.get("truthful_status") or "UNKNOWN")
+        capability = str(app.get("proof_capability") or "UNKNOWN")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        capability_counts[capability] = capability_counts.get(capability, 0) + 1
+    accepted_blockers = [
+        app
+        for app in apps
+        if bool(app.get("proof_blocker_accepted"))
+        and app.get("truthful_status") != "INSTALLED_PROVEN"
+    ]
+    return {
+        "truthful_status_counts": status_counts,
+        "proof_capability_counts": capability_counts,
+        "command_proof_count": capability_counts.get("COMMAND_PROOF", 0),
+        "accepted_blocker_count": len(accepted_blockers),
+        "accepted_blocker_ids": [str(app["id"]) for app in accepted_blockers],
+        "generic_no_proof_count": sum(
+            1
+            for app in apps
+            if app.get("truthful_status") in {"NO_PROOF_COMMAND", "PROOF_REQUIRED"}
+            or app.get("proof_capability") == "PROOF_COMMAND_MISSING"
+        ),
+        "lm_studio_counts_for_modeling": False,
+    }
+
+
 @router.get("/api/apps")
 def list_apps(
     section: str | None = None,
@@ -137,10 +187,12 @@ def list_apps(
         params.append(update_lane)
     sql += " ORDER BY section, display_name"
     records = rows(sql, tuple(params))
+    app_payloads = [_app_response(record) for record in records]
     return {
         "count": len(records),
         "filters": {"section": section, "update_lane": update_lane},
-        "apps": [_app_response(record) for record in records],
+        "proof_summary": _proof_summary(app_payloads),
+        "apps": app_payloads,
     }
 
 
@@ -167,19 +219,21 @@ def _run_proof_for_record(record: dict[str, Any], *, timeout_s: int) -> dict[str
     proof_command = (record.get("proof_command") or "").strip()
     if not proof_command:
         proof_truth = classify_app_proof(record)
+        blocker_accepted = bool(proof_truth.get("proof_blocker_accepted"))
+        status = "accepted_blocked" if blocker_accepted else "not_set"
         execute(
             """
             UPDATE modules
-               SET last_proof_status = 'not_set',
+               SET last_proof_status = ?,
                    last_proof_at = datetime('now'),
                    updated_at = datetime('now')
              WHERE id = ?
             """,
-            (app_id,),
+            (status, app_id),
         )
         return {
             "accepted": False,
-            "status": "not_set",
+            "status": status,
             "app_id": app_id,
             "reason": proof_truth["proof_gap_reason"] or "module has no proof_command configured",
             **proof_truth,
@@ -278,6 +332,7 @@ def run_app_proof_sweep(body: ProofSweepRequest | None = None) -> dict[str, Any]
         "timeout": sum(1 for result in results if result["status"] == "timeout"),
         "error": sum(1 for result in results if result["status"] == "error"),
         "not_set": sum(1 for result in results if result["status"] == "not_set"),
+        "accepted_blocked": sum(1 for result in results if result["status"] == "accepted_blocked"),
     }
     proof_event_id = uuid.uuid4().hex
     execute(

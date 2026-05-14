@@ -8,8 +8,8 @@ the run-proof case using a benign command, verifying:
 2. ``GET /api/apps/{id}`` returns one record with extended metadata.
 3. ``POST /api/apps/{id}/run-proof`` executes the proof_command and
    persists ``last_proof_status``.
-4. ``POST /api/apps/{id}/run-proof`` returns ``not_set`` when the app
-   has no proof_command on file.
+4. ``POST /api/apps/{id}/run-proof`` returns ``accepted_blocked`` when
+   the app has no proof_command but its blocker is explicitly classified.
 5. ``POST /api/apps/{id}/rollback`` returns 501 for apps with
    ``rollback_supported=False`` and 200 (with redirect-to-modules) for
    ``rollback_supported=True``.
@@ -88,6 +88,10 @@ def test_list_apps_returns_60_with_w6_7_fields(client: TestClient) -> None:
         assert field in sample, f"missing field {field}"
     assert isinstance(sample["tested_versions"], list)
     assert isinstance(sample["rollback_supported"], bool)
+    assert payload["proof_summary"]["generic_no_proof_count"] == 0
+    assert payload["proof_summary"]["lm_studio_counts_for_modeling"] is False
+    assert "PROOF_REQUIRED" not in payload["proof_summary"]["truthful_status_counts"]
+    assert "NO_PROOF_COMMAND" not in payload["proof_summary"]["truthful_status_counts"]
 
 
 def test_get_single_app_extended_payload(client: TestClient) -> None:
@@ -117,12 +121,17 @@ def test_no_proof_apps_are_classified_instead_of_flat_unknown(
     comfyui = client.get("/api/apps/comfyui").json()
     assert comfyui["proof_command"] is None
     assert comfyui["truthful_status"] != "NO_PROOF_COMMAND"
+    assert comfyui["truthful_status"] == "MODEL_RUNTIME_ACCEPTED_BLOCKED"
     assert comfyui["proof_capability"] == "MODEL_RUNTIME_PROOF_REQUIRED"
+    assert comfyui["proof_blocker_accepted"] is True
+    assert comfyui["lm_studio_counts_for_modeling"] is False
     assert "LM Studio does not count" in comfyui["proof_gap_reason"]
 
     freecad = client.get("/api/apps/freecad").json()
     assert freecad["truthful_status"] != "NO_PROOF_COMMAND"
+    assert freecad["truthful_status"] == "ACCEPTED_BLOCKED_DESKTOP"
     assert freecad["proof_capability"] == "DESKTOP_PROOF_REQUIRED"
+    assert freecad["proof_blocker_accepted"] is True
 
 
 def test_source_os_modules_expose_same_proof_truth_labels(client: TestClient) -> None:
@@ -242,19 +251,20 @@ def test_run_proof_uses_app_local_path_as_working_directory(
     assert "true" in body["captured_output_redacted"]
 
 
-def test_run_proof_when_not_set(client: TestClient) -> None:
-    """An app whose proof_command is NULL gets status='not_set' without
-    actually running anything."""
+def test_run_proof_when_accepted_blocked(client: TestClient) -> None:
+    """Accepted blocker rows do not run anything and persist that truth."""
     app_id = "kiln"  # seed has proof_command=None
     response = client.post(f"/api/apps/{app_id}/run-proof")
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "not_set"
+    assert body["status"] == "accepted_blocked"
     assert body["accepted"] is False
+    assert body["proof_blocker_accepted"] is True
+    assert body["proof_acceptance_status"] == "accepted_reference_only"
 
 
 def test_run_proof_sweep_executes_bounded_batch_and_records_event(client: TestClient) -> None:
-    """Batch proof sweep must persist explicit pass/fail/not_set evidence.
+    """Batch proof sweep must persist explicit pass/fail/blocker evidence.
 
     The route is operator-triggered and bounded; this fixture pins the
     behavior with three app ids and benign cross-platform Python commands.
@@ -296,13 +306,14 @@ def test_run_proof_sweep_executes_bounded_batch_and_records_event(client: TestCl
         "fail": 1,
         "timeout": 0,
         "error": 0,
-        "not_set": 1,
+        "not_set": 0,
+        "accepted_blocked": 1,
     }
 
     by_id = {result["app_id"]: result for result in body["results"]}
     assert by_id["trimesh"]["status"] == "pass"
     assert by_id["cadquery"]["status"] == "fail"
-    assert by_id["kiln"]["status"] == "not_set"
+    assert by_id["kiln"]["status"] == "accepted_blocked"
 
     conn = dbinit.connect()
     statuses = {
@@ -316,7 +327,7 @@ def test_run_proof_sweep_executes_bounded_batch_and_records_event(client: TestCl
         (body["proof_event_id"],),
     ).fetchone()
     conn.close()
-    assert statuses == {"trimesh": "pass", "cadquery": "fail", "kiln": "not_set"}
+    assert statuses == {"trimesh": "pass", "cadquery": "fail", "kiln": "accepted_blocked"}
     assert event is not None
     payload = json.loads(event["payload"])
     assert payload["summary"]["total"] == 3
@@ -341,6 +352,7 @@ def test_run_proof_sweep_defaults_to_rows_with_proof_commands_only(client: TestC
     body = response.json()
     assert body["summary"]["total"] == 1
     assert body["summary"]["not_set"] == 0
+    assert body["summary"]["accepted_blocked"] == 0
     assert body["results"][0]["app_id"] == "trimesh"
     assert body["results"][0]["status"] == "pass"
 
