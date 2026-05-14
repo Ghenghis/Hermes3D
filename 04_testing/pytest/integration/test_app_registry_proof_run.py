@@ -118,6 +118,15 @@ def test_no_proof_apps_are_classified_instead_of_flat_unknown(
     assert kiln["proof_capability"] == "REFERENCE_ONLY"
     assert "read-only" in kiln["proof_gap_reason"]
 
+    # Linux CI only has source proof for ComfyUI; set the seeded row to
+    # installed for this assertion so the test covers the runtime blocker path.
+    import hermes3d.db.init as dbinit
+
+    conn = dbinit.connect()
+    conn.execute("UPDATE modules SET install_state = 'installed' WHERE id = 'comfyui'")
+    conn.commit()
+    conn.close()
+
     comfyui = client.get("/api/apps/comfyui").json()
     assert comfyui["proof_command"] is None
     assert comfyui["truthful_status"] != "NO_PROOF_COMMAND"
