@@ -1,0 +1,13 @@
+{
+  "sourceRoot": "G:\\Github\\Hermes3D",
+  "archiveRoot": "G:\\Github\\Hermes3D\\06_release\\backup",
+  "archiveId": "w21-mvp6-expected",
+  "manifestType": "post-commit-release-snapshot",
+  "commit": "c1260d4",
+  "branch": "codex/w21-mvp6-gen3d-bgremove",
+  "filesChanged": 51,
+  "insertions": 6527,
+  "deletions": 922,
+  "note": "All tracked W21 MVP6 work committed; temporary/local paths .claude, phase-0-log, hermes3d.db, 03_implementation/docs/proof ignored via .gitignore",
+  "verificationCommand": "git show --stat c1260d4"
+}
