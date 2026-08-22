@@ -4,6 +4,9 @@ import { TAB_TO_HASH, tabIdFromHash, useStore } from "./app/store";
 import { SimpleHermesDashboard } from "./components/simple/SimpleHermesDashboard";
 import { DashboardSimple } from "./components/dashboard/DashboardSimple";
 import { DashboardAdvanced } from "./components/dashboard/DashboardAdvanced";
+import { DashboardFactory } from "./components/dashboard/DashboardFactory";
+import { DashboardCreator } from "./components/dashboard/DashboardCreator";
+import { DashboardInspector } from "./components/dashboard/DashboardInspector";
 import { DashboardCustom } from "./components/dashboard/DashboardCustom";
 import {
   modeFromHash as dashboardModeFromHash,
@@ -146,12 +149,13 @@ export default function App() {
   const activeTabId = useStore((s) => s.activeTabId);
   const setActiveTabId = useStore((s) => s.setActiveTabId);
   const uiMode = useStore((s) => s.uiMode);
+  const setUiMode = useStore((s) => s.setUiMode);
   const dashboardMode = useDashboardModeStore((s) => s.mode);
   const setDashboardMode = useDashboardModeStore((s) => s.setMode);
   const tab = TABS.find((t) => t.id === activeTabId) ?? TABS[0];
   const baseComponent = TAB_COMPONENTS[tab.id] ?? UnavailableTab;
   const Component =
-    tab.id === "dashboard" && uiMode === "full"
+    tab.id === "dashboard"
       ? dashboardComponentFor(dashboardMode)
       : baseComponent;
 
@@ -167,8 +171,16 @@ export default function App() {
       const hashMode = dashboardModeFromHash(window.location.hash);
       const queryMode = modeFromQueryString(window.location.search);
       const nextMode = hashMode ?? queryMode;
-      if (nextMode && nextMode !== useDashboardModeStore.getState().mode) {
-        setDashboardMode(nextMode);
+      if (nextMode) {
+        if (nextMode !== useDashboardModeStore.getState().mode) {
+          setDashboardMode(nextMode);
+        }
+        const hashHead = window.location.hash.replace(/^#/, "").split(/[:/.]/, 1)[0] ?? "";
+        const dashboardAddressed =
+          hashHead === "dashboard" || nextTabId === "dashboard" || useStore.getState().activeTabId === "dashboard";
+        if (dashboardAddressed && useStore.getState().uiMode !== "full") {
+          setUiMode("full");
+        }
       }
     };
     syncFromUrl();
@@ -180,7 +192,7 @@ export default function App() {
       window.removeEventListener("popstate", syncFromUrl);
       window.clearInterval(syncTimer);
     };
-  }, [setActiveTabId, setDashboardMode]);
+  }, [setActiveTabId, setDashboardMode, setUiMode]);
 
   useEffect(() => {
     // Keep the URL hash authoritative for the active tab and the dashboard
@@ -195,7 +207,7 @@ export default function App() {
       activeTabId === "dashboard" && uiMode === "full"
         ? `#${baseHash}:${dashboardMode}`
         : `#${baseHash}`;
-    const currentHead = window.location.hash.replace(/^#/, "").split("/", 2)[0] ?? "";
+    const currentHead = window.location.hash.replace(/^#/, "").split(/[:/.]/, 1)[0] ?? "";
     const expectedHead = baseHash;
     if (currentHead === expectedHead) return;
     if (window.location.hash !== nextHash) {
@@ -203,8 +215,30 @@ export default function App() {
     }
   }, [activeTabId, dashboardMode, uiMode]);
 
-  if (uiMode === "simple") {
-    return <SimpleHermesDashboard activeTabId={tab.id} activeLabel={tab.label} Content={baseComponent} />;
+  const openFullDashboard = () => {
+    setDashboardMode("advanced");
+    setUiMode("full");
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "#dashboard:advanced");
+      try {
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      } catch {
+        const event = document.createEvent("HTMLEvents");
+        event.initEvent("hashchange", true, false);
+        window.dispatchEvent(event);
+      }
+    }
+  };
+
+  if (uiMode === "simple" && tab.id !== "dashboard") {
+    return (
+      <SimpleHermesDashboard
+        activeTabId={tab.id}
+        activeLabel={tab.label}
+        Content={baseComponent}
+        onFullMode={openFullDashboard}
+      />
+    );
   }
 
   return (
@@ -214,10 +248,16 @@ export default function App() {
   );
 }
 
-function dashboardComponentFor(mode: "simple" | "advanced" | "custom"): () => JSX.Element {
+function dashboardComponentFor(mode: "simple" | "advanced" | "factory" | "creator" | "inspector" | "custom"): () => JSX.Element {
   switch (mode) {
     case "simple":
       return DashboardSimple;
+    case "factory":
+      return DashboardFactory;
+    case "creator":
+      return DashboardCreator;
+    case "inspector":
+      return DashboardInspector;
     case "custom":
       return DashboardCustom;
     case "advanced":

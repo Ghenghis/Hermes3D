@@ -24,6 +24,7 @@ export interface GcodeUploadResult {
   moonraker_url?: string;
   item_path?: string;
   gcode_path?: string;
+  upload_source?: string;
   gcode_sha256?: string;
   gcode_bytes?: number;
   bounds_passed?: boolean;

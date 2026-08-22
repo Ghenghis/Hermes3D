@@ -272,6 +272,7 @@ const STATUSES = new Set<PrinterStatus>([
   "paused",
   "maintenance",
   "offline",
+  "disabled",
   "error",
 ]);
 const ADAPTERS = new Set<PrinterAdapter>(["moonraker", "octoprint", "printrun", "manual"]);
@@ -647,8 +648,69 @@ export async function uploadGcodeLive(
   }
 }
 
-export function updatePrinterStatusLive(id: string, status: Printer["status"], actor = "hermes-agent"): Promise<void> {
-  return putVoid(`/api/printers/${encodeURIComponent(id)}/status`, { status, actor });
+export async function uploadGcodeFileLive(
+  id: string,
+  file: File,
+  start: boolean,
+  remoteSubdir = "hermes3d",
+  actor = "hermes-agent",
+  jobId?: string,
+): Promise<GcodeUploadResult> {
+  const params = new URLSearchParams({
+    filename: file.name,
+    start: String(start),
+    remote_subdir: remoteSubdir,
+    actor,
+  });
+  const trimmedJobId = jobId?.trim();
+  if (trimmedJobId) {
+    params.set("job_id", trimmedJobId);
+  }
+  try {
+    const response = await fetch(`${LIVE_BASE_URL}/api/printers/${encodeURIComponent(id)}/upload-gcode-file?${params.toString()}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+      },
+      body: file,
+      cache: "no-store",
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
+      return {
+        printer_id: id,
+        accepted: false,
+        uploaded: false,
+        started: false,
+        status: `HTTP ${response.status}`,
+        reason: detailMessage(payload) ?? "G-code file upload/start rejected by local backend.",
+        detail: payload,
+      };
+    }
+    return parseGcodeUploadResult(payload, id) ?? {
+      printer_id: id,
+      accepted: false,
+      uploaded: false,
+      started: false,
+      status: "invalid_response",
+      reason: "G-code file upload response was not in the expected shape.",
+      detail: payload,
+    };
+  } catch (error) {
+    return {
+      printer_id: id,
+      accepted: false,
+      uploaded: false,
+      started: false,
+      status: "unreachable",
+      reason: error instanceof Error ? error.message : "Local backend unreachable.",
+    };
+  }
+}
+
+export async function updatePrinterStatusLive(id: string, status: Printer["status"], actor = "hermes-agent"): Promise<void> {
+  await putVoid(`/api/printers/${encodeURIComponent(id)}/status`, { status, actor });
+  dispatchSettingsChanged();
 }
 
 export function getVoiceAgentsLive(): Promise<VoiceAgent[]> {
@@ -1294,11 +1356,15 @@ export function attachEvidenceLive(form: EvidenceForm): Promise<Artifact> {
 }
 
 export function getPendingApprovalsLive(): Promise<Approval[]> {
-  return fetchArray("/api/approvals?status=pending");
+  return fetchArray<unknown>("/api/approvals?status=pending").then((approvals) =>
+    approvals.map(parseApproval).filter(isPresent),
+  );
 }
 
 export function getApprovalHistoryLive(): Promise<Approval[]> {
-  return fetchArray("/api/approvals?status=approved,rejected");
+  return fetchArray<unknown>("/api/approvals?status=approved,rejected,deferred").then((approvals) =>
+    approvals.map(parseApproval).filter(isPresent),
+  );
 }
 
 export function approveApprovalLive(id: string, notes: string): Promise<void> {
@@ -1371,12 +1437,14 @@ export function getSettingsLive(): Promise<AppSettings> {
     ports: { bridge: Number(LIVE_BRIDGE_PORT), api: 8000, ui: 5173 },
     printerUrls: {},
     cameraUrls: {},
+    printerStatuses: {},
     serviceUrls: {},
   });
 }
 
-export function saveSettingsLive(settings: Partial<AppSettings>): Promise<void> {
-  return putVoid("/api/settings", settings);
+export async function saveSettingsLive(settings: Partial<AppSettings>): Promise<void> {
+  await putVoid("/api/settings", settings);
+  dispatchSettingsChanged();
 }
 
 export function emitProofEventLive(type: string, payload: Record<string, unknown>): Promise<void> {
@@ -1705,6 +1773,11 @@ function isRetryableApiMiss(response: Response): boolean {
 
 function apiBaseSummary(): string {
   return API_BASE_URLS.join(", ");
+}
+
+function dispatchSettingsChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("hermes3d:settings-changed"));
 }
 
 function parseAutopilotCheck(value: unknown): AutopilotCheck | null {
@@ -2760,6 +2833,7 @@ function parseGcodeUploadResult(value: unknown, fallbackId: string): GcodeUpload
     moonraker_url: isString(value.moonraker_url) ? value.moonraker_url : undefined,
     item_path: isString(value.item_path) ? value.item_path : undefined,
     gcode_path: isString(value.gcode_path) ? value.gcode_path : undefined,
+    upload_source: isString(value.upload_source) ? value.upload_source : undefined,
     gcode_sha256: isString(value.gcode_sha256) ? value.gcode_sha256 : undefined,
     gcode_bytes: isNumber(value.gcode_bytes) ? value.gcode_bytes : undefined,
     bounds_passed: typeof value.bounds_passed === "boolean" ? value.bounds_passed : undefined,
@@ -2911,6 +2985,79 @@ function parseAgent(value: unknown): Agent | null {
     last_activity_utc: isString(value.last_activity_utc) ? value.last_activity_utc : "",
     model_provider: isString(value.model_provider) ? value.model_provider : "",
   };
+}
+
+function parseApproval(value: unknown): Approval | null {
+  if (!isRecord(value) || !isString(value.id)) {
+    return null;
+  }
+  const approvalType = value.approvalType ?? value.approval_type;
+  const status = value.status;
+  if (!isApprovalType(approvalType) || !isApprovalStatus(status)) {
+    return null;
+  }
+  const rawJobId = value.jobId ?? value.job_id ?? 0;
+  const jobId = isNumber(rawJobId) ? rawJobId : Number.parseInt(String(rawJobId ?? "0"), 10) || 0;
+  const notes = isNullableString(value.notes) ? value.notes : null;
+  return {
+    id: value.id,
+    jobId,
+    jobTitle: isString(value.jobTitle)
+      ? value.jobTitle
+      : isString(value.model_name)
+        ? value.model_name
+        : isString(value.job_name)
+          ? value.job_name
+          : jobId > 0
+            ? `Job ${jobId}`
+            : approvalType,
+    approvalType,
+    status,
+    createdAt: isString(value.createdAt) ? value.createdAt : isString(value.requested_at) ? value.requested_at : "",
+    decidedAt: isNullableString(value.decidedAt) ? value.decidedAt : isNullableString(value.decided_at) ? value.decided_at : null,
+    decidedBy: value.decidedBy === "operator" || value.decidedBy === "auto"
+      ? value.decidedBy
+      : value.decided_by === "operator" || value.decided_by === "auto"
+        ? value.decided_by
+        : null,
+    evidence: {
+      gateResultsUrl: isNullableString(value.gateResultsUrl) ? value.gateResultsUrl : null,
+      artifactUrls: isStringArray(value.artifactUrls) ? value.artifactUrls : [],
+    },
+    fileScope: approvalFileScope(notes),
+    requester: isNullableString(value.requester)
+      ? value.requester
+      : isNullableString(value.requesting_agent)
+        ? value.requesting_agent
+        : null,
+  };
+}
+
+function approvalFileScope(notes: string | null): string[] {
+  if (!notes) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(notes);
+    if (isRecord(parsed)) {
+      const files = parsed.fileScope ?? parsed.file_scope ?? parsed.files;
+      return isStringArray(files) ? files : [];
+    }
+  } catch {
+    return [];
+  }
+  return [];
+}
+
+function isApprovalType(value: unknown): value is Approval["approvalType"] {
+  return value === "MODEL_APPROVAL"
+    || value === "PRINT_APPROVAL"
+    || value === "REPAIR_APPROVAL"
+    || value === "IDLE_CANDIDATE_REVIEW";
+}
+
+function isApprovalStatus(value: unknown): value is Approval["status"] {
+  return value === "pending" || value === "approved" || value === "rejected" || value === "deferred";
 }
 
 function parseNotification(value: unknown): Notification | null {

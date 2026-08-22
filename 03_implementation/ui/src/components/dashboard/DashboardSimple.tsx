@@ -27,6 +27,7 @@ type SimpleSnapshot = {
 };
 
 const EMPTY: SimpleSnapshot = { printers: [], jobs: [], system: null };
+const SIMPLE_REFRESH_INTERVAL_MS = 5_000;
 
 export function DashboardSimple() {
   const [snapshot, setSnapshot] = useState<SimpleSnapshot>(EMPTY);
@@ -34,28 +35,40 @@ export function DashboardSimple() {
 
   useEffect(() => {
     let mounted = true;
-    void Promise.allSettled([
-      adapters.getPrinters(),
-      adapters.getJobs("printing,queued,completed,failed,cancelled"),
-      adapters.getSystemSnapshot(),
-    ]).then((results) => {
-      if (!mounted) return;
-      const [printersResult, jobsResult, systemResult] = results;
-      setSnapshot({
-        printers: printersResult.status === "fulfilled" ? printersResult.value : [],
-        jobs: jobsResult.status === "fulfilled" ? jobsResult.value : [],
-        system: systemResult.status === "fulfilled" ? systemResult.value : null,
+    const load = () => {
+      void Promise.allSettled([
+        adapters.getPrinters(),
+        adapters.getJobs("printing,queued,completed,failed,cancelled"),
+        adapters.getSystemSnapshot(),
+      ]).then((results) => {
+        if (!mounted) return;
+        const [printersResult, jobsResult, systemResult] = results;
+        setSnapshot({
+          printers: printersResult.status === "fulfilled" ? printersResult.value : [],
+          jobs: jobsResult.status === "fulfilled" ? jobsResult.value : [],
+          system: systemResult.status === "fulfilled" ? systemResult.value : null,
+        });
+        setLoaded(true);
       });
-      setLoaded(true);
-    });
+    };
+    load();
+    const timer = window.setInterval(() => {
+      if (!document.hidden) load();
+    }, SIMPLE_REFRESH_INTERVAL_MS);
+    const onSettingsChanged = () => load();
+    window.addEventListener("hermes3d:settings-changed", onSettingsChanged);
     return () => {
       mounted = false;
+      window.clearInterval(timer);
+      window.removeEventListener("hermes3d:settings-changed", onSettingsChanged);
     };
   }, []);
 
-  const totalPrinters = snapshot.printers.length;
-  const onlinePrinters = snapshot.printers.filter((p) => p.status !== "offline").length;
-  const activePrints = snapshot.printers.filter((p) => p.status === "printing").length;
+  const livePrinters = snapshot.printers.filter(isLivePrinter);
+  const hiddenPrinters = snapshot.printers.length - livePrinters.length;
+  const totalPrinters = livePrinters.length;
+  const onlinePrinters = livePrinters.filter((p) => p.status !== "offline").length;
+  const activePrints = livePrinters.filter((p) => p.status === "printing").length;
   const queued = snapshot.jobs.filter((job) => job.status === "queued").length;
   const completed = snapshot.jobs.filter((job) => job.status === "completed").length;
   const failed = snapshot.jobs.filter((job) => job.status === "failed").length;
@@ -77,7 +90,7 @@ export function DashboardSimple() {
           icon={<PrinterIcon size={20} className="text-accent-cyan" />}
           label="Total Printers"
           value={String(totalPrinters)}
-          detail={`${onlinePrinters} online · ${Math.max(totalPrinters - onlinePrinters, 0)} offline`}
+          detail={`${onlinePrinters} online${hiddenPrinters > 0 ? ` · ${hiddenPrinters} hidden` : ""}`}
         />
         <KpiTile
           icon={<Activity size={20} className="text-accent-green" />}
@@ -209,4 +222,10 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
       <span className="text-fg font-medium truncate">{value}</span>
     </li>
   );
+}
+
+function isLivePrinter(printer: Printer): boolean {
+  return !printer.maintenance_flag
+    && printer.status !== "disabled"
+    && printer.status !== "maintenance";
 }

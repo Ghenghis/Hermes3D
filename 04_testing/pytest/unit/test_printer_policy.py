@@ -14,6 +14,7 @@ Key invariants proven here:
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -298,6 +299,82 @@ def test_validate_camera_route_returns_400_for_rtsp(client):
         "/api/printers/validate-camera", json={"camera_url": "rtsp://192.168.0.10/stream"}
     )
     assert response.status_code == 400
+
+
+def test_upload_gcode_file_route_blocks_s1_before_moonraker(client):
+    """Browser-selected G-code upload keeps the S1 hard lock before Moonraker I/O."""
+    with patch("hermes3d.api.routes.printers.MoonrakerClient") as moonraker:
+        response = client.post(
+            "/api/printers/flsun_s1/upload-gcode-file",
+            params={"filename": "part.gcode", "start": "false"},
+            content=b"G28\n",
+            headers={"Content-Type": "text/x-gcode"},
+        )
+    assert response.status_code == 423
+    assert response.json()["detail"]["error"] == "PRINTER_LOCKED"
+    moonraker.assert_not_called()
+
+
+def test_upload_gcode_file_route_spools_selected_file_and_uploads_without_start(client):
+    """Browse-file upload stores a safe local copy, runs gates, and uploads without start."""
+    upload_calls: list[tuple[str, str]] = []
+
+    class FakeMoonrakerClient:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def server_info(self):
+            return SimpleNamespace(
+                klippy_connected=True,
+                klippy_state="ready",
+                moonraker_version="test",
+                api_version="test",
+            )
+
+        def printer_state(self, *_args, **_kwargs):
+            return SimpleNamespace(state="ready", raw={"status": {}}, filename="", progress=0)
+
+        def upload_gcode(self, path, *, remote_subdir, start_print):
+            upload_calls.append((str(path), remote_subdir))
+            assert start_print is False
+            return SimpleNamespace(
+                item_path=f"{remote_subdir}/{path.name}",
+                item_root="gcodes",
+                print_started=False,
+            )
+
+        def start_print(self, _item_path):
+            raise AssertionError("start_print must not be called for upload-only browse flow")
+
+    with (
+        patch("hermes3d.api.routes.printers.MoonrakerClient", FakeMoonrakerClient),
+        patch(
+            "hermes3d.api.routes.printers.resolve_bounds",
+            return_value=(SimpleNamespace(), False),
+        ),
+        patch(
+            "hermes3d.api.routes.printers.check_gcode_file",
+            return_value=SimpleNamespace(passed=True, to_dict=lambda: {"passed": True}),
+        ),
+    ):
+        response = client.post(
+            "/api/printers/flsun_t1_b/upload-gcode-file",
+            params={"filename": "../Hermes Logo Test.gcode", "start": "false"},
+            content=b"G28\nG1 X10 Y10 Z0.3\n",
+            headers={"Content-Type": "text/x-gcode"},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["accepted"] is True
+    assert body["uploaded"] is True
+    assert body["started"] is False
+    assert body["upload_source"] == "browser_file"
+    assert body["printer_id"] == "flsun_t1_b"
+    assert upload_calls
+    spooled_path = upload_calls[0][0]
+    assert spooled_path.endswith(".gcode")
+    assert "Hermes_Logo_Test" in spooled_path
 
 
 # ---------------------------------------------------------------------------

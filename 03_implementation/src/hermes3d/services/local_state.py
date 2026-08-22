@@ -58,7 +58,7 @@ STATUS_MAP = {
     "paused": "paused",
     "maintenance": "maintenance",
     "offline": "offline",
-    "disabled": "offline",
+    "disabled": "disabled",
     "error": "error",
 }
 
@@ -385,6 +385,12 @@ def _moonraker_printer_info_state(url: str, timeout_s: float = 1.5) -> str | Non
 def _moonraker_snapshots(config: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     requests: list[tuple[str, str | None, bool]] = []
     for printer_id, item in config.items():
+        configured_status = _setting(f"printer.{printer_id}.status") or str(
+            item.get("status") or "offline"
+        )
+        status = STATUS_MAP.get(configured_status.lower(), "offline")
+        if status in {"disabled", "offline", "maintenance"}:
+            continue
         url = _setting(f"printer.{printer_id}.moonraker_url") or str(
             item.get("moonraker_url") or ""
         )
@@ -433,11 +439,17 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
         elif model == "V400":
             model = "FLSUN V400"
         live_source = str(live_snapshot.get("data_source") or "")
-        effective_status = str(live_snapshot.get("status") or status)
-        effective_data_source = str(
-            live_snapshot.get("data_source") or ("policy" if locked else "config")
+        operator_forced_state = status in {"disabled", "offline", "maintenance"}
+        effective_status = status if operator_forced_state else str(live_snapshot.get("status") or status)
+        effective_data_source = (
+            "config"
+            if operator_forced_state and _setting(f"printer.{printer_id}.status")
+            else str(live_snapshot.get("data_source") or ("policy" if locked else "config"))
         )
         effective_status_source = (
+            "settings"
+            if operator_forced_state and _setting(f"printer.{printer_id}.status")
+            else
             live_source
             if live_source
             else "settings"
@@ -466,7 +478,7 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
                 "temp_bed": live_snapshot.get("temp_bed"),
                 "progress": live_snapshot.get("progress"),
                 "current_job": live_snapshot.get("current_job"),
-                "maintenance_flag": locked or status == "maintenance",
+                "maintenance_flag": locked or status in {"maintenance", "disabled"},
                 "camera_url": printer_camera_url(printer_id, ip),
                 "moonraker_url": url or None,
                 "source_refs": source_refs,
@@ -475,6 +487,7 @@ def local_printers(*, live: bool = True) -> list[dict[str, Any]]:
                 if locked
                 else str(item.get("safety_policy") or "write_enabled"),
                 "write_enabled": (not locked)
+                and effective_status not in {"disabled", "offline", "maintenance"}
                 and str(item.get("safety_policy") or "write_enabled") == "write_enabled",
                 "onboarded": bool(item.get("onboarded")),
             }

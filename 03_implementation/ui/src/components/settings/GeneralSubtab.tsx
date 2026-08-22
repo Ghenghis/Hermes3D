@@ -44,7 +44,7 @@ import {
   type NamedPaletteId,
 } from "../../theme/palettes";
 
-type DashboardModePref = "simple" | "advanced" | "custom";
+type DashboardModePref = "simple" | "advanced" | "factory" | "creator" | "inspector" | "custom";
 type UIModePref = "full" | "simple";
 type LanguagePref = "en" | "es" | "de" | "fr" | "ja" | "zh";
 
@@ -72,6 +72,9 @@ const UI_MODE_OPTIONS: { value: UIModePref; label: string; help: string }[] = [
 const DASHBOARD_MODE_OPTIONS: { value: DashboardModePref; label: string; help: string }[] = [
   { value: "simple", label: "Simple", help: "Status pills + key metrics" },
   { value: "advanced", label: "Advanced", help: "All panels, default" },
+  { value: "factory", label: "Factory", help: "Cameras, console, jobs" },
+  { value: "creator", label: "Create", help: "Idea/image to printable model" },
+  { value: "inspector", label: "Inspect", help: "Software + live surfaces" },
   { value: "custom", label: "Custom", help: "User-curated layout" },
 ];
 
@@ -104,7 +107,7 @@ export function GeneralSubtab() {
     readLocal(LS_UI_MODE, ["full", "simple"] as const, "full"),
   );
   const [dashboardMode, setDashboardMode] = useState<DashboardModePref>(() =>
-    readLocal(LS_DASHBOARD_MODE, ["simple", "advanced", "custom"] as const, "advanced"),
+    readLocal(LS_DASHBOARD_MODE, ["simple", "advanced", "factory", "creator", "inspector", "custom"] as const, "advanced"),
   );
   // Named palette is persisted to localStorage under the dedicated
   // `h3d.theme.palette` key (W15-A17). Backend persistence is owned by
@@ -370,7 +373,7 @@ export function GeneralSubtab() {
         <legend className="px-1 text-[10px] uppercase tracking-wide text-muted">
           Default Dashboard Mode
         </legend>
-        <div role="radiogroup" aria-label="Default dashboard mode" className="grid grid-cols-1 gap-1 sm:grid-cols-3">
+        <div role="radiogroup" aria-label="Default dashboard mode" className="grid grid-cols-1 gap-1 sm:grid-cols-3 xl:grid-cols-6">
           {DASHBOARD_MODE_OPTIONS.map((opt) => (
             <label
               key={opt.value}

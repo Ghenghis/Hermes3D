@@ -100,6 +100,27 @@
     min-height: 0;
   }
 
+  .operator-workbench-grid {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: clamp(0.5rem, 0.65vw, 0.8rem);
+    align-content: start;
+    overflow: auto;
+    padding-bottom: 0.25rem;
+  }
+
+  .operator-workbench-panel {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    resize: none;
+    contain: layout paint;
+  }
+
+  .operator-workbench-panel:focus-within {
+    box-shadow: 0 0 0 1px theme(colors.accent.cyan / 0.4);
+  }
+
   .simple-dashboard-grid > * {
     min-height: 0;
   }
@@ -151,6 +172,16 @@
   }
 
   @media (max-width: 1023px) {
+    .operator-workbench-grid {
+      grid-template-columns: minmax(0, 1fr);
+      overflow: auto;
+    }
+
+    .operator-workbench-panel {
+      grid-column: 1 / -1 !important;
+      resize: none;
+    }
+
     .dashboard-grid {
       height: auto;
       min-height: calc(100vh - 5.5rem);

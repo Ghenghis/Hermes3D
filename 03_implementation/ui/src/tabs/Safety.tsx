@@ -59,6 +59,7 @@ const STATUS_TONE: Record<PrinterStatus, string> = {
   paused: "text-accent-amber",
   maintenance: "text-accent-amber",
   offline: "text-muted",
+  disabled: "text-muted",
   error: "text-accent-red",
 };
 

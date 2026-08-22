@@ -38,15 +38,32 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import shutil
+import subprocess
 import threading
+import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from hermes3d.api.routes._common import as_json, execute, new_id, row, rows
 from hermes3d.services.local_state import implementation_path
+from hermes3d.services.source_tool_support import source_support_record, source_support_records
+from hermes3d.services.window_capture import (
+    capture_window_jpeg,
+    capture_window_png,
+    click_window,
+    find_desktop_window,
+    focus_window,
+    list_matching_windows,
+    press_window_key,
+    wheel_window,
+    windows_available,
+)
 
 LOG = logging.getLogger(__name__)
 
@@ -70,6 +87,77 @@ class SliceRequest(BaseModel):
         ),
     )
     options: dict[str, Any] = Field(default_factory=dict, description="Future-use options.")
+
+
+class SlicerAppPathRequest(BaseModel):
+    """Body of PUT /api/slicer/apps/{app_id}/path."""
+
+    path: str = Field(..., description="Absolute path to a local slicer executable.")
+
+
+class WindowClickRequest(BaseModel):
+    x_ratio: float = Field(..., ge=0, le=1)
+    y_ratio: float = Field(..., ge=0, le=1)
+    button: str = "left"
+    double: bool = False
+
+
+class WindowWheelRequest(BaseModel):
+    x_ratio: float = Field(..., ge=0, le=1)
+    y_ratio: float = Field(..., ge=0, le=1)
+    delta_y: float
+
+
+class WindowKeyRequest(BaseModel):
+    key: str
+    ctrl: bool = False
+    alt: bool = False
+    shift: bool = False
+
+
+SLICER_DESKTOP_APPS: dict[str, dict[str, Any]] = {
+    "prusaslicer": {
+        "label": "PrusaSlicer",
+        "module_id": "prusaslicer",
+        "kind": "desktop_slicer",
+        "default_path": "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
+        "candidates": [
+            "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer.exe",
+            "C:/Program Files/Prusa3D/PrusaSlicer/prusa-slicer-console.exe",
+            "C:/Program Files (x86)/Prusa3D/PrusaSlicer/prusa-slicer.exe",
+        ],
+        "path_commands": ["prusa-slicer", "PrusaSlicer", "prusa-slicer-console"],
+        "window_process_names": ["prusa-slicer", "PrusaSlicer"],
+        "window_title_contains": ["PrusaSlicer"],
+    },
+    "flsun_slicer": {
+        "label": "FLSUN Slicer",
+        "module_id": "flsun_slicer",
+        "kind": "desktop_slicer",
+        "default_path": "C:/FlsunSlicer2.0/FlsunSlicer.exe",
+        "candidates": [
+            "C:/FlsunSlicer2.0/FlsunSlicer.exe",
+            "C:/Program Files/FlsunSlicer/FlsunSlicer.exe",
+        ],
+        "path_commands": ["FlsunSlicer", "flsun-slicer", "flusn-slicer"],
+        "window_process_names": ["FlsunSlicer"],
+        "window_title_contains": ["FlsunSlicer"],
+    },
+    "orcaslicer": {
+        "label": "OrcaSlicer",
+        "module_id": "orcaslicer",
+        "kind": "desktop_slicer",
+        "default_path": "C:/Program Files/OrcaSlicer/orca-slicer.exe",
+        "candidates": [
+            "C:/Program Files/OrcaSlicer/orca-slicer.exe",
+            "C:/Program Files/OrcaSlicer/OrcaSlicer.exe",
+            "C:/Program Files (x86)/OrcaSlicer/orca-slicer.exe",
+        ],
+        "path_commands": ["orca-slicer", "OrcaSlicer", "orcaslicer"],
+        "window_process_names": ["orca-slicer", "OrcaSlicer"],
+        "window_title_contains": ["OrcaSlicer"],
+    },
+}
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +222,479 @@ def _record_proof_event(event_type: str, payload: dict[str, Any]) -> str:
         (event_id, event_type, as_json(payload)),
     )
     return event_id
+
+
+def _slicer_app_or_404(app_id: str) -> dict[str, Any]:
+    app = SLICER_DESKTOP_APPS.get(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail=f"Unknown slicer app: {app_id}")
+    return app
+
+
+def _slicer_app_settings_key(app_id: str) -> str:
+    return f"slicer.desktop_app.{app_id}.path"
+
+
+def _setting_value(key: str) -> str | None:
+    item = row("SELECT value FROM settings WHERE key = ?", (key,))
+    value = str(item["value"]).strip() if item and item.get("value") else ""
+    return value or None
+
+
+def _save_setting(key: str, value: str) -> None:
+    execute(
+        "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+        (key, value),
+    )
+
+
+def _normalise_executable_path(raw_path: str) -> Path:
+    stripped = raw_path.strip().strip("\"'")
+    if not stripped:
+        raise HTTPException(status_code=400, detail="Executable path is required.")
+    path = Path(stripped)
+    if not path.is_absolute():
+        raise HTTPException(status_code=400, detail="Use an absolute executable path.")
+    if path.suffix.lower() != ".exe":
+        raise HTTPException(status_code=400, detail="Slicer app path must point to a .exe file.")
+    try:
+        resolved = path.resolve(strict=False)
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid executable path: {exc}") from exc
+    return resolved
+
+
+def _slicer_app_candidates(app_id: str, app: dict[str, Any]) -> list[dict[str, Any]]:
+    override = _setting_value(_slicer_app_settings_key(app_id))
+    raw_candidates: list[tuple[str, str]] = []
+    if override:
+        raw_candidates.append(("user", override))
+    raw_candidates.extend(("known", str(path)) for path in app.get("candidates") or [])
+    for command in app.get("path_commands") or []:
+        found = shutil.which(str(command))
+        raw_candidates.append(("path", found or f"PATH:{command}"))
+
+    seen: set[str] = set()
+    records: list[dict[str, Any]] = []
+    for source, raw_path in raw_candidates:
+        if raw_path in seen:
+            continue
+        seen.add(raw_path)
+        if raw_path.startswith("PATH:"):
+            records.append(
+                {
+                    "source": source,
+                    "path": raw_path,
+                    "exists": False,
+                    "is_executable": False,
+                }
+            )
+            continue
+        path = Path(raw_path)
+        exists = path.is_file()
+        records.append(
+            {
+                "source": source,
+                "path": str(path),
+                "exists": exists,
+                "is_executable": exists and path.suffix.lower() == ".exe",
+            }
+        )
+    return records
+
+
+def _slicer_app_record(app_id: str) -> dict[str, Any]:
+    app = _slicer_app_or_404(app_id)
+    candidates = _slicer_app_candidates(app_id, app)
+    selected = next((item for item in candidates if item["is_executable"]), None)
+    override = _setting_value(_slicer_app_settings_key(app_id))
+    window = _slicer_app_window_record(app_id, app, str(selected["path"]) if selected else None)
+    return {
+        "id": app_id,
+        "module_id": app["module_id"],
+        "label": app["label"],
+        "kind": app["kind"],
+        "status": "ready" if selected else "missing",
+        "detected": bool(selected),
+        "path": selected["path"] if selected else override or app["default_path"],
+        "path_source": selected["source"] if selected else "user" if override else "default",
+        "user_path": override,
+        "default_path": app["default_path"],
+        "candidates": candidates,
+        "launch_supported": bool(selected),
+        "window": window,
+        "window_available": bool(window.get("available")),
+        "window_preview_url": f"/api/slicer/apps/{app_id}/window/screenshot.png",
+        "window_stream_url": f"/api/slicer/apps/{app_id}/window/stream.mjpeg",
+        "source_support": source_support_record(app_id),
+        "proof_gate_version": "desktop-slicer-launcher-v1",
+        "safety": "Launches the local slicer desktop program only. It does not upload, start, stop, home, heat, or otherwise command printer hardware.",
+    }
+
+
+def _slicer_app_window(app_id: str, app: dict[str, Any] | None = None, executable_path: str | None = None):
+    app = app or _slicer_app_or_404(app_id)
+    return find_desktop_window(
+        process_names=app.get("window_process_names") or (),
+        title_contains=app.get("window_title_contains") or (),
+        executable_path=executable_path,
+    )
+
+
+def _slicer_app_window_record(app_id: str, app: dict[str, Any] | None = None, executable_path: str | None = None) -> dict[str, Any]:
+    if not windows_available():
+        return {
+            "available": False,
+            "status": "desktop_capture_unavailable",
+            "reason": "Windows desktop capture libraries are unavailable in this runtime.",
+        }
+    window = _slicer_app_window(app_id, app, executable_path)
+    matching_windows = list_matching_windows(
+        process_names=app.get("window_process_names") or (),
+        title_contains=app.get("window_title_contains") or (),
+        executable_path=executable_path,
+    )
+    if not window:
+        if matching_windows:
+            best = matching_windows[0]
+            return {
+                "available": False,
+                "status": "running_needs_focus",
+                "reason": "The desktop slicer process has a window, but it is minimized or parked offscreen. Use Focus Window.",
+                "hwnd": best.hwnd,
+                "title": best.title,
+                "process_id": best.process_id,
+                "process_name": best.process_name,
+                "process_path": best.process_path,
+            }
+        return {
+            "available": False,
+            "status": "not_running",
+            "reason": "The desktop slicer window is not open.",
+        }
+    left, top, right, bottom = window.rect
+    return {
+        "available": True,
+        "status": "running",
+        "hwnd": window.hwnd,
+        "title": window.title,
+        "process_id": window.process_id,
+        "process_name": window.process_name,
+        "process_path": window.process_path,
+        "rect": {"left": left, "top": top, "right": right, "bottom": bottom},
+        "preview_url": f"/api/slicer/apps/{app_id}/window/screenshot.png",
+        "stream_url": f"/api/slicer/apps/{app_id}/window/stream.mjpeg",
+    }
+
+
+@router.get("/api/slicer/apps")
+def list_slicer_apps() -> dict[str, Any]:
+    """Return detected local desktop slicer applications.
+
+    This is an app-launch surface, not a CLI proof surface. It reports the
+    executable that a user can open manually from the dashboard and keeps
+    printer hardware completely untouched.
+    """
+
+    app_ids = ["flsun_slicer", "prusaslicer", "orcaslicer"]
+    return {
+        "status": "ready",
+        "count": len(app_ids),
+        "apps": [_slicer_app_record(app_id) for app_id in app_ids],
+        "source_supported": source_support_records(app_ids),
+    }
+
+
+@router.get("/api/slicer/apps/{app_id}")
+def get_slicer_app(app_id: str) -> dict[str, Any]:
+    return _slicer_app_record(app_id)
+
+
+@router.get("/api/slicer/apps/{app_id}/window")
+def get_slicer_app_window(app_id: str) -> dict[str, Any]:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    return {
+        "app_id": app_id,
+        "label": app["label"],
+        "window": _slicer_app_window_record(app_id, app, str(record.get("path") or "")),
+    }
+
+
+@router.get("/api/slicer/apps/{app_id}/window/screenshot.png")
+def get_slicer_app_window_screenshot(app_id: str) -> Response:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    window = _slicer_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "not_running",
+                "reason": f"{app['label']} is not open, so no desktop GUI screenshot can be captured.",
+            },
+        )
+    try:
+        png = capture_window_png(window)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "desktop_capture_unavailable",
+                "reason": str(exc),
+            },
+        ) from exc
+    return Response(
+        content=png,
+        media_type="image/png",
+        headers={"Cache-Control": "no-store, max-age=0"},
+    )
+
+
+@router.get("/api/slicer/apps/{app_id}/window/stream.mjpeg")
+def stream_slicer_app_window(app_id: str, fps: float = 8.0) -> StreamingResponse:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    executable_path = str(record.get("path") or "")
+    if not _slicer_app_window(app_id, app, executable_path):
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "not_running",
+                "reason": f"{app['label']} is not open, so no live desktop GUI stream can be captured.",
+            },
+        )
+    return StreamingResponse(
+        _slicer_mjpeg_frames(app_id, app, executable_path, fps=fps),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/api/slicer/apps/{app_id}/window/focus")
+def focus_slicer_app_window(app_id: str) -> dict[str, Any]:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    window = _slicer_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        matching_windows = list_matching_windows(
+            process_names=app.get("window_process_names") or (),
+            title_contains=app.get("window_title_contains") or (),
+            executable_path=str(record.get("path") or ""),
+        )
+        if not matching_windows:
+            return {
+                "accepted": False,
+                "status": "not_running",
+                "reason": f"{app['label']} is not open.",
+            }
+        window = matching_windows[0]
+    try:
+        focus_window(window)
+    except Exception as exc:  # pragma: no cover - desktop focus can be OS-policy blocked
+        return {
+            "accepted": False,
+            "status": "focus_blocked",
+            "reason": str(exc),
+            "window": _slicer_app_window_record(app_id, app, str(record.get("path") or "")),
+        }
+    return {
+        "accepted": True,
+        "status": "focused",
+        "window": _slicer_app_window_record(app_id, app, str(record.get("path") or "")),
+    }
+
+
+@router.post("/api/slicer/apps/{app_id}/window/click")
+def click_slicer_app_window(app_id: str, body: WindowClickRequest) -> dict[str, Any]:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    window = _slicer_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        return {"accepted": False, "status": "not_running", "reason": f"{app['label']} is not open."}
+    try:
+        click_window(
+            window,
+            x_ratio=body.x_ratio,
+            y_ratio=body.y_ratio,
+            button=body.button,
+            double=body.double,
+        )
+    except Exception as exc:
+        return {"accepted": False, "status": "input_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "clicked",
+        "window": _slicer_app_window_record(app_id, app, str(record.get("path") or "")),
+        "safety": "Local desktop input only; no Hermes3D printer API call was made.",
+    }
+
+
+@router.post("/api/slicer/apps/{app_id}/window/wheel")
+def wheel_slicer_app_window(app_id: str, body: WindowWheelRequest) -> dict[str, Any]:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    window = _slicer_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        return {"accepted": False, "status": "not_running", "reason": f"{app['label']} is not open."}
+    try:
+        wheel_window(window, x_ratio=body.x_ratio, y_ratio=body.y_ratio, delta_y=body.delta_y)
+    except Exception as exc:
+        return {"accepted": False, "status": "input_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "wheeled",
+        "window": _slicer_app_window_record(app_id, app, str(record.get("path") or "")),
+        "safety": "Local desktop input only; no Hermes3D printer API call was made.",
+    }
+
+
+@router.post("/api/slicer/apps/{app_id}/window/key")
+def key_slicer_app_window(app_id: str, body: WindowKeyRequest) -> dict[str, Any]:
+    app = _slicer_app_or_404(app_id)
+    record = _slicer_app_record(app_id)
+    window = _slicer_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        return {"accepted": False, "status": "not_running", "reason": f"{app['label']} is not open."}
+    try:
+        press_window_key(window, key=body.key, ctrl=body.ctrl, alt=body.alt, shift=body.shift)
+    except Exception as exc:
+        return {"accepted": False, "status": "input_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "key_sent",
+        "window": _slicer_app_window_record(app_id, app, str(record.get("path") or "")),
+        "safety": "Local desktop input only; no Hermes3D printer API call was made.",
+    }
+
+
+def _slicer_mjpeg_frames(
+    app_id: str,
+    app: dict[str, Any],
+    executable_path: str,
+    *,
+    fps: float,
+) -> Iterator[bytes]:
+    interval = 1.0 / max(1.0, min(12.0, float(fps or 8.0)))
+    while True:
+        started = time.monotonic()
+        window = _slicer_app_window(app_id, app, executable_path)
+        if window:
+            try:
+                frame = capture_window_jpeg(window, quality=72, max_width=1600)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
+                    + frame
+                    + b"\r\n"
+                )
+            except Exception:
+                # Window capture can fail while the native app is resizing or
+                # switching GPU surfaces; retry on the next frame.
+                pass
+        elapsed = time.monotonic() - started
+        time.sleep(max(0.01, interval - elapsed))
+
+
+@router.put("/api/slicer/apps/{app_id}/path")
+def set_slicer_app_path(app_id: str, body: SlicerAppPathRequest) -> dict[str, Any]:
+    _slicer_app_or_404(app_id)
+    path = _normalise_executable_path(body.path)
+    if not path.is_file():
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "blocked",
+                "reason": f"Executable not found: {path}",
+                "path": str(path),
+            },
+        )
+    _save_setting(_slicer_app_settings_key(app_id), str(path))
+    record = _slicer_app_record(app_id)
+    proof_event_id = _record_proof_event(
+        "slicer_app_path_saved",
+        {
+            "app_id": app_id,
+            "label": record["label"],
+            "path": str(path),
+            "safety": record["safety"],
+        },
+    )
+    return {
+        "accepted": True,
+        "status": "saved",
+        "app": record,
+        "proof_event_id": proof_event_id,
+    }
+
+
+@router.post("/api/slicer/apps/{app_id}/launch")
+def launch_slicer_app(app_id: str) -> dict[str, Any]:
+    record = _slicer_app_record(app_id)
+    app = _slicer_app_or_404(app_id)
+    existing_window = _slicer_app_window(app_id, app, str(record.get("path") or ""))
+    if existing_window:
+        try:
+            focus_window(existing_window)
+        except Exception:
+            pass
+        return {
+            "accepted": True,
+            "status": "focused_existing",
+            "app": _slicer_app_record(app_id),
+            "pid": existing_window.process_id,
+        }
+    if not record["detected"]:
+        return {
+            "accepted": False,
+            "status": "missing",
+            "app": record,
+            "reason": f"{record['label']} executable was not found. Set a local .exe path first.",
+        }
+    path = Path(str(record["path"]))
+    if not path.is_file():
+        return {
+            "accepted": False,
+            "status": "missing",
+            "app": record,
+            "reason": f"{record['label']} executable no longer exists at {path}.",
+        }
+    try:
+        proc = subprocess.Popen(  # noqa: S603 -- fixed local executable path, shell disabled.
+            [str(path)],
+            cwd=str(path.parent),
+            shell=False,
+        )
+    except OSError as exc:
+        return {
+            "accepted": False,
+            "status": "launch_failed",
+            "app": record,
+            "reason": f"Launch failed: {exc}",
+        }
+    proof_event_id = _record_proof_event(
+        "slicer_app_launched",
+        {
+            "app_id": app_id,
+            "label": record["label"],
+            "path": str(path),
+            "pid": proc.pid,
+            "safety": record["safety"],
+            "no_printer_hardware": True,
+        },
+    )
+    return {
+        "accepted": True,
+        "status": "launched",
+        "app": record,
+        "pid": proc.pid,
+        "proof_event_id": proof_event_id,
+    }
 
 
 def _write_proof_envelope(

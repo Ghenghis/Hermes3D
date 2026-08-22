@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { adapters } from "../api/adapters";
 import type { Job } from "../types/job";
 import type { JobDetail } from "../types/job-detail";
@@ -43,11 +43,20 @@ export function JobsTab() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [detail, setDetail] = useState<JobDetail | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const printerName = useMemo(() => new Map(printers.map((printer) => [printer.id, printer.name])), [printers]);
 
-  const loadJobs = () => {
-    void adapters.getJobs(activeFilter).then(setJobs);
-  };
+  const loadJobs = useCallback(() => {
+    void adapters.getJobs(activeFilter)
+      .then((next) => {
+        setJobs(next);
+        setLoadError(null);
+      })
+      .catch((error) => {
+        setLoadError(errorMessage(error));
+        setJobs([]);
+      });
+  }, [activeFilter]);
 
   useEffect(() => {
     loadJobs();
@@ -58,7 +67,17 @@ export function JobsTab() {
         window.clearInterval(timer);
       }
     };
-  }, [activeFilter]);
+  }, [activeFilter, loadJobs]);
+
+  useEffect(() => {
+    if (jobs.length === 0) {
+      setSelectedJobId(null);
+      return;
+    }
+    if (selectedJobId == null || !jobs.some((job) => job.id === selectedJobId)) {
+      setSelectedJobId(jobs[0].id);
+    }
+  }, [jobs, selectedJobId]);
 
   useEffect(() => {
     if (selectedJobId == null) {
@@ -67,7 +86,12 @@ export function JobsTab() {
       return;
     }
     setActionMessage(null);
-    void adapters.getJobDetail(selectedJobId).then(setDetail);
+    void adapters.getJobDetail(selectedJobId)
+      .then(setDetail)
+      .catch((error) => {
+        setDetail(null);
+        setActionMessage(`Blocked: ${errorMessage(error)}`);
+      });
     void adapters.emitProofEvent("jobs.job.selected", { job_id: selectedJobId });
   }, [selectedJobId]);
 
@@ -147,7 +171,7 @@ export function JobsTab() {
           ))}
           {jobs.length === 0 && (
             <div className="rounded border border-border bg-bg/40 p-3 text-sm text-muted">
-              No {activeFilter} jobs returned by the live jobs API.
+              {loadError ? `Jobs API blocked: ${loadError}` : `No ${activeFilter} jobs returned by the live jobs API.`}
             </div>
           )}
         </div>

@@ -11,16 +11,23 @@
  * AppShell provides.
  */
 import { DASHBOARD_MODES, type DashboardMode, useDashboardModeStore } from "./dashboardModeStore";
+import { useStore } from "../../app/store";
 
 const MODE_LABELS: Record<DashboardMode, string> = {
   simple: "Simple",
   advanced: "Advanced",
+  factory: "Factory",
+  creator: "Create",
+  inspector: "Inspect",
   custom: "Custom",
 };
 
 const MODE_TITLES: Record<DashboardMode, string> = {
   simple: "Minimal KPI cards and system status only",
   advanced: "Full live dashboard with all panels and the Hermes Agents dock",
+  factory: "Live factory floor: cameras, printer console, queue, and agents",
+  creator: "Create-to-print workflow with image/model, modelers, slicers, and preview",
+  inspector: "Software and live inspection surfaces for slicers, modelers, cameras, and console",
   custom: "User-configurable widget layout (drag to rearrange)",
 };
 
@@ -37,6 +44,7 @@ export type DashboardModeSwitcherProps = {
 export function DashboardModeSwitcher({ mode, onChange, className = "" }: DashboardModeSwitcherProps) {
   const storeMode = useDashboardModeStore((state) => state.mode);
   const setStoreMode = useDashboardModeStore((state) => state.setMode);
+  const setUiMode = useStore((state) => state.setUiMode);
   const active = mode ?? storeMode;
 
   const handleSelect = (next: DashboardMode) => {
@@ -45,6 +53,7 @@ export function DashboardModeSwitcher({ mode, onChange, className = "" }: Dashbo
       return;
     }
     setStoreMode(next);
+    setUiMode("full");
     if (typeof window !== "undefined") {
       const desired = `#dashboard:${next}`;
       if (window.location.hash !== desired) {

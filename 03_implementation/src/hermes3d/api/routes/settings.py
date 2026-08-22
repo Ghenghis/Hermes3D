@@ -37,6 +37,11 @@ def get_settings() -> dict[str, Any]:
         for key, value in flat.items()
         if key.startswith("printer.") and key.endswith(".camera_url")
     }
+    printer_statuses = {
+        key.removeprefix("printer.").removesuffix(".status"): value
+        for key, value in flat.items()
+        if key.startswith("printer.") and key.endswith(".status")
+    }
     service_urls = {
         key.removeprefix("service.").removesuffix(".url"): value
         for key, value in flat.items()
@@ -48,6 +53,7 @@ def get_settings() -> dict[str, Any]:
         "ports": ports,
         "printerUrls": printer_urls,
         "cameraUrls": camera_urls,
+        "printerStatuses": printer_statuses,
         "serviceUrls": service_urls,
     }
 
@@ -77,6 +83,15 @@ def put_settings(body: dict[str, Any]) -> dict[str, Any]:
                 execute(
                     "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
                     (f"printer.{printer_id}.camera_url", str(url)),
+                )
+            continue
+        if key == "printerStatuses" and isinstance(value, dict):
+            for printer_id, status in value.items():
+                cleaned_status = str(status).strip().lower()
+                _validate_printer_status(str(printer_id), cleaned_status)
+                execute(
+                    "INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+                    (f"printer.{printer_id}.status", cleaned_status),
                 )
             continue
         if key == "serviceUrls" and isinstance(value, dict):
@@ -112,9 +127,30 @@ def _validate_printer_url(printer_id: str, url: str) -> None:
     _validate_printer_lan_url(printer_id, url, "Moonraker URL")
 
 
+def _validate_printer_status(printer_id: str, status: str) -> None:
+    allowed_statuses = {
+        "active",
+        "online",
+        "printing",
+        "paused",
+        "maintenance",
+        "offline",
+        "disabled",
+        "error",
+    }
+    if status not in allowed_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status for {printer_id}: {status}")
+    known_ids = {str(printer.get("id")) for printer in local_printers(live=False)}
+    if printer_id not in known_ids:
+        raise HTTPException(status_code=404, detail=f"Unknown printer id: {printer_id}")
+
+
 def _validate_printer_lan_url(printer_id: str, url: str, label: str) -> None:
     if not url.strip():
         return
+    known_ids = {str(printer.get("id")) for printer in local_printers(live=False)}
+    if printer_id not in known_ids:
+        raise HTTPException(status_code=404, detail=f"Unknown printer id: {printer_id}")
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise HTTPException(
@@ -124,19 +160,19 @@ def _validate_printer_lan_url(printer_id: str, url: str, label: str) -> None:
         raise HTTPException(
             status_code=400, detail=f"{label} for {printer_id} must not include credentials"
         )
-    allowed_hosts = {str(printer.get("ip")) for printer in local_printers() if printer.get("ip")}
-    if parsed.hostname not in allowed_hosts:
-        raise HTTPException(
-            status_code=400,
-            detail=f"{label} host {parsed.hostname} is not one of the configured printer IPs",
-        )
     try:
         address = ipaddress.ip_address(parsed.hostname)
     except ValueError as exc:
         raise HTTPException(
             status_code=400, detail=f"{label} host {parsed.hostname} must be a printer IP address"
         ) from exc
-    if address.is_loopback or address.is_multicast or address.is_unspecified or address.is_reserved:
+    if (
+        address.is_loopback
+        or address.is_multicast
+        or address.is_unspecified
+        or address.is_reserved
+        or not address.is_private
+    ):
         raise HTTPException(
-            status_code=400, detail=f"{label} host {parsed.hostname} is not allowed"
+            status_code=400, detail=f"{label} host {parsed.hostname} must be a private LAN IP address"
         )

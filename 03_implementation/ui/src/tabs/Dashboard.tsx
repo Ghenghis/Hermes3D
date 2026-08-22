@@ -47,7 +47,8 @@ import type { ProofBundle } from "../types/proof";
 import type { SystemSnapshot } from "../types/system";
 import type { DimensionalAccuracyReport } from "../types/dimensional";
 import { tokens } from "../styles/tokens";
-import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
+import { STATUS_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type HermesImportMeta = ImportMeta & {
   env: {
@@ -58,6 +59,7 @@ type HermesImportMeta = ImportMeta & {
 const DEFAULT_BRIDGE_PORT = "8765";
 const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
+const DASHBOARD_REQUEST_TIMEOUT_MS = 2_500;
 
 const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   online: "green",
@@ -66,6 +68,7 @@ const PRINTER_TONE: Record<PrinterStatus, StatusTone> = {
   paused: "amber",
   maintenance: "amber",
   offline: "muted",
+  disabled: "muted",
   error: "red",
 };
 
@@ -76,6 +79,7 @@ const PRINTER_LABEL: Record<PrinterStatus, string> = {
   paused: "Paused",
   maintenance: "Maint.",
   offline: "Offline",
+  disabled: "Disabled",
   error: "Error",
 };
 
@@ -120,6 +124,8 @@ const PIPELINE_STAGE_ICONS: Array<{ id: string; label: string; Icon: typeof Spar
   { id: "print",     label: "Print",          Icon: PrinterIcon },
 ];
 
+const DASHBOARD_JOB_STATUSES = "printing,queued,running,completed,failed,cancelled,rolled_back";
+
 type EvidenceEvent = {
   type: string;
   ts_utc: string;
@@ -140,37 +146,45 @@ export function Dashboard() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [events, setEvents] = useState<EvidenceEvent[]>([]);
   const [eventStreamStatus, setEventStreamStatus] = useState<"connecting" | "streaming" | "unreachable">("connecting");
+  const mountedRef = useRef(false);
+
   useEffect(() => {
-    let mounted = true;
-    void Promise.allSettled([
-      adapters.getPrinters(),
-      adapters.getJobs("printing,queued,running"),
-      adapters.getAgents(),
-      adapters.getActiveWorkflows(),
-      adapters.getLatestProofBundle(),
-      adapters.getSystemSnapshot(),
-      adapters.getDimensionalReports(),
-      adapters.getLogs(),
-      adapters.getNotifications(),
-    ]).then((results) => {
-      if (!mounted) {
-        return;
-      }
-      setSettledValue(results[0], setPrinters);
-      setSettledValue(results[1], setJobs);
-      setSettledValue(results[2], setAgents);
-      setSettledValue(results[3], setWorkflows);
-      setSettledValue(results[4], setLatestProof);
-      setSettledValue(results[5], setSystemSnapshot);
-      setSettledValue(results[6], setDimensionalReports);
-      setSettledValue(results[7], setLogs);
-      setSettledValue(results[8], setNotifications);
-    });
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
+
+  const refreshDashboard = useCallback(async () => {
+    const results = await Promise.all([
+      withTimeout<Printer[]>(adapters.getPrinters(), []),
+      withTimeout<Job[]>(adapters.getJobs(DASHBOARD_JOB_STATUSES), []),
+      withTimeout<Agent[]>(adapters.getAgents(), []),
+      withTimeout<Workflow[]>(adapters.getActiveWorkflows(), []),
+      withTimeout<ProofBundle | null>(adapters.getLatestProofBundle(), null),
+      withTimeout<SystemSnapshot | null>(adapters.getSystemSnapshot(), null),
+      withTimeout<DimensionalAccuracyReport[]>(adapters.getDimensionalReports(), []),
+      withTimeout<LogEntry[]>(adapters.getLogs(), []),
+      withTimeout<Notification[]>(adapters.getNotifications(), []),
+    ]);
+    if (!mountedRef.current) {
+      return;
+    }
+    setPrinters(results[0].value);
+    setJobs(results[1].value);
+    setAgents(results[2].value);
+    setWorkflows(results[3].value);
+    setLatestProof(results[4].value);
+    setSystemSnapshot(results[5].value);
+    setDimensionalReports(results[6].value);
+    setLogs(results[7].value);
+    setNotifications(results[8].value);
+  }, []);
+
+  usePollingEffect(refreshDashboard, STATUS_POLL_MS, [refreshDashboard]);
+
   useEffect(() => {
+    setEventStreamStatus("connecting");
     const stream = new EventSource(`${LIVE_BASE_URL}/api/events/stream`);
     stream.onopen = () => setEventStreamStatus("streaming");
     stream.onmessage = (message) => {
@@ -184,15 +198,17 @@ export function Dashboard() {
           message: message.data,
         }, ...current].slice(0, 50));
       }
+      void refreshDashboard();
     };
     stream.onerror = () => setEventStreamStatus("unreachable");
     return () => stream.close();
-  }, []);
+  }, [refreshDashboard]);
 
-  const totalPrinters = printers.length;
-  const onlinePrinters = printers.filter((p) => p.status !== "offline").length;
+  const enabledPrinters = printers.filter((p) => p.status !== "disabled");
+  const totalPrinters = enabledPrinters.length;
+  const onlinePrinters = enabledPrinters.filter((p) => ["online", "active", "printing", "paused"].includes(p.status)).length;
   const offlinePrinters = totalPrinters - onlinePrinters;
-  const activePrints = printers.filter((p) => p.status === "printing").length;
+  const activePrints = enabledPrinters.filter((p) => p.status === "printing").length;
   const queuedJobs = jobs.filter((j) => j.status === "queued").length;
   const completedJobs = jobs.filter((j) => j.status === "completed").length;
   const failedJobs = jobs.filter((j) => j.status === "failed").length;
@@ -257,7 +273,7 @@ export function Dashboard() {
         <Panel
           id="dashboard.fleet"
           title="PRINTER FLEET"
-          status={{ tone: "green", label: `${totalPrinters} units` }}
+          status={{ tone: "green", label: `${totalPrinters} enabled` }}
           headerExtra={
             <button
               type="button"
@@ -270,7 +286,7 @@ export function Dashboard() {
           dense
           className="h-full min-h-0"
         >
-          <FleetTable printers={printers} />
+          <FleetTable printers={enabledPrinters} />
         </Panel>
       </div>
       <div className="col-span-12 min-h-0 lg:col-span-5">
@@ -333,7 +349,7 @@ export function Dashboard() {
           dense
           className="h-full min-h-0"
         >
-          <RecentJobs printers={printers} jobs={jobs} />
+          <RecentJobs printers={enabledPrinters} jobs={jobs} />
         </Panel>
       </div>
 
@@ -395,17 +411,26 @@ export function Dashboard() {
   );
 }
 
-function setSettledValue<T>(
-  result: PromiseSettledResult<T>,
-  setter: Dispatch<SetStateAction<T>>,
-) {
-  if (result.status === "fulfilled") {
-    setter(result.value);
-  }
-}
-
 function flatSparkline(value: number): number[] {
   return [value, value, value];
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  fallback: T,
+  timeoutMs = DASHBOARD_REQUEST_TIMEOUT_MS,
+): Promise<{ value: T; failed: boolean }> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: T, failed: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      resolve({ value, failed });
+    };
+    const timeout = window.setTimeout(() => finish(fallback, true), timeoutMs);
+    promise.then((value) => finish(value, false)).catch(() => finish(fallback, true));
+  });
 }
 
 /* ────────────────────────────────────────────────────────────────────────── *

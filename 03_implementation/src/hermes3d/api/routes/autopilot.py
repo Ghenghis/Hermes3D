@@ -5,7 +5,7 @@ import os
 
 from fastapi import APIRouter, HTTPException
 
-from hermes3d.api.routes._common import new_id, row, rows, utc_now
+from hermes3d.api.routes._common import execute, new_id, row, rows, utc_now
 from hermes3d.db.init import DB_PATH
 from hermes3d.services.local_state import local_printers, port_reachable, service_url
 
@@ -157,6 +157,28 @@ def guardrails() -> list[dict]:
     ]
 
 
+@router.get("/api/autopilot/state")
+def autopilot_state() -> dict:
+    stored = row("SELECT value, updated_at FROM agent_config WHERE key = ?", (_AUTOPILOT_STATE_KEY,))
+    state = stored["value"] if stored and stored.get("value") in {"frozen", "thawed"} else "thawed"
+    return {
+        "accepted": True,
+        "status": state,
+        "mode": state,
+        "updated_at": stored.get("updated_at") if stored else None,
+    }
+
+
+@router.post("/api/autopilot/freeze")
+def freeze_autopilot() -> dict:
+    return _set_autopilot_state("frozen")
+
+
+@router.post("/api/autopilot/thaw")
+def thaw_autopilot() -> dict:
+    return _set_autopilot_state("thawed")
+
+
 def _write_autopilot_file(slug: str, title: str, lines: list[str]) -> dict:
     directory = DB_PATH.parent / "autopilot"
     directory.mkdir(parents=True, exist_ok=True)
@@ -173,6 +195,26 @@ def _write_autopilot_file(slug: str, title: str, lines: list[str]) -> dict:
         "bytes": stat.st_size,
         "sha256": digest,
         "proof_event_id": event_id,
+    }
+
+
+_AUTOPILOT_STATE_KEY = "autopilot.state"
+
+
+def _set_autopilot_state(state: str) -> dict:
+    if state not in {"frozen", "thawed"}:
+        raise HTTPException(status_code=400, detail="unknown autopilot state")
+    execute(
+        "INSERT OR REPLACE INTO agent_config (key, value, updated_at) VALUES (?, ?, datetime('now'))",
+        (_AUTOPILOT_STATE_KEY, state),
+    )
+    proof_event_id = new_id()
+    return {
+        "accepted": True,
+        "status": state,
+        "mode": state,
+        "message": f"Autopilot {state}. No printer hardware action was taken.",
+        "proof_event_id": proof_event_id,
     }
 
 

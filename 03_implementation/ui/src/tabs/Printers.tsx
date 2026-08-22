@@ -6,7 +6,7 @@ import type { GcodeUploadResult, PrinterLock, TestResult } from "../types/printe
 import { usePrinters } from "../hooks/usePrinters";
 
 const PRINTER_ORDER = ["t1-1", "t1-2", "s1", "v400"];
-const S1_POLICY_STATUS_OPTIONS: Printer["status"][] = ["online", "active", "offline", "maintenance", "error"];
+const S1_POLICY_STATUS_OPTIONS: Printer["status"][] = ["online", "active", "offline", "disabled", "maintenance", "error"];
 const OPERATOR_IPS: Record<string, string> = {
   "t1-1": "192.168.0.10",
   "t1-2": "192.168.0.11",
@@ -456,10 +456,14 @@ export function PrintersTab() {
   const [locks, setLocks] = useState<Record<string, PrinterLock>>({});
   const [testResults, setTestResults] = useState<Record<string, TestResult | null>>({});
   const [gcodePaths, setGcodePaths] = useState<Record<string, string>>({});
+  const [gcodeFiles, setGcodeFiles] = useState<Record<string, File | null>>({});
   const [jobIds, setJobIds] = useState<Record<string, string>>({});
   const [uploadResults, setUploadResults] = useState<Record<string, GcodeUploadResult | null>>({});
   const [uploadBusy, setUploadBusy] = useState<Record<string, boolean>>({});
   const [statusMessages, setStatusMessages] = useState<Record<string, string | null>>({});
+  const [urlDrafts, setUrlDrafts] = useState<Record<string, string>>({});
+  const [cameraDrafts, setCameraDrafts] = useState<Record<string, string>>({});
+  const [configBusy, setConfigBusy] = useState<Record<string, boolean>>({});
   const [showWizard, setShowWizard] = useState(false);
 
   const orderedPrinters = useMemo(
@@ -479,6 +483,24 @@ export function PrintersTab() {
     if (!printersQuery.data) return;
     const normalized = printersQuery.data.map(normalizeOperatorPrinter);
     setPrinters(normalized);
+    setUrlDrafts((current) => {
+      const next = { ...current };
+      for (const printer of normalized) {
+        if (!(printer.id in next)) {
+          next[printer.id] = printer.moonraker_url ?? (printer.ip ? `http://${printer.ip}` : "");
+        }
+      }
+      return next;
+    });
+    setCameraDrafts((current) => {
+      const next = { ...current };
+      for (const printer of normalized) {
+        if (!(printer.id in next)) {
+          next[printer.id] = printer.camera_url ?? "";
+        }
+      }
+      return next;
+    });
     // Side-effects that previously lived in refresh(): fetch S1 lock state
     // and emit refresh proof events. Run as fire-and-forget; failures here
     // do NOT clear the printer list.
@@ -521,7 +543,8 @@ export function PrintersTab() {
       return;
     }
     const path = (gcodePaths[printer.id] ?? "").trim();
-    if (path === "") {
+    const selectedFile = gcodeFiles[printer.id] ?? null;
+    if (selectedFile == null && path === "") {
       setUploadResults((current) => ({
         ...current,
         [printer.id]: {
@@ -551,12 +574,16 @@ export function PrintersTab() {
       return;
     }
     setUploadBusy((current) => ({ ...current, [printer.id]: true }));
-    const result = await adapters.uploadGcode(printer.id, path, start, "hermes3d", "local-operator", start ? jobId : undefined);
+    const result = selectedFile
+      ? await adapters.uploadGcodeFile(printer.id, selectedFile, start, "hermes3d", "local-operator", start ? jobId : undefined)
+      : await adapters.uploadGcode(printer.id, path, start, "hermes3d", "local-operator", start ? jobId : undefined);
     setUploadResults((current) => ({ ...current, [printer.id]: result }));
     setUploadBusy((current) => ({ ...current, [printer.id]: false }));
     await adapters.emitProofEvent("printers.gcode_upload.requested", {
       printer_id: printer.id,
       start,
+      source: selectedFile ? "browser_file" : "path",
+      filename: selectedFile?.name ?? null,
       accepted: result.accepted,
       uploaded: result.uploaded,
       started: result.started,
@@ -578,6 +605,35 @@ export function PrintersTab() {
       });
     } catch (error) {
       setStatusMessages((current) => ({ ...current, [printer.id]: `Blocked: ${errorMessage(error)}` }));
+    }
+  };
+
+  const savePrinterConfig = async (printer: Printer, kind: "moonraker" | "camera") => {
+    const value = (kind === "moonraker" ? urlDrafts[printer.id] : cameraDrafts[printer.id]) ?? "";
+    setConfigBusy((current) => ({ ...current, [`${printer.id}:${kind}`]: true }));
+    try {
+      if (kind === "moonraker") {
+        await adapters.saveSettings({ printerUrls: { [printer.id]: value.trim() } });
+      } else {
+        await adapters.saveSettings({ cameraUrls: { [printer.id]: value.trim() } });
+      }
+      setStatusMessages((current) => ({
+        ...current,
+        [printer.id]: `${kind === "moonraker" ? "Printer console address" : "Camera URL"} saved.`,
+      }));
+      await adapters.emitProofEvent("printers.config.saved", {
+        printer_id: printer.id,
+        field: kind,
+        configured: value.trim().length > 0,
+      });
+      await printersQuery.refetch();
+    } catch (error) {
+      setStatusMessages((current) => ({
+        ...current,
+        [printer.id]: `Blocked: ${errorMessage(error)}`,
+      }));
+    } finally {
+      setConfigBusy((current) => ({ ...current, [`${printer.id}:${kind}`]: false }));
     }
   };
 
@@ -637,15 +693,16 @@ export function PrintersTab() {
           const result = testResults[printer.id];
           const uploadResult = uploadResults[printer.id];
           const uploadPath = gcodePaths[printer.id] ?? "";
+          const selectedFile = gcodeFiles[printer.id] ?? null;
           const jobId = jobIds[printer.id] ?? "";
           const uploadDisabledReason = locked
             ? "S1 is safety locked; upload, print start, test, and movement are blocked by backend policy."
             : printer.write_enabled === false
               ? "This onboarded printer is read-only until guarded writes are enabled after idle/bounds/profile gates."
-            : printer.status === "offline" || printer.status === "maintenance"
+            : printer.status === "offline" || printer.status === "disabled" || printer.status === "maintenance"
               ? "Printer must be online before uploading G-code."
-              : uploadPath.trim() === ""
-                ? "Enter a local .gcode path that the backend can read."
+              : selectedFile == null && uploadPath.trim() === ""
+                ? "Choose a .gcode file or enter a local .gcode path that the backend can read."
                 : null;
           const startDisabledReason = uploadDisabledReason ?? (
             jobId.trim() === ""
@@ -654,7 +711,7 @@ export function PrintersTab() {
           );
           const testDisabledReason = locked
             ? "S1 is safety locked; test, movement, upload, and print start are blocked by backend policy."
-            : printer.status === "offline" || printer.status === "maintenance"
+            : printer.status === "offline" || printer.status === "disabled" || printer.status === "maintenance"
               ? "Printer must be online before running a Moonraker test."
               : null;
           const safety = printerSafetyState(printer);
@@ -706,7 +763,50 @@ export function PrintersTab() {
                   <div>Onboarding: <span className="text-fg">{printer.safety_policy ?? "read_only"}</span></div>
                 )}
                 <div>Health probe: <span className="text-fg">{result ? `${result.ok ? "ready" : "failed"} (${result.latency_ms ?? 0} ms)` : "not run"}</span></div>
-                <div>Moonraker: <span className="font-mono text-fg">http://{printer.ip}</span></div>
+                <label className="grid gap-1">
+                  <span>Moonraker / Mainsail / Fluidd address</span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={urlDrafts[printer.id] ?? printer.moonraker_url ?? (printer.ip ? `http://${printer.ip}` : "")}
+                      onChange={(event) => {
+                        const { value } = event.currentTarget;
+                        setUrlDrafts((current) => ({ ...current, [printer.id]: value }));
+                      }}
+                      className="min-w-0 flex-1 rounded border border-border bg-bg px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent-cyan"
+                    />
+                    <button
+                      type="button"
+                      disabled={configBusy[`${printer.id}:moonraker`] === true}
+                      onClick={() => void savePrinterConfig(printer, "moonraker")}
+                      className="rounded border border-border px-2 py-1 text-xs text-fg hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {configBusy[`${printer.id}:moonraker`] ? "Saving" : "Save"}
+                    </button>
+                  </span>
+                </label>
+                <label className="grid gap-1">
+                  <span>Camera URL</span>
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={cameraDrafts[printer.id] ?? printer.camera_url ?? ""}
+                      onChange={(event) => {
+                        const { value } = event.currentTarget;
+                        setCameraDrafts((current) => ({ ...current, [printer.id]: value }));
+                      }}
+                      className="min-w-0 flex-1 rounded border border-border bg-bg px-2 py-1 font-mono text-xs text-fg outline-none focus:border-accent-cyan"
+                    />
+                    <button
+                      type="button"
+                      disabled={configBusy[`${printer.id}:camera`] === true}
+                      onClick={() => void savePrinterConfig(printer, "camera")}
+                      className="rounded border border-border px-2 py-1 text-xs text-fg hover:bg-surface2 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {configBusy[`${printer.id}:camera`] ? "Saving" : "Save"}
+                    </button>
+                  </span>
+                </label>
                 {printer.source_refs.official_wiki_url && (
                   <div>
                     Source:{" "}
@@ -742,13 +842,37 @@ export function PrintersTab() {
               </div>
               <div className="mt-4 rounded border border-border bg-bg/60 p-3">
                 <label className="grid gap-1 text-xs text-muted">
-                  <span>Local G-code path for backend upload</span>
+                  <span>Browse G-code file for upload</span>
+                  <input
+                    type="file"
+                    accept=".gcode,.g"
+                    disabled={locked}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0] ?? null;
+                      setGcodeFiles((current) => ({ ...current, [printer.id]: file }));
+                      if (file) {
+                        setGcodePaths((current) => ({ ...current, [printer.id]: "" }));
+                      }
+                    }}
+                    className="rounded border border-border bg-bg px-2 py-1 text-xs text-fg file:mr-3 file:rounded file:border-0 file:bg-accent-cyan file:px-2 file:py-1 file:text-xs file:font-semibold file:text-bg disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </label>
+                {selectedFile && (
+                  <div className="mt-2 rounded border border-accent-cyan/40 bg-cyan-950/20 px-2 py-1 text-xs text-accent-cyan">
+                    Selected {selectedFile.name} · {formatBytes(selectedFile.size)}
+                  </div>
+                )}
+                <label className="mt-2 grid gap-1 text-xs text-muted">
+                  <span>Advanced: paste backend-readable G-code path</span>
                   <input
                     type="text"
                     value={uploadPath}
                     onChange={(event) => {
                       const { value } = event.currentTarget;
                       setGcodePaths((current) => ({ ...current, [printer.id]: value }));
+                      if (value.trim() !== "") {
+                        setGcodeFiles((current) => ({ ...current, [printer.id]: null }));
+                      }
                     }}
                     placeholder="G:\\Github\\...\\part.gcode"
                     disabled={locked}
@@ -807,6 +931,16 @@ export function PrintersTab() {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Backend rejected the printer status update.";
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+  return `${bytes} B`;
 }
 
 function canonicalPrinterId(printer: Printer): string {
@@ -895,15 +1029,14 @@ function normalizeOperatorPrinter(printer: Printer): Printer {
   if (printerId === "s1") {
     return {
       ...printer,
-      id: "s1",
       name: "FLSUN S1",
-      ip: OPERATOR_IPS.s1,
+      ip: printer.ip ?? OPERATOR_IPS.s1,
       model: "FLSUN S1",
       maintenance_flag: true,
     };
   }
   return {
     ...printer,
-    ip: OPERATOR_IPS[printerId] ?? printer.ip,
+    ip: printer.ip ?? OPERATOR_IPS[printerId] ?? null,
   };
 }

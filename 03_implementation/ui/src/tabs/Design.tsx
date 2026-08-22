@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { adapters } from "../api/adapters";
+import type { Artifact } from "../types/artifact";
 import type { Printer } from "../types/printer";
 import type { ToolchainEvidence, ToolchainStage, ToolchainStatus } from "../types/toolchain";
 import {
@@ -133,7 +134,7 @@ export function DesignTab() {
   const [lastIntakeBackend, setLastIntakeBackend] = useState<IntakeBackendInfo | null>(null);
   const [backendProbe, setBackendProbe] = useState<BackendProbeResponse | null>(null);
   const unlockedPrinters = useMemo(
-    () => printers.filter((printer) => !printer.maintenance_flag && printer.status !== "maintenance"),
+    () => printers.filter((printer) => !printer.maintenance_flag && !["disabled", "maintenance", "offline", "error"].includes(printer.status)),
     [printers],
   );
   const toolchainReady = toolchain.overall === "ready" && toolchain.execution_ready !== false;
@@ -150,10 +151,28 @@ export function DesignTab() {
         return;
       }
       setPrinters(next);
-      setTargetPrinterId(next.find((printer) => !printer.maintenance_flag && printer.status !== "maintenance")?.id ?? "");
+      setTargetPrinterId(next.find((printer) => !printer.maintenance_flag && !["disabled", "maintenance", "offline", "error"].includes(printer.status))?.id ?? "");
     });
     return () => {
       mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = () => {
+      void adapters.getArtifacts().then((artifacts) => {
+        if (!mounted) {
+          return;
+        }
+        setProducedStls((current) => mergeProducedStls(current, artifactsToProducedStls(artifacts)));
+      });
+    };
+    load();
+    const timer = window.setInterval(load, 15_000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
     };
   }, []);
 
@@ -543,12 +562,12 @@ export function DesignTab() {
               Produced STLs
             </div>
             <p className="text-xs text-muted">
-              STLs returned by recent design-intake calls in this session.
+              STLs returned by design-intake calls and the live artifacts API.
             </p>
             <div className="mt-3 grid gap-2" data-testid="design-slicer-stl-list">
               {producedStls.length === 0 && (
                 <div className="rounded border border-border bg-bg/30 p-3 text-xs text-muted">
-                  No STLs yet. Submit a Design Intake first and a "Slice this STL" button will appear here.
+                  No STL artifacts returned yet. Submit a Design Intake and the live artifact will appear here.
                 </div>
               )}
               {producedStls.map((stl) => (
@@ -708,6 +727,35 @@ function extractStlArtifact(payload: unknown): ProducedStl | null {
     sha256: typeof artifact.sha256 === "string" ? artifact.sha256 : null,
     job_id: typeof payload.job_id === "string" ? payload.job_id : null,
   };
+}
+
+function mergeProducedStls(current: ProducedStl[], incoming: ProducedStl[]): ProducedStl[] {
+  const seen = new Set<string>();
+  const merged: ProducedStl[] = [];
+  for (const stl of [...current, ...incoming]) {
+    if (!stl.file_path || seen.has(stl.file_path)) {
+      continue;
+    }
+    seen.add(stl.file_path);
+    merged.push(stl);
+  }
+  return merged.slice(0, 12);
+}
+
+function artifactsToProducedStls(artifacts: Artifact[]): ProducedStl[] {
+  return artifacts
+    .filter((artifact) => {
+      const path = `${artifact.path} ${artifact.name}`.toLowerCase();
+      return artifact.type === "mesh" || /\.stl\b/.test(path);
+    })
+    .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
+    .map((artifact) => ({
+      file_path: artifact.path,
+      label: artifact.label ?? artifact.name,
+      file_size: artifact.sizeBytes,
+      sha256: null,
+      job_id: String(artifact.jobId),
+    }));
 }
 
 // ---------------------------------------------------------------------------

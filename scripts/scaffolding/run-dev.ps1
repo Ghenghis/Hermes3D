@@ -89,7 +89,7 @@ try {
     if ($api) {
         Write-Host '[run-dev] starting REST API on :8765 ...' -ForegroundColor Cyan
         $apiProc = Start-Process -FilePath $py `
-            -ArgumentList '-m', 'uvicorn', 'hermes3d.api.server:app',
+            -ArgumentList '-m', 'uvicorn', 'hermes3d.api.app:app',
                           '--host', '127.0.0.1', '--port', '8765',
                           '--log-level', 'info' `
             -RedirectStandardOutput 'logs/api.log' `

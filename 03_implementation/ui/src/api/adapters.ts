@@ -93,6 +93,7 @@ import {
   updateHermesAgentStagedLive,
   pushCodeBranchLive,
   openCodePullRequestLive,
+  uploadGcodeFileLive,
   uploadGcodeLive,
 } from "./adapters.live";
 import type { Agent } from "../types/agent";
@@ -223,6 +224,7 @@ export interface AdapterAPI {
   probePrinter(ip: string): Promise<PrinterProbeResult>;
   validateCameraUrl(cameraUrl: string): Promise<CameraValidateResult>;
   uploadGcode(id: string, gcodePath: string, start: boolean, remoteSubdir?: string, actor?: string, jobId?: string): Promise<GcodeUploadResult>;
+  uploadGcodeFile(id: string, file: File, start: boolean, remoteSubdir?: string, actor?: string, jobId?: string): Promise<GcodeUploadResult>;
   updatePrinterStatus(id: string, status: Printer["status"], actor?: string): Promise<void>;
   getVoiceAgents(): Promise<VoiceAgent[]>;
   getVoiceCatalog(locale?: string): Promise<VoiceCatalog>;
@@ -321,6 +323,7 @@ export const adapters: AdapterAPI = {
   probePrinter: probePrinterLive,
   validateCameraUrl: validateCameraUrlLive,
   uploadGcode: uploadGcodeLive,
+  uploadGcodeFile: uploadGcodeFileLive,
   updatePrinterStatus: updatePrinterStatusLive,
   getVoiceAgents: getVoiceAgentsLive,
   getVoiceCatalog: getVoiceCatalogLive,

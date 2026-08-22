@@ -26,74 +26,80 @@ vi.mock("../../src/components/charts/Sparkline", () => ({
 }));
 
 import { DashboardCustom } from "../../src/components/dashboard/DashboardCustom";
-import {
-  DEFAULT_CUSTOM_LAYOUT,
-  LS_CUSTOM_LAYOUT_KEY,
-} from "../../src/components/dashboard/dashboardModeStore";
 
-beforeEach(() => {
+const WORKBENCH_LAYOUT_KEY = "h3d.operatorWorkbench.layout.custom";
+const WORKBENCH_SAVED_LAYOUTS_KEY = "h3d.operatorWorkbench.savedLayouts.custom";
+const WORKBENCH_ACTION_TAB_KEY = "h3d.operatorWorkbench.actionTab.custom";
+const DEFAULT_CUSTOM_WORKBENCH = ["action", "modeler", "slicerApps", "slicer", "cameras", "printerConsole", "agents"];
+
+function clearCustomWorkbenchStorage() {
   window.localStorage.removeItem("h3d.dashboard.mode");
   window.localStorage.removeItem("h3d.dashboard.custom.layout");
+  window.localStorage.removeItem(WORKBENCH_LAYOUT_KEY);
+  window.localStorage.removeItem(WORKBENCH_SAVED_LAYOUTS_KEY);
+  window.localStorage.removeItem(WORKBENCH_ACTION_TAB_KEY);
+}
+
+beforeEach(() => {
+  clearCustomWorkbenchStorage();
 });
 
 afterEach(() => {
-  window.localStorage.removeItem("h3d.dashboard.mode");
-  window.localStorage.removeItem("h3d.dashboard.custom.layout");
+  clearCustomWorkbenchStorage();
   vi.clearAllMocks();
 });
 
 describe("DashboardCustom", () => {
-  it("renders the default layout when no localStorage layout is present", async () => {
+  it("renders the custom workbench layout when no localStorage layout is present", async () => {
     render(<DashboardCustom />);
     await screen.findByTestId("dashboard-root");
-    for (const widgetId of DEFAULT_CUSTOM_LAYOUT) {
-      expect(screen.getByTestId(`dashboard-custom-widget-${widgetId}`)).toBeTruthy();
+    expect(screen.getByText("Custom Workbench")).toBeTruthy();
+    for (const widgetId of DEFAULT_CUSTOM_WORKBENCH) {
+      expect(screen.getByTestId(`operator-widget-${widgetId}`)).toBeTruthy();
     }
   });
 
-  it("opens the palette when Edit Layout is clicked", async () => {
+  it("opens the card editor when Cards is clicked", async () => {
     render(<DashboardCustom />);
     await screen.findByTestId("dashboard-root");
-    expect(screen.queryByTestId("dashboard-custom-palette")).toBeNull();
-    fireEvent.click(screen.getByTestId("dashboard-custom-edit-btn"));
-    expect(screen.getByTestId("dashboard-custom-palette")).toBeTruthy();
+    expect(screen.queryByTestId("operator-workbench-layout-editor")).toBeNull();
+    fireEvent.click(screen.getByTestId("operator-workbench-cards-btn"));
+    expect(screen.getByTestId("operator-workbench-layout-editor")).toBeTruthy();
   });
 
-  it("removing a widget persists the new layout to localStorage", async () => {
+  it("removing a card persists the new workbench layout to localStorage", async () => {
     render(<DashboardCustom />);
     await screen.findByTestId("dashboard-root");
-    fireEvent.click(screen.getByTestId("dashboard-custom-remove-jobs"));
+    fireEvent.click(screen.getByTestId("operator-widget-remove-slicer"));
     await waitFor(() => {
-      expect(screen.queryByTestId("dashboard-custom-widget-jobs")).toBeNull();
+      expect(screen.queryByTestId("operator-widget-slicer")).toBeNull();
     });
-    const persisted = window.localStorage.getItem(LS_CUSTOM_LAYOUT_KEY);
+    const persisted = window.localStorage.getItem(WORKBENCH_LAYOUT_KEY);
     expect(persisted).toBeTruthy();
     const parsed = JSON.parse(persisted as string);
-    expect(parsed).not.toContain("jobs");
+    expect(parsed.order).not.toContain("slicer");
   });
 
-  it("adding a widget from the palette appends it to the grid", async () => {
+  it("adding a card from the editor appends it to the workbench", async () => {
     render(<DashboardCustom />);
     await screen.findByTestId("dashboard-root");
-    fireEvent.click(screen.getByTestId("dashboard-custom-edit-btn"));
-    // "logs" is not in the default layout so it should appear in the palette.
-    const addBtn = await screen.findByTestId("dashboard-custom-add-logs");
+    fireEvent.click(screen.getByTestId("operator-workbench-cards-btn"));
+    const addBtn = await screen.findByTestId("operator-card-add-jobs");
     fireEvent.click(addBtn);
     await waitFor(() => {
-      expect(screen.getByTestId("dashboard-custom-widget-logs")).toBeTruthy();
+      expect(screen.getByTestId("operator-widget-jobs")).toBeTruthy();
     });
   });
 
-  it("Reset returns the layout to the default order", async () => {
+  it("Reset returns the workbench to the default custom order", async () => {
     render(<DashboardCustom />);
     await screen.findByTestId("dashboard-root");
-    // First remove a widget, then reset.
-    fireEvent.click(screen.getByTestId("dashboard-custom-remove-fleet"));
-    await waitFor(() => expect(screen.queryByTestId("dashboard-custom-widget-fleet")).toBeNull());
-    fireEvent.click(screen.getByTestId("dashboard-custom-reset-btn"));
+    fireEvent.click(screen.getByTestId("operator-widget-remove-slicer"));
+    await waitFor(() => expect(screen.queryByTestId("operator-widget-slicer")).toBeNull());
+    fireEvent.click(screen.getByTestId("operator-workbench-reset-btn"));
     await waitFor(() => {
-      for (const widgetId of DEFAULT_CUSTOM_LAYOUT) {
-        expect(screen.getByTestId(`dashboard-custom-widget-${widgetId}`)).toBeTruthy();
+      for (const widgetId of DEFAULT_CUSTOM_WORKBENCH) {
+        expect(screen.getByTestId(`operator-widget-${widgetId}`)).toBeTruthy();
       }
     });
   });

@@ -12,5 +12,6 @@ export interface AppSettings {
   ports: RuntimePorts;
   printerUrls: Record<string, string>;
   cameraUrls: Record<string, string>;
+  printerStatuses: Record<string, string>;
   serviceUrls: Record<string, string>;
 }

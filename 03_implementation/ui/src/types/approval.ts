@@ -1,4 +1,4 @@
-export type ApprovalType = "MODEL_APPROVAL" | "PRINT_APPROVAL" | "REPAIR_APPROVAL";
+export type ApprovalType = "MODEL_APPROVAL" | "PRINT_APPROVAL" | "REPAIR_APPROVAL" | "IDLE_CANDIDATE_REVIEW";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | "deferred";
 export type ApprovalDecision = "approved" | "rejected" | "deferred";
 

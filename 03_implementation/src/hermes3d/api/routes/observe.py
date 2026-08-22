@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
@@ -57,7 +58,7 @@ def observe_status() -> dict:
     This endpoint is read-only: it only probes MJPEG endpoints, never sends
     control commands. S1 (192.168.0.12) is probed for connectivity only.
     """
-    printers = local_printers(live=False)
+    printers = [printer for printer in local_printers(live=False) if _camera_dashboard_enabled(printer)]
     statuses: list[dict] = []
     for printer in printers:
         camera_url = printer.get("camera_url")
@@ -91,7 +92,7 @@ def observe_status() -> dict:
 
 @router.get("/api/observe/cameras")
 def cameras() -> list[dict]:
-    printers = local_printers(live=False)
+    printers = [printer for printer in local_printers(live=False) if _camera_dashboard_enabled(printer)]
     plates = {plate["printer_id"]: plate for plate in build_plate_clearance_rows(printers)}
     result = []
     for printer in printers:
@@ -156,7 +157,7 @@ def stream(printer_id: str) -> RedirectResponse:
     camera_url = printer.get("camera_url")
     if not camera_url:
         raise HTTPException(status_code=404, detail=_camera_note(printer))
-    return RedirectResponse(str(camera_url), status_code=307)
+    return RedirectResponse(_stream_url(str(camera_url)), status_code=307)
 
 
 @router.get("/api/observe/cameras/{printer_id}/snapshot")
@@ -275,6 +276,20 @@ def _configured_camera_state(printer: dict) -> str:
     return "configured" if printer.get("camera_url") else "not_configured"
 
 
+def _camera_dashboard_enabled(printer: dict) -> bool:
+    """Respect operator-disabled fleet rows for camera dashboards.
+
+    Disabled/offline/maintenance rows still exist in /api/printers for Settings
+    and audit history, but Observe/Dashboard should not keep streaming stale
+    camera cards for printers the operator has intentionally turned off.
+    """
+    return str(printer.get("status") or "").lower() not in {
+        "disabled",
+        "offline",
+        "maintenance",
+    }
+
+
 def _camera_is_locked(printer: dict) -> bool:
     return is_s1_target(printer["id"]) and not printer.get("camera_url")
 
@@ -302,10 +317,38 @@ def _camera_note(printer: dict) -> str:
 
 
 def _snapshot_url(camera_url: str) -> str:
-    if "action=stream" in camera_url:
-        return camera_url.replace("action=stream", "action=snapshot")
-    separator = "&" if "?" in camera_url else "?"
-    return f"{camera_url}{separator}action=snapshot"
+    return _camera_action_url(camera_url, "snapshot")
+
+
+def _stream_url(camera_url: str) -> str:
+    return _camera_action_url(camera_url, "stream")
+
+
+def _camera_action_url(camera_url: str, action: str) -> str:
+    """Return the lightweight mjpg_streamer endpoint for camera display.
+
+    FLSUN T1 exposes `/cam` as a full Vue/Mainsail-style camera page. Embedding
+    multiple `/cam` pages in Hermes causes large iframes and stream contention.
+    The actual camera server is available at `/webcam/?action=stream|snapshot`,
+    so the Observe and dashboard cards should route through that lighter image
+    endpoint while the operator can still open `/cam` in a full tab.
+    """
+    parsed = urlparse(camera_url)
+    path = parsed.path.rstrip("/").lower()
+    if path == "/cam":
+        return urlunparse((parsed.scheme, parsed.netloc, "/webcam/", "", f"action={action}", ""))
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query["action"] = action
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path or "/webcam/",
+            parsed.params,
+            urlencode(query),
+            parsed.fragment,
+        )
+    )
 
 
 def _probe_camera(camera_url: str | None) -> tuple[str, int | None]:
@@ -323,7 +366,7 @@ def _probe_camera_timed(camera_url: str | None) -> tuple[str, int | None, int | 
         return "not_configured", None, None
     t0 = time.monotonic()
     try:
-        request = urllib.request.Request(camera_url, headers={"Accept": "image/*,*/*"})
+        request = urllib.request.Request(_stream_url(camera_url), headers={"Accept": "image/*,*/*"})
         with urllib.request.urlopen(request, timeout=1.5) as response:
             status = int(response.status)
             elapsed_ms = int((time.monotonic() - t0) * 1000)

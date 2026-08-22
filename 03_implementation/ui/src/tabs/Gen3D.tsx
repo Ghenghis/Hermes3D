@@ -16,6 +16,7 @@ import { WorkflowPipeline, type PipelineStage } from "../components/pipeline/Wor
 import { adapters } from "../api/adapters";
 import type { TaskDAG } from "../types/dag";
 import type { ProviderHealth } from "../types/provider";
+import type { Artifact } from "../types/artifact";
 import { GitBranch, Image as ImageIcon, Layers, AlertTriangle } from "lucide-react";
 import { useCallback, useState } from "react";
 import { PANEL_POLL_MS, usePollingEffect } from "../hooks/_useQuery";
@@ -85,10 +86,12 @@ export function Gen3DTab() {
   const [selectedTemplate, setSelectedTemplate] = useState<string>("calibration_cube");
   const [generateMessage, setGenerateMessage] = useState<string | null>(null);
   const [generatedModels, setGeneratedModels] = useState<GeneratedModelResult[]>([]);
+  const [artifactModels, setArtifactModels] = useState<GeneratedModelResult[]>([]);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
   const [referenceArtifactId, setReferenceArtifactId] = useState<string | null>(null);
   const [referenceMessage, setReferenceMessage] = useState<string | null>(null);
   const plannerMode = previewDag?.metadata?.planner_mode;
+  const displayedModels = mergeGeneratedModels(generatedModels, artifactModels);
 
   // W21-MVP-5: poll provider health + Gen3D providers + Gen3D templates
   // on PANEL_POLL_MS. When the operator installs rembg / TripoSR /
@@ -131,6 +134,12 @@ export function Gen3DTab() {
         })
         .catch(() => {
           /* backend not yet running — silently ignore */
+        }),
+      adapters
+        .getArtifacts()
+        .then((artifacts) => setArtifactModels(artifactsToGeneratedModels(artifacts)))
+        .catch(() => {
+          /* artifacts are best-effort reload history */
         }),
     ]);
   }, []);
@@ -466,8 +475,27 @@ export function Gen3DTab() {
                 </div>
               </>
             ) : (
-              <div className="h-full flex items-center justify-center text-muted text-xs">
-                No plan preview loaded
+              <div className="grid h-full min-h-[120px] grid-cols-1 gap-2 text-xs md:grid-cols-3">
+                <div className="rounded border border-border bg-bg/40 p-3">
+                  <div className="font-semibold text-fg">Plan preview not requested</div>
+                  <p className="mt-1 text-muted">
+                    Use Preview plan to build a live DAG from the current prompt. No staged work is being claimed as ready yet.
+                  </p>
+                </div>
+                <div className="rounded border border-border bg-bg/40 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted">Current input</div>
+                  <div className="mt-1 truncate font-mono text-fg">{prompt || "(empty prompt)"}</div>
+                  <div className="mt-1 text-muted">Size target: {sizeMm} mm</div>
+                </div>
+                <div className="rounded border border-border bg-bg/40 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-muted">Selected template</div>
+                  <div className="mt-1 truncate font-semibold text-fg">
+                    {gen3dTemplates.find((template) => template.id === selectedTemplate)?.name ?? selectedTemplate}
+                  </div>
+                  <div className="mt-1 text-muted">
+                    Reference image: {referenceArtifactId ? "attached" : referenceFile ? "selected, not attached" : "not attached"}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -570,12 +598,12 @@ export function Gen3DTab() {
           id="gen3d.results"
           title="GENERATED MODELS"
           dense
-          status={{ tone: generatedModels.length > 0 ? "cyan" : "muted", label: `${generatedModels.length} models` }}
+          status={{ tone: displayedModels.length > 0 ? "cyan" : "muted", label: `${displayedModels.length} models` }}
           className="h-full min-h-0"
         >
-          {generatedModels.length > 0 ? (
+          {displayedModels.length > 0 ? (
             <div className="grid h-full min-h-0 gap-2 overflow-auto md:grid-cols-2 xl:grid-cols-3">
-              {generatedModels.map((model) => (
+              {displayedModels.map((model) => (
                 <article key={`${model.jobId}-${model.artifactLabel}`} className="grid min-h-[150px] grid-rows-[auto_1fr_auto] gap-2 rounded border border-border bg-surface2/30 p-3 text-xs">
                   <div className="flex min-w-0 items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -596,7 +624,7 @@ export function Gen3DTab() {
               ))}
             </div>
           ) : (
-            <EmptyState title="No generated models" detail="No generated model artifacts were returned by the backend." />
+            <EmptyState title="No generated models" detail="No mesh, STL, 3MF, GLB, or OBJ artifacts were returned by the backend." />
           )}
         </Panel>
       </div>
@@ -620,6 +648,48 @@ function generationSummary(payload: unknown, fallback: string): string {
     return `${payload.artifact.label}${packageLabel}${proofId}`;
   }
   return String(payload.reason ?? payload.message ?? payload.status ?? payload.id ?? payload.artifact_id ?? fallback);
+}
+
+function mergeGeneratedModels(sessionModels: GeneratedModelResult[], artifactModels: GeneratedModelResult[]): GeneratedModelResult[] {
+  const seen = new Set<string>();
+  const merged: GeneratedModelResult[] = [];
+  for (const model of [...sessionModels, ...artifactModels]) {
+    const key = model.packagePath ?? model.artifactPath;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(model);
+  }
+  return merged.slice(0, 12);
+}
+
+function artifactsToGeneratedModels(artifacts: Artifact[]): GeneratedModelResult[] {
+  return artifacts
+    .filter(isGeneratedModelArtifact)
+    .sort((left, right) => Date.parse(right.createdAt || "0") - Date.parse(left.createdAt || "0"))
+    .slice(0, 12)
+    .map((artifact) => {
+      const isPackage = /\.(3mf)$/i.test(artifact.path) || /\.(3mf)$/i.test(artifact.name);
+      return {
+        jobId: String(artifact.jobId),
+        template: artifact.stage || "artifact_history",
+        artifactLabel: artifact.label ?? artifact.name,
+        artifactPath: artifact.path,
+        artifactSize: artifact.sizeBytes,
+        packageLabel: isPackage ? artifact.label ?? artifact.name : undefined,
+        packagePath: isPackage ? artifact.path : undefined,
+        packageSize: isPackage ? artifact.sizeBytes : undefined,
+        truthGate: artifact.gate ?? "artifact",
+      };
+    });
+}
+
+function isGeneratedModelArtifact(artifact: Artifact): boolean {
+  const path = `${artifact.path} ${artifact.name}`.toLowerCase();
+  return artifact.type === "mesh"
+    || artifact.type === "model_evidence"
+    || /\.(stl|3mf|glb|gltf|obj)\b/.test(path);
 }
 
 function actionAccepted(httpOk: boolean, payload: unknown): boolean {

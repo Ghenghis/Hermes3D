@@ -53,7 +53,7 @@ export function printersUrl(): string {
 // Validation predicates — must stay in sync with backend
 // `hermes3d.services.local_state.local_printers()`.
 const MODELS = new Set<Printer["model"]>(["FLSUN T1", "FLSUN S1", "FLSUN V400", "Generic"]);
-const STATUSES = new Set<PrinterStatus>(["online", "active", "printing", "paused", "maintenance", "offline", "error"]);
+const STATUSES = new Set<PrinterStatus>(["online", "active", "printing", "paused", "maintenance", "offline", "disabled", "error"]);
 const ADAPTERS = new Set<PrinterAdapter>(["moonraker", "octoprint", "printrun", "manual"]);
 const DATA_SOURCES = new Set<PrinterDataSource>(["live", "degraded", "error", "policy", "config"]);
 

@@ -92,3 +92,9 @@ tmp/
 
 ## Hermes3D-OS app installs (vendored, large) - local-only, never committed
 apps/
+
+## Per-user / scratch / proof artifacts (generated locally)
+.claude/
+phase-0-log/
+03_implementation/data/hermes3d.db
+03_implementation/docs/proof/

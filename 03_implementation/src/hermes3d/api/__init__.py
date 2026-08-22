@@ -1,5 +1,7 @@
-"""Hermes3D-OS Lite REST + MCP API surface."""
+"""Hermes3D GUI API surface."""
 
-from .server import create_app
+from .app import create_gui_app
 
-__all__ = ["create_app"]
+create_app = create_gui_app
+
+__all__ = ["create_app", "create_gui_app"]

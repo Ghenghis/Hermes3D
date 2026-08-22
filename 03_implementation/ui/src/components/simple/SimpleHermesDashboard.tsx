@@ -10,16 +10,18 @@ import {
   LucideIcon,
   MessageSquare,
   Printer,
+  RefreshCcw,
   Settings,
   ShieldCheck,
   Sparkles,
   Upload,
   Wrench,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { PRIMARY_TABS } from "../../app/routes";
 import { useStore } from "../../app/store";
 import { adapters } from "../../api/adapters";
+import { STATUS_POLL_MS, usePollingEffect } from "../../hooks/_useQuery";
 import { ResizablePane } from "../layout/ResizablePane";
 import type { Agent } from "../../types/agent";
 import type { Artifact } from "../../types/artifact";
@@ -41,6 +43,7 @@ type HermesImportMeta = ImportMeta & {
 const DEFAULT_BRIDGE_PORT = "8765";
 const LIVE_BRIDGE_PORT = (import.meta as HermesImportMeta).env.VITE_HERMES3D_BRIDGE_PORT ?? DEFAULT_BRIDGE_PORT;
 const LIVE_BASE_URL = `http://127.0.0.1:${LIVE_BRIDGE_PORT}`;
+const SIMPLE_REQUEST_TIMEOUT_MS = 4_500;
 
 type EvidenceEvent = {
   type: string;
@@ -48,6 +51,8 @@ type EvidenceEvent = {
   source?: string;
   message?: string;
 };
+
+type LiveState = "connecting" | "live" | "reconnecting" | "offline";
 
 type SimpleState = {
   printers: PrinterRow[];
@@ -101,6 +106,7 @@ const PRINTER_TONE: Record<PrinterStatus, string> = {
   paused: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   maintenance: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   offline: "bg-red-500/15 text-red-300 border-red-500/30",
+  disabled: "bg-slate-500/15 text-slate-300 border-slate-500/30",
   error: "bg-red-500/15 text-red-300 border-red-500/30",
 };
 
@@ -108,50 +114,111 @@ type SimpleHermesDashboardProps = {
   activeTabId?: string;
   activeLabel?: string;
   Content?: ComponentType;
+  onFullMode?: () => void;
 };
 
-export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel = "Dashboard", Content }: SimpleHermesDashboardProps) {
+export function SimpleHermesDashboard({
+  activeTabId = "dashboard",
+  activeLabel = "Dashboard",
+  Content,
+  onFullMode,
+}: SimpleHermesDashboardProps) {
   const setUiMode = useStore((s) => s.setUiMode);
   const setActiveTabId = useStore((s) => s.setActiveTabId);
   const [state, setState] = useState<SimpleState>(EMPTY_STATE);
   const [events, setEvents] = useState<EvidenceEvent[]>([]);
+  const [liveState, setLiveState] = useState<LiveState>("connecting");
+  const [lastRefreshUtc, setLastRefreshUtc] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshFailures, setRefreshFailures] = useState(0);
+  const mountedRef = useRef(false);
+  const lastStreamRefreshRef = useRef(0);
   const dashboardActive = activeTabId === "dashboard";
 
-  const load = async () => {
-    const [
-      printers,
-      jobs,
-      agents,
-      workflows,
-      logs,
-      notifications,
-      proof,
-      system,
-      artifacts,
-      sourceModules,
-    ] = await Promise.all([
-      adapters.getPrinters(),
-      adapters.getJobs("printing,queued,completed,failed,cancelled"),
-      adapters.getAgents(),
-      adapters.getActiveWorkflows(),
-      adapters.getLogs(),
-      adapters.getNotifications(),
-      adapters.getLatestProofBundle(),
-      adapters.getSystemSnapshot(),
-      adapters.getArtifacts(),
-      adapters.getSourceOSModules(),
-    ]);
-    setState({ printers, jobs, agents, workflows, logs, notifications, proof, system, artifacts, sourceModules });
-  };
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  const load = useCallback(async () => {
+    if (!mountedRef.current) {
+      return;
+    }
+    setRefreshing(true);
+    try {
+      const results = await Promise.all([
+        withTimeout<PrinterRow[]>(adapters.getPrinters(), []),
+        withTimeout<Job[]>(adapters.getJobs("printing,queued,completed,failed,cancelled"), []),
+        withTimeout<Agent[]>(adapters.getAgents(), []),
+        withTimeout<WorkflowRow[]>(adapters.getActiveWorkflows(), []),
+        withTimeout<LogEntry[]>(adapters.getLogs(), []),
+        withTimeout<Notification[]>(adapters.getNotifications(), []),
+        withTimeout<ProofBundle | null>(adapters.getLatestProofBundle(), null),
+        withTimeout<SystemSnapshot | null>(adapters.getSystemSnapshot(), null),
+        withTimeout<Artifact[]>(adapters.getArtifacts(), []),
+        withTimeout<SourceOSModule[]>(adapters.getSourceOSModules(), []),
+      ]);
+      if (!mountedRef.current) {
+        return;
+      }
+      const [
+        printers,
+        jobs,
+        agents,
+        workflows,
+        logs,
+        notifications,
+        proof,
+        system,
+        artifacts,
+        sourceModules,
+      ] = results;
+      setState({
+        printers: printers.value,
+        jobs: jobs.value,
+        agents: agents.value,
+        workflows: workflows.value,
+        logs: logs.value,
+        notifications: notifications.value,
+        proof: proof.value,
+        system: system.value,
+        artifacts: artifacts.value,
+        sourceModules: sourceModules.value,
+      });
+      setRefreshFailures(results.filter((result) => result.failed).length);
+      setLastRefreshUtc(new Date().toISOString());
+    } finally {
+      if (mountedRef.current) {
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  usePollingEffect(load, STATUS_POLL_MS, [load]);
 
   useEffect(() => {
-    void load();
-    const refresh = window.setInterval(() => void load(), 8000);
-    return () => window.clearInterval(refresh);
-  }, []);
+    const onRefresh = () => void load();
+    const onVisible = () => {
+      if (!document.hidden) void load();
+    };
+    window.addEventListener("focus", onRefresh);
+    window.addEventListener("hermes3d:settings-changed", onRefresh);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.removeEventListener("focus", onRefresh);
+      window.removeEventListener("hermes3d:settings-changed", onRefresh);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [load]);
 
   useEffect(() => {
     const stream = new EventSource(`${LIVE_BASE_URL}/api/events/stream`);
+    setLiveState("connecting");
+    stream.onopen = () => {
+      setLiveState("live");
+    };
     stream.onmessage = (message) => {
       try {
         const parsed = JSON.parse(message.data) as EvidenceEvent;
@@ -163,22 +230,48 @@ export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel =
           message: message.data,
         }, ...current].slice(0, 50));
       }
+      const now = Date.now();
+      if (now - lastStreamRefreshRef.current > 1000) {
+        lastStreamRefreshRef.current = now;
+        void load();
+      }
     };
-    return () => stream.close();
-  }, []);
+    stream.onerror = () => {
+      setLiveState(stream.readyState === EventSource.CLOSED ? "offline" : "reconnecting");
+    };
+    return () => {
+      stream.close();
+    };
+  }, [load]);
 
-  const onlinePrinters = state.printers.filter((printer) => printer.status !== "offline").length;
-  const activePrints = state.printers.filter((printer) => printer.status === "printing").length;
+  const visiblePrinters = state.printers.filter(isDashboardPrinter);
+  const onlinePrinters = visiblePrinters.filter((printer) => printer.status !== "offline").length;
+  const activePrints = visiblePrinters.filter((printer) => printer.status === "printing").length;
   const queuedPrints = state.jobs.filter((job) => job.status === "queued").length;
   const completed = state.jobs.filter((job) => job.status === "completed").length;
   const failed = state.jobs.filter((job) => job.status === "failed").length;
   const successRate = completed + failed > 0 ? Math.round((completed / (completed + failed)) * 1000) / 10 : null;
   const activeWorkflow = state.workflows.find((workflow) => workflow.status === "active") ?? state.workflows[0] ?? null;
   const latestPreview = state.artifacts.find((artifact) => artifact.type === "screenshot" || artifact.type === "photo") ?? null;
+  const backendOffline =
+    lastRefreshUtc !== null
+    && state.system === null
+    && state.printers.length === 0
+    && state.jobs.length === 0
+    && state.sourceModules.length === 0
+    && refreshFailures >= 3;
 
   const openSimpleTab = (tab: string) => {
     setActiveTabId(tab);
     setUiMode("simple");
+  };
+
+  const openFullMode = () => {
+    if (onFullMode) {
+      onFullMode();
+      return;
+    }
+    setUiMode("full");
   };
 
   return (
@@ -197,16 +290,23 @@ export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel =
             <div className="mt-1 text-[13px] text-blue-100/80">Design. Verify. Slice. Print. Monitor. Repeat.</div>
           </div>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <TopStatus system={state.system} />
+            <TopStatus
+              system={state.system}
+              liveState={liveState}
+              lastRefreshUtc={lastRefreshUtc}
+              refreshing={refreshing}
+              refreshFailures={refreshFailures}
+            />
             <div className="rounded-md border border-slate-700/80 bg-slate-900/70 px-5 py-3 font-mono text-[13px] text-blue-100">
               {formatClock(state.system?.ts_utc)}
             </div>
             <div className="rounded border border-cyan-500/40 bg-cyan-500/10 px-3 py-2 text-[12px] font-semibold text-cyan-200">Live API + Proof</div>
+            <IconShell title="Refresh live dashboard" onClick={() => void load()}><RefreshCcw size={21} /></IconShell>
             <IconShell title="Open dashboard notifications" onClick={() => openSimpleTab("dashboard")}><Bell size={22} /></IconShell>
             <IconShell title="Open settings" onClick={() => openSimpleTab("settings")}><Settings size={22} /></IconShell>
             <button
               type="button"
-              onClick={() => setUiMode("full")}
+              onClick={openFullMode}
               className="grid h-12 w-12 place-items-center rounded-full border border-blue-500 bg-blue-600/10 text-blue-300 shadow-[0_0_22px_rgba(59,130,246,0.25)]"
               title="Switch to full Hermes3D OS"
             >
@@ -285,8 +385,16 @@ export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel =
               data-testid="simple-dashboard-grid"
               className="simple-dashboard-grid grid min-w-0 flex-1 grid-cols-12 gap-3 xl:h-full xl:grid-rows-[90px_minmax(0,2fr)_minmax(0,1.12fr)_minmax(0,0.95fr)] xl:overflow-hidden"
             >
+              {backendOffline && (
+                <BackendOfflineBanner
+                  className="col-span-12"
+                  refreshing={refreshing}
+                  failures={refreshFailures}
+                  onRetry={() => void load()}
+                />
+              )}
               <KpiStrip
-                totalPrinters={state.printers.length}
+                totalPrinters={visiblePrinters.length}
                 onlinePrinters={onlinePrinters}
                 activePrints={activePrints}
                 queuedPrints={queuedPrints}
@@ -296,7 +404,7 @@ export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel =
 
               <SimplePanel className="col-span-12 min-h-[360px] p-4 xl:col-span-5 xl:h-full xl:min-h-0">
                 <PanelHeader title="Printer Fleet" action="View All" onAction={() => openSimpleTab("printers")} />
-                <PrinterFleet printers={state.printers} />
+                <PrinterFleet printers={visiblePrinters} hiddenCount={state.printers.length - visiblePrinters.length} />
               </SimplePanel>
 
               <SimplePanel className="col-span-12 min-h-[360px] p-4 xl:col-span-7 xl:h-full xl:min-h-0">
@@ -310,7 +418,7 @@ export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel =
               </SimplePanel>
               <SimplePanel className="col-span-12 min-h-[240px] p-4 sm:col-span-6 xl:col-span-3 xl:h-full xl:min-h-0">
                 <PanelHeader title="Agent Activity (Live)" />
-                <ActivityPanel events={events} />
+                <ActivityPanel events={events} liveState={liveState} />
               </SimplePanel>
               <SimplePanel className="col-span-12 min-h-[240px] p-4 sm:col-span-6 xl:col-span-3 xl:h-full xl:min-h-0">
                 <PanelHeader title="System Resources" />
@@ -318,7 +426,7 @@ export function SimpleHermesDashboard({ activeTabId = "dashboard", activeLabel =
               </SimplePanel>
               <SimplePanel className="col-span-12 min-h-[240px] p-4 sm:col-span-6 xl:col-span-3 xl:h-full xl:min-h-0">
                 <PanelHeader title="Recent Jobs" action="View All" onAction={() => openSimpleTab("jobs")} />
-                <RecentJobs jobs={state.jobs} printers={state.printers} />
+                <RecentJobs jobs={state.jobs} printers={visiblePrinters} />
               </SimplePanel>
 
               <SimplePanel className="col-span-12 min-h-[190px] p-4 sm:col-span-6 xl:col-span-3 xl:h-full xl:min-h-0">
@@ -421,12 +529,22 @@ function MetricCard({
   );
 }
 
-function PrinterFleet({ printers }: { printers: PrinterRow[] }) {
+function PrinterFleet({ printers, hiddenCount }: { printers: PrinterRow[]; hiddenCount: number }) {
   if (printers.length === 0) {
-    return <EmptyTruth title="No printers from API" detail="Connect Moonraker printers in Settings." />;
+    return (
+      <EmptyTruth
+        title="No enabled printers from API"
+        detail={hiddenCount > 0 ? `${hiddenCount} disabled or hidden by Settings.` : "Connect Moonraker printers in Settings."}
+      />
+    );
   }
   return (
     <div className="mt-4 min-h-0 flex-1 overflow-auto">
+      {hiddenCount > 0 && (
+        <div className="mb-2 rounded border border-slate-700/70 bg-slate-950/40 px-3 py-2 text-[11px] text-blue-100/70">
+          {hiddenCount} disabled or hidden by Settings.
+        </div>
+      )}
       <table className="w-full min-w-[720px] text-[13px]">
         <thead>
           <tr className="border-b border-slate-700/40 text-left text-[11px] uppercase tracking-[0.06em] text-blue-100/60">
@@ -534,9 +652,9 @@ function ActiveAgents({ agents }: { agents: Agent[] }) {
   );
 }
 
-function ActivityPanel({ events }: { events: EvidenceEvent[] }) {
+function ActivityPanel({ events, liveState }: { events: EvidenceEvent[]; liveState?: LiveState }) {
   if (events.length === 0) {
-    return <EmptyTruth title="No stream events" detail="Waiting for the live event stream." />;
+    return <EmptyTruth title="No stream events" detail={liveState === "offline" ? "Live event stream is offline." : "Waiting for the live event stream."} />;
   }
   return (
     <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-auto font-mono text-[12px]">
@@ -647,6 +765,30 @@ function NotificationsPanel({ notifications }: { notifications: Notification[] }
   );
 }
 
+function isDashboardPrinter(printer: PrinterRow): boolean {
+  return !printer.maintenance_flag
+    && printer.status !== "disabled"
+    && printer.status !== "maintenance";
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  fallback: T,
+  timeoutMs = SIMPLE_REQUEST_TIMEOUT_MS,
+): Promise<{ value: T; failed: boolean }> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (value: T, failed: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      resolve({ value, failed });
+    };
+    const timeout = window.setTimeout(() => finish(fallback, true), timeoutMs);
+    promise.then((value) => finish(value, false)).catch(() => finish(fallback, true));
+  });
+}
+
 function PreviewFrame({ artifact }: { artifact: Artifact | null }) {
   if (!artifact) {
     return (
@@ -682,13 +824,30 @@ function PanelHeader({ title, action, onAction }: { title: string; action?: stri
   );
 }
 
-function TopStatus({ system }: { system: SystemSnapshot | null }) {
+function TopStatus({
+  system,
+  liveState = "connecting",
+  refreshing = false,
+  refreshFailures = 0,
+}: {
+  system: SystemSnapshot | null;
+  liveState?: LiveState;
+  lastRefreshUtc?: string | null;
+  refreshing?: boolean;
+  refreshFailures?: number;
+}) {
   const online = system?.system_status === "OK";
+  const liveOk = liveState === "live" || liveState === "connecting";
+  const label = refreshing
+    ? "REFRESHING"
+    : online && liveOk && refreshFailures === 0
+      ? "ONLINE"
+      : system?.system_status ?? "UNAVAILABLE";
   return (
     <div className="flex items-center gap-3 rounded-md border border-slate-700/80 bg-slate-900/70 px-4 py-3 text-[13px]">
       <span>System Status</span>
-      <span className={["rounded-md px-2 py-1 text-[12px] font-bold", online ? "bg-green-500/20 text-green-300" : "bg-amber-500/20 text-amber-300"].join(" ")}>
-        {online ? "ONLINE" : system?.system_status ?? "UNAVAILABLE"}
+      <span className={["rounded-md px-2 py-1 text-[12px] font-bold", online && liveOk && refreshFailures === 0 ? "bg-green-500/20 text-green-300" : "bg-amber-500/20 text-amber-300"].join(" ")}>
+        {label}
       </span>
     </div>
   );
@@ -777,6 +936,41 @@ function EmptyTruth({ title, detail }: { title: string; detail: string }) {
         <div className="mt-1 max-w-[260px] text-[12px] text-blue-100/60">{detail}</div>
       </div>
     </div>
+  );
+}
+
+function BackendOfflineBanner({
+  className = "",
+  refreshing,
+  failures,
+  onRetry,
+}: {
+  className?: string;
+  refreshing: boolean;
+  failures: number;
+  onRetry: () => void;
+}) {
+  return (
+    <section
+      data-testid="backend-offline-banner"
+      className={`rounded-card border border-amber-700/70 bg-amber-950/35 px-4 py-3 text-sm text-amber-100 ${className}`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="font-semibold text-amber-100">Local Hermes3D API is not responding</div>
+          <div className="mt-1 text-xs text-amber-100/75">
+            Cards are waiting on <span className="font-mono">{LIVE_BASE_URL}</span>. No data is being faked; this page will keep retrying.
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="rounded border border-amber-500/60 px-3 py-1 text-xs font-semibold text-amber-100 hover:bg-amber-900/40"
+        >
+          {refreshing ? "Retrying" : `Retry (${failures})`}
+        </button>
+      </div>
+    </section>
   );
 }
 

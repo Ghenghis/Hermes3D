@@ -455,7 +455,6 @@ function CameraCard({
   const needsClearance = camera.plate_clearance?.state === "needs_clearance";
   const cardSizeClass = undocked ? "h-full" : cardSizeClassName(settings.card_size);
   const cardMinClass = undocked ? "min-h-0" : cardMinHeightClass(settings.card_size);
-  const resizeStyle: CSSProperties = undocked ? {} : { resize: "both" };
 
   // V400 fps indicator — show estimated fps from status probe
   const estimatedFps = cameraStatus?.estimated_fps ?? null;
@@ -463,8 +462,8 @@ function CameraCard({
 
   return (
     <section
-      className={`grid ${cardMinClass} min-w-[16rem] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-card border border-border bg-bg/45 ${cardSizeClass}`}
-      style={resizeStyle}
+      data-testid={`observe-camera-card-${camera.printer_id}`}
+      className={`grid ${cardMinClass} min-w-0 max-w-full grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-card border border-border bg-bg/45 ${cardSizeClass}`}
     >
       <header className="flex items-start justify-between gap-2 border-b border-border p-2">
         <div className="min-w-0">

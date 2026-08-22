@@ -84,6 +84,9 @@ function readArray(record: Record<string, unknown>, key: string): unknown[] {
 }
 
 function readProofStatus(value: unknown): ProofStatus {
+  if (value === "not_set") {
+    return "unknown";
+  }
   if (typeof value === "string" && KNOWN_PROOF_STATUSES.has(value as ProofStatus)) {
     return value as ProofStatus;
   }
@@ -130,7 +133,9 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
       url: readString(obj, "url"),
     };
   } else if (typeof licenseRaw === "string" && licenseRaw.length > 0) {
-    license = { spdx: licenseRaw };
+    license = { spdx: readString(record, "license_spdx") ?? licenseRaw, label: licenseRaw };
+  } else if (readString(record, "license_spdx")) {
+    license = { spdx: readString(record, "license_spdx") ?? "Unknown" };
   } else {
     license = { spdx: "Unknown" };
   }
@@ -144,14 +149,25 @@ export function toRegistryApp(record: Record<string, unknown>): RegistryApp {
       at: readString(obj, "at") ?? readString(obj, "timestamp"),
       reason: readString(obj, "reason"),
     };
+  } else if (readString(record, "last_proof_status") || readString(record, "last_proof_at")) {
+    last_proof = {
+      proof_event_id: readString(record, "last_proof_id"),
+      status: readProofStatus(record.last_proof_status),
+      at: readString(record, "last_proof_at"),
+      reason: readString(record, "last_proof_reason"),
+    };
   }
   return {
     id: (typeof record.id === "string" ? record.id : "") || "(unknown)",
     name:
       (typeof record.name === "string" ? record.name : null) ??
+      (typeof record.display_name === "string" ? record.display_name : null) ??
       (typeof record.display === "string" ? record.display : null) ??
       (typeof record.id === "string" ? record.id : "(unknown)"),
-    current_version: readString(record, "current_version") ?? readString(record, "version"),
+    current_version:
+      readString(record, "current_version") ??
+      readString(record, "detected_version") ??
+      readString(record, "version"),
     tested_versions: readArray(record, "tested_versions").filter(
       (v): v is string => typeof v === "string" && v.length > 0,
     ),

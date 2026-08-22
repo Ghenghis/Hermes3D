@@ -70,6 +70,10 @@ class GenerationRun(BaseModel):
     template_id: str | None = None
 
 
+class PlanPreviewRequest(BaseModel):
+    prompt: str
+
+
 @router.get("/api/generation/services")
 def services() -> list[dict]:
     configured = [
@@ -92,6 +96,13 @@ def services() -> list[dict]:
             }
         )
     return result
+
+
+@router.post("/api/plan/preview")
+def plan_preview(body: PlanPreviewRequest) -> dict[str, object]:
+    from hermes3d.orchestration.bridge import BridgeState
+
+    return BridgeState().preview_plan(body.prompt)
 
 
 @router.put("/api/generation/services/{service_id}/url")

@@ -5,17 +5,32 @@ import importlib.util
 import json
 import shutil
 import subprocess
+import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from hermes3d.api.routes._common import as_json, execute, new_id, rows, utc_now
 from hermes3d.services.gpu_probe import probe_gpu
 from hermes3d.services.gpu_render import render_stl_thumbnail_gpu
-from hermes3d.services.local_state import implementation_path, source_modules
+from hermes3d.services.local_state import implementation_path, port_reachable, service_url, source_modules
 from hermes3d.services.modeling_backend import backend_summary_for_proof, survey_backends
+from hermes3d.services.source_tool_support import source_support_record, source_support_records
+from hermes3d.services.window_capture import (
+    capture_window_jpeg,
+    capture_window_png,
+    click_window,
+    find_desktop_window,
+    focus_window,
+    list_matching_windows,
+    press_window_key,
+    wheel_window,
+    windows_available,
+)
 
 router = APIRouter()
 
@@ -38,10 +53,76 @@ LOCAL_TOOL_LABELS = {
     "flsun_slicer_cli": "FLSUN Slicer CLI",
 }
 
+MODELER_DESKTOP_APPS: dict[str, dict[str, Any]] = {
+    "openscad": {
+        "label": "OpenSCAD",
+        "kind": "desktop_modeler",
+        "default_path": "C:/Program Files/OpenSCAD/openscad.exe",
+        "candidates": [
+            "C:/Program Files/OpenSCAD/openscad.exe",
+            "C:/Program Files (x86)/OpenSCAD/openscad.exe",
+            "C:/Program Files/OpenSCAD (Nightly)/openscad.exe",
+        ],
+        "path_commands": ["openscad", "openscad-nightly"],
+        "window_process_names": ["openscad"],
+        "window_title_contains": ["OpenSCAD"],
+    },
+    "blender": {
+        "label": "Blender",
+        "kind": "desktop_modeler",
+        "default_path": "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe",
+        "candidates": [
+            "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe",
+            "C:/Program Files/Blender Foundation/Blender 4.5/blender.exe",
+            "C:/Program Files/Blender Foundation/Blender 4.4/blender.exe",
+            "C:/Program Files/Blender Foundation/Blender 4.3/blender.exe",
+            "C:/Program Files/Blender Foundation/Blender 4.2/blender.exe",
+            "C:/Program Files/Blender Foundation/Blender/blender.exe",
+        ],
+        "path_commands": ["blender"],
+        "window_process_names": ["blender"],
+        "window_title_contains": ["Blender"],
+    },
+    "freecad": {
+        "label": "FreeCAD",
+        "kind": "desktop_modeler",
+        "default_path": "C:/Program Files/FreeCAD/bin/FreeCAD.exe",
+        "candidates": [
+            "C:/Program Files/FreeCAD/bin/FreeCAD.exe",
+            "C:/Program Files/FreeCAD 1.0/bin/FreeCAD.exe",
+            "C:/Program Files/FreeCAD 0.21/bin/FreeCAD.exe",
+            "C:/Program Files (x86)/FreeCAD 0.21/bin/FreeCAD.exe",
+        ],
+        "path_commands": ["freecad", "FreeCAD"],
+        "window_process_names": ["FreeCAD", "freecad"],
+        "window_title_contains": ["FreeCAD"],
+    },
+}
+
 
 class DesignIntake(BaseModel):
     prompt: str
     constraints: dict[str, Any] = Field(default_factory=dict)
+
+
+class WindowClickRequest(BaseModel):
+    x_ratio: float = Field(..., ge=0, le=1)
+    y_ratio: float = Field(..., ge=0, le=1)
+    button: str = "left"
+    double: bool = False
+
+
+class WindowWheelRequest(BaseModel):
+    x_ratio: float = Field(..., ge=0, le=1)
+    y_ratio: float = Field(..., ge=0, le=1)
+    delta_y: float
+
+
+class WindowKeyRequest(BaseModel):
+    key: str
+    ctrl: bool = False
+    alt: bool = False
+    shift: bool = False
 
 
 class UnsupportedDesignError(ValueError):
@@ -176,6 +257,254 @@ def list_providers() -> list[dict]:
     return _probe_providers()
 
 
+@router.get("/api/design/modeler/apps")
+def list_modeler_apps() -> dict[str, Any]:
+    app_ids = ["comfyui", "openscad", "blender", "freecad"]
+    return {
+        "status": "ready",
+        "count": len(app_ids),
+        "apps": [_modeler_app_record(app_id) for app_id in app_ids],
+        "source_supported": source_support_records(app_ids),
+    }
+
+
+@router.get("/api/design/modeler/apps/{app_id}")
+def get_modeler_app(app_id: str) -> dict[str, Any]:
+    return _modeler_app_record(app_id)
+
+
+@router.post("/api/design/modeler/apps/{app_id}/launch")
+def launch_modeler_app(app_id: str) -> dict[str, Any]:
+    if app_id == "comfyui":
+        record = _modeler_comfyui_record()
+        return {
+            "accepted": False,
+            "status": "start_not_configured",
+            "app": record,
+            "reason": "ComfyUI is a web runtime. Start its local server separately; Hermes3D will embed it when the real URL is reachable.",
+        }
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    existing_window = _modeler_app_window(app_id, app, str(record.get("path") or ""))
+    if existing_window:
+        try:
+            focus_window(existing_window)
+        except Exception:
+            pass
+        return {
+            "accepted": True,
+            "status": "focused_existing",
+            "app": _modeler_app_record(app_id),
+            "pid": existing_window.process_id,
+        }
+    if not record["detected"]:
+        return {
+            "accepted": False,
+            "status": "missing",
+            "app": record,
+            "reason": f"{record['label']} executable was not found.",
+        }
+    path = Path(str(record["path"]))
+    try:
+        proc = subprocess.Popen(  # noqa: S603 -- fixed local executable path, shell disabled.
+            [str(path)],
+            cwd=str(path.parent),
+            shell=False,
+        )
+    except OSError as exc:
+        return {
+            "accepted": False,
+            "status": "launch_failed",
+            "app": record,
+            "reason": f"Launch failed: {exc}",
+        }
+    proof_event_id = _record_modeler_proof_event(
+        "modeler_app_launched",
+        {
+            "app_id": app_id,
+            "label": app["label"],
+            "path": str(path),
+            "pid": proc.pid,
+            "no_printer_hardware": True,
+        },
+    )
+    return {
+        "accepted": True,
+        "status": "launched",
+        "app": _modeler_app_record(app_id),
+        "pid": proc.pid,
+        "proof_event_id": proof_event_id,
+    }
+
+
+@router.get("/api/design/modeler/apps/{app_id}/window/screenshot.png")
+def get_modeler_window_screenshot(app_id: str) -> Response:
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    window = _modeler_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "not_running",
+                "reason": f"{app['label']} is not open, so no desktop GUI screenshot can be captured.",
+            },
+        )
+    try:
+        png = capture_window_png(window)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"status": "desktop_capture_unavailable", "reason": str(exc)},
+        ) from exc
+    return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store, max-age=0"})
+
+
+@router.get("/api/design/modeler/apps/{app_id}/window/stream.mjpeg")
+def stream_modeler_window(app_id: str, fps: float = 6.0) -> StreamingResponse:
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    executable_path = str(record.get("path") or "")
+    if not _modeler_app_window(app_id, app, executable_path):
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "status": "not_running",
+                "reason": f"{app['label']} is not open, so no live desktop GUI stream can be captured.",
+            },
+        )
+    return StreamingResponse(
+        _modeler_mjpeg_frames(app_id, app, executable_path, fps=fps),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post("/api/design/modeler/apps/{app_id}/window/focus")
+def focus_modeler_window(app_id: str) -> dict[str, Any]:
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    window = _modeler_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        matching_windows = list_matching_windows(
+            process_names=app.get("window_process_names") or (),
+            title_contains=app.get("window_title_contains") or (),
+            executable_path=str(record.get("path") or ""),
+        )
+        if not matching_windows:
+            return {
+                "accepted": False,
+                "status": "not_running",
+                "reason": f"{app['label']} is not open.",
+            }
+        window = matching_windows[0]
+    try:
+        focus_window(window)
+    except Exception as exc:  # pragma: no cover - desktop focus can be OS-policy blocked
+        return {"accepted": False, "status": "focus_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "focused",
+        "window": _modeler_app_window_record(app_id, app, str(record.get("path") or "")),
+    }
+
+
+@router.post("/api/design/modeler/apps/{app_id}/window/click")
+def click_modeler_window(app_id: str, body: WindowClickRequest) -> dict[str, Any]:
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    window = _modeler_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        return {"accepted": False, "status": "not_running", "reason": f"{app['label']} is not open."}
+    try:
+        click_window(
+            window,
+            x_ratio=body.x_ratio,
+            y_ratio=body.y_ratio,
+            button=body.button,
+            double=body.double,
+        )
+    except Exception as exc:
+        return {"accepted": False, "status": "input_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "clicked",
+        "window": _modeler_app_window_record(app_id, app, str(record.get("path") or "")),
+        "safety": "Local desktop input only; no Hermes3D printer API call was made.",
+    }
+
+
+def _modeler_mjpeg_frames(
+    app_id: str,
+    app: dict[str, Any],
+    executable_path: str,
+    *,
+    fps: float,
+) -> Iterator[bytes]:
+    interval = 1.0 / max(1.0, min(10.0, float(fps or 6.0)))
+    while True:
+        started = time.monotonic()
+        window = _modeler_app_window(app_id, app, executable_path)
+        if window:
+            try:
+                frame = capture_window_jpeg(window, quality=72, max_width=1600)
+                yield (
+                    b"--frame\r\n"
+                    b"Content-Type: image/jpeg\r\n"
+                    + f"Content-Length: {len(frame)}\r\n\r\n".encode("ascii")
+                    + frame
+                    + b"\r\n"
+                )
+            except Exception:
+                # Native modelers can briefly fail capture while resizing or
+                # redrawing GPU panes; keep the live stream alive and retry.
+                pass
+        elapsed = time.monotonic() - started
+        time.sleep(max(0.01, interval - elapsed))
+
+
+@router.post("/api/design/modeler/apps/{app_id}/window/wheel")
+def wheel_modeler_window(app_id: str, body: WindowWheelRequest) -> dict[str, Any]:
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    window = _modeler_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        return {"accepted": False, "status": "not_running", "reason": f"{app['label']} is not open."}
+    try:
+        wheel_window(window, x_ratio=body.x_ratio, y_ratio=body.y_ratio, delta_y=body.delta_y)
+    except Exception as exc:
+        return {"accepted": False, "status": "input_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "wheeled",
+        "window": _modeler_app_window_record(app_id, app, str(record.get("path") or "")),
+        "safety": "Local desktop input only; no Hermes3D printer API call was made.",
+    }
+
+
+@router.post("/api/design/modeler/apps/{app_id}/window/key")
+def key_modeler_window(app_id: str, body: WindowKeyRequest) -> dict[str, Any]:
+    app = _modeler_desktop_app_or_404(app_id)
+    record = _modeler_app_record(app_id)
+    window = _modeler_app_window(app_id, app, str(record.get("path") or ""))
+    if not window:
+        return {"accepted": False, "status": "not_running", "reason": f"{app['label']} is not open."}
+    try:
+        press_window_key(window, key=body.key, ctrl=body.ctrl, alt=body.alt, shift=body.shift)
+    except Exception as exc:
+        return {"accepted": False, "status": "input_blocked", "reason": str(exc)}
+    return {
+        "accepted": True,
+        "status": "key_sent",
+        "window": _modeler_app_window_record(app_id, app, str(record.get("path") or "")),
+        "safety": "Local desktop input only; no Hermes3D printer API call was made.",
+    }
+
+
 @router.get("/api/design/toolchain/status")
 def toolchain_status() -> dict:
     return _toolchain_status()
@@ -197,6 +526,159 @@ def list_backends() -> dict[str, Any]:
         "default_template_backend": backend_summary_for_proof("desk_organizer"),
         "gpu": gpu,
         "probed_at": utc_now(),
+    }
+
+
+def _record_modeler_proof_event(event_type: str, payload: dict[str, Any]) -> str:
+    event_id = new_id()
+    execute(
+        "INSERT INTO proof_events (id, event_type, source_agent, payload) VALUES (?, ?, 'design-modeler-apps', ?)",
+        (event_id, event_type, as_json(payload)),
+    )
+    return event_id
+
+
+def _modeler_desktop_app_or_404(app_id: str) -> dict[str, Any]:
+    app = MODELER_DESKTOP_APPS.get(app_id)
+    if not app:
+        raise HTTPException(status_code=404, detail=f"Unknown desktop modeler app: {app_id}")
+    return app
+
+
+def _modeler_candidates(app: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_candidates: list[tuple[str, str]] = [("known", str(path)) for path in app.get("candidates") or []]
+    for command in app.get("path_commands") or []:
+        found = shutil.which(str(command))
+        raw_candidates.append(("path", found or f"PATH:{command}"))
+
+    seen: set[str] = set()
+    records: list[dict[str, Any]] = []
+    for source, raw_path in raw_candidates:
+        if raw_path in seen:
+            continue
+        seen.add(raw_path)
+        if raw_path.startswith("PATH:"):
+            records.append({"source": source, "path": raw_path, "exists": False, "is_executable": False})
+            continue
+        path = Path(raw_path)
+        exists = path.is_file()
+        records.append(
+            {
+                "source": source,
+                "path": str(path),
+                "exists": exists,
+                "is_executable": exists and path.suffix.lower() == ".exe",
+            }
+        )
+    return records
+
+
+def _modeler_app_record(app_id: str) -> dict[str, Any]:
+    if app_id == "comfyui":
+        return _modeler_comfyui_record()
+    app = _modeler_desktop_app_or_404(app_id)
+    candidates = _modeler_candidates(app)
+    selected = next((item for item in candidates if item["is_executable"]), None)
+    window = _modeler_app_window_record(app_id, app, str(selected["path"]) if selected else None)
+    return {
+        "id": app_id,
+        "label": app["label"],
+        "kind": app["kind"],
+        "status": "ready" if selected else "missing",
+        "detected": bool(selected),
+        "path": selected["path"] if selected else app["default_path"],
+        "path_source": selected["source"] if selected else "default",
+        "default_path": app["default_path"],
+        "candidates": candidates,
+        "launch_supported": bool(selected),
+        "window": window,
+        "window_available": bool(window.get("available")),
+        "window_preview_url": f"/api/design/modeler/apps/{app_id}/window/screenshot.png",
+        "window_stream_url": f"/api/design/modeler/apps/{app_id}/window/stream.mjpeg",
+        "source_support": source_support_record(app_id),
+        "safety": "Launches or previews the local modeler desktop program only. It does not command printer hardware.",
+    }
+
+
+def _modeler_comfyui_record() -> dict[str, Any]:
+    root = Path(str(service_url("comfyui.root") or r"G:\Github\ComfyUI"))
+    url = service_url("comfyui") or "http://127.0.0.1:8188"
+    detected = (root / "main.py").is_file()
+    reachable = port_reachable(url)
+    return {
+        "id": "comfyui",
+        "label": "ComfyUI",
+        "kind": "web_modeler",
+        "status": "ready" if reachable else "installed_not_running" if detected else "missing",
+        "detected": detected,
+        "path": str(root),
+        "path_source": "known",
+        "default_path": r"G:\Github\ComfyUI",
+        "candidates": [{"source": "known", "path": str(root), "exists": root.is_dir(), "is_executable": detected}],
+        "launch_supported": False,
+        "window": {
+            "available": reachable,
+            "status": "reachable" if reachable else "not_running" if detected else "missing",
+            "reason": None if reachable else "ComfyUI local server is not reachable.",
+            "title": "ComfyUI",
+            "preview_url": url if reachable else None,
+        },
+        "window_available": reachable,
+        "window_preview_url": url if reachable else "",
+        "window_stream_url": url if reachable else "",
+        "source_support": source_support_record("comfyui"),
+        "safety": "Embeds the real local ComfyUI web interface only when its local server is reachable.",
+    }
+
+
+def _modeler_app_window(app_id: str, app: dict[str, Any] | None = None, executable_path: str | None = None):
+    app = app or _modeler_desktop_app_or_404(app_id)
+    return find_desktop_window(
+        process_names=app.get("window_process_names") or (),
+        title_contains=app.get("window_title_contains") or (),
+        executable_path=executable_path,
+    )
+
+
+def _modeler_app_window_record(app_id: str, app: dict[str, Any] | None = None, executable_path: str | None = None) -> dict[str, Any]:
+    if not windows_available():
+        return {
+            "available": False,
+            "status": "desktop_capture_unavailable",
+            "reason": "Windows desktop capture libraries are unavailable in this runtime.",
+        }
+    window = _modeler_app_window(app_id, app, executable_path)
+    matching_windows = list_matching_windows(
+        process_names=app.get("window_process_names") or (),
+        title_contains=app.get("window_title_contains") or (),
+        executable_path=executable_path,
+    )
+    if not window:
+        if matching_windows:
+            best = matching_windows[0]
+            return {
+                "available": False,
+                "status": "running_needs_focus",
+                "reason": "The desktop modeler process has a window, but it is minimized or parked offscreen. Use Focus Window.",
+                "hwnd": best.hwnd,
+                "title": best.title,
+                "process_id": best.process_id,
+                "process_name": best.process_name,
+                "process_path": best.process_path,
+            }
+        return {"available": False, "status": "not_running", "reason": "The desktop modeler window is not open."}
+    left, top, right, bottom = window.rect
+    return {
+        "available": True,
+        "status": "running",
+        "hwnd": window.hwnd,
+        "title": window.title,
+        "process_id": window.process_id,
+        "process_name": window.process_name,
+        "process_path": window.process_path,
+        "rect": {"left": left, "top": top, "right": right, "bottom": bottom},
+        "preview_url": f"/api/design/modeler/apps/{app_id}/window/screenshot.png",
+        "stream_url": f"/api/design/modeler/apps/{app_id}/window/stream.mjpeg",
     }
 
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from hermes3d.api.routes._common import as_json, execute, new_id, row
@@ -22,6 +22,7 @@ from hermes3d.core.safety.gcode_bounds import check_gcode_file, resolve_bounds
 from hermes3d.services.local_state import (
     assert_build_plate_clear,
     canonical_printer_id,
+    implementation_path,
     local_printer,
     local_printers,
     save_onboarded_printer,
@@ -34,6 +35,8 @@ BASE_WRITE_ALLOWED_PRINTERS = {"flsun_t1_a", "flsun_t1_b", "flsun_v400"}
 IDLE_PRINT_STATES = {"standby", "complete", "ready"}
 REMOTE_SUBDIR_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 ONBOARD_ID_RE = re.compile(r"^[A-Za-z0-9._-]{2,64}$")
+SAFE_GCODE_FILENAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+MAX_GCODE_UPLOAD_BYTES = 512 * 1024 * 1024
 
 # S1 is camera/read-only ONLY — it must never be added as a printable target.
 # Any attempt to add a printer whose IP is in this set returns 403.
@@ -313,6 +316,7 @@ def update_printer_status(printer_id: str, body: StatusUpdate) -> dict[str, Any]
         "paused",
         "maintenance",
         "offline",
+        "disabled",
         "error",
         "active",
     }:
@@ -327,7 +331,7 @@ def update_printer_status(printer_id: str, body: StatusUpdate) -> dict[str, Any]
                 "reason": "Live Moonraker printer status is read-only; use the health probe or printer actions instead.",
             },
         )
-    allowed_s1_statuses = {"online", "active", "offline", "maintenance", "error"}
+    allowed_s1_statuses = {"online", "active", "offline", "maintenance", "disabled", "error"}
     if body.status not in allowed_s1_statuses:
         raise HTTPException(
             status_code=409,
@@ -407,9 +411,55 @@ def upload_to_printer(printer_id: str) -> dict[str, Any]:
 @router.post("/api/printers/{printer_id}/upload-gcode")
 def upload_gcode_to_printer(printer_id: str, body: GcodeUploadRequest) -> dict[str, Any]:
     check_s1_lock(printer_id)
+    return _upload_gcode_path(
+        printer_id=printer_id,
+        gcode_path=_validated_gcode_path(body.gcode_path),
+        start=body.start,
+        job_id=body.job_id,
+        remote_subdir=body.remote_subdir,
+        actor=body.actor,
+        upload_source="path",
+    )
+
+
+@router.post("/api/printers/{printer_id}/upload-gcode-file")
+async def upload_gcode_file_to_printer(
+    printer_id: str,
+    request: Request,
+    filename: str,
+    start: bool = False,
+    job_id: str | None = None,
+    remote_subdir: str = "hermes3d",
+    actor: str = "hermes-agent",
+) -> dict[str, Any]:
+    # Keep the hard safety lock before reading or storing operator-selected files.
+    check_s1_lock(printer_id)
+    body = await request.body()
+    gcode_path = _store_uploaded_gcode(printer_id=printer_id, filename=filename, body=body)
+    return _upload_gcode_path(
+        printer_id=printer_id,
+        gcode_path=gcode_path,
+        start=start,
+        job_id=job_id,
+        remote_subdir=remote_subdir,
+        actor=actor,
+        upload_source="browser_file",
+    )
+
+
+def _upload_gcode_path(
+    *,
+    printer_id: str,
+    gcode_path: Path,
+    start: bool,
+    job_id: str | None,
+    remote_subdir: str,
+    actor: str,
+    upload_source: str,
+) -> dict[str, Any]:
     printer = _write_enabled_printer(printer_id)
-    gcode_path = _validated_gcode_path(body.gcode_path)
-    remote_subdir = _validated_remote_subdir(body.remote_subdir)
+    gcode_path = _validated_gcode_path(str(gcode_path))
+    remote_subdir = _validated_remote_subdir(remote_subdir)
     bounds, used_fallback_bounds = resolve_bounds(
         printer_id=printer["id"], fleet_lookup=get_profile
     )
@@ -423,16 +473,16 @@ def upload_gcode_to_printer(printer_id: str, body: GcodeUploadRequest) -> dict[s
                 "report": bounds_report.to_dict(),
             },
         )
-    if body.start:
-        _require_print_start_gates(body.job_id)
+    if start:
+        _require_print_start_gates(job_id)
         assert_build_plate_clear(printer["id"])
 
     client = MoonrakerClient(str(printer["moonraker_url"]), timeout_s=8.0)
-    info, state_before = _fresh_idle_state(client, printer["id"], require_idle=body.start)
+    info, state_before = _fresh_idle_state(client, printer["id"], require_idle=start)
     try:
         upload = client.upload_gcode(gcode_path, remote_subdir=remote_subdir, start_print=False)
         start_result: dict[str, Any] | None = None
-        if body.start:
+        if start:
             _fresh_idle_state(client, printer["id"], require_idle=True)
             start_result = client.start_print(upload.item_path)
     except (MoonrakerError, OSError, ValueError) as exc:
@@ -445,9 +495,10 @@ def upload_gcode_to_printer(printer_id: str, body: GcodeUploadRequest) -> dict[s
         "printer_name": printer["name"],
         "accepted": True,
         "uploaded": True,
-        "started": bool(body.start),
-        "job_id": body.job_id,
-        "actor": body.actor,
+        "started": bool(start),
+        "job_id": job_id,
+        "actor": actor,
+        "upload_source": upload_source,
         "moonraker_url": printer["moonraker_url"],
         "item_path": upload.item_path,
         "item_root": upload.item_root,
@@ -835,6 +886,32 @@ def _validated_gcode_path(raw_path: str) -> Path:
     if path.stat().st_size <= 0:
         raise HTTPException(status_code=400, detail="G-code file is empty.")
     return path
+
+
+def _store_uploaded_gcode(*, printer_id: str, filename: str, body: bytes) -> Path:
+    original = Path(filename.strip()).name
+    if not original:
+        raise HTTPException(status_code=400, detail="filename is required.")
+    suffix = Path(original).suffix.lower()
+    if suffix not in {".gcode", ".g"}:
+        raise HTTPException(
+            status_code=400, detail="Only .gcode or .g files can be uploaded to a printer."
+        )
+    if not body:
+        raise HTTPException(status_code=400, detail="G-code file is empty.")
+    if len(body) > MAX_GCODE_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"G-code upload exceeds {MAX_GCODE_UPLOAD_BYTES // (1024 * 1024)} MiB limit.",
+        )
+    safe_name = SAFE_GCODE_FILENAME_RE.sub("_", Path(original).stem).strip("._-") or "upload"
+    storage_dir = implementation_path(
+        "var", "printer_uploads", canonical_printer_id(printer_id) or printer_id
+    )
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    target = storage_dir / f"{int(time.time() * 1000)}_{safe_name}{suffix}"
+    target.write_bytes(body)
+    return target
 
 
 def _validated_remote_subdir(value: str) -> str:

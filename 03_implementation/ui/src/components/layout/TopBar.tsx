@@ -3,6 +3,7 @@ import { EditionBadge } from "../badges/EditionBadge";
 import { ProofChip } from "../badges/ProofChip";
 import { DashboardModeSwitcher } from "../dashboard/DashboardModeSwitcher";
 import { ThemeSwitcher } from "../ThemeSwitcher";
+import { useDashboardModeStore } from "../dashboard/dashboardModeStore";
 import { adapters } from "../../api/adapters";
 import type { Notification } from "../../types/notification";
 import type { ProofBundle } from "../../types/proof";
@@ -22,6 +23,7 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
   const setUiMode = useStore((s) => s.setUiMode);
   const setActiveTabId = useStore((s) => s.setActiveTabId);
   const activeTabId = useStore((s) => s.activeTabId);
+  const setDashboardMode = useDashboardModeStore((s) => s.setMode);
   const [sys, setSys] = useState<SystemSnapshot | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [latestProof, setLatestProof] = useState<ProofBundle | null>(null);
@@ -33,15 +35,27 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
     let mounted = true;
 
     const fetchAll = () => {
-      void adapters.getSystemSnapshot().then((snapshot) => {
-        if (mounted) setSys(snapshot);
-      });
-      void adapters.getNotifications().then((items) => {
-        if (mounted) setNotifications(items);
-      });
-      void adapters.getLatestProofBundle().then((bundle) => {
-        if (mounted) setLatestProof(bundle);
-      });
+      void adapters.getSystemSnapshot()
+        .then((snapshot) => {
+          if (mounted) setSys(snapshot);
+        })
+        .catch(() => {
+          if (mounted) setSys(null);
+        });
+      void adapters.getNotifications()
+        .then((items) => {
+          if (mounted) setNotifications(items);
+        })
+        .catch(() => {
+          if (mounted) setNotifications([]);
+        });
+      void adapters.getLatestProofBundle()
+        .then((bundle) => {
+          if (mounted) setLatestProof(bundle);
+        })
+        .catch(() => {
+          if (mounted) setLatestProof(null);
+        });
     };
 
     fetchAll();
@@ -82,7 +96,14 @@ export function TopBar({ activeLabel }: { activeLabel: string }) {
         {showDashboardModes && <DashboardModeSwitcher />}
         <button
           type="button"
-          onClick={() => setUiMode("simple")}
+          onClick={() => {
+            setDashboardMode("simple");
+            setUiMode("full");
+            if (activeTabId === "dashboard") {
+              window.history.replaceState(null, "", "#dashboard:simple");
+              window.dispatchEvent(new HashChangeEvent("hashchange"));
+            }
+          }}
           className="rounded-md border border-accent-blue/50 bg-accent-blue/10 px-2 py-1 text-xs font-semibold text-accent-blue hover:bg-accent-blue/20"
           title="Switch to the live Simple Version (legacy)"
         >

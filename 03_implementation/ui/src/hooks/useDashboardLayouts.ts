@@ -46,6 +46,7 @@ type ImportMetaEnv = { VITE_FEATURE_DASHBOARD_LAYOUTS?: string };
 type ImportMetaShape = { env?: ImportMetaEnv };
 
 const DEFAULT_LAYOUTS_PATH = "/api/dashboard/layouts";
+const DEFAULT_LAYOUT_USER_ID = "local-operator";
 
 /** Feature-flag gate. Lifts the gate when the env var is exactly `"1"` or
  *  case-insensitive `"true"`. Anything else (undefined, empty, "0", "false",
@@ -80,6 +81,52 @@ function sanitiseLayout(raw: unknown): CustomWidgetId[] | null {
   return seen.size > 0 ? Array.from(seen) : null;
 }
 
+function extractServerLayoutResponse(body: unknown): ServerLayoutResponse | null {
+  if (!body || typeof body !== "object") return null;
+  const record = body as {
+    layout?: unknown;
+    updated_utc?: unknown;
+    updated_at?: unknown;
+    items?: unknown;
+    user_id?: unknown;
+  };
+  const directLayout = sanitiseLayout(record.layout);
+  if (directLayout) {
+    return {
+      layout: directLayout,
+      updated_utc:
+        typeof record.updated_utc === "string"
+          ? record.updated_utc
+          : typeof record.updated_at === "string"
+            ? record.updated_at
+            : undefined,
+    };
+  }
+  if (record.layout && typeof record.layout === "object") {
+    const nested = record.layout as { widgets?: unknown; order?: unknown };
+    const nestedLayout = sanitiseLayout(nested.widgets) ?? sanitiseLayout(nested.order);
+    if (nestedLayout) {
+      return {
+        layout: nestedLayout,
+        updated_utc:
+          typeof record.updated_utc === "string"
+            ? record.updated_utc
+            : typeof record.updated_at === "string"
+              ? record.updated_at
+              : undefined,
+      };
+    }
+  }
+  if (Array.isArray(record.items)) {
+    const candidates = record.items.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object");
+    const preferred =
+      candidates.find((item) => item.user_id === DEFAULT_LAYOUT_USER_ID) ??
+      candidates.find((item) => extractServerLayoutResponse(item) != null);
+    return preferred ? extractServerLayoutResponse(preferred) : null;
+  }
+  return null;
+}
+
 /** Default `fetch`-based client. Implementation is small enough that callers
  *  can supply their own (mock-friendly for unit tests). */
 export function createDashboardLayoutsClient(opts: { endpoint?: string; fetchImpl?: typeof fetch } = {}): DashboardLayoutsClient {
@@ -95,13 +142,7 @@ export function createDashboardLayoutsClient(opts: { endpoint?: string; fetchImp
           signal,
         });
         if (!response.ok) return null;
-        const body = (await response.json()) as { layout?: unknown; updated_utc?: unknown };
-        const layout = sanitiseLayout(body?.layout);
-        if (!layout) return null;
-        return {
-          layout,
-          updated_utc: typeof body?.updated_utc === "string" ? body.updated_utc : undefined,
-        };
+        return extractServerLayoutResponse(await response.json());
       } catch {
         return null;
       }
@@ -109,19 +150,23 @@ export function createDashboardLayoutsClient(opts: { endpoint?: string; fetchImp
     async save(layout: readonly CustomWidgetId[], signal?: AbortSignal): Promise<ServerLayoutResponse | null> {
       if (!fetchImpl) return null;
       try {
-        const response = await fetchImpl(endpoint, {
+        const putResponse = await fetchImpl(endpoint, {
           method: "PUT",
           headers: { Accept: "application/json", "Content-Type": "application/json" },
           body: JSON.stringify({ layout }),
           signal,
         });
+        const response = putResponse.ok
+          ? putResponse
+          : await fetchImpl(endpoint, {
+            method: "POST",
+            headers: { Accept: "application/json", "Content-Type": "application/json" },
+            body: JSON.stringify({ user_id: DEFAULT_LAYOUT_USER_ID, layout: { widgets: Array.from(layout) } }),
+            signal,
+          });
         if (!response.ok) return null;
-        const body = (await response.json()) as { layout?: unknown; updated_utc?: unknown };
-        const sanitised = sanitiseLayout(body?.layout) ?? Array.from(layout);
-        return {
-          layout: sanitised,
-          updated_utc: typeof body?.updated_utc === "string" ? body.updated_utc : undefined,
-        };
+        const parsed = extractServerLayoutResponse(await response.json());
+        return parsed ?? { layout: Array.from(layout) };
       } catch {
         return null;
       }

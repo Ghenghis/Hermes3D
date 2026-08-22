@@ -442,8 +442,12 @@ function Row({
 function LoadingSkeleton() {
   return (
     <div data-testid="app-status-panel-loading" aria-busy="true" className="space-y-2">
-      <div className="h-6 w-48 animate-pulse rounded bg-surface2" />
-      <div className="h-4 w-72 animate-pulse rounded bg-surface2" />
+      <div className="rounded border border-border bg-surface px-3 py-2">
+        <div className="text-sm font-semibold text-fg">Loading app registry</div>
+        <div className="mt-0.5 text-xs text-muted">
+          Reading live module status from <code className="font-mono text-[10px]">/api/apps</code>.
+        </div>
+      </div>
       <div className="rounded border border-border bg-surface p-3">
         {[0, 1, 2, 3].map((row) => (
           <div key={row} className="my-2 h-5 animate-pulse rounded bg-surface2" />

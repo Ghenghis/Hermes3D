@@ -128,8 +128,25 @@ export function PrintQueueTab() {
       )}
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-2">
-        <Lane title="Printing now" jobs={printing} printerName={printerName} testId="print-queue-lane-printing" />
-        <Lane title="Queued" jobs={queued} printerName={printerName} testId="print-queue-lane-queued" />
+        <Lane
+          title="Printing now"
+          jobs={printing}
+          printerName={printerName}
+          testId="print-queue-lane-printing"
+          fallbackJobs={queued}
+          emptyDetail={
+            queued.length > 0
+              ? `${queued.length} waiting job${queued.length === 1 ? "" : "s"} in the live queue. The next job is shown below so this lane still gives useful operator context.`
+              : "No active print and no queued jobs were returned by the live jobs API."
+          }
+        />
+        <Lane
+          title="Queued"
+          jobs={queued}
+          printerName={printerName}
+          testId="print-queue-lane-queued"
+          emptyDetail="No waiting jobs were returned by the live jobs API."
+        />
       </div>
 
       {submitOpen && (
@@ -151,23 +168,35 @@ function Lane({
   jobs,
   printerName,
   testId,
+  fallbackJobs = [],
+  emptyDetail,
 }: {
   title: string;
   jobs: Job[];
   printerName: Map<string, string>;
   testId: string;
+  fallbackJobs?: Job[];
+  emptyDetail: string;
 }) {
+  const visibleJobs = jobs.length > 0 ? jobs : fallbackJobs.slice(0, 4);
   return (
     <section data-testid={testId} className="flex min-h-0 flex-col rounded border border-border bg-surface p-3">
       <h3 className="text-xs font-semibold uppercase text-muted">{title}</h3>
       <div className="mt-2 min-h-0 flex-1 overflow-auto">
-        {jobs.length === 0 ? (
+        {visibleJobs.length === 0 ? (
           <div className="rounded border border-border bg-bg/40 p-3 text-xs text-muted">
-            No jobs in this lane.
+            <div className="font-semibold text-fg">Nothing active in this lane</div>
+            <p className="mt-1 leading-relaxed">{emptyDetail}</p>
           </div>
         ) : (
           <ul className="space-y-2">
-            {jobs.map((job) => (
+            {jobs.length === 0 && fallbackJobs.length > 0 && (
+              <li className="rounded border border-amber-700/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-100">
+                <div className="font-semibold">No active print right now</div>
+                <div className="mt-1 text-amber-200/80">{emptyDetail}</div>
+              </li>
+            )}
+            {visibleJobs.map((job) => (
               <li
                 key={job.id}
                 data-testid={`print-queue-job-${job.id}`}

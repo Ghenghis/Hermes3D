@@ -7,6 +7,7 @@ export type PrinterStatus =
   | "paused"
   | "maintenance"
   | "offline"
+  | "disabled"
   | "error";
 
 export type PrinterAdapter = "moonraker" | "octoprint" | "printrun" | "manual";

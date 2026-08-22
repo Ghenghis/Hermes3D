@@ -23,7 +23,7 @@
  */
 import { create } from "zustand";
 
-export const DASHBOARD_MODES = ["simple", "advanced", "custom"] as const;
+export const DASHBOARD_MODES = ["simple", "advanced", "factory", "creator", "inspector", "custom"] as const;
 export type DashboardMode = (typeof DASHBOARD_MODES)[number];
 
 const DEFAULT_MODE: DashboardMode = "advanced";
@@ -70,7 +70,7 @@ export function modeFromHash(hash: string): DashboardMode | null {
     return null;
   }
   // Accept `dashboard:custom`, `dashboard/custom`, `dashboard.custom`.
-  const match = raw.match(/^dashboard[:/.](simple|advanced|custom)$/i);
+  const match = raw.match(/^dashboard[:/.](simple|advanced|factory|creator|inspector|custom)$/i);
   if (!match) {
     return null;
   }

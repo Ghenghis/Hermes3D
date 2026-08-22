@@ -28,7 +28,7 @@ $PwLog  = Join-Path $RunDir 'playwright.log'
 Write-Host "[run-e2e] artifacts -> $RunDir"
 
 $apiProc = Start-Process -FilePath 'python' `
-    -ArgumentList @('-m','uvicorn','hermes3d.api.server:app','--host','127.0.0.1','--port',$ApiPort,'--log-level','info') `
+    -ArgumentList @('-m','uvicorn','hermes3d.api.app:app','--host','127.0.0.1','--port',$ApiPort,'--log-level','info') `
     -RedirectStandardOutput $ApiLog -RedirectStandardError "$ApiLog.err" -PassThru -NoNewWindow
 
 $env:HERMES3D_HOST = '127.0.0.1'
