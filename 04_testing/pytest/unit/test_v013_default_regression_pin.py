@@ -48,6 +48,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+
+from conftest import strip_provider_env
 from hermes3d.services import agent_checkout as ac
 
 V013_DEFAULT = "G:/Github/hermes-agent-v013-canary"
@@ -147,6 +149,7 @@ def test_v013_default_provider_probe_requests_build(monkeypatch: pytest.MonkeyPa
     from hermes3d.gateways.providers import deepseek, minimax
     from hermes3d.orchestration.types import ProviderConfig
 
+    strip_provider_env(monkeypatch)
     monkeypatch.setenv("MINIMAX_API_KEY", "fake-minimax-key")
     monkeypatch.setenv("DEEPSEEK_API_KEY", "fake-deepseek-key")
 

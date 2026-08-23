@@ -58,6 +58,8 @@ from typing import Any
 
 import pytest
 
+from conftest import strip_provider_env
+
 # Anchor sys.path on the production source tree (repo-root /
 # 03_implementation / src) so the test runs from any CWD.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -127,8 +129,8 @@ def test_preflight_v012_production_checkout_byte_identical() -> None:
     must remain byte-identical — the canary work and promotion must
     NOT have modified that working tree.
     """
-    if not V012_FALLBACK.exists():
-        pytest.skip(f"v0.12 fallback checkout not present at {V012_FALLBACK}")
+    if not (V012_FALLBACK / ".git").exists():
+        pytest.skip(f"v0.12 fallback checkout not present or not a git repo at {V012_FALLBACK}")
     head = subprocess.check_output(
         ["git", "-C", str(V012_FALLBACK), "rev-parse", "HEAD"],
         text=True,
@@ -236,6 +238,7 @@ def test_smoke_3_minimax_build_probe_request_redacted_header(
     from hermes3d.gateways.providers.minimax import build_probe_request
     from hermes3d.orchestration.types import ProviderConfig
 
+    strip_provider_env(monkeypatch)
     monkeypatch.setenv("MINIMAX_API_KEY", "sk-test-DUMMY-DO-NOT-USE")
     cfg = ProviderConfig(
         base_url="https://api.minimax.io/v1",

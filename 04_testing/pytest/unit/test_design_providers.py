@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import shutil
+from pathlib import Path
 
 import pytest
 
@@ -186,7 +187,13 @@ class TestProbeProviders:
 
     def test_openscad_not_installed_has_no_path(self) -> None:
         """If OpenSCAD is absent, path must be None — not a fabricated string."""
-        if shutil.which("openscad") is not None:
+        openscad_fallback_paths = (
+            r"C:\Program Files\OpenSCAD\openscad.exe",
+            r"C:\Program Files (x86)\OpenSCAD\openscad.exe",
+        )
+        if shutil.which("openscad") is not None or any(
+            Path(p).exists() for p in openscad_fallback_paths
+        ):
             pytest.skip("OpenSCAD is installed — skip the not_installed assertion")
         result = _probe_providers()
         openscad = next((p for p in result if p["id"] == "openscad"), None)

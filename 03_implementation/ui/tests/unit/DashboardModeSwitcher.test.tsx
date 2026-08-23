@@ -15,13 +15,13 @@ afterEach(() => {
 });
 
 describe("DashboardModeSwitcher", () => {
-  it("renders three radio buttons and marks the active one", () => {
+  it("renders one radio button per dashboard mode and marks the active one", () => {
     useDashboardModeStore.setState({ mode: "custom" });
     render(<DashboardModeSwitcher />);
     const buttons = screen.getAllByRole("radio");
-    expect(buttons).toHaveLength(3);
+    expect(buttons).toHaveLength(6);
     const labels = buttons.map((button) => button.textContent);
-    expect(labels).toEqual(["Simple", "Advanced", "Custom"]);
+    expect(labels).toEqual(["Simple", "Advanced", "Factory", "Create", "Inspect", "Custom"]);
     const custom = screen.getByTestId("dashboard-mode-btn-custom");
     expect(custom.getAttribute("aria-checked")).toBe("true");
     expect(custom.dataset.active).toBe("true");

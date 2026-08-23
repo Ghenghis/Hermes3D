@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import uuid4 as _recovery_uuid4
 
 import pytest
+from conftest import strip_provider_env
 from fastapi.testclient import TestClient
 from hermes3d.api.app import create_gui_app
 from hermes3d.services import code_history
@@ -350,8 +351,7 @@ def test_provider_status_accepts_private_env_aliases(
     monkeypatch.setattr(
         code_history, "PROVIDER_SMOKE_STATUS_FILE", tmp_path / "provider-smoke-status.json"
     )
-    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("OPENAI_BASE_URL", raising=False)
+    strip_provider_env(monkeypatch)
 
     status = code_history._provider_status(
         "minimax",
@@ -394,6 +394,7 @@ def test_minimax_chat_payload_uses_current_openai_compatible_fields() -> None:
 def test_minimax_provider_accepts_openai_token_plan_aliases(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    strip_provider_env(monkeypatch)
     monkeypatch.setenv("OPENAI_API_KEY", "token-plan-key")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.minimax.io/v1")
 
@@ -414,6 +415,7 @@ def test_minimax_provider_accepts_openai_token_plan_aliases(
 
 
 def test_minimax_provider_prefers_explicit_token_plan_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    strip_provider_env(monkeypatch)
     monkeypatch.setenv("MINIMAX_TOKEN_PLAN_API_KEY", "token-plan-key")
     monkeypatch.setenv("OPENAI_API_KEY", "generic-openai-key")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.minimax.io/v1")
@@ -451,14 +453,7 @@ def test_deepseek_v4_pro_payload_uses_official_reasoning_fields() -> None:
 def test_cli_provider_env_contract_redacts_task_scoped_keys(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in [
-        "OPENAI_API_KEY",
-        "OPENAI_BASE_URL",
-        "OPENAI_MODEL",
-        "MINIMAX_TOKEN_PLAN_API_KEY",
-        "DEEPSEEK_API_KEY",
-    ]:
-        monkeypatch.delenv(name, raising=False)
+    strip_provider_env(monkeypatch)
 
     contract = code_history._cli_provider_env_contract(
         {
@@ -596,7 +591,8 @@ def test_write_policy_is_positive_allowlist() -> None:
             code_history._resolve_project_path(site_index.as_posix(), write=True)
 
 
-def test_mcp_server_path_is_hard_pinned() -> None:
+def test_mcp_server_path_is_hard_pinned(monkeypatch: pytest.MonkeyPatch) -> None:
+    strip_provider_env(monkeypatch)
     readiness = code_history.mcp_lock_readiness(
         {
             "MCP_LOCK_WORKSPACE": str(code_history.PROJECT_ROOT),
